@@ -25,7 +25,8 @@
           "] "))
    [:span.date (:date issue)]])
 
-(defn- title-component [title]
+;; TODO extract ns
+(defn title-component [title]
   [:span.title
    [:> ReactMarkdown
     {:children title}]])
