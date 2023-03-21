@@ -1,16 +1,7 @@
 (ns ui.main.rhs.issues-list-item
-  (:require [ui.actions :as actions]
-            ["react-markdown$default" :as ReactMarkdown]))
-
-(defn context-badges-component [state contexts]
-  [:span.contexts
-   (doall
-    (->> contexts
-         (filter (fn [[idx _title]]
-                   (not= idx (:id (:selected-context state)))))
-         (map (fn [[idx title]]
-                [:span.badge {:key idx}
-                 title]))))])
+  (:require ["react-markdown$default" :as ReactMarkdown]
+            [ui.actions :as actions]
+            [ui.main.rhs.context-badges :as context-badges]))
 
 (defn- info-component [state issue]
   [:span.info
@@ -40,4 +31,6 @@
     {:class (when (:important issue) :important)}
     [title-component (:title issue)]
     [info-component @*state issue]
-    [context-badges-component @*state (:contexts issue)]]])
+    [context-badges/component (remove #(= (:id (:selected-context @*state))
+                                          (first %)) 
+                                      (:contexts issue))]]])

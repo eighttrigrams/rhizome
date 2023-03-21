@@ -1,16 +1,8 @@
 (ns ui.main.rhs
   (:require [ui.main.input :as input]
             [ui.main.rhs.issues-list-item :as issues-list-item]
-            [ui.actions :as actions]))
-
-;; TODO dedup with issues_list_item.cljc
-(defn context-badges-component [contexts]
-  [:span.contexts
-   (doall
-    (->> contexts
-         (map (fn [[idx title]]
-                [:span.badge {:key idx}
-                 title]))))])
+            [ui.actions :as actions]
+            [ui.main.rhs.context-badges :as context-badges]))
 
 (defn- issues-list-component [*state]
   [:ul.cards
@@ -26,7 +18,7 @@
       {:on-click #(actions/select-issue! *state {:id id})}
       [:div
        [issues-list-item/title-component title]
-       [context-badges-component contexts]]])])
+       [context-badges/component contexts]]])])
 
 (defn component [_*state]
   (fn [*state]
