@@ -98,7 +98,7 @@
 (defn component [issue]
   (let [*date-visible?  (r/atom (boolean (:date issue)))
         *dropdown-issues (r/atom '())]
-    (reset! *related-issues (:related_issues issue))
+    (reset! *related-issues (into {} (map (fn [{:keys [id title]}] [id title]) (:related_issues issue))))
     (r/create-class
      {:component-did-mount #(.focus (get-title-el))
       :reagent-render      ;

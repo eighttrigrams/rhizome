@@ -38,30 +38,43 @@
                                            :updated_at  [:raw "NOW()"]}})
                      {:return-keys true}))
 
+(defn- related-issues-query [id]
+  {:select [:issues.*
+            [[:array_agg :contexts.id] :context_ids]
+            [[:array_agg :contexts.title] :context_titles]]
+   :from   [:issues]
+   :join   [:context_issue [:= :issues.id :context_issue.issue_id]
+            :contexts [:= :context_issue.context_id :contexts.id]]
+   :group-by [:issues.id]
+   :where  [:= :issues.id [:inline id]]})
+
+(defn- post-process [query-result]
+  (-> query-result
+      un-namespace-keys
+      join-contexts
+      simplify-date
+      (dissoc :searchable)))
+
+(defn- perform-query-and-post-process [query db]
+  (-> query
+      sql/format
+      (#(jdbc/execute-one! db % {:return-keys true}))
+      post-process))
+
+(defn- get-related-issue [db id]
+  (-> id
+      related-issues-query
+      (perform-query-and-post-process db)))
+
 (defn- join-related-issues [db issue]
   (-> issue
       (dissoc :related_issues_ids)
-      (dissoc :related_issues_titles)
       (assoc :related_issues
-             (doall 
-               (map 
-                (fn [[id title]]
-                  (let [query {:select [:issues.*
-                                        [[:array_agg :contexts.id] :context_ids]
-                                        [[:array_agg :contexts.title] :context_titles]]
-                               :from   [:issues]
-                               :join   [:context_issue [:= :issues.id :context_issue.issue_id]
-                                        :contexts [:= :context_issue.context_id :contexts.id]]
-                               :group-by [:issues.id]
-                               :where  [:= :issues.id [:inline id]]}
-                        result (-> (jdbc/execute! db (sql/format query))
-                                   first
-                                   join-contexts)]
-                    {:id id
-                     :title title
-                     :contexts (:contexts result)}))
-                (zipmap (.getArray (:related_issues_ids issue))
-                        (.getArray (:related_issues_titles issue))))))))
+             (->> issue
+                  :related_issues_ids
+                  .getArray
+                  (map #(get-related-issue db %))
+                  set))))
 
 (defn- delete-related-issues [db id]
   (jdbc/execute! db (sql/format {:delete-from [:issue_issue]
@@ -86,7 +99,6 @@
                :from   [:events]
                :where  [:= :events.issue_id :issues.id]}
               [[:array_agg :related_issues.id] :related_issues_ids]
-              [[:array_agg :related_issues.title] :related_issues_titles]
               [[:array_agg :contexts.id] :context_ids]
               [[:array_agg :contexts.title] :context_titles]]
    :from     [:issues]
@@ -122,18 +134,29 @@
                         (#(jdbc/execute-one! db % {:return-keys true})))]
     (join-related-issues db result)))
 
-(defn get-issue [db {:keys [id]}]
+(defn- get-issue-without-related-issues [db id]
+  (-> id
+      simple-issues-query
+      sql/format
+      (#(jdbc/execute-one! db % {:return-keys true}))))
+
+(defn get-issue 
+  "Gets an issue, including related issues.
+   
+   {:id 123
+    :title \"some-title-1\"
+    :contexts {223 \"some-context-title-1\"}
+    :related_issues '({:id 124
+                       :title \"some-title-2\"
+                       :contexts {224 \"some-context-title\"}})
+   }
+   "
+  [db {:keys [id]}]
   (-> (if-let [issue (get-issue-with-related-issues db id)]
         issue
-        ;; TODO explain when this does happen
-        (-> id
-            simple-issues-query
-            sql/format
-            (#(jdbc/execute-one! db % {:return-keys true}))))
-      un-namespace-keys
-      join-contexts
-      simplify-date
-      (dissoc :searchable)))
+        ;; if there are no related issues, the former query returns an empty result set
+        (get-issue-without-related-issues db id))
+      post-process))
 
 (defn update-issue [db {:keys [issue related-issues-ids]}]
   (let [{:keys [date id event_archived?]} issue]
