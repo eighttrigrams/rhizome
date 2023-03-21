@@ -58,7 +58,7 @@
                                    first
                                    join-contexts)]
                     {:id id
-                     :title :title
+                     :title title
                      :contexts (:contexts result)}))
                 (zipmap (.getArray (:related_issues_ids issue))
                         (.getArray (:related_issues_titles issue))))))))
