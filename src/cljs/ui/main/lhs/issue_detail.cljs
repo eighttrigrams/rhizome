@@ -19,7 +19,7 @@
         {:keys [title description contexts]} selected-issue]
     [:<>
      [:h4 (if selected-context (str "[" (:title selected-context) "]") "[Overview]")]
-     [context-links-component *state (remove #(= (first %) (:id selected-context)) contexts)]
+     [context-links-component *state contexts]
      [:hr]
      [:span
       {:style {:font-size "35px"}}
