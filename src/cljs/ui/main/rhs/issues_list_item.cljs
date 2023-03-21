@@ -2,7 +2,7 @@
   (:require [ui.actions :as actions]
             ["react-markdown$default" :as ReactMarkdown]))
 
-(defn- context-badges-component [state contexts]
+(defn context-badges-component [state contexts]
   [:span.contexts
    (doall
     (->> contexts

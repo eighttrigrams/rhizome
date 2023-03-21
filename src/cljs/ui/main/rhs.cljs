@@ -3,6 +3,15 @@
             [ui.main.rhs.issues-list-item :as issues-list-item]
             [ui.actions :as actions]))
 
+;; TODO dedup with issues_list_item.cljc
+(defn context-badges-component [contexts]
+  [:span.contexts
+   (doall
+    (->> contexts
+         (map (fn [[idx title]]
+                [:span.badge {:key idx}
+                 title]))))])
+
 (defn- issues-list-component [*state]
   [:ul.cards
    (for [issue (:issues @*state)]
@@ -11,12 +20,13 @@
 
 (defn- related-issues-list-component [*state]
   [:ul.cards
-   (for [[id title] (:related_issues (:selected-issue @*state))]
+   (for [{:keys [id title contexts]} (:related_issues (:selected-issue @*state))]
      ^{:key id}
      [:li.card.issue-card
       {:on-click #(actions/select-issue! *state {:id id})}
       [:div
-       [issues-list-item/title-component title]]])])
+       [issues-list-item/title-component title]
+       [context-badges-component contexts]]])])
 
 (defn component [_*state]
   (fn [*state]

@@ -38,13 +38,30 @@
                                            :updated_at  [:raw "NOW()"]}})
                      {:return-keys true}))
 
-(defn- join-related-issues [issue]
+(defn- join-related-issues [db issue]
   (-> issue
       (dissoc :related_issues_ids)
       (dissoc :related_issues_titles)
       (assoc :related_issues
-             (zipmap (.getArray (:related_issues_ids issue))
-                     (.getArray (:related_issues_titles issue))))))
+             (doall 
+               (map 
+                (fn [[id title]]
+                  (let [query {:select [:issues.*
+                                        [[:array_agg :contexts.id] :context_ids]
+                                        [[:array_agg :contexts.title] :context_titles]]
+                               :from   [:issues]
+                               :join   [:context_issue [:= :issues.id :context_issue.issue_id]
+                                        :contexts [:= :context_issue.context_id :contexts.id]]
+                               :group-by [:issues.id]
+                               :where  [:= :issues.id [:inline id]]}
+                        result (-> (jdbc/execute! db (sql/format query))
+                                   first
+                                   join-contexts)]
+                    {:id id
+                     :title :title
+                     :contexts (:contexts result)}))
+                (zipmap (.getArray (:related_issues_ids issue))
+                        (.getArray (:related_issues_titles issue))))))))
 
 (defn- delete-related-issues [db id]
   (jdbc/execute! db (sql/format {:delete-from [:issue_issue]
@@ -103,11 +120,12 @@
                         issues-query
                         sql/format
                         (#(jdbc/execute-one! db % {:return-keys true})))]
-    (join-related-issues result)))
+    (join-related-issues db result)))
 
 (defn get-issue [db {:keys [id]}]
   (-> (if-let [issue (get-issue-with-related-issues db id)]
         issue
+        ;; TODO explain when this does happen
         (-> id
             simple-issues-query
             sql/format
