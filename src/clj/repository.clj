@@ -107,7 +107,7 @@
        (= :change-secondary-contexts-inverted cmd)
        {:issues (search/search-issues db opts)}
        (= :deselect-secondary-contexts cmd)
-       {:issues                          (search/search-issues db opts)
+       {:issues                          (search/search-issues db (assoc opts :selected-secondary-contexts-ids #{}))
         :contexts                        (search/search-contexts db "")
         :selected-secondary-contexts-ids #{}}
        (= :exit-events-view cmd)
