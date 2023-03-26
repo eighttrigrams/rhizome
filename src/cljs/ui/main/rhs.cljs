@@ -10,15 +10,25 @@
      ^{:key (:id issue)}
      [issues-list-item/component *state issue])])
 
+(defn- related-issues-list-item-component [*state {:keys [id title contexts] :as issue}]
+  [:li.card.issue-card
+   {:on-click #(do (swap! *state (fn [state] ;; TODO review and dedup with issues-list-item/component
+                                   (-> state 
+                                       (assoc :loading true)
+                                       (dissoc :preview-issue))))
+                   (actions/select-issue! *state {:id id})
+                   (js/setTimeout (fn [_] (swap! *state dissoc :loading)) 500))
+    :on-mouse-enter #(when-not (:loading @*state) (swap! *state assoc :preview-issue issue))
+    :on-mouse-leave #(swap! *state dissoc :preview-issue)}
+   [:div
+    [issues-list-item/title-component title]
+    [context-badges/component contexts]]])
+
 (defn- related-issues-list-component [*state]
   [:ul.cards
-   (for [{:keys [id title contexts]} (:related_issues (:selected-issue @*state))]
-     ^{:key id}
-     [:li.card.issue-card
-      {:on-click #(actions/select-issue! *state {:id id})}
-      [:div
-       [issues-list-item/title-component title]
-       [context-badges/component contexts]]])])
+   (for [related-issue (:related_issues (:selected-issue @*state))]
+     ^{:key (:id related-issue)}
+     [related-issues-list-item-component *state related-issue])])
 
 (defn component [_*state]
   (fn [*state]

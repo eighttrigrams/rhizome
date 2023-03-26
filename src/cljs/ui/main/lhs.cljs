@@ -14,6 +14,10 @@
 (defn component [_*state]
   (fn [*state]
     (cond
+      (and (:preview-issue @*state)
+           (not (:loading @*state)))
+      [:div.details-component.scrollable
+       [issue-detail/preview-component (:preview-issue @*state)]]
       (= :contexts (:active-search @*state))
       [:<>
        [input/component *state]

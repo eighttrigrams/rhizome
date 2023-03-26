@@ -24,9 +24,16 @@
 
 (defn component [*state issue]
   [:li.card.issue-card
-   {:class     (when (= (:id (:selected-issue @*state))
-                        (:id issue)) :selected)
-    :on-click #(actions/select-issue! *state issue)}
+   {:class          (when (= (:id (:selected-issue @*state))
+                             (:id issue)) :selected)
+    :on-click       #(do (swap! *state (fn [state]
+                                         (-> state 
+                                             (assoc :loading true)
+                                             (dissoc :preview-issue))))
+                         (actions/select-issue! *state issue)
+                         (js/setTimeout (fn [_] (swap! *state dissoc :loading)) 500))
+    :on-mouse-enter #(when-not (:loading @*state) (swap! *state assoc :preview-issue issue))
+    :on-mouse-leave #(swap! *state dissoc :preview-issue)}
    [:div
     {:class (when (:important issue) :important)}
     [title-component (:title issue)]

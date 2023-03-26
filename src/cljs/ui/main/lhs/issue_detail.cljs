@@ -14,16 +14,23 @@
               title])
            related-contexts)]]))
 
+(defn- the-issue-itself-component [{:keys [title description]}]
+  [:<>
+   [:span
+    {:style {:font-size "35px"}}
+    [:> ReactMarkdown
+     {:children title}]]
+   [:> ReactMarkdown
+    {:children description}]])
+
 (defn component [*state]
   (let [{:keys [selected-issue selected-context]} @*state
-        {:keys [title description contexts]} selected-issue]
+        {:keys [contexts]} selected-issue]
     [:<>
      [:h4 (if selected-context (str "[" (:title selected-context) "]") "[Overview]")]
      [context-links-component *state contexts]
      [:hr]
-     [:span
-      {:style {:font-size "35px"}}
-      [:> ReactMarkdown
-       {:children title}]]
-     [:> ReactMarkdown
-      {:children description}]]))
+     [the-issue-itself-component selected-issue]]))
+
+(defn preview-component [issue]
+  (the-issue-itself-component issue))
