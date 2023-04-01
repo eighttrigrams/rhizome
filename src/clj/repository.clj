@@ -42,12 +42,15 @@
    {:active-search                   active-search
     :selected-secondary-contexts-ids selected-secondary-contexts-ids
     :selected-issue                  selected-issue
-    :selected-context                selected-context}
+    :selected-context                selected-context
+    :cmd                             nil
+    :arg                             nil}
    (let [db (:db config/config)]
      (cond
        link-issue-contexts
-       {:selected-issue (datastore/link-issue-contexts db selected-issue link-issue-contexts)
-        :issues         (search/search-issues db opts)}
+       {:selected-issue      (datastore/link-issue-contexts db selected-issue link-issue-contexts)
+        :issues              (search/search-issues db opts)
+        :link-issue-contexts nil}
        (= :reprioritize-issue cmd)
        (do (datastore/reprioritize-issue db selected-issue)
            {:issues (search/search-issues db opts)})
@@ -73,7 +76,7 @@
          {:selected-issue   (datastore/get-issue db selected-issue)
           :issues           (search/search-issues db (dissoc opts :search-globally?))
           :active-search    nil
-          ;; TODO is not yet handled in ui.actions.common
+          :link-issue?      nil
           :search-globally? false})
        (= :insert-issue cmd)
        (let [selected-issue (datastore/new-issue db arg
@@ -107,7 +110,11 @@
                                                          (assoc :selected-context selected-context)
                                                          (dissoc :search-globally?)))
           :active-search    nil
-          :search-globally? false})
+          :search-globally? false
+          :context-to-fetch nil
+          :secondary-contexts-inverted? false
+          :selected-secondary-contexts-ids #{}
+          :unassigned-secondary-contexts-selected? false})
        (= :issues active-search)
        {:issues (search/search-issues db opts)}
        (= :contexts active-search)

@@ -6,26 +6,13 @@
 (defn reset-state! [new-state *state]
   (reset! *state new-state))
 
-(defn- update-state [{:keys [issues 
-                             contexts 
-                             selected-issue 
-                             selected-context
-                             quit-active-search?
-                             selected-secondary-contexts-ids
-                             active-search] :as i} 
+(defn- update-state [{:keys [issues contexts] :as i} 
                      state]
-  (->
+  (merge 
    state
-   (assoc :issues (or issues (:issues state))) 
-   (assoc :contexts (or contexts (:contexts state)))
-   (assoc :selected-issue selected-issue)
-   (assoc :selected-context selected-context)
-   (assoc :selected-secondary-contexts-ids selected-secondary-contexts-ids)
-   (assoc :active-search active-search)
-   (dissoc :cmd
-           :arg
-           :context-to-fetch
-           :link-issue-contexts)))
+   i
+   {:issues (or issues (:issues state))
+    :contexts (or contexts (:contexts state))}))
 
 (defn- list-resources [state q]
   (api/list-resources

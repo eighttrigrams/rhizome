@@ -12,8 +12,7 @@
   (js/setTimeout (fn [_] (swap! *state dissoc :loading)) 500))
 
 (defn deselect-context! [*state]
-  (fetch-and-reset! *state (-> @*state
-                               (assoc :cmd :deselect-context))))
+  (fetch-and-reset! *state (-> @*state (assoc :cmd :deselect-context))))
 
 (defn select-context! 
   ([*state context] (select-context! *state context false))
@@ -21,10 +20,6 @@
    ;; See below
    (swap! *state assoc :selected-context context)
    (fetch-and-reset! *state (-> @*state
-                                ;; TODO review; simplify
-                                (assoc :selected-secondary-contexts-ids #{})
-                                (assoc :secondary-contexts-inverted? false)
-                                (assoc :unassigned-secondary-contexts-selected? false)
                                 (assoc :context-to-fetch context)
                                 (#(if-not suppress-reset-issue
                                     (dissoc % :selected-issue) ;; TODO review
@@ -32,54 +27,43 @@
 
 (defn select-issue! [*state issue]
   (if (:link-issue? @*state)
-    (do
-      (swap! *state dissoc :link-issue? :search-globally?)
-      (fetch-and-reset! *state (-> @*state
-                                   (assoc :cmd :link-issue)
-                                   (assoc :arg (:id issue)))))
+    (fetch-and-reset! *state (assoc @*state :cmd :link-issue :arg (:id issue)))
     (do
       ;; For a snappy response in the UI, set :selected-issue immediately.
       ;; The subsequent call to fetch-and-reset! then
       ;; will fetch and replace it, thereby filling in the related issues.
       (swap! *state assoc :selected-issue issue)
-      (fetch-and-reset! *state (-> @*state
-                                   (assoc :cmd :fetch-issue)
-                                   (assoc :arg issue))))))
+      (fetch-and-reset! *state (assoc @*state :cmd :fetch-issue :arg issue)))))
 
 (defn start-global-search! [*state]
-  (fetch-and-reset! *state 
-                    (-> @*state 
-                        (assoc :active-search :issues
-                               :search-globally? true))
+  (fetch-and-reset! *state
+                    (assoc @*state 
+                           :active-search :issues
+                           :search-globally? true)
                     ""))
 
 (defn link-with-global-search! [*state]
   (swap! *state assoc :link-issue? true)
   (fetch-and-reset! *state
-                    (-> @*state
-                        (assoc :active-search :issues
-                               :search-globally? true))
+                    (assoc @*state 
+                           :active-search :issues
+                           :search-globally? true)
                     ""))
 
 (defn search! [*state value]
   (fetch-and-reset! *state @*state value))
 
 (defn deselect-secondary-contexts! [*state]
-  ;; TODO dedup, extract common pattern here
-  (fetch-and-reset! *state (-> @*state
-                               (assoc :cmd :deselect-secondary-contexts))))
+  (fetch-and-reset! *state (assoc @*state :cmd :deselect-secondary-contexts)))
 
 (defn change-secondary-contexts-selection! [*state]
-  (fetch-and-reset! *state (-> @*state
-                               (assoc :cmd :change-secondary-contexts-selection))))
+  (fetch-and-reset! *state (assoc @*state :cmd :change-secondary-contexts-selection)))
 
 (defn change-secondary-contexts-unassigned-selected! [*state]
-  (fetch-and-reset! *state (-> @*state
-                               (assoc :cmd :change-secondary-contexts-unassigned-selected))))
+  (fetch-and-reset! *state (assoc @*state :cmd :change-secondary-contexts-unassigned-selected)))
 
 (defn change-secondary-contexts-inverted! [*state]
-  (fetch-and-reset! *state (-> @*state
-                               (assoc :cmd :change-secondary-contexts-inverted))))
+  (fetch-and-reset! *state (assoc @*state :cmd :change-secondary-contexts-inverted)))
 
 (defn show-events! [*state]
   (fetch-and-reset! *state (-> @*state
