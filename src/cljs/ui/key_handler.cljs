@@ -43,7 +43,7 @@
                (and selected-context (= "KeyE" code))
                (swap! *state #(assoc % :modal :edit-context))
                (and shift-pressed? (= "KeyI" code))
-               (swap! *state #(assoc % :active-search :issues :search-globally? true))
+               (actions/start-global-search! *state) 
                (= "KeyI" code)
                (swap! *state #(assoc % :active-search :issues :search-globally? false))
                (and (= "KeyC" code) 

@@ -39,6 +39,13 @@
                                (assoc :cmd :fetch-issue)
                                (assoc :arg issue))))
 
+(defn start-global-search! [*state]
+  (fetch-and-reset! *state 
+                    (-> @*state 
+                        (assoc :active-search :issues
+                               :search-globally? true))
+                    ""))
+
 (defn search! [*state value]
   (fetch-and-reset! *state @*state value))
 
