@@ -1,10 +1,7 @@
 (ns ui.modals.issue-edit
-  (:require [clojure.string :as str]
-            [reagent.core :as r]
+  (:require [reagent.core :as r]
             [net.eighttrigrams.cljs-text-editor.editor :as editor]
-            api
-            [cljs.core.async :refer [go]]
-            [cljs.core.async.interop :refer-macros [<p!]]))
+            api))
 
 (defn- get-title-el []
   (.getElementById js/document "issue-title"))
