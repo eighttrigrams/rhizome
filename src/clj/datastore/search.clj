@@ -48,19 +48,25 @@
     (jdbc/execute!
      ds
      (sql/format
-      {:select   [:issues.id]
-       :from     [:issues]
-       :order-by [[:important :desc] [:updated_at :desc]]
-       :join     join-clause
-       :where    [:and
-                  exists-clause
-                  join-where-clause
-                  (if (and (= "" q) 
-                           (not selected-context)
-                           (not show-events?))
-                    [:= :important [:inline true]] 
-                    [:=])
-                  search-clause]}))))
+      (merge
+       {:select   [:issues.id]
+        :from     [:issues]
+        :order-by [[:important :desc] [:updated_at :desc]]
+        :join     join-clause
+        :where    [:or
+                   [:and
+                    exists-clause
+                    join-where-clause
+                    search-clause]
+                   (if (and (= "" q)
+                            (not selected-context)
+                            (not show-events?))
+                     [:= :important [:inline true]]
+                     nil)]}
+       (when (and (= "" q)
+                  (not selected-context)
+                  (not show-events?))
+         {:limit 100}))))))
 
 (defn- issues-query [ids]
   {:select   [:issues.*
