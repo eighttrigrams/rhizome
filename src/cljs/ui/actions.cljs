@@ -6,7 +6,10 @@
   (fetch-and-reset! *state @*state))
 
 (defn quit-search! [*state]
-  (fetch-and-reset! *state (dissoc @*state :active-search :search-globally?)))
+  (fetch-and-reset! *state (-> @*state
+                               (assoc :loading true)
+                               (dissoc :active-search :search-globally? :preview-issue)))
+  (js/setTimeout (fn [_] (swap! *state dissoc :loading)) 500))
 
 (defn deselect-context! [*state]
   (fetch-and-reset! *state (-> @*state
