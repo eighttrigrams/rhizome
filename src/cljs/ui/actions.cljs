@@ -6,7 +6,7 @@
   (fetch-and-reset! *state @*state))
 
 (defn quit-search! [*state]
-  (fetch-and-reset! *state (dissoc @*state :active-search)))
+  (fetch-and-reset! *state (dissoc @*state :active-search :search-globally?)))
 
 (defn deselect-context! [*state]
   (fetch-and-reset! *state (-> @*state
