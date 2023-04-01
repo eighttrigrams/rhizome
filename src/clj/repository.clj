@@ -88,14 +88,18 @@
        {:selected-context (datastore/update-context db arg)
         :issues           (search/search-issues db opts)} ;; maybe not necessary (yet)
        (= :fetch-issue cmd)
-       {:selected-issue (datastore/get-issue db arg)
-        :issues         (when active-search (search/search-issues db opts))
-        :active-search  nil}
+       {:selected-issue   (datastore/get-issue db arg)
+        :issues           (when active-search (search/search-issues db (dissoc opts :search-globally?)))
+        :active-search    nil
+        :search-globally? false}
        context-to-fetch
        (let [selected-context (datastore/get-context db context-to-fetch)]
          {:selected-context selected-context
-          :issues           (search/search-issues db (assoc opts :selected-context selected-context))
-          :active-search    nil})
+          :issues           (search/search-issues db (-> opts
+                                                         (assoc :selected-context selected-context)
+                                                         (dissoc :search-globally?)))
+          :active-search    nil
+          :search-globally? false})
        (= :issues active-search)
        {:issues (search/search-issues db opts)}
        (= :contexts active-search)
