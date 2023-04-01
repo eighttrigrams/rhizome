@@ -27,6 +27,8 @@
 
 (def new-issue issues/new-issue)
 
+(def link-issue issues/link-issue)
+
 (def reprioritize-issue issues/reprioritize-issue)
 
 (def mark-issue-important issues/mark-issue-important) 

@@ -8,7 +8,7 @@
 (defn quit-search! [*state]
   (fetch-and-reset! *state (-> @*state
                                (assoc :loading true)
-                               (dissoc :active-search :search-globally? :preview-issue)))
+                               (dissoc :active-search :search-globally? :preview-issue :link-issue?)))
   (js/setTimeout (fn [_] (swap! *state dissoc :loading)) 500))
 
 (defn deselect-context! [*state]
@@ -31,17 +31,32 @@
                                     (identity %)))))))
 
 (defn select-issue! [*state issue]
-  ;; For a snappy response in the UI, set :selected-issue immediately.
-  ;; The subsequent call to fetch-and-reset! then
-  ;; will fetch and replace it, thereby filling in the related issues.
-  (swap! *state assoc :selected-issue issue)
-  (fetch-and-reset! *state (-> @*state
-                               (assoc :cmd :fetch-issue)
-                               (assoc :arg issue))))
+  (if (:link-issue? @*state)
+    (do
+      (swap! *state dissoc :link-issue? :search-globally?)
+      (fetch-and-reset! *state (-> @*state
+                                   (assoc :cmd :link-issue)
+                                   (assoc :arg (:id issue)))))
+    (do
+      ;; For a snappy response in the UI, set :selected-issue immediately.
+      ;; The subsequent call to fetch-and-reset! then
+      ;; will fetch and replace it, thereby filling in the related issues.
+      (swap! *state assoc :selected-issue issue)
+      (fetch-and-reset! *state (-> @*state
+                                   (assoc :cmd :fetch-issue)
+                                   (assoc :arg issue))))))
 
 (defn start-global-search! [*state]
   (fetch-and-reset! *state 
                     (-> @*state 
+                        (assoc :active-search :issues
+                               :search-globally? true))
+                    ""))
+
+(defn link-with-global-search! [*state]
+  (swap! *state assoc :link-issue? true)
+  (fetch-and-reset! *state
+                    (-> @*state
                         (assoc :active-search :issues
                                :search-globally? true))
                     ""))

@@ -67,6 +67,14 @@
        (let [selected-context (datastore/cycle-search-mode db selected-context)]
          {:selected-context selected-context
           :issues           (search/search-issues db (assoc opts :selected-context selected-context))})
+       (= :link-issue cmd)
+       (do
+         (datastore/link-issue db (:id selected-issue) arg)
+         {:selected-issue   (datastore/get-issue db selected-issue)
+          :issues           (search/search-issues db (dissoc opts :search-globally?))
+          :active-search    nil
+          ;; TODO is not yet handled in ui.actions.common
+          :search-globally? false})
        (= :insert-issue cmd)
        (let [selected-issue (datastore/new-issue db arg
                                                  (:id selected-context)
