@@ -4,7 +4,7 @@
 
 (defn handle-keys [*state]
   (handle-keys* 
-   (fn [code ctrl-pressed? meta-pressed? alt-pressed? _e]
+   (fn [code ctrl-pressed? meta-pressed? alt-pressed? shift-pressed? _e]
      (let [{:keys [selected-issue
                    selected-context]} @*state]
        (cond (= "Escape" code)
@@ -42,8 +42,10 @@
                (actions/mark-issue-important! *state)
                (and selected-context (= "KeyE" code))
                (swap! *state #(assoc % :modal :edit-context))
+               (and shift-pressed? (= "KeyI" code))
+               (swap! *state #(assoc % :active-search :issues :search-globally? true))
                (= "KeyI" code)
-               (swap! *state #(assoc % :active-search :issues))
+               (swap! *state #(assoc % :active-search :issues :search-globally? false))
                (and (= "KeyC" code) 
                     (not meta-pressed?)
                     (not ctrl-pressed?)

@@ -4,7 +4,7 @@
 
 (defn handle-modal-keys [*state value-fn]
   (handle-keys*
-   (fn [code _ctrl-pressed? meta-pressed? alt-pressed? e]
+   (fn [code _ctrl-pressed? meta-pressed? alt-pressed? _shift-pressed? e]
      (let [{:keys [modal]} @*state]
        (cond (= "Escape" code)
              (actions/cancel-modal! *state)
@@ -38,7 +38,7 @@
 
 (defn handle-edit-keys [*state value-fn]
   (handle-keys*
-   (fn [code _ctrl-pressed? meta-pressed? alt-pressed? e]
+   (fn [code _ctrl-pressed? meta-pressed? alt-pressed? _shift-pressed? e]
      (cond (= "Escape" code)
            (actions/cancel-modal! *state)
            (and (= "Digit9" code)

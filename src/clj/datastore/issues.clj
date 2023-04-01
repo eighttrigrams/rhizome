@@ -2,16 +2,7 @@
   (:require [clojure.string :as str]
             [next.jdbc :as jdbc]
             [honey.sql :as sql]
-            [datastore.helpers
-             :refer [un-namespace-keys simplify-date]]))
-
-(defn- join-contexts [issue] ;; TODO dedup with search/join-contexts
-  (-> issue
-      (dissoc :context_ids)
-      (dissoc :context_titles)
-      (assoc :contexts
-             (zipmap (.getArray (:context_ids issue))
-                     (.getArray (:context_titles issue))))))
+            [datastore.issues.common :as common]))
 
 (defn- delete-date [db issue-id]
   (jdbc/execute! db
@@ -48,18 +39,11 @@
    :group-by [:issues.id]
    :where  [:= :issues.id [:inline id]]})
 
-(defn- post-process [query-result]
-  (-> query-result
-      un-namespace-keys
-      join-contexts
-      simplify-date
-      (dissoc :searchable)))
-
 (defn- perform-query-and-post-process [query db]
   (-> query
       sql/format
       (#(jdbc/execute-one! db % {:return-keys true}))
-      post-process))
+      common/post-process))
 
 (defn- get-related-issue [db id]
   (-> id
@@ -156,7 +140,7 @@
         issue
         ;; if there are no related issues, the former query returns an empty result set
         (get-issue-without-related-issues db id))
-      post-process))
+      common/post-process))
 
 (defn update-issue [db {:keys [issue related-issues-ids]}]
   (let [{:keys [date id event_archived?]} issue]

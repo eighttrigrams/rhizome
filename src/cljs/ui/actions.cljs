@@ -8,8 +8,7 @@
 (defn quit-search! [*state]
   (fetch-and-reset! *state (dissoc @*state :active-search)))
 
-(defn deselect-context! [*state] 
-  (prn "deselect-context!")
+(defn deselect-context! [*state]
   (fetch-and-reset! *state (-> @*state
                                (assoc :cmd :deselect-context))))
 

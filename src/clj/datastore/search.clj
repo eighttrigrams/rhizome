@@ -4,7 +4,8 @@
             [next.jdbc :as jdbc]
             [honey.sql :as sql]
             [datastore.helpers
-             :refer [un-namespace-keys simplify-date]]))
+             :refer [un-namespace-keys]]
+            [datastore.issues.common :as common]))
 
 (defn- convert-q-to-query-string [q]
   (str/join " & " (map #(str % ":*") (str/split q #" "))))
@@ -27,8 +28,7 @@
    (map #(dissoc % :searchable))))
 
 (defn- fetch-ids [ds q selected-context show-events?]
-  (let [selected-context-id (:id selected-context)
-        search-clause       (if (not= "" q)
+  (let [search-clause       (if (not= "" q)
                               [:raw (format "searchable @@ to_tsquery('simple', '%s')" 
                                             (convert-q-to-query-string q))] 
                               [:=])
@@ -36,7 +36,7 @@
                               [:context_issue [:= :issues.id :context_issue.issue_id]]
                               [])
         join-where-clause   (if selected-context
-                              [:= :context_issue.context_id selected-context-id]
+                              [:= :context_issue.context_id (:id selected-context)]
                               [:=])
         exists-clause       (if show-events? 
                               [:exists {:select [:events.id]
@@ -61,14 +61,6 @@
                     [:= :important [:inline true]] 
                     [:=])
                   search-clause]}))))
-
-(defn- join-contexts [issue]
-  (-> issue
-      (dissoc :context_ids)
-      (dissoc :context_titles)
-      (assoc :contexts
-             (zipmap (.getArray (:context_ids issue))
-                     (.getArray (:context_titles issue))))))
 
 (defn- issues-query [ids]
   {:select   [:issues.*
@@ -116,27 +108,29 @@
        )issues)
     issues))
 
+(defn- do-fetch-ids 
+  [db {:keys [q
+              selected-context
+              show-events?
+              search-globally?]
+       :or   {q ""}}]
+  (seq (fetch-ids db q (if search-globally? nil selected-context) show-events?)))
+
 (defn search-issues
-  "Returns a sequence of items
-   ([\"some-id\" {:title \"title\" :desc \"desc\"}])"
-  [db {:keys [q 
-              selected-context 
-              show-events? 
+  [db {:keys [selected-context 
+              show-events?
               selected-secondary-contexts-ids
               unassigned-secondary-contexts-selected?
               secondary-contexts-inverted?]
-       :or   {q ""}}]
+       :as opts}]
   
-  (if-let [ids (seq (fetch-ids db q selected-context show-events?))]
+  (if-let [ids (do-fetch-ids db opts)]
     (->> ids
          (map #(:issues/id %))
          issues-query
          sql/format
          (jdbc/execute! db)
-         (map un-namespace-keys)
-         (map simplify-date)
-         (map join-contexts)
-         (map #(dissoc % :searchable))
+         (map common/post-process)
          (#(if show-events? (sort-by :date %) %))
          (#(if (contains? #{1 2} (:search_mode selected-context))
              (re-order % (:search_mode selected-context))

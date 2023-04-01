@@ -29,7 +29,7 @@
 (defn list-resources [{:keys [q 
                               cmd
                               arg
-                              active-search 
+                              active-search
                               selected-issue
                               selected-context
                               selected-secondary-contexts-ids
