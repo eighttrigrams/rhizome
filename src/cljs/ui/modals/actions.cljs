@@ -3,7 +3,10 @@
             [ui.actions.common :refer [fetch-and-reset!]]))
 
 (defn cancel-modal! [*state]
-  (swap! *state dissoc :modal))
+  (reset! *state (-> @*state
+                     (dissoc :modal)
+                     (assoc :loading true)))
+  (js/setTimeout (fn [_] (swap! *state dissoc :loading)) 500))
 
 (defn new-issue! [*state issue]
   (fetch-and-reset! *state (-> @*state
