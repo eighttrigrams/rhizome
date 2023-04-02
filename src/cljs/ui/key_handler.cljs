@@ -49,7 +49,8 @@
                (and shift-pressed? selected-issue (= "KeyA" code))
                (actions/link-with-global-search! *state)
                (and selected-issue (= "KeyA" code))
-               (swap! *state #(assoc % :active-search :issues 
+               (swap! *state #(assoc % 
+                                     :active-search :issues 
                                      :search-globally? false
                                      :link-issue?      true))
                (and (= "KeyC" code)

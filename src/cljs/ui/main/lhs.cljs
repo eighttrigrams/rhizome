@@ -15,7 +15,8 @@
   (fn [*state]
     (cond
       (and (:preview-issue @*state)
-           (not (:loading @*state)))
+           (not (:loading @*state))
+           (not (= :contexts (:active-search @*state))))
       [:div.details-component.scrollable
        [issue-detail/preview-component (:preview-issue @*state)]]
       (= :contexts (:active-search @*state))
