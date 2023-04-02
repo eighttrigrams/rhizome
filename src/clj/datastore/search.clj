@@ -66,7 +66,7 @@
        (when (and (= "" q)
                   (not selected-context)
                   (not show-events?))
-         {:limit 100}))))))
+         {:limit 500}))))))
 
 (defn- issues-query [ids]
   {:select   [:issues.*
