@@ -18,7 +18,8 @@
 (defn deselect-issue! [*state]
   (swap! *state #(-> @*state 
                      (assoc :loading true)
-                     (dissoc :selected-issue)))
+                     (dissoc :selected-issue)
+                     (dissoc :preview-issue)))
   (js/setTimeout (fn [_] (swap! *state dissoc :loading)) 500))
 
 (defn select-context! 
