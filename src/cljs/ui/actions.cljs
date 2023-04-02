@@ -28,7 +28,8 @@
    ;; See below
    (swap! *state assoc :selected-context context)
    (fetch-and-reset! *state (-> @*state
-                                (assoc :context-to-fetch context) ;; TODO make this an arg, to a new cmd and in repository.clj, use case (on cmd) instead cond
+                                (assoc :cmd :fetch-context 
+                                       :arg context)
                                 (#(if-not suppress-reset-issue
                                     (dissoc % :selected-issue) ;; TODO review
                                     (identity %)))))))

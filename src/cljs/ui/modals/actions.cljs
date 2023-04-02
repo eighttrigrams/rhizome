@@ -45,5 +45,6 @@
 (defn update-issue-contexts! [*state values]
   (fetch-and-reset! *state
                     (-> @*state
-                        (assoc :link-issue-contexts values)
+                        (assoc :cmd :link-issue-contexts 
+                               :arg values)
                         (dissoc :modal))))
