@@ -15,6 +15,12 @@
   (fetch-and-reset! *state (assoc @*state :cmd :deselect-context :loading true))
   (js/setTimeout (fn [_] (swap! *state dissoc :loading)) 500))
 
+(defn deselect-issue! [*state]
+  (swap! *state #(-> @*state 
+                     (assoc :loading true)
+                     (dissoc :selected-issue)))
+  (js/setTimeout (fn [_] (swap! *state dissoc :loading)) 500))
+
 (defn select-context! 
   ([*state context] (select-context! *state context false))
   ([*state context suppress-reset-issue]

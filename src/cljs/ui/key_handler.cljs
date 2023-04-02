@@ -13,7 +13,7 @@
                    (:show-events? @*state)
                    (actions/exit-events-view! *state)
                    selected-issue
-                   (swap! *state #(dissoc % :selected-issue))
+                   (actions/deselect-issue! *state)
                    (seq (:selected-secondary-contexts-ids @*state))
                    (actions/deselect-secondary-contexts! *state)
                    selected-context
