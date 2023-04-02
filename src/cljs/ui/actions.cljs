@@ -8,11 +8,12 @@
 (defn quit-search! [*state]
   (fetch-and-reset! *state (-> @*state
                                (assoc :loading true)
-                               (dissoc :active-search :search-globally? :preview-issue :link-issue?)))
+                               (dissoc :preview-issue :active-search :search-globally? :link-issue?)))
   (js/setTimeout (fn [_] (swap! *state dissoc :loading)) 500))
 
 (defn deselect-context! [*state]
-  (fetch-and-reset! *state (-> @*state (assoc :cmd :deselect-context))))
+  (fetch-and-reset! *state (assoc @*state :cmd :deselect-context :loading true))
+  (js/setTimeout (fn [_] (swap! *state dissoc :loading)) 500))
 
 (defn select-context! 
   ([*state context] (select-context! *state context false))
