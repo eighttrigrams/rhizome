@@ -47,7 +47,10 @@
                                   #((if (:selected-issue @*state)
                                       issue-edit/get-values
                                       context-edit/get-values)
-                                    (:id item)))
+                                    (:id item))
+                                  (if (= :edit-issue (:modal @*state))
+                                    #(link-context-issue/get-values)
+                                    nil))
     :description
     (key-handler/handle-modal-keys *state 
                                    #(do {:id          (:id item) 
@@ -58,9 +61,6 @@
     :new-context
     (key-handler/handle-modal-keys *state
                                    #(do {:title (.-value (get-title-el))}))
-    :link-context-issue
-    (key-handler/handle-modal-keys *state
-                                   #(link-context-issue/get-values))
     #()))
 
 (defn component [*state]
@@ -78,10 +78,8 @@
          [new-issue-component]
          :new-context
          [new-context-component]
-         :link-context-issue
-         [:div#modal-component [link-context-issue/component (:selected-context @*state) item]]
          :edit-issue
-         [:div#modal-component [issue-edit/component item]]
+         [:div#modal-component [issue-edit/component (:selected-context @*state) item]]
          :edit-context
          [:div#modal-component [context-edit/component item]]
          nil)])))

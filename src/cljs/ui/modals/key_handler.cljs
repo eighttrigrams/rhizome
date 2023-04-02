@@ -36,7 +36,7 @@
                   (if (:selected-issue @*state) :issue :context)
                   (value-fn))))))))
 
-(defn handle-edit-keys [*state value-fn]
+(defn handle-edit-keys [*state value-fn value-fn-2]
   (handle-keys*
    (fn [code _ctrl-pressed? meta-pressed? alt-pressed? _shift-pressed? e]
      (cond (= "Escape" code)
@@ -46,4 +46,5 @@
            (do (.preventDefault e)
                ((if (:selected-issue @*state)
                   actions/update-issue!
-                  actions/update-context!) *state (value-fn)))))))
+                  actions/update-context!) *state (value-fn))
+               (when value-fn-2 (actions/update-issue-contexts! *state (value-fn-2))))))))
