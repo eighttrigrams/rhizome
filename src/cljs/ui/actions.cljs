@@ -5,8 +5,10 @@
 (defn fetch! [*state]
   (fetch-and-reset! *state @*state))
 
-(defn- exec-cmd [*state cmd]
-  (fetch-and-reset! *state (assoc @*state :cmd cmd)))
+(defn- exec-cmd 
+  ([*state cmd] (exec-cmd *state cmd nil))
+  ([*state cmd arg]
+   (fetch-and-reset! *state (assoc @*state :cmd cmd :arg arg))))
 
 (defn quit-search! [*state]
   (fetch-and-reset! *state (-> @*state
@@ -93,15 +95,11 @@
 
 (defn delete-issue! [*state]
   (when (js/window.confirm "Delete currently selected issue?")
-    (fetch-and-reset! *state (-> @*state
-                                 (assoc :cmd :delete-issue)
-                                 (assoc :arg (:selected-issue @*state))))))
+    (exec-cmd *state :delete-issue (:selected-issue @*state))))
 
 (defn delete-context! [*state]
   (when (js/window.confirm "Delete currently selected context?")
-    (fetch-and-reset! *state (-> @*state 
-                                 (assoc :cmd :delete-context)
-                                 (assoc :arg (:selected-context @*state))))))
+    (exec-cmd *state :delete-context (:selected-context @*state))))
 
 (defn reprioritize-issue! [*state]
   (exec-cmd *state :reprioritize-issue))
