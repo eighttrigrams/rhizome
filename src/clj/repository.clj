@@ -54,10 +54,6 @@
              {:issues   (search/search-issues db opts)
               :contexts (search/search-contexts db "")})
        (case cmd
-         :link-issue-contexts
-         {:selected-issue      (datastore/link-issue-contexts db selected-issue arg)
-          :issues              (search/search-issues db opts)
-          :link-issue-contexts nil}
          :reprioritize-issue 
          (do (datastore/reprioritize-issue db selected-issue)
              {:issues (search/search-issues db opts)})
@@ -102,8 +98,10 @@
          :update-context-description
          {:selected-context (datastore/update-context-description db arg)}
          :update-issue
-         {:selected-issue (datastore/update-issue db arg)
-          :issues         (search/search-issues db opts)}
+         (do
+          (datastore/link-issue-contexts db selected-issue (:issue-contexts arg))
+          {:selected-issue (datastore/update-issue db (:issue arg))
+           :issues         (search/search-issues db opts)})
          :update-context
          {:selected-context (datastore/update-context db arg)
           :issues           (search/search-issues db opts)}

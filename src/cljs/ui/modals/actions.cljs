@@ -28,11 +28,12 @@
                                              :update-context-description))
                                (assoc :arg item))))
 
-(defn update-issue! [*state issue]
+(defn update-issue! [*state issue issue-contexts]
   (fetch-and-reset! *state 
                     (-> @*state
                         (assoc :cmd :update-issue)
-                        (assoc :arg issue)
+                        (assoc :arg {:issue issue 
+                                     :issue-contexts issue-contexts})
                         (dissoc :modal))))
 
 (defn update-context! [*state context]
@@ -40,11 +41,4 @@
                     (-> @*state
                         (assoc :cmd :update-context)
                         (assoc :arg context)
-                        (dissoc :modal))))
-
-(defn update-issue-contexts! [*state values]
-  (fetch-and-reset! *state
-                    (-> @*state
-                        (assoc :cmd :link-issue-contexts 
-                               :arg values)
                         (dissoc :modal))))
