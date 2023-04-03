@@ -62,17 +62,20 @@
 (defn search! [*state value]
   (fetch-and-reset! *state @*state value))
 
+(defn- exec-cmd [*state cmd]
+  (fetch-and-reset! *state (assoc @*state :cmd cmd)))
+
 (defn deselect-secondary-contexts! [*state]
-  (fetch-and-reset! *state (assoc @*state :cmd :deselect-secondary-contexts)))
+  (exec-cmd *state :deselect-secondary-contexts))
 
 (defn change-secondary-contexts-selection! [*state]
-  (fetch-and-reset! *state (assoc @*state :cmd :change-secondary-contexts-selection)))
+  (exec-cmd *state :change-secondary-contexts-selection))
 
 (defn change-secondary-contexts-unassigned-selected! [*state]
-  (fetch-and-reset! *state (assoc @*state :cmd :change-secondary-contexts-unassigned-selected)))
+  (exec-cmd *state :change-secondary-contexts-unassigned-selected))
 
 (defn change-secondary-contexts-inverted! [*state]
-  (fetch-and-reset! *state (assoc @*state :cmd :change-secondary-contexts-inverted)))
+  (exec-cmd *state :change-secondary-contexts-inverted))
 
 (defn show-events! [*state]
   (fetch-and-reset! *state (-> @*state
@@ -101,7 +104,7 @@
                                  (assoc :arg (:selected-context @*state))))))
 
 (defn reprioritize-issue! [*state]
-  (fetch-and-reset! *state (assoc @*state :cmd :reprioritize-issue)))
+  (exec-cmd *state :reprioritize-issue))
 
 (defn mark-issue-important! [*state]
-  (fetch-and-reset! *state (assoc @*state :cmd :mark-issue-important)))
+  (exec-cmd *state :mark-issue-important))
