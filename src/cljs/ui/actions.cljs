@@ -80,15 +80,10 @@
   (exec-cmd *state :change-secondary-contexts-inverted))
 
 (defn show-events! [*state]
-  (fetch-and-reset! *state (-> @*state
-                               (assoc :cmd :enter-events-view)
-                               (assoc :show-events? true) ;; TODO set this in the backend
-                               )))
+  (exec-cmd *state :enter-events-view))
 
 (defn exit-events-view! [*state]
-  (fetch-and-reset! *state (-> @*state
-                               (assoc :cmd :exit-events-view)
-                               (assoc :show-events? false))))
+  (exec-cmd *state :exit-events-view))
 
 (defn cycle-search-mode! [*state]
   (fetch-and-reset! *state (assoc @*state :cmd :cycle-search-mode)))
