@@ -85,7 +85,7 @@
 
 (defn exit-events-view! [*state]
   (fetch-and-reset! *state (-> @*state
-                               (assoc :cmd :exist-events-view)
+                               (assoc :cmd :exit-events-view)
                                (assoc :show-events? false))))
 
 (defn cycle-search-mode! [*state]

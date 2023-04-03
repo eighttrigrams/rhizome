@@ -37,7 +37,7 @@
                               selected-context
                               selected-secondary-contexts-ids] 
                        :as   opts}]
-  
+
   #_{:clj-kondo/ignore [:unresolved-var]}
   (merge 
    {:cmd                             nil
@@ -83,7 +83,7 @@
            {:selected-issue   (datastore/get-issue db selected-issue)
             :issues           (search/search-issues db (-> opts
                                                            (dissoc :search-globally?)
-                                                           (assoc :selected-secondary-contexts-ids '())))
+                                                           (assoc :selected-secondary-contexts-ids #{})))
             :active-search    nil
             :link-issue?      nil
             :search-globally? false})
@@ -142,7 +142,7 @@
          {:issues                          (search/search-issues db opts)
           :contexts                        []
           :selected-issue                  nil
-          :selectec-context                nil
+          :selected-context                nil
           :selected-secondary-contexts-ids #{}}
          :deselect-context
          {:issues           (search/search-issues db (dissoc opts :selected-context))
