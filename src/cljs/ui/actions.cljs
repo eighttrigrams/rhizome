@@ -5,6 +5,9 @@
 (defn fetch! [*state]
   (fetch-and-reset! *state @*state))
 
+(defn- exec-cmd [*state cmd]
+  (fetch-and-reset! *state (assoc @*state :cmd cmd)))
+
 (defn quit-search! [*state]
   (fetch-and-reset! *state (-> @*state
                                (assoc :loading true)
@@ -61,9 +64,6 @@
 
 (defn search! [*state value]
   (fetch-and-reset! *state @*state value))
-
-(defn- exec-cmd [*state cmd]
-  (fetch-and-reset! *state (assoc @*state :cmd cmd)))
 
 (defn deselect-secondary-contexts! [*state]
   (exec-cmd *state :deselect-secondary-contexts))
