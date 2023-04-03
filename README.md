@@ -29,6 +29,10 @@ clj:user:> (start)
 - Jack-in
     - deps.edn
         - Profile: :dev
+- Jack-in
+    - shadow-cljs
+        - :app
+            - :app
 
 ## Package and run
 

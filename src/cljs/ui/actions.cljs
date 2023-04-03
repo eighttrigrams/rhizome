@@ -52,11 +52,11 @@
                     ""))
 
 (defn link-with-global-search! [*state]
-  (swap! *state assoc :link-issue? true)
   (fetch-and-reset! *state
                     (assoc @*state 
                            :active-search :issues
-                           :search-globally? true)
+                           :search-globally? true
+                           :link-issue? true)
                     ""))
 
 (defn search! [*state value]

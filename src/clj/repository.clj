@@ -32,6 +32,7 @@
                               cmd
                               arg
                               active-search
+                              link-issue?
                               selected-issue
                               selected-context
                               selected-secondary-contexts-ids] 
@@ -44,7 +45,9 @@
    (let [db (:db config/config)]
      (if-not cmd
        (cond (= :issues active-search)
-             {:issues (search/search-issues db opts)}
+             {:issues (search/search-issues db (cond-> opts
+                                                 link-issue?
+                                                 (assoc :selected-secondary-contexts-ids '())))}
              (= :contexts active-search)
              {:contexts (search/search-contexts db q)}
              :else 
@@ -78,7 +81,9 @@
          (do
            (datastore/link-issue db (:id selected-issue) arg)
            {:selected-issue   (datastore/get-issue db selected-issue)
-            :issues           (search/search-issues db (dissoc opts :search-globally?))
+            :issues           (search/search-issues db (-> opts
+                                                           (dissoc :search-globally?)
+                                                           (assoc :selected-secondary-contexts-ids '())))
             :active-search    nil
             :link-issue?      nil
             :search-globally? false})
