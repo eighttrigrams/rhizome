@@ -106,10 +106,12 @@
        {:selected-context (datastore/update-context db arg)
         :issues           (search/search-issues db opts)}
        :fetch-issue
-       {:selected-issue   (datastore/get-issue db arg)
-        :issues           (when active-search (search/search-issues db (dissoc opts :search-globally?)))
-        :active-search    nil
-        :search-globally? false}
+       (do
+         (datastore/reprioritize-issue db arg)
+         {:selected-issue   (datastore/get-issue db arg)
+          :issues           (search/search-issues db (dissoc opts :search-globally?))
+          :active-search    nil
+          :search-globally? false})
        :fetch-context
        (do 
          (datastore/reprioritize-context db arg)
