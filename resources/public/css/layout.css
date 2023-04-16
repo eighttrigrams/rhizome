@@ -4,6 +4,7 @@ body {
     display: unset !important;
     flex-direction: unset !important;
     margin: 0;
+    font-family: fantasy;
 }
 
 #app {
@@ -19,7 +20,7 @@ body {
     margin: auto;
     height: 100vh;
     background-color:rgb(61, 14, 14);
-    color: white;
+    color: #9c996f;
 }
 
 #lhs-component {

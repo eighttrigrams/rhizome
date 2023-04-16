@@ -20,8 +20,9 @@
     {:style {:font-size "35px"}}
     [:> ReactMarkdown
      {:children title}]]
-   [:> ReactMarkdown
-    {:children description}]])
+   [:div.description
+    [:> ReactMarkdown
+     {:children description}]]])
 
 (defn component [*state]
   (let [{:keys [selected-issue selected-context]} @*state

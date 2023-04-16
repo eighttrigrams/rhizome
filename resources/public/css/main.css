@@ -32,6 +32,7 @@ ul.cards {
     margin: 0;
     padding: 5px;
     list-style-type: none;
+    color: rgb(192, 186, 173);
 }
 
 .mask {
@@ -88,4 +89,10 @@ ul.cards {
 
 #title {
     width: 600px;
+}
+
+.description {
+    font-family: math;
+    line-height: 1.9;
+    letter-spacing: .12rem;
 }
