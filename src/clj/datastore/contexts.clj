@@ -103,3 +103,8 @@
                                        :set    {:search_mode [:inline (mod (inc (:search_mode context)) 3)]}
                                        :where  [:= :id [:inline id]]}))
     (get-context db context)))
+
+(defn reprioritize-context [db {:keys [id]}]
+  (jdbc/execute! db (sql/format {:update [:contexts]
+                                 :set {:updated_at [:raw "NOW()"]}
+                                 :where [:= :id [:inline id]]})))

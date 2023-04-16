@@ -111,17 +111,19 @@
         :active-search    nil
         :search-globally? false}
        :fetch-context
-       (let [selected-context (datastore/get-context db arg)
-             opts             {:search-globally?                false
-                               :selected-secondary-contexts-ids #{}
-                               :selected-context                selected-context}]
-         (merge opts
-                {:selected-context                        selected-context
-                 :issues                                  (search/search-issues db opts)
-                 :active-search                           nil
-                 :context-to-fetch                        nil
-                 :secondary-contexts-inverted?            false
-                 :unassigned-secondary-contexts-selected? false}))
+       (do 
+         (datastore/reprioritize-context db arg)
+         (let [selected-context (datastore/get-context db arg)
+               opts             {:search-globally?                false
+                                 :selected-secondary-contexts-ids #{}
+                                 :selected-context                selected-context}]
+           (merge opts
+                  {:selected-context                        selected-context
+                   :issues                                  (search/search-issues db opts)
+                   :active-search                           nil
+                   :context-to-fetch                        nil
+                   :secondary-contexts-inverted?            false
+                   :unassigned-secondary-contexts-selected? false})))
        :change-secondary-contexts-selection
        {:issues (search/search-issues db opts)}
        :change-secondary-contexts-unassigned-selected

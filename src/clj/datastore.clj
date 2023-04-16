@@ -43,6 +43,8 @@
 
 (def update-context contexts/update-context)
 
+(def reprioritize-context contexts/reprioritize-context)
+
 (def get-context contexts/get-context)
 
 (def new-context contexts/new-context)
