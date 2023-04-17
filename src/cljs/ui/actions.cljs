@@ -13,7 +13,7 @@
 (defn quit-search! [*state]
   (fetch-and-reset! *state (-> @*state
                                (assoc :loading true)
-                               (dissoc :preview-issue :active-search :search-globally? :link-issue?)))
+                               (dissoc :preview-issue :active-search :search-globally? :link-issue)))
   (js/setTimeout (fn [_] (swap! *state dissoc :loading)) 500))
 
 (defn deselect-context! [*state]
@@ -40,8 +40,12 @@
                                     (identity %)))))))
 
 (defn select-issue! [*state issue]
-  (if (:link-issue? @*state)
-    (fetch-and-reset! *state (assoc @*state :cmd :link-issue :arg (:id issue)))
+  (cond 
+    (= :issue (:link-issue @*state))
+    (fetch-and-reset! *state (assoc @*state :cmd :link-issues :arg (:id issue)))
+    (= :context (:link-issue @*state))
+    (fetch-and-reset! *state (assoc @*state :cmd :link-issue-context :arg (:id issue)))
+    :else 
     (do
       ;; For a snappy response in the UI, set :selected-issue immediately.
       ;; The subsequent call to fetch-and-reset! then
@@ -61,7 +65,23 @@
                     (assoc @*state 
                            :active-search :issues
                            :search-globally? true
-                           :link-issue? true)
+                           :link-issue :issue)
+                    ""))
+
+(defn link-with-local-search! [*state]
+  (fetch-and-reset! *state
+                    (assoc @*state
+                           :active-search :issues
+                           :search-globally? false
+                           :link-issue :issue)
+                    ""))
+
+(defn link-context-with-global-search! [*state]
+  (fetch-and-reset! *state
+                    (assoc @*state
+                           :active-search :issues
+                           :search-globally? true
+                           :link-issue :context)
                     ""))
 
 (defn search! [*state value]

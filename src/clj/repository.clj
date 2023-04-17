@@ -71,7 +71,7 @@
        (let [selected-context (datastore/cycle-search-mode db selected-context)]
          {:selected-context selected-context
           :issues           (search/search-issues db (assoc opts :selected-context selected-context))})
-       :link-issue
+       :link-issues
        (do
          (datastore/link-issue db (:id selected-issue) arg)
          {:selected-issue   (datastore/get-issue db selected-issue)
@@ -79,7 +79,18 @@
                                                          (dissoc :search-globally?)
                                                          (assoc :selected-secondary-contexts-ids #{})))
           :active-search    nil
-          :link-issue?      nil
+          :link-issue       nil
+          :search-globally? false})
+       :link-issue-context
+       (let [selected-issue (datastore/get-issue db {:id arg})
+             context-ids   (keys (:contexts selected-issue))]
+         (datastore/link-issue-contexts db {:id arg} (vec (set (conj context-ids (:id selected-context)))))
+         {:selected-issue   selected-issue
+          :issues           (search/search-issues db (-> opts
+                                                         (dissoc :search-globally?)
+                                                         (assoc :selected-secondary-contexts-ids #{})))
+          :active-search    nil
+          :link-issue       nil
           :search-globally? false})
        :insert-issue 
        (let [selected-issue (datastore/new-issue db arg

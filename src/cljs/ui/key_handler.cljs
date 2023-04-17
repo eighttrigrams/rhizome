@@ -46,11 +46,10 @@
                (swap! *state #(assoc % :active-search :issues :search-globally? false))
                (and shift-pressed? selected-issue (= "KeyA" code))
                (actions/link-with-global-search! *state)
-               (and selected-issue (= "KeyA" code))
-               (swap! *state #(assoc % 
-                                     :active-search :issues 
-                                     :search-globally? false
-                                     :link-issue?      true))
+               (and (not shift-pressed?) selected-issue (= "KeyA" code))
+               (actions/link-with-local-search! *state)
+               (and shift-pressed? selected-context (= "KeyA" code))
+               (actions/link-context-with-global-search! *state)
                (and (= "KeyC" code)
                     (not meta-pressed?)
                     (not ctrl-pressed?)
