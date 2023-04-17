@@ -82,7 +82,7 @@
        (let [selected-issue (datastore/get-issue db {:id arg})
              context-ids   (keys (:contexts selected-issue))]
          (datastore/link-issue-contexts db {:id arg} (vec (set (conj context-ids (:id selected-context)))))
-         {:selected-issue   selected-issue
+         {:selected-issue   nil
           :issues           (search/search-issues db (-> opts
                                                          (dissoc :search-globally?)
                                                          (assoc :selected-secondary-contexts-ids #{})))
