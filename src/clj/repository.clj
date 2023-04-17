@@ -46,9 +46,7 @@
      (case cmd
        nil
        (cond (= :issues active-search)
-             {:issues (search/search-issues db (cond-> opts
-                                                 link-issue?
-                                                 (assoc :selected-secondary-contexts-ids '())))}
+             {:issues (search/search-issues db (assoc opts :selected-secondary-contexts-ids '()))}
              (= :contexts active-search)
              {:contexts (search/search-contexts db q)}
              :else
