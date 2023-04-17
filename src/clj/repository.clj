@@ -52,9 +52,6 @@
              :else
              {:issues   (search/search-issues db opts)
               :contexts (search/search-contexts db "")})
-       :reprioritize-issue 
-       (do (datastore/reprioritize-issue db selected-issue)
-           {:issues (search/search-issues db opts)})
        :mark-issue-important 
        {:selected-issue (datastore/mark-issue-important db selected-issue)
         :issues         (search/search-issues db opts)}

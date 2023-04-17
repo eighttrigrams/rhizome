@@ -34,8 +34,6 @@
                (actions/delete-issue! *state)
                (and selected-context (= "Delete" code))
                (actions/delete-context! *state)
-               (and selected-issue (= "KeyP" code))
-               (actions/reprioritize-issue! *state)
                (and selected-issue (= "KeyT" code))
                (actions/mark-issue-important! *state)
                (and selected-context (= "KeyE" code))
