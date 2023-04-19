@@ -28,6 +28,8 @@
                               arg
                               active-search
                               selected-issue
+                              link-issue
+                              search-globally?
                               selected-context
                               selected-secondary-contexts-ids] 
                        :as   opts}]
@@ -40,7 +42,10 @@
      (case cmd
        nil
        (cond (= :issues active-search)
-             {:issues (search/search-issues db (assoc opts :selected-secondary-contexts-ids '()))}
+             {:issues (search/search-issues db (if (or (= :issue link-issue)
+                                                       search-globally?) 
+                                                 (assoc opts :selected-secondary-contexts-ids '())
+                                                 opts))}
              (= :contexts active-search)
              {:contexts (search/search-contexts db q)}
              :else
