@@ -56,7 +56,7 @@
        :mark-issue-important 
        {:selected-issue (datastore/mark-issue-important db selected-issue)
         :issues         (search/search-issues db opts)}
-       :delete-issue 
+       :delete-issue
        (do (datastore/delete-issue db arg)
            {:issues         (search/search-issues db opts)
             :selected-issue nil})

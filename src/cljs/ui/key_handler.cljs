@@ -59,11 +59,8 @@
                     (not ctrl-pressed?)
                     (not alt-pressed?)
                     shift-pressed?
-                    selected-issue
-                    (not (:show-events? @*state)))
-               (swap! *state #(assoc % 
-                                     :active-search :contexts
-                                     :link-context true))
+                    selected-issue)
+               (actions/start-linking-context *state)
                (and selected-context
                     (not selected-issue)
                     (= "KeyS" code))

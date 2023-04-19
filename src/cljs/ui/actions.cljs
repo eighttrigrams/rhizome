@@ -58,8 +58,15 @@
 (defn start-context-search [*state]
   (fetch-and-reset! *state 
                     (assoc @*state
-                           :cd :start-context-search
+                           :cmd :start-context-search
                            :active-search :contexts)))
+
+(defn start-linking-context [*state]
+  (fetch-and-reset! *state
+                    (assoc @*state
+                           :cmd :start-context-search
+                           :active-search :contexts
+                           :link-context true)))
 
 (defn start-global-search! [*state]
   (fetch-and-reset! *state
