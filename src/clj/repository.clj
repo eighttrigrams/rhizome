@@ -151,15 +151,18 @@
         :contexts                        (search/search-contexts db "")
         :selected-secondary-contexts-ids #{}}
        :exit-events-view
-       {:issues         (search/search-issues db (assoc opts :show-events? false))
-        :contexts       (search/search-contexts db "")
-        :selected-issue nil
-        :show-events?   false}
+       (if selected-context
+         {:show-events? false
+          :issues         (search/search-issues db (assoc opts :show-events? false))}
+         {:issues         (search/search-issues db (assoc opts :show-events? false))
+          :contexts       (search/search-contexts db "")
+          :selected-issue nil
+          :show-events?   false})
        :enter-events-view
        {:issues                          (search/search-issues db (assoc opts :show-events? true))
         :contexts                        []
         :selected-issue                  nil
-        :selected-context                nil
+        ;; :selected-context                nil
         :selected-secondary-contexts-ids #{}
         :show-events?                    true}
        :deselect-context
