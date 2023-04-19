@@ -11,7 +11,12 @@
   (merge 
    state
    i
-   {:issues (or issues (:issues state))
+   {:issues (if issues 
+              (first issues)
+              (:issues state))
+    :aggregated-contexts (if issues
+                           (second issues)
+                           (:aggregated-contexts state))
     :contexts (or contexts (:contexts state))}))
 
 (defn- list-resources [state q]

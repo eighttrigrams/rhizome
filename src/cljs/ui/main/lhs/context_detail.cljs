@@ -39,8 +39,13 @@
 (defn- secondary-contexts-component [*state]
   (let [{:keys                        [selected-secondary-contexts-ids
                                        issues
-                                       unassigned-secondary-contexts-selected?]
-         {:keys [secondary_contexts]} :selected-context} @*state]
+                                       unassigned-secondary-contexts-selected?
+                                       aggregated-contexts 
+                                       selected-context]} @*state
+        secondary_contexts (into {} (remove (fn [[idx _v]]
+                                              (= idx (:id selected-context))) 
+                                            aggregated-contexts))] 
+
     [:ul
      [:li [unassigned-secondary-contexts-component *state]]
      (->> secondary_contexts
@@ -75,12 +80,12 @@
         0 "Normal"
         1 "A->Z,0->9"
         2 "9->0,Z->A")]
+     [:hr]
+     [:> ReactMarkdown
+      {:children (:description (:selected-context @*state))}]
      (when (:secondary_contexts (:selected-context @*state))
        [:<>
         [:hr]
         [:h2 "Secondary contexts:"]
         [invert-component *state]
-        [secondary-contexts-component *state]])
-     [:hr]
-     [:> ReactMarkdown
-      {:children (:description (:selected-context @*state))}]]))
+        [secondary-contexts-component *state]])]))

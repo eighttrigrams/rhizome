@@ -122,7 +122,7 @@
        :or   {q ""}}]
   (seq (fetch-ids db q (if search-globally? nil selected-context) show-events?)))
 
-(defn search-issues
+(defn- search-issues'
   [db {:keys [selected-context 
               show-events?
               selected-secondary-contexts-ids
@@ -145,3 +145,16 @@
                                                 unassigned-secondary-contexts-selected?
                                                 secondary-contexts-inverted?))
     '()))
+
+(defn search-issues [db {:keys [show-events? selected-context] :as opts}]
+  (if-not (or selected-context show-events?)
+    [(search-issues' db opts) {}]
+    (let [aggregated-contexts 
+          (into {} (map :contexts (search-issues' db (-> opts 
+                                                         (assoc :selected-secondary-contexts-ids '())
+                                                         (dissoc
+                                                          :show-events?
+                                                          :unassigned-secondary-contexts-selected?
+                                                          :secondary-contexts-inverted?)))))]
+      
+      [(search-issues' db opts) aggregated-contexts])))

@@ -19,11 +19,6 @@
           nil))
 
 #_{:clj-kondo/ignore [:unresolved-var]}
-(defn get-issues [q]
-  (let [db (:db config/config)]
-    (search/search-issues db {:q q})))
-
-#_{:clj-kondo/ignore [:unresolved-var]}
 (defn get-contexts [q]
   (let [db (:db config/config)]
     (search/search-contexts db q)))
