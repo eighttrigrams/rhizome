@@ -1,7 +1,7 @@
 (ns ui.modals.issue-edit
   (:require [reagent.core :as r]
             [net.eighttrigrams.cljs-text-editor.editor :as editor]
-            [ui.modals.link-context-issue :as link-content-issue]
+            [ui.modals.link-context-issue :as link-context-issue]
             api))
 
 (defn- get-title-el []
@@ -71,7 +71,7 @@
                         :on-click #(swap! *related-issues dissoc idx)}
                        title]) @*related-issues))]])
 
-(defn component [selected-context issue]
+(defn component [issue]
   (let [*date-visible?  (r/atom (boolean (:date issue)))]
     (reset! *related-issues (into {} (map (fn [{:keys [id title]}] [id title]) (:related_issues issue))))
     (r/create-class
@@ -86,7 +86,7 @@
          [:hr]
          [:h4 "Related issues"]
          [related-issues-component *related-issues]
-         [link-content-issue/component selected-context issue]])})))
+         [link-context-issue/component issue]])})))
 
 (defn get-values [id]
   {:issue              {:id              id

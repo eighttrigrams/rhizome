@@ -79,7 +79,7 @@
          :new-context
          [new-context-component]
          :edit-issue
-         [:div#modal-component [issue-edit/component (:selected-context @*state) item]]
+         [:div#modal-component [issue-edit/component item]]
          :edit-context
          [:div#modal-component [context-edit/component item]]
          nil)])))
