@@ -11,7 +11,10 @@
   (let [remove-context (fn [idx]
                          #(swap! *selectable-contexts
                                  (fn [vals]
-                                   (into {} (remove (fn [[k _v]] (= k idx)) vals)))))] 
+                                   (let [new-vals (remove (fn [[k _v]] (= k idx)) vals)]
+                                     (if (seq new-vals)
+                                       (into {} new-vals)
+                                       vals)))))] 
     
     (reset! *selectable-contexts (:contexts issue))
     
