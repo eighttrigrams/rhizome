@@ -70,7 +70,7 @@
 (defn component [_*state]
   (fn [*state]
     [:<>
-     [:h2 "Search mode: " 
+     [:h4 "Search mode: " 
       (case (:search_mode (:selected-context @*state))
         0 "Normal"
         1 "A->Z,0->9"
