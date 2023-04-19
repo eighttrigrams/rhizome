@@ -28,7 +28,13 @@
   (let [{:keys [selected-issue selected-context]} @*state
         {:keys [contexts]} selected-issue]
     [:<>
-     [:h4 (if selected-context (str "[" (:title selected-context) "]") "[Overview]")]
+     [:h4 (if selected-context 
+            
+            [:div
+             {:on-click #(actions/deselect-issue! *state)}
+             (str "[" (:title selected-context) "]")] 
+            
+            "[Overview]")]
      [context-links-component *state contexts]
      [:hr]
      [the-issue-itself-component selected-issue]]))
