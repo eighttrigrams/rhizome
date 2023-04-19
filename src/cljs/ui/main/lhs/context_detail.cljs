@@ -42,13 +42,13 @@
                                        unassigned-secondary-contexts-selected?
                                        aggregated-contexts 
                                        selected-context]} @*state
-        secondary_contexts (into {} (remove (fn [[idx _v]]
+        secondary-contexts (into {} (remove (fn [[idx _v]]
                                               (= idx (:id selected-context))) 
                                             aggregated-contexts))] 
 
     [:ul
      [:li [unassigned-secondary-contexts-component *state]]
-     (->> secondary_contexts
+     (->> secondary-contexts
           (count-issues issues)
           (sort-by (fn [[_id [title _count]]] (.toLowerCase title)))
           (map (fn [[id [title count]]]
