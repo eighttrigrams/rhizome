@@ -149,12 +149,15 @@
 (defn search-issues [db {:keys [show-events? selected-context] :as opts}]
   (if-not (or selected-context show-events?)
     [(search-issues' db opts) {}]
-    (let [aggregated-contexts 
-          (into {} (map :contexts (search-issues' db (-> opts 
-                                                         (assoc :selected-secondary-contexts-ids '())
-                                                         (dissoc
-                                                          :show-events?
-                                                          :unassigned-secondary-contexts-selected?
-                                                          :secondary-contexts-inverted?)))))]
-      
+    (let [result (map :contexts (search-issues' db (-> opts 
+                                                       (assoc :selected-secondary-contexts-ids '())
+                                                       (dissoc
+                                                        :show-events?
+                                                        :unassigned-secondary-contexts-selected?
+                                                        :secondary-contexts-inverted?))))
+          result (apply concat (map seq result))
+          result (group-by first result)
+          aggregated-contexts
+          (reverse (map second (sort-by first (map #(do [(count (second %)) (first (second %))])
+                                                   result))))]
       [(search-issues' db opts) aggregated-contexts])))

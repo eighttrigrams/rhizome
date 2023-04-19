@@ -42,15 +42,14 @@
                                        unassigned-secondary-contexts-selected?
                                        aggregated-contexts 
                                        selected-context]} @*state
-        secondary-contexts (into {} (remove (fn [[idx _v]]
-                                              (= idx (:id selected-context))) 
-                                            aggregated-contexts))] 
+        secondary-contexts (remove (fn [[idx _v]]
+                                     (= idx (:id selected-context))) 
+                                   aggregated-contexts)]
 
     [:ul
      [:li [unassigned-secondary-contexts-component *state]]
      (->> secondary-contexts
           (count-issues issues)
-          (sort-by (fn [[_id [title _count]]] (.toLowerCase title)))
           (map (fn [[id [title count]]]
                  [:li
                   {:key id
@@ -83,9 +82,8 @@
      [:hr]
      [:> ReactMarkdown
       {:children (:description (:selected-context @*state))}]
-     (when (:secondary_contexts (:selected-context @*state))
-       [:<>
-        [:hr]
-        [:h2 "Secondary contexts:"]
-        [invert-component *state]
-        [secondary-contexts-component *state]])]))
+     [:<>
+      [:hr]
+      [:h2 "Secondary contexts:"]
+      [invert-component *state]
+      [secondary-contexts-component *state]]]))
