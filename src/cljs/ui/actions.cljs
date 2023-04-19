@@ -131,8 +131,5 @@
   (when (js/window.confirm "Delete currently selected context?")
     (exec-cmd *state :delete-context (:selected-context @*state))))
 
-(defn reprioritize-issue! [*state]
-  (exec-cmd *state :reprioritize-issue))
-
 (defn mark-issue-important! [*state]
   (exec-cmd *state :mark-issue-important))
