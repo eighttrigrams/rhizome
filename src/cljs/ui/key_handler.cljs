@@ -52,8 +52,18 @@
                     (not meta-pressed?)
                     (not ctrl-pressed?)
                     (not alt-pressed?)
+                    (not shift-pressed?)
                     (not (:show-events? @*state)))
                (swap! *state #(assoc % :active-search :contexts))
+               (and (= "KeyC" code)
+                    (not meta-pressed?)
+                    (not ctrl-pressed?)
+                    (not alt-pressed?)
+                    shift-pressed?
+                    (not (:show-events? @*state)))
+               (swap! *state #(assoc % 
+                                     :active-search :contexts
+                                     :link-context true))
                (and selected-context
                     (not selected-issue)
                     (= "KeyS" code))
