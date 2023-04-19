@@ -162,7 +162,6 @@
        {:issues                          (search/search-issues db (assoc opts :show-events? true))
         :contexts                        []
         :selected-issue                  nil
-        ;; :selected-context                nil
         :selected-secondary-contexts-ids #{}
         :show-events?                    true}
        :deselect-context
