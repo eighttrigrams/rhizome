@@ -55,6 +55,12 @@
       (swap! *state assoc :selected-issue issue)
       (fetch-and-reset! *state (assoc @*state :cmd :fetch-issue :arg issue)))))
 
+(defn start-context-search [*state]
+  (fetch-and-reset! *state 
+                    (assoc @*state
+                           :cd :start-context-search
+                           :active-search :contexts)))
+
 (defn start-global-search! [*state]
   (fetch-and-reset! *state
                     (assoc @*state 
