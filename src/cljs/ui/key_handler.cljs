@@ -60,6 +60,7 @@
                     (not ctrl-pressed?)
                     (not alt-pressed?)
                     shift-pressed?
+                    selected-issue
                     (not (:show-events? @*state)))
                (swap! *state #(assoc % 
                                      :active-search :contexts
