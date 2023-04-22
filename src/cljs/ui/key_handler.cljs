@@ -34,8 +34,6 @@
                (actions/delete-issue! *state)
                (and selected-context (= "Delete" code))
                (actions/delete-context! *state)
-               (and selected-issue (= "KeyT" code))
-               (actions/mark-issue-important! *state)
                (and selected-context (= "KeyE" code))
                (swap! *state #(assoc % :modal :edit-context))
                (and shift-pressed? (= "KeyI" code))

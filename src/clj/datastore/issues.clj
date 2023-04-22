@@ -176,12 +176,6 @@
                                  :set {:updated_at [:raw "NOW()"]}
                                  :where [:= :id [:inline id]]})))
 
-(defn mark-issue-important [db {:keys [id important] :as selected-issue}]
-  (jdbc/execute! db (sql/format {:update [:issues]
-                                 :set {:important (not important)}
-                                 :where [:= :id [:inline id]]}))
-  (get-issue db selected-issue))
-
 (defn link-issue-contexts [db selected-issue link-issue-contexts]
   (jdbc/execute! db (sql/format {:delete-from [:context_issue]
                                  :where [:= :issue_id [:inline (:id selected-issue)]]}))

@@ -53,9 +53,6 @@
               :contexts (search/search-contexts db "")})
        :start-context-search
        {:contexts (search/search-contexts db "")}
-       :mark-issue-important 
-       {:selected-issue (datastore/mark-issue-important db selected-issue)
-        :issues         (search/search-issues db opts)}
        :delete-issue
        (do (datastore/delete-issue db arg)
            {:issues         (search/search-issues db opts)

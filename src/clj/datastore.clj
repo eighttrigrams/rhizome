@@ -29,9 +29,7 @@
 
 (def link-issue issues/link-issue)
 
-(def reprioritize-issue issues/reprioritize-issue)
-
-(def mark-issue-important issues/mark-issue-important) 
+(def reprioritize-issue issues/reprioritize-issue) 
 
 (def link-issue-contexts issues/link-issue-contexts)
 
