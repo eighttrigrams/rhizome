@@ -115,6 +115,9 @@
 (defn change-secondary-contexts-inverted! [*state]
   (exec-cmd *state :change-secondary-contexts-inverted))
 
+(defn change-secondary-contexts-and! [*state]
+  (exec-cmd *state :change-secondary-contexts-and))
+
 (defn show-events! [*state]
   (exec-cmd *state :enter-events-view))
 

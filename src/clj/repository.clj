@@ -43,7 +43,7 @@
        nil
        (cond (= :issues active-search)
              {:issues (search/search-issues db (if (or (= :issue link-issue)
-                                                       search-globally?) 
+                                                       search-globally?)
                                                  (assoc opts :selected-secondary-contexts-ids '())
                                                  opts))}
              (= :contexts active-search)
@@ -57,7 +57,7 @@
        (do (datastore/delete-issue db arg)
            {:issues         (search/search-issues db opts)
             :selected-issue nil})
-       :delete-context 
+       :delete-context
        (do (datastore/delete-context db arg)
            {:issues           (search/search-issues db opts)
             :contexts         (search/search-contexts db "")
@@ -87,14 +87,14 @@
           :active-search    nil
           :link-issue       nil
           :search-globally? false})
-       :link-context 
+       :link-context
        (do
          (datastore/link-issue-contexts db selected-issue (vec (set (conj (keys (:contexts selected-issue))
                                                                           (:id arg)))))
          {:link-context nil
           :selected-issue (datastore/get-issue db selected-issue)
           :active-search nil})
-       :insert-issue 
+       :insert-issue
        (let [selected-issue (datastore/new-issue db arg
                                                  (:id selected-context)
                                                  selected-secondary-contexts-ids)]
@@ -124,7 +124,7 @@
           :active-search    nil
           :search-globally? false})
        :fetch-context
-       (do 
+       (do
          (datastore/reprioritize-context db arg)
          (let [selected-context (datastore/get-context db arg)
                opts             {:search-globally?                false
@@ -136,12 +136,15 @@
                    :active-search                           nil
                    :context-to-fetch                        nil
                    :secondary-contexts-inverted?            false
+                   :secondary-contexts-and?                 false
                    :unassigned-secondary-contexts-selected? false})))
        :change-secondary-contexts-selection
        {:issues (search/search-issues db opts)}
        :change-secondary-contexts-unassigned-selected
        {:issues (search/search-issues db opts)}
        :change-secondary-contexts-inverted
+       {:issues (search/search-issues db opts)}
+       :change-secondary-contexts-and
        {:issues (search/search-issues db opts)}
        :deselect-secondary-contexts
        {:issues                          (search/search-issues db (assoc opts :selected-secondary-contexts-ids #{}))

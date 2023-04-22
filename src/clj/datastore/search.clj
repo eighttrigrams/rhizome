@@ -100,6 +100,7 @@
 (defn- filter-by-selected-secondary-contexts [selected-secondary-contexts-ids 
                                               unassigned-secondary-contexts-selected?
                                               secondary-contexts-inverted?
+                                              secondary-contexts-and?
                                               issues]
   (if (or unassigned-secondary-contexts-selected?
           (seq selected-secondary-contexts-ids))
@@ -108,9 +109,13 @@
        (or 
         (and unassigned-secondary-contexts-selected?
              (= 1 (count (:contexts issue))))
-        (seq (set/intersection 
-              (set (keys (:contexts issue)))
-              selected-secondary-contexts-ids)))
+        
+        (if secondary-contexts-and?
+          (every? identity (map #(contains? (set (keys (:contexts issue))) %) 
+                                selected-secondary-contexts-ids))
+          (seq (set/intersection 
+                (set (keys (:contexts issue)))
+                selected-secondary-contexts-ids))))
        )issues)
     issues))
 
@@ -127,6 +132,7 @@
               show-events?
               selected-secondary-contexts-ids
               unassigned-secondary-contexts-selected?
+              secondary-contexts-and?
               secondary-contexts-inverted?]
        :as opts}]
   
@@ -143,7 +149,8 @@
              %))
          (filter-by-selected-secondary-contexts selected-secondary-contexts-ids
                                                 unassigned-secondary-contexts-selected?
-                                                secondary-contexts-inverted?))
+                                                secondary-contexts-inverted?
+                                                secondary-contexts-and?))
     '()))
 
 (defn search-issues [db {:keys [show-events? selected-context] :as opts}]

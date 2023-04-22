@@ -65,6 +65,17 @@
     (swap! *state update :secondary-contexts-inverted? not)
     (actions/change-secondary-contexts-inverted! *state)))
 
+(defn- select-and-contexts [*state]
+  (fn [_]
+    (swap! *state update :secondary-contexts-and? not)
+    (actions/change-secondary-contexts-and! *state)))
+
+(defn- and-search-component [*state]
+  [:span {:style (when (:secondary-contexts-and? @*state)
+                   {:font-weight :bold})
+          :on-click (select-and-contexts *state)}
+   "And"])
+
 (defn- invert-component [*state]
   [:span {:style (when (:secondary-contexts-inverted? @*state)
                    {:font-weight :bold})
@@ -85,5 +96,7 @@
      [:<>
       [:hr]
       [:h2 "Secondary contexts:"]
+      [and-search-component *state]
+      [:br]
       [invert-component *state]
       [secondary-contexts-component *state]]]))
