@@ -30,16 +30,17 @@
 (defn select-context! 
   ([*state context] (select-context! *state context false))
   ([*state context suppress-reset-issue]
-   ;; See below
-   (swap! *state assoc :selected-context context)
    (if (true? (:link-context @*state))
      (fetch-and-reset! *state (assoc @*state :cmd :link-context :arg context))
-     (fetch-and-reset! *state (-> @*state
-                                  (assoc :cmd :fetch-context 
-                                         :arg context)
-                                  (#(if-not suppress-reset-issue
-                                      (dissoc % :selected-issue) ;; TODO review
-                                      (identity %))))))))
+     (do
+       ;; See below
+       (swap! *state assoc :selected-context context)
+       (fetch-and-reset! *state (-> @*state
+                                    (assoc :cmd :fetch-context 
+                                           :arg context)
+                                    (#(if-not suppress-reset-issue
+                                        (dissoc % :selected-issue) ;; TODO review
+                                        (identity %)))))))))
 
 (defn select-issue! [*state issue]
   (cond 
