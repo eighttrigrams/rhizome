@@ -76,7 +76,7 @@
           :active-search    nil
           :link-issue       nil
           :search-globally? false})
-       :link-issue-context
+       :link-issue-context ;; when context selected, add an issue
        (let [selected-issue (datastore/get-issue db {:id arg})
              context-ids   (keys (:contexts selected-issue))]
          (datastore/link-issue-contexts db {:id arg} (vec (set (conj context-ids (:id selected-context)))))
@@ -87,13 +87,14 @@
           :active-search    nil
           :link-issue       nil
           :search-globally? false})
-       :link-context
-       (do
+       :link-context ;; when issue selected, link to yet another context
+       (do 
          (datastore/link-issue-contexts db selected-issue (vec (set (conj (keys (:contexts selected-issue))
                                                                           (:id arg)))))
          {:link-context nil
           :selected-issue (datastore/get-issue db selected-issue)
-          :active-search nil})
+          :active-search nil
+          :issues (search/search-issues db opts)})
        :insert-issue
        (let [selected-issue (datastore/new-issue db arg
                                                  (:id selected-context)
