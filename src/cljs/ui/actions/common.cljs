@@ -4,7 +4,7 @@
             api))
 
 (defn reset-state! [new-state *state]
-  (reset! *state new-state))
+  (reset! *state (assoc new-state :loading true)))
 
 (defn- update-state [{:keys [issues contexts] :as i} 
                      state]
@@ -32,10 +32,14 @@
           <p!
           (update-state state))))
 
+(defn- dissoc-loading [_ *state]
+  (js/setTimeout (fn [_] (swap! *state dissoc :loading)) 500))
+
 (defn fetch-and-reset!
   ([*state state] (fetch-and-reset! *state state ""))
   ([*state state value]
    (go (-> state
            (fetch-resources value)
            <!
-           (reset-state! *state)))))
+           (reset-state! *state)
+           (dissoc-loading *state)))))

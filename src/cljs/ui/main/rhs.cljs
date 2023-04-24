@@ -13,11 +13,9 @@
 (defn- related-issues-list-item-component [*state {:keys [id title contexts] :as issue}]
   [:li.card.issue-card
    {:on-click #(do (swap! *state (fn [state] ;; TODO review and dedup with issues-list-item/component
-                                   (-> state 
-                                       (assoc :loading true)
+                                   (-> state
                                        (dissoc :preview-issue))))
-                   (actions/select-issue! *state {:id id})
-                   (js/setTimeout (fn [_] (swap! *state dissoc :loading)) 500))
+                   (actions/select-issue! *state {:id id}))
     :on-mouse-enter #(when-not (:loading @*state) (swap! *state assoc :preview-issue issue))
     :on-mouse-leave #(swap! *state dissoc :preview-issue)}
    [:div
