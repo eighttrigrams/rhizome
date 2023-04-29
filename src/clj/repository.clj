@@ -44,7 +44,16 @@
        (cond (= :issues active-search)
              {:issues (search/search-issues db (if (or (= :issue link-issue)
                                                        search-globally?)
-                                                 (assoc opts :selected-secondary-contexts-ids '())
+                                                 (if (and (= :issue link-issue)
+                                                          search-globally?)
+                                                   (-> opts
+                                                       (cond-> :selected-context
+                                                         (update :selected-context #(dissoc % :search-mode)))
+                                                       (assoc :selected-secondary-contexts-ids '())
+                                                       (dissoc :show-events?
+                                                               :unassigned-secondary-contexts-selected?
+                                                               :secondary-contexts-inverted?))
+                                                   (assoc opts :selected-secondary-contexts-ids '()))
                                                  opts))}
              (= :contexts active-search)
              {:contexts (search/search-contexts db q)}
