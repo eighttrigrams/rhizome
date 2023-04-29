@@ -14,8 +14,9 @@
               title])
            related-contexts)]]))
 
-(defn- the-issue-itself-component [{:keys [title description]}]
+(defn- the-issue-itself-component [{:keys [title description date]}]
   [:<>
+   (when date [:b date])
    [:span
     {:style {:font-size "35px"}}
     [:> ReactMarkdown
