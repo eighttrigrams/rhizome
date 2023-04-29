@@ -48,7 +48,7 @@
                                                           search-globally?)
                                                    (-> opts
                                                        (cond-> :selected-context
-                                                         (update :selected-context #(dissoc % :search-mode)))
+                                                         (update :selected-context #(dissoc % :search_mode)))
                                                        (assoc :selected-secondary-contexts-ids '())
                                                        (dissoc :show-events?
                                                                :unassigned-secondary-contexts-selected?
