@@ -32,7 +32,10 @@
 (defn- related-issues-query [id]
   {:select [:issues.*
             [[:array_agg :contexts.id] :context_ids]
-            [[:array_agg :contexts.title] :context_titles]]
+            [[:array_agg :contexts.title] :context_titles]
+            {:select :date
+             :from   [:events]
+             :where  [:= :events.issue_id :issues.id]}]
    :from   [:issues]
    :join   [:context_issue [:= :issues.id :context_issue.issue_id]
             :contexts [:= :context_issue.context_id :contexts.id]]

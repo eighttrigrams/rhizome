@@ -20,6 +20,7 @@
     :on-mouse-leave #(swap! *state dissoc :preview-issue)}
    [:div
     [issues-list-item/title-component title]
+    [issues-list-item/info-component @*state issue]
     [context-badges/component contexts]]])
 
 (defn- related-issues-list-component [*state]

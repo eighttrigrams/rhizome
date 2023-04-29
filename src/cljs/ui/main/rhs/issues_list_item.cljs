@@ -3,7 +3,7 @@
             [ui.actions :as actions]
             [ui.main.rhs.context-badges :as context-badges]))
 
-(defn- info-component [state issue]
+(defn info-component [state issue]
   [:span.info
    (when (and (:selected-context state)
               (not= 0 (:search_mode (:selected-context state)))
@@ -31,7 +31,6 @@
     :on-mouse-enter #(when-not (:loading @*state) (swap! *state assoc :preview-issue issue))
     :on-mouse-leave #(swap! *state dissoc :preview-issue)}
    [:div
-    {:class (when (:important issue) :important)}
     [title-component (:title issue)]
     [info-component @*state issue]
     [context-badges/component (remove #(= (:id (:selected-context @*state))
