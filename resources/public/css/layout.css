@@ -37,3 +37,7 @@ body {
     height: 100vh;
     width: 600px;
 }
+
+#search-input {
+    width: 585px;
+}
