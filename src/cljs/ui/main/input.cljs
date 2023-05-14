@@ -11,6 +11,8 @@
                 :on-change    #(actions/search! *state (.-value (.-target %)))
                 :on-key-down  #(let [code (.-code %)]
                                  (.stopPropagation %)
+                                 (when (= code "Enter")
+                                   (actions/select-first-context! *state))
                                  (when (= code "Escape")
                                    (actions/quit-search! *state)))}])}))
 

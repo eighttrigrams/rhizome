@@ -38,6 +38,11 @@
                                         (dissoc % :selected-issue) ;; TODO review
                                         (identity %)))))))))
 
+(defn select-first-context! [*state]
+  (when (seq (:contexts @*state))
+    (let [first-context (first (:contexts @*state))]
+      (select-context! *state first-context))))
+
 (defn select-issue! [*state issue]
   (cond 
     (= :issue (:link-issue @*state))
