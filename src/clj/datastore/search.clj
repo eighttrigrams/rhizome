@@ -164,7 +164,8 @@
                                       (str/replace ")" "") 
                                       (str/replace "[" "")
                                       (str/replace "]" "")
-                                      (str/replace "|" "")))
+                                      (str/replace "|" "")
+                                      (str/replace "'" "")))
                  ;; for destructuring in searcj-issues' to work properly when :q is present but has nil value
                  (dissoc opts :q)) 
           aggregated-contexts
