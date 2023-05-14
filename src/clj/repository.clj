@@ -167,17 +167,20 @@
        :exit-events-view
        (if selected-context
          {:show-events? false
-          :issues         (search/search-issues db (assoc opts :show-events? false))}
-         {:issues         (search/search-issues db (assoc opts :show-events? false))
+          :issues       (search/search-issues db (dissoc (assoc opts :show-events? false) :q))
+          :q            nil}
+         {:issues         (search/search-issues db (dissoc (assoc opts :show-events? false) :q))
           :contexts       (search/search-contexts db "")
           :selected-issue nil
-          :show-events?   false})
+          :show-events?   false
+          :q              nil})
        :enter-events-view
-       {:issues                          (search/search-issues db (assoc opts :show-events? true))
+       {:issues                          (search/search-issues db (assoc opts :show-events? true :q nil))
         :contexts                        []
         :selected-issue                  nil
         :selected-secondary-contexts-ids #{}
-        :show-events?                    true}
+        :show-events?                    true
+        :q                               nil}
        :deselect-context
        {:issues           (search/search-issues db (dissoc opts :selected-context :q))
         :contexts         (search/search-contexts db "")
