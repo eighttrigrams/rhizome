@@ -33,7 +33,7 @@
                               selected-context
                               selected-secondary-contexts-ids] 
                        :as   opts}]
-
+  
   #_{:clj-kondo/ignore [:unresolved-var]}
   (merge 
    {:cmd                             nil
@@ -81,26 +81,29 @@
                                                          (assoc :selected-secondary-contexts-ids #{})))
           :active-search    nil
           :link-issue       nil
-          :search-globally? false})
+          :search-globally? false
+          :q                nil})
        :link-issue-context ;; when context selected, add an issue
        (let [selected-issue (datastore/get-issue db {:id arg})
              context-ids   (keys (:contexts selected-issue))]
          (datastore/link-issue-contexts db {:id arg} (vec (set (conj context-ids (:id selected-context)))))
          {:selected-issue   nil
           :issues           (search/search-issues db (-> opts
-                                                         (dissoc :search-globally?)
+                                                         (dissoc :search-globally? :q)
                                                          (assoc :selected-secondary-contexts-ids #{})))
           :active-search    nil
           :link-issue       nil
-          :search-globally? false})
+          :search-globally? false
+          :q                nil})
        :link-context ;; when issue selected, link to yet another context
        (do 
          (datastore/link-issue-contexts db selected-issue (vec (set (conj (keys (:contexts selected-issue))
                                                                           (:id arg)))))
-         {:link-context nil
+         {:link-context   nil
           :selected-issue (datastore/get-issue db selected-issue)
-          :active-search nil
-          :issues (search/search-issues db opts)})
+          :active-search  nil
+          :issues         (search/search-issues db (dissoc opts :q))
+          :q              nil})
        :insert-issue
        (let [selected-issue (datastore/new-issue db arg
                                                  (:id selected-context)
@@ -119,17 +122,20 @@
        (do
          (datastore/link-issue-contexts db selected-issue (:issue-contexts arg))
          {:selected-issue (datastore/update-issue db (:issue arg))
-          :issues         (search/search-issues db opts)})
+          :issues         (search/search-issues db (dissoc opts :q))
+          :q              nil})
        :update-context
        {:selected-context (datastore/update-context db arg)
-        :issues           (search/search-issues db opts)}
+        :issues           (search/search-issues db (dissoc opts :q))
+        :q                nil}
        :fetch-issue
        (do
          (datastore/reprioritize-issue db arg)
          {:selected-issue   (datastore/get-issue db arg)
-          :issues           (search/search-issues db (dissoc opts :search-globally?))
+          :issues           (search/search-issues db (dissoc opts :search-globally? :q))
           :active-search    nil
-          :search-globally? false})
+          :search-globally? false
+          :q                nil})
        :fetch-context
        (do
          (datastore/reprioritize-context db arg)
@@ -139,12 +145,13 @@
                                  :selected-context                selected-context}]
            (merge opts
                   {:selected-context                        selected-context
-                   :issues                                  (search/search-issues db opts)
+                   :issues                                  (search/search-issues db (dissoc opts :q))
                    :active-search                           nil
                    :context-to-fetch                        nil
                    :secondary-contexts-inverted?            false
                    :secondary-contexts-and?                 false
-                   :unassigned-secondary-contexts-selected? false})))
+                   :unassigned-secondary-contexts-selected? false
+                   :q                                       nil})))
        :change-secondary-contexts-selection
        {:issues (search/search-issues db opts)}
        :change-secondary-contexts-unassigned-selected
@@ -172,6 +179,10 @@
         :selected-secondary-contexts-ids #{}
         :show-events?                    true}
        :deselect-context
-       {:issues           (search/search-issues db (dissoc opts :selected-context))
+       {:issues           (search/search-issues db (dissoc opts :selected-context :q))
         :contexts         (search/search-contexts db "")
-        :selected-context nil}))))
+        :selected-context nil
+        :q                nil}
+       
+       ;; TODO remove :else clause. fix where there are cases where this fires but there shoulnd't be
+       :else {}))))

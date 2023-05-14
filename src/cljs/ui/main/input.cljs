@@ -8,10 +8,12 @@
     :render (fn []
               [:input#search-input
                {:autoComplete :off
-                :on-change    #(actions/search! *state (.-value (.-target %)))
+                :on-change    #(do (swap! *state assoc :q (.-value (.-target %)))
+                                   (actions/search! *state))
                 :on-key-down  #(let [code (.-code %)]
                                  (.stopPropagation %)
-                                 (when (= code "Enter")
+                                 (when (and (= code "Enter")
+                                            (= :contexts (:active-search @*state)))
                                    (actions/select-first-context! *state))
                                  (when (= code "Escape")
                                    (actions/quit-search! *state)))}])}))
@@ -19,5 +21,9 @@
 (defn component [*state]
   [:<>
    [:div.active-search-input-container [input-component *state]]
-   [:div.mask.search-active
-    {:on-click #(actions/quit-search! *state)}]])
+   (when (not (and (nil? (:selected-issue @*state))
+                   (:selected-context @*state)
+                   (= :issues (:active-search @*state))
+                   (not (:search-globally? @*state))))
+     [:div.mask.search-active
+      {:on-click #(actions/quit-search! *state)}])])

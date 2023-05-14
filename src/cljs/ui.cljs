@@ -26,7 +26,8 @@
                               (not (:active-search new-state)))
                          (and (:modal old-state) ;; TODO extract duplicate pattern
                               (not (:modal new-state))))
-                 (re-focus)))))
+                 (re-focus)
+                 (swap! *state dissoc :q)))))
 
 (defn component []
   (let [*state (r/atom original-state)]

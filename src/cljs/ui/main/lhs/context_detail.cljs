@@ -19,16 +19,22 @@
              (reduce (count-reducer id) 0 issues)]])
          secondary-contexts)))
 
+(defn re-focus []
+  (when-let [el (.getElementById js/document "search-input")]
+    (.focus el)))
+
 (defn- select-secondary-context [*state id]
   (fn [_]
     (swap! *state update :selected-secondary-contexts-ids
            #((if (contains? % id) disj conj) % id))
-    (actions/change-secondary-contexts-selection! *state)))
+    (actions/change-secondary-contexts-selection! *state)
+    (re-focus)))
 
 (defn- select-unassigned-secondary-contexts [*state]
   (fn [_]
     (swap! *state update :unassigned-secondary-contexts-selected? not)
-    (actions/change-secondary-contexts-unassigned-selected! *state)))
+    (actions/change-secondary-contexts-unassigned-selected! *state)
+    (re-focus)))
 
 (defn- unassigned-secondary-contexts-component [*state]
   [:span {:style (when (:unassigned-secondary-contexts-selected? @*state)
@@ -45,7 +51,6 @@
         secondary-contexts (remove (fn [[idx _v]]
                                      (= idx (:id selected-context))) 
                                    aggregated-contexts)]
-
     [:ul
      [:li [unassigned-secondary-contexts-component *state]]
      (->> secondary-contexts
@@ -63,12 +68,14 @@
 (defn- select-invert-contexts [*state]
   (fn [_]
     (swap! *state update :secondary-contexts-inverted? not)
-    (actions/change-secondary-contexts-inverted! *state)))
+    (actions/change-secondary-contexts-inverted! *state)
+    (re-focus)))
 
 (defn- select-and-contexts [*state]
   (fn [_]
     (swap! *state update :secondary-contexts-and? not)
-    (actions/change-secondary-contexts-and! *state)))
+    (actions/change-secondary-contexts-and! *state)
+    (re-focus)))
 
 (defn- and-search-component [*state]
   [:span {:style (when (:secondary-contexts-and? @*state)
@@ -85,18 +92,21 @@
 (defn component [_*state]
   (fn [*state]
     [:<>
-     [:h4 "Search mode: " 
-      (case (:search_mode (:selected-context @*state))
-        0 "Normal"
-        1 "A->Z,0->9"
-        2 "9->0,Z->A")]
-     [:hr]
+     (when-not (:search-globally? @*state)
+       [:<>
+        [:h4 "Search mode: " 
+         (case (:search_mode (:selected-context @*state))
+           0 "Normal"
+           1 "A->Z,0->9"
+           2 "9->0,Z->A")]
+        [:hr]])
      [:> ReactMarkdown
       {:children (:description (:selected-context @*state))}]
-     [:<>
-      [:hr]
-      [:h2 "Secondary contexts:"]
-      [and-search-component *state]
-      [:br]
-      [invert-component *state]
-      [secondary-contexts-component *state]]]))
+     (when-not (:search-globally? @*state)
+       [:<>
+        [:hr]
+        [:h2 "Secondary contexts:"]
+        [and-search-component *state]
+        [:br]
+        [invert-component *state]
+        [secondary-contexts-component *state]])]))

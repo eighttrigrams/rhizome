@@ -5,7 +5,8 @@
             [honey.sql :as sql]
             [datastore.helpers
              :refer [un-namespace-keys]]
-            [datastore.issues.common :as common]))
+            [datastore.issues.common :as common]
+            [datastore.contexts :as contexts]))
 
 (defn- convert-q-to-query-string [q]
   (str/join " & " (map #(str % ":*") (str/split q #" "))))
@@ -153,10 +154,12 @@
                                                 secondary-contexts-and?))
     '()))
 
-(defn search-issues [db {:keys [show-events? selected-context] :as opts}]
+(defn search-issues [db {:keys [show-events? selected-context selected-secondary-contexts-ids] :as opts}]
   (if-not (or selected-context show-events?)
     [(search-issues' db opts) {}]
-    (let [aggregated-contexts
+    (let [;; TODO instead of doing this, make sure q is always at least ""
+          opts (if (:q opts) opts (dissoc opts :q)) ;; for destructuring in searcj-issues' to work properly when :q is present but has nil value
+          aggregated-contexts
           (->> (search-issues' db (-> opts 
                                       (assoc :selected-secondary-contexts-ids '())
                                       (dissoc
@@ -170,5 +173,9 @@
                (map #(do [(count (second %)) (first (second %))]))
                (sort-by first)
                (map second)
-               reverse)]
+               reverse)
+          aggregated-contexts (reduce (fn [acc val]
+                                        (conj acc [val (:title (contexts/get-context db {:id val}))])) 
+                                      aggregated-contexts (set/difference selected-secondary-contexts-ids
+                                                                          (set (map first aggregated-contexts))))]
       [(search-issues' db opts) aggregated-contexts])))

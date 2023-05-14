@@ -12,14 +12,14 @@
 
 (defn quit-search! [*state]
   (fetch-and-reset! *state (-> @*state
-                               (dissoc :preview-issue :active-search :search-globally? :link-issue))))
+                               (dissoc :preview-issue :active-search :search-globally? :link-issue :q))))
 
 (defn deselect-context! [*state]
   (fetch-and-reset! *state (assoc @*state :cmd :deselect-context)))
 
 (defn deselect-issue! [*state]
   (swap! *state #(-> @*state
-                     (dissoc :selected-issue)
+                     (dissoc :selected-issue :preview-issue)
                      (dissoc :preview-issue)))
   (js/setTimeout (fn [_] (swap! *state dissoc :loading)) 500))
 
@@ -74,35 +74,35 @@
   (fetch-and-reset! *state
                     (assoc @*state 
                            :active-search :issues
-                           :search-globally? true)
-                    ""))
+                           :search-globally? true
+                           :q "")))
 
 (defn link-with-global-search! [*state]
   (fetch-and-reset! *state
                     (assoc @*state 
                            :active-search :issues
                            :search-globally? true
-                           :link-issue :issue)
-                    ""))
+                           :link-issue :issue
+                           :q "")))
 
 (defn link-with-local-search! [*state]
   (fetch-and-reset! *state
                     (assoc @*state
                            :active-search :issues
                            :search-globally? false
-                           :link-issue :issue)
-                    ""))
+                           :link-issue :issue
+                           :q "")))
 
 (defn link-context-with-global-search! [*state]
   (fetch-and-reset! *state
                     (assoc @*state
                            :active-search :issues
                            :search-globally? true
-                           :link-issue :context)
-                    ""))
+                           :link-issue :context
+                           :q "")))
 
-(defn search! [*state value]
-  (fetch-and-reset! *state @*state value))
+(defn search! [*state]
+  (fetch-and-reset! *state @*state))
 
 (defn deselect-secondary-contexts! [*state]
   (exec-cmd *state :deselect-secondary-contexts))

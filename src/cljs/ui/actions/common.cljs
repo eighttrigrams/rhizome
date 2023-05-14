@@ -19,16 +19,13 @@
                            (:aggregated-contexts state))
     :contexts (or contexts (:contexts state))}))
 
-(defn- list-resources [state q]
-  (api/list-resources
-   (-> state
-       (dissoc :issues :contexts)
-       (assoc :q q))))
+(defn- list-resources [state]
+  (api/list-resources (dissoc state :issues :contexts)))
 
 (defn- fetch-resources
-  [state value]
+  [state]
   (go (-> state
-          (list-resources value)
+          list-resources
           <p!
           (update-state state))))
 
@@ -36,10 +33,9 @@
   (js/setTimeout (fn [_] (swap! *state dissoc :loading)) 500))
 
 (defn fetch-and-reset!
-  ([*state state] (fetch-and-reset! *state state ""))
-  ([*state state value]
+  ([*state state]
    (go (-> state
-           (fetch-resources value)
+           fetch-resources
            <!
            (reset-state! *state)
            (dissoc-loading *state)))))
