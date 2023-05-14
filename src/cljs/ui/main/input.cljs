@@ -27,7 +27,12 @@
                                             (= :contexts (:active-search @*state)))
                                    (actions/select-first-context! *state))
                                  (when (= code "Escape")
-                                   (actions/quit-search! *state)))}])}))
+                                   (if (or (:search-globally? @*state)
+                                           (:selected-issue @*state))
+                                     (actions/quit-search! *state)
+                                     (if (seq (:selected-secondary-contexts-ids @*state))
+                                       (actions/deselect-secondary-contexts! *state)
+                                       (actions/quit-search! *state)))))}])}))
 
 (defn component [*state]
   [:<>
