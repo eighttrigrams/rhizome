@@ -12,6 +12,17 @@
                                    (actions/search! *state))
                 :on-key-down  #(let [code (.-code %)]
                                  (.stopPropagation %)
+                                 (when (and (= code "Digit9")
+                                            (or (.-metaKey %) (.-altKey %)))
+                                   (.preventDefault %)
+                                   (when
+                                    ;; TODO extract this common pattern
+                                    (and (not (:search-globally? @*state))
+                                         (:selected-context @*state)
+                                         (not (:selected-issue @*state)))
+                                     (actions/new-issue! *state {:title (.-value (.getElementById js/document "search-input"))})
+                                     (set! (.-value (.getElementById js/document "search-input")) "")
+                                     (swap! *state dissoc nil)))
                                  (when (and (= code "Enter")
                                             (= :contexts (:active-search @*state)))
                                    (actions/select-first-context! *state))

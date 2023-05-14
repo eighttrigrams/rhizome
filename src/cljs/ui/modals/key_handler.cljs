@@ -8,13 +8,6 @@
      (let [{:keys [modal]} @*state]
        (cond (= "Escape" code)
              (actions/cancel-modal! *state)
-             (and (= "Digit9" code)
-                  (or meta-pressed? alt-pressed?)
-                  (= :new-issue modal))
-             (do (.preventDefault e)
-                 (actions/new-issue!
-                  *state
-                  (value-fn)))
              (and (= "Digit9" code) 
                   (or meta-pressed? alt-pressed?)
                   (= :new-context modal))

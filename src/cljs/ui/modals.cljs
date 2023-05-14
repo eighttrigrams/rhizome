@@ -55,9 +55,6 @@
     (key-handler/handle-modal-keys *state 
                                    #(do {:id          (:id item) 
                                          :description (.-value (get-description-el))}))
-    :new-issue
-    (key-handler/handle-modal-keys *state 
-                                   #(do {:title (.-value (get-title-el))}))
     :new-context
     (key-handler/handle-modal-keys *state
                                    #(do {:title (.-value (get-title-el))}))

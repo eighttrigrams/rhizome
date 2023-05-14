@@ -108,8 +108,9 @@
        (let [selected-issue (datastore/new-issue db arg
                                                  (:id selected-context)
                                                  selected-secondary-contexts-ids)]
-         {:selected-issue selected-issue
-          :issues         (search/search-issues db (assoc opts :selected-issue selected-issue))})
+         {:selected-issue nil
+          :issues         (search/search-issues db (dissoc (assoc opts :selected-issue selected-issue) :q))
+          :q              nil})
        :insert-context
        {:selected-context (datastore/new-context db arg)
         :issues           []}

@@ -23,6 +23,13 @@
                      (dissoc :preview-issue)))
   (js/setTimeout (fn [_] (swap! *state dissoc :loading)) 500))
 
+(defn new-issue! [*state issue]
+  ;; TODO use exec-cmd ?
+  (fetch-and-reset! *state (-> @*state
+                               (dissoc :modal)
+                               (assoc :cmd :insert-issue)
+                               (assoc :arg issue))))
+
 (defn select-context! 
   ([*state context] (select-context! *state context false))
   ([*state context suppress-reset-issue]
