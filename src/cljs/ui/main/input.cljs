@@ -1,10 +1,16 @@
 (ns ui.main.input
   (:require [reagent.core :as r]
+            [net.eighttrigrams.cljs-text-editor.editor :as editor]
             [ui.actions :as actions]))
+
+(defn- get-title-el []
+  (.getElementById js/document "search-input"))
 
 (defn input-component [*state]
   (r/create-class
-   {:component-did-mount #(.focus (.getElementById js/document "search-input"))
+   {:component-did-mount #(let [el (get-title-el)]
+                            (editor/create el {:input-field-mode? true})
+                            (.focus (get-title-el)))
     :render (fn []
               [:input#search-input
                {:autoComplete :off
@@ -20,8 +26,8 @@
                                     (and (not (:search-globally? @*state))
                                          (:selected-context @*state)
                                          (not (:selected-issue @*state)))
-                                     (actions/new-issue! *state {:title (.-value (.getElementById js/document "search-input"))})
-                                     (set! (.-value (.getElementById js/document "search-input")) "")
+                                     (actions/new-issue! *state {:title (.-value (get-title-el))})
+                                     (set! (.-value (get-title-el)) "")
                                      (swap! *state dissoc nil)))
                                  (when (= code "Enter")
                                    (when (= :contexts (:active-search @*state))
