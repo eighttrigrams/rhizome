@@ -47,8 +47,7 @@
 
 (defn select-first-context! [*state]
   (when (seq (:contexts @*state))
-    (let [first-context (first (:contexts @*state))]
-      (select-context! *state first-context))))
+    (select-context! *state (first (:contexts @*state)))))
 
 (defn select-issue! [*state issue]
   (cond 
@@ -63,6 +62,10 @@
       ;; will fetch and replace it, thereby filling in the related issues.
       (swap! *state assoc :selected-issue issue)
       (fetch-and-reset! *state (assoc @*state :cmd :fetch-issue :arg issue)))))
+
+(defn select-first-issue! [*state]
+  (when (seq (:issues @*state))
+    (select-issue! *state (first (:issues @*state)))))
 
 (defn start-context-search [*state]
   (fetch-and-reset! *state 
