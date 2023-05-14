@@ -146,7 +146,7 @@
            (merge opts
                   {:selected-context                        selected-context
                    :issues                                  (search/search-issues db (dissoc opts :q))
-                   :active-search                           nil
+                   :active-search                           :issues
                    :context-to-fetch                        nil
                    :secondary-contexts-inverted?            false
                    :secondary-contexts-and?                 false
