@@ -18,9 +18,7 @@
   (fetch-and-reset! *state (assoc @*state :cmd :deselect-context)))
 
 (defn deselect-issue! [*state]
-  (swap! *state #(-> @*state
-                     (dissoc :selected-issue :preview-issue)
-                     (dissoc :preview-issue)))
+  (fetch-and-reset! *state (dissoc @*state :selected-issue :preview-issue :q))
   (js/setTimeout (fn [_] (swap! *state dissoc :loading)) 500))
 
 (defn new-issue! [*state issue]
