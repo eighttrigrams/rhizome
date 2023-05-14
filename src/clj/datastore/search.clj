@@ -157,8 +157,16 @@
 (defn search-issues [db {:keys [show-events? selected-context selected-secondary-contexts-ids] :as opts}]
   (if-not (or selected-context show-events?)
     [(search-issues' db opts) {}]
-    (let [;; TODO instead of doing this, make sure q is always at least ""
-          opts (if (:q opts) opts (dissoc opts :q)) ;; for destructuring in searcj-issues' to work properly when :q is present but has nil value
+    (let [opts (
+                ;; TODO instead of doing this, make sure q is always at least ""
+                if (:q opts) 
+                 (update opts :q #(-> % (str/replace "(" "")
+                                      (str/replace ")" "") 
+                                      (str/replace "[" "")
+                                      (str/replace "]" "")
+                                      (str/replace "|" "")))
+                 ;; for destructuring in searcj-issues' to work properly when :q is present but has nil value
+                 (dissoc opts :q)) 
           aggregated-contexts
           (->> (search-issues' db (-> opts 
                                       (assoc :selected-secondary-contexts-ids '())
