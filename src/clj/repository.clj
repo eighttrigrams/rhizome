@@ -116,7 +116,8 @@
         :issues           []}
        :update-issue-description
        {:selected-issue (datastore/update-issue-description db arg)
-        :issues         (search/search-issues db opts)}
+        :issues         (search/search-issues db (dissoc opts :q))
+        :q              nil}
        :update-context-description
        {:selected-context (datastore/update-context-description db arg)}
        :update-issue
