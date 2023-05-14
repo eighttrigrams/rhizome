@@ -63,7 +63,5 @@
                     (not selected-issue)
                     (= "KeyS" code))
                (actions/cycle-search-mode! *state)
-               (and selected-context (= "KeyN" code))
-               (swap! *state #(assoc % :modal :new-issue))
                (= "KeyN" code)
                (swap! *state #(assoc % :modal :new-context))))))))

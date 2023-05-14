@@ -22,15 +22,6 @@
                       [:textarea#description-editor
                        {:defaultValue (:description item)}])}))
 
-(defn- new-issue-component []
-  (r/create-class
-   {:component-did-mount #(let [el (get-title-el)]
-                            (editor/create el {:input-field-mode? true})
-                            (.focus el))
-    :reagent-render      (fn []
-                           [:input#title
-                            {:autoComplete :off}])}))
-
 (defn- new-context-component []
   (r/create-class
    {:component-did-mount #(let [el (get-title-el)]
@@ -71,8 +62,6 @@
        (case (:modal @*state)
          :description
          [textarea-component item]
-         :new-issue
-         [new-issue-component]
          :new-context
          [new-context-component]
          :edit-issue
