@@ -8,12 +8,6 @@
                      (assoc :loading true)))
   (js/setTimeout (fn [_] (swap! *state dissoc :loading)) 500))
 
-(defn new-context! [*state context]
-  (fetch-and-reset! *state (-> @*state
-                               (dissoc :modal)
-                               (assoc :cmd :insert-context)
-                               (assoc :arg context))))
-
 (defn save-description! [*state type item]
   (fetch-and-reset! *state (-> @*state
                                (dissoc :modal)

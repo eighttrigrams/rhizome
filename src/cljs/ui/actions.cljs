@@ -28,6 +28,12 @@
                                (assoc :cmd :insert-issue)
                                (assoc :arg issue))))
 
+(defn new-context! [*state context]
+  (fetch-and-reset! *state (-> @*state
+                               (dissoc :modal)
+                               (assoc :cmd :insert-context)
+                               (assoc :arg context))))
+
 (defn select-context! 
   ([*state context] (select-context! *state context false))
   ([*state context suppress-reset-issue]

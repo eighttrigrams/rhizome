@@ -10,13 +10,6 @@
              (actions/cancel-modal! *state)
              (and (= "Digit9" code) 
                   (or meta-pressed? alt-pressed?)
-                  (= :new-context modal))
-             (do (.preventDefault e)
-                 (actions/new-context!
-                  *state
-                  (value-fn)))
-             (and (= "Digit9" code) 
-                  (or meta-pressed? alt-pressed?)
                   (= :description modal))
              (do (.preventDefault e)
                  (actions/save-description!

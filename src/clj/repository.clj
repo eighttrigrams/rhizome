@@ -112,8 +112,14 @@
           :issues         (search/search-issues db (dissoc (assoc opts :selected-issue selected-issue) :q))
           :q              nil})
        :insert-context
-       {:selected-context (datastore/new-context db arg)
-        :issues           []}
+       {:selected-context                        (datastore/new-context db arg)
+        :selected-issue                          nil
+        :issues                                  []
+        :q                                       nil
+        :active-search                           :issues
+        :secondary-contexts-inverted?            false
+        :secondary-contexts-and?                 false
+        :unassigned-secondary-contexts-selected? false}
        :update-issue-description
        {:selected-issue (datastore/update-issue-description db arg)
         :issues         (search/search-issues db (dissoc opts :q))

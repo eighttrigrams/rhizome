@@ -9,9 +9,6 @@
 (defn- get-description-el []
   (.getElementById js/document "description-editor"))
 
-(defn- get-title-el []
-  (.getElementById js/document "title"))
-
 (defn- textarea-component [_item]
   (r/create-class
    {:component-did-mount ;
@@ -21,15 +18,6 @@
     :reagent-render (fn [item]
                       [:textarea#description-editor
                        {:defaultValue (:description item)}])}))
-
-(defn- new-context-component []
-  (r/create-class
-   {:component-did-mount #(let [el (get-title-el)]
-                            (editor/create el {:input-field-mode? true})
-                            (.focus el))
-    :reagent-render      (fn []
-                           [:input#title
-                            {:autoComplete :off}])}))
 
 (defn- handle-keys [*state item]
   (case (:modal @*state)
@@ -46,9 +34,6 @@
     (key-handler/handle-modal-keys *state 
                                    #(do {:id          (:id item) 
                                          :description (.-value (get-description-el))}))
-    :new-context
-    (key-handler/handle-modal-keys *state
-                                   #(do {:title (.-value (get-title-el))}))
     #()))
 
 (defn component [*state]
@@ -62,8 +47,6 @@
        (case (:modal @*state)
          :description
          [textarea-component item]
-         :new-context
-         [new-context-component]
          :edit-issue
          [:div#modal-component [issue-edit/component item]]
          :edit-context

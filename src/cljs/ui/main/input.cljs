@@ -21,14 +21,18 @@
                                  (when (and (= code "Digit9")
                                             (or (.-metaKey %) (.-altKey %)))
                                    (.preventDefault %)
-                                   (when
-                                    ;; TODO extract this common pattern
-                                    (and (not (:search-globally? @*state))
-                                         (:selected-context @*state)
-                                         (not (:selected-issue @*state)))
-                                     (actions/new-issue! *state {:title (.-value (get-title-el))})
-                                     (set! (.-value (get-title-el)) "")
-                                     (swap! *state dissoc nil)))
+                                   (cond
+                                     (= :contexts (:active-search @*state))
+                                     (do
+                                       (actions/new-context! *state {:title (.-value (get-title-el))})
+                                       (set! (.-value (get-title-el)) ""))
+                                     ;; TODO extract this common pattern
+                                     (and (not (:search-globally? @*state))
+                                          (:selected-context @*state)
+                                          (not (:selected-issue @*state)))
+                                     (do (actions/new-issue! *state {:title (.-value (get-title-el))})
+                                         (set! (.-value (get-title-el)) "")
+                                         #_ (swap! *state dissoc nil))))
                                  (when (and (= code "KeyC")
                                             (.-altKey %))
                                    (swap! *state dissoc :search-globally? :q :active-search)
