@@ -11,7 +11,7 @@
  
  :dev-http
  {8020 {:root      "resources/public"
-        :proxy-url "http://localhost:3000"}}
+        :proxy-url "http://localhost:3006"}}
 
  :builds
  {:app
