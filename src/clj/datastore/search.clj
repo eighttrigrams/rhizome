@@ -8,8 +8,22 @@
             [datastore.issues.common :as common]
             [datastore.contexts :as contexts]))
 
+(defn- remove-some-chars [q]
+  (-> q
+      (str/replace "(" " ")
+      (str/replace ")" " ")
+      (str/replace "[" " ")
+      (str/replace "]" " ")
+      (str/replace "|" " ")
+      (str/replace "'" " ")
+      (str/replace ":" " ")
+      (str/replace "{" " ")
+      (str/replace "}" " ")
+      (str/replace "  " " ")
+      (str/replace "  " " ")))
+
 (defn- convert-q-to-query-string [q]
-  (str/join " & " (map #(str % ":*") (str/split q #" "))))
+  (str/join " & " (map #(str % ":*") (str/split (remove-some-chars q) #" "))))
 
 (defn search-contexts
   [ds q]
@@ -155,36 +169,31 @@
     '()))
 
 (defn search-issues [db {:keys [show-events? selected-context selected-secondary-contexts-ids] :as opts}]
-  (if-not (or selected-context show-events?)
-    [(search-issues' db opts) {}]
-    (let [opts (
+  (let [opts (
                 ;; TODO instead of doing this, make sure q is always at least ""
-                if (:q opts) 
-                 (update opts :q #(-> % (str/replace "(" "")
-                                      (str/replace ")" "") 
-                                      (str/replace "[" "")
-                                      (str/replace "]" "")
-                                      (str/replace "|" "")
-                                      (str/replace "'" "")))
+                  if (:q opts) 
+                   (update opts :q remove-some-chars)
                  ;; for destructuring in searcj-issues' to work properly when :q is present but has nil value
-                 (dissoc opts :q)) 
-          aggregated-contexts
-          (->> (search-issues' db (-> opts 
-                                      (assoc :selected-secondary-contexts-ids '())
-                                      (dissoc
-                                       :show-events?
-                                       :unassigned-secondary-contexts-selected?
-                                       :secondary-contexts-inverted?)))
-               (map :contexts)
-               (map seq)
-               (apply concat)
-               (group-by first)
-               (map #(do [(count (second %)) (first (second %))]))
-               (sort-by first)
-               (map second)
-               reverse)
-          aggregated-contexts (reduce (fn [acc val]
-                                        (conj acc [val (:title (contexts/get-context db {:id val}))])) 
-                                      aggregated-contexts (set/difference selected-secondary-contexts-ids
-                                                                          (set (map first aggregated-contexts))))]
-      [(search-issues' db opts) aggregated-contexts])))
+                   (dissoc opts :q))]
+    (if-not (or selected-context show-events?)
+      [(search-issues' db opts) {}]
+      (let [aggregated-contexts
+            (->> (search-issues' db (-> opts 
+                                        (assoc :selected-secondary-contexts-ids '())
+                                        (dissoc
+                                         :show-events?
+                                         :unassigned-secondary-contexts-selected?
+                                         :secondary-contexts-inverted?)))
+                 (map :contexts)
+                 (map seq)
+                 (apply concat)
+                 (group-by first)
+                 (map #(do [(count (second %)) (first (second %))]))
+                 (sort-by first)
+                 (map second)
+                 reverse)
+            aggregated-contexts (reduce (fn [acc val]
+                                          (conj acc [val (:title (contexts/get-context db {:id val}))])) 
+                                        aggregated-contexts (set/difference selected-secondary-contexts-ids
+                                                                            (set (map first aggregated-contexts))))]
+        [(search-issues' db opts) aggregated-contexts]))))
