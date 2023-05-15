@@ -11,8 +11,14 @@
    (fetch-and-reset! *state (assoc @*state :cmd cmd :arg arg))))
 
 (defn quit-search! [*state]
-  (fetch-and-reset! *state (-> @*state
-                               (dissoc :preview-issue :active-search :search-globally? :link-issue :q))))
+  (fetch-and-reset! *state (if (= :contexts (:active-search @*state))
+                             (do 
+                               (prn "switch")
+                               (-> @*state
+                                   (assoc :active-search :issues)
+                                   (dissoc :preview-issue :search-globally? :link-issue :q)))
+                             (-> @*state
+                                 (dissoc :preview-issue :active-search :search-globally? :link-issue :q)))))
 
 (defn deselect-context! [*state]
   (fetch-and-reset! *state (assoc @*state :cmd :deselect-context)))
