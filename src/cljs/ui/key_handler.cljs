@@ -38,7 +38,7 @@
                (actions/link-with-global-search! *state)
                (and (not shift-pressed?) selected-issue (= "KeyA" code))
                (actions/link-with-local-search! *state)
-               (and shift-pressed? selected-context (= "KeyA" code))
+               (and alt-pressed? selected-context (not selected-issue) (= "KeyD" code))
                (actions/link-context-with-global-search! *state)
                (and (= "KeyC" code)
                     (not meta-pressed?)
