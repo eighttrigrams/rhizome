@@ -22,12 +22,6 @@
              (cond
                (= "KeyV" code)
                (actions/show-events! *state)
-               (and
-                (or
-                 selected-issue
-                 selected-context)
-                (= "KeyD" code))
-               (swap! *state #(assoc % :modal :description))
                (and selected-issue (= "KeyE" code))
                (swap! *state #(assoc % :modal :edit-issue))
                (and selected-issue (= "Delete" code))
@@ -52,13 +46,19 @@
                     alt-pressed?
                     (not shift-pressed?))
                (actions/start-context-search *state)
-               (and (= "KeyC" code)
+               (and (= "KeyD" code)
                     (not meta-pressed?)
                     (not ctrl-pressed?)
-                    (not alt-pressed?)
-                    shift-pressed?
+                    alt-pressed?
+                    (not shift-pressed?)
                     selected-issue)
                (actions/start-linking-context *state)
+               (and
+                (or
+                 selected-issue
+                 selected-context)
+                (= "KeyD" code))
+               (swap! *state #(assoc % :modal :description))
                (and selected-context
                     (not selected-issue)
                     (= "KeyS" code))
