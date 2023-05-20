@@ -24,7 +24,11 @@
       (str/trim)))
 
 (defn- convert-q-to-query-string [q]
-  (str/join " & " (map #(str % ":*") (str/split (remove-some-chars q) #" "))))
+  (let [qs
+        (str/join " & " (map #(str % ":*") (str/split (remove-some-chars q) #" ")))]
+    (if (= ":*" qs)
+      "*"
+      qs)))
 
 (defn search-contexts
   [ds q]
