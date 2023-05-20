@@ -30,7 +30,7 @@
                (actions/delete-context! *state)
                (and selected-context (= "KeyE" code))
                (swap! *state #(assoc % :modal :edit-context))
-               (and shift-pressed? (= "KeyI" code))
+               (and alt-pressed? (= "KeyI" code))
                (actions/start-global-search! *state)
                (= "KeyI" code)
                (swap! *state #(assoc % :active-search :issues :search-globally? false))
