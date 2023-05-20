@@ -20,7 +20,8 @@
       (str/replace "{" " ")
       (str/replace "}" " ")
       (str/replace "  " " ")
-      (str/replace "  " " ")))
+      (str/replace "  " " ")
+      (str/trim)))
 
 (defn- convert-q-to-query-string [q]
   (str/join " & " (map #(str % ":*") (str/split (remove-some-chars q) #" "))))
