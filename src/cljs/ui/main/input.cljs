@@ -18,7 +18,8 @@
                                    (actions/search! *state))
                 :on-key-down  #(let [code (.-code %)]
                                  (.stopPropagation %)
-                                 (when (= code "Enter")
+                                 (when (and (= code "Digit9")
+                                            (or (.-metaKey %) (.-altKey %)))
                                    (.preventDefault %)
                                    (cond
                                      (= :contexts (:active-search @*state))

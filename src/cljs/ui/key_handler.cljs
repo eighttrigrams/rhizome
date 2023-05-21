@@ -43,12 +43,6 @@
                (and (= "KeyC" code)
                     (not meta-pressed?)
                     (not ctrl-pressed?)
-                    (not alt-pressed?)
-                    (not shift-pressed?))
-               (actions/start-context-search *state)
-               (and (= "KeyC" code)
-                    (not meta-pressed?)
-                    (not ctrl-pressed?)
                     alt-pressed?
                     (not shift-pressed?))
                (actions/start-context-search *state)
