@@ -16,6 +16,7 @@
       (str/replace "]" " ")
       (str/replace "|" " ")
       (str/replace "!" " ")
+      (str/replace "&" " ")
       (str/replace "'" " ")
       (str/replace ":" " ")
       (str/replace "{" " ")
