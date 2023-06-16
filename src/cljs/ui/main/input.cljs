@@ -1,83 +1,20 @@
 (ns ui.main.input
   (:require [reagent.core :as r]
             [net.eighttrigrams.cljs-text-editor.editor :as editor]
-            [ui.actions :as actions]))
-
-(defn- get-title-el []
-  (.getElementById js/document "search-input"))
+            [ui.actions :as actions]
+            [ui.main.input.key-handler :as key-handler]))
 
 (defn input-component [*state]
-  (r/create-class
-   {:component-did-mount #(let [el (get-title-el)]
+  (r/create-class ;; TODO simplify
+   {:component-did-mount #(let [el (key-handler/get-title-el)]
                             (editor/create el {:input-field-mode? true})
-                            (.focus (get-title-el)))
+                            (.focus (key-handler/get-title-el)))
     :render (fn []
               [:input#search-input
                {:autoComplete :off
                 :on-change    #(do (swap! *state assoc :q (.-value (.-target %)))
                                    (actions/search! *state))
-                :on-key-down  #(let [code (.-code %)]
-                                 (.stopPropagation %)
-                                 (when (and (= code "Enter"))
-                                   (.preventDefault %)
-                                   (cond
-                                     (or (and (.-shiftKey %)
-                                              (= :contexts (:active-search @*state)))
-                                         (and (= :contexts (:active-search @*state))
-                                              (= 0 (count (:contexts @*state)))))
-                                     (do
-                                       (actions/new-context! *state {:title (.-value (get-title-el))})
-                                       (set! (.-value (get-title-el)) ""))
-                                     (or (and (.-shiftKey %)
-                                              (not (:search-globally? @*state))
-                                              (:selected-context @*state)
-                                              (not (:selected-issue @*state)))
-                                         (and (not (:search-globally? @*state))
-                                              (:selected-context @*state)
-                                              (not (:selected-issue @*state))
-                                              (= 0 (count (:issues @*state)))))
-                                     (do (actions/new-issue! *state {:title (.-value (get-title-el))})
-                                         (set! (.-value (get-title-el)) "")
-                                         #_ (swap! *state dissoc nil))
-                                     (= :contexts (:active-search @*state))
-                                     (actions/select-first-context! *state)
-                                     (= :issues (:active-search @*state))
-                                     (actions/select-first-issue! *state))) 
-                                 (when (and (.-altKey %) 
-                                            (:selected-issue @*state)
-                                            (= "KeyA" code))
-                                   (.preventDefault %)
-                                   (actions/link-with-global-search! *state))
-                                 (when (and (= code "KeyI")
-                                            (.-altKey %))
-                                   (.preventDefault %)
-                                   (set! (.-value (get-title-el)) "")
-                                   (actions/start-global-search! *state))
-                                 (when (and (= code "KeyC")
-                                            (.-altKey %))
-                                   (swap! *state dissoc :search-globally? :q :active-search)
-                                   (actions/start-context-search *state))
-                                 (when (and (= code "KeyD")
-                                            (not (:selected-issue @*state))
-                                            (:selected-context @*state)
-                                            (.-altKey %))
-                                   (.preventDefault %)
-                                   (set! (.-value (get-title-el)) "")
-                                   (actions/link-context-with-global-search! *state))
-                                 (when (and (= code "KeyD")
-                                            (.-altKey %)
-                                            (:selected-issue @*state))
-                                   (swap! *state assoc :active-search :contexts)
-                                   (actions/start-linking-context *state))
-                                 (when (= code "Escape")
-                                   (if (or (:search-globally? @*state)
-                                           (:selected-issue @*state)
-                                           ;; TODO (not (:selected-context @*state)) not necessary?
-                                           )
-                                     (actions/quit-search! *state)
-                                     (if (seq (:selected-secondary-contexts-ids @*state))
-                                       (actions/deselect-secondary-contexts! *state)
-                                       (actions/quit-search! *state)))))}])}))
+                :on-key-down  (key-handler/handle-keys *state)}])}))
 
 (defn component [*state]
   [:<>
