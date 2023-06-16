@@ -28,7 +28,8 @@
            found (str/replace (str/trim found) "watch?v=" "embed/")]
        [:iframe {:width "420px" 
                  :height "315px"
-                 :src found}]))
+                 :src found
+                 :allowFullScreen true}]))
    [:div.description
     [:> ReactMarkdown
      {:children description}]]])
