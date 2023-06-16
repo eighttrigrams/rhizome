@@ -11,14 +11,11 @@
    (fetch-and-reset! *state (assoc @*state :cmd cmd :arg arg))))
 
 (defn quit-search! [*state]
-  (fetch-and-reset! *state (if (= :contexts (:active-search @*state))
-                             (do 
-                               (prn "switch")
-                               (-> @*state
-                                   (assoc :active-search :issues)
-                                   (dissoc :preview-issue :search-globally? :link-issue :q)))
-                             (-> @*state
-                                 (dissoc :preview-issue :active-search :search-globally? :link-issue :q)))))
+  (if (= :contexts (:active-search @*state))
+    (fetch-and-reset! *state (-> @*state
+                                 (assoc :active-search :issues)
+                                 (dissoc :preview-issue :search-globally? :link-issue :q)))
+    (fetch-and-reset! *state (-> @*state (dissoc :preview-issue :active-search :search-globally? :link-issue :q)))))
 
 (defn deselect-context! [*state]
   (fetch-and-reset! *state (assoc @*state :cmd :deselect-context)))
@@ -89,35 +86,16 @@
                            :link-context true)))
 
 (defn start-global-search! [*state]
-  (fetch-and-reset! *state
-                    (assoc @*state 
-                           :active-search :issues
-                           :search-globally? true
-                           :q "")))
+  (fetch-and-reset! *state (assoc @*state :cmd :start-global-search)))
 
 (defn link-with-global-search! [*state]
-  (fetch-and-reset! *state
-                    (assoc @*state 
-                           :active-search :issues
-                           :search-globally? true
-                           :link-issue :issue
-                           :q "")))
+  (fetch-and-reset! *state (assoc @*state :cmd :link-with-global-search)))
 
 (defn link-with-local-search! [*state]
-  (fetch-and-reset! *state
-                    (assoc @*state
-                           :active-search :issues
-                           :search-globally? false
-                           :link-issue :issue
-                           :q "")))
+  (fetch-and-reset! *state (assoc @*state :cmd :link-with-local-search)))
 
 (defn link-context-with-global-search! [*state]
-  (fetch-and-reset! *state
-                    (assoc @*state
-                           :active-search :issues
-                           :search-globally? true
-                           :link-issue :context
-                           :q "")))
+  (fetch-and-reset! *state (assoc @*state :cmd :link-context-with-global-search)))
 
 (defn search! [*state]
   (fetch-and-reset! *state @*state))

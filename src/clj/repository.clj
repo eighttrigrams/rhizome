@@ -38,25 +38,51 @@
   (merge 
    {:cmd                             nil
     :arg                             nil}
-   (let [db (:db config/config)]
+   (let [db (:db config/config)
+         search-issues #(if (or (= :issue link-issue)
+                                search-globally?)
+                          (-> opts
+                              (cond-> :selected-context
+                                (update :selected-context (fn [a] (dissoc a :search_mode))))
+                              (assoc :selected-secondary-contexts-ids '())
+                              (dissoc :show-events?
+                                      :unassigned-secondary-contexts-selected?
+                                      :secondary-contexts-inverted?))
+                          opts)]
      (case cmd
        nil
        (cond (= :issues active-search)
-             {:issues (search/search-issues db (if (or (= :issue link-issue)
-                                                       search-globally?)
-                                                 (-> opts
-                                                     (cond-> :selected-context
-                                                       (update :selected-context #(dissoc % :search_mode)))
-                                                     (assoc :selected-secondary-contexts-ids '())
-                                                     (dissoc :show-events?
-                                                             :unassigned-secondary-contexts-selected?
-                                                             :secondary-contexts-inverted?))
-                                                 opts))}
+             {:issues (search/search-issues db (search-issues))}
              (= :contexts active-search)
              {:contexts (search/search-contexts db q)}
              :else
              {:issues   (search/search-issues db opts)
               :contexts (search/search-contexts db "")})
+       :start-global-search
+       {:issues           (search/search-issues db (search-issues))
+        :active-search    :issues
+        :search-globally? true
+        :link-context     false
+        :link-issue       nil
+        :q                ""}
+       :link-with-global-search
+       {:issues           (search/search-issues db (search-issues))
+        :active-search    :issues
+        :search-globally? true
+        :link-issue       :issue
+        :q                ""}
+       :link-with-local-search
+       {:issues           (search/search-issues db (search-issues))
+        :active-search    :issues
+        :search-globally? false
+        :link-issue       :issue
+        :q                ""}
+       :link-context-with-global-search
+       {:issues           (search/search-issues db (search-issues))
+        :active-search    :issues
+        :search-globally? true
+        :link-issue       :context
+        :q                ""}
        :start-context-search
        {:contexts (search/search-contexts db "")}
        :delete-issue
@@ -96,7 +122,7 @@
           :search-globally? false
           :q                nil})
        :link-context ;; when issue selected, link to yet another context
-       (do 
+       (do
          (datastore/link-issue-contexts db selected-issue (vec (set (conj (keys (:contexts selected-issue))
                                                                           (:id arg)))))
          {:link-context   nil
@@ -195,6 +221,6 @@
         :contexts         (search/search-contexts db "")
         :selected-context nil
         :q                nil}
-       
+
        ;; TODO remove :else clause. fix where there are cases where this fires but there shoulnd't be
        :else {}))))
