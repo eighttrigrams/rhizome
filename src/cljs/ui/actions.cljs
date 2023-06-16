@@ -46,14 +46,12 @@
    (if (true? (:link-context @*state))
      (fetch-and-reset! *state (assoc @*state :cmd :link-context :arg context))
      (do
-       ;; See below
+       ;; For a snappy response in the UI; see below
        (swap! *state assoc :selected-context context)
-       (fetch-and-reset! *state (-> @*state
-                                    (assoc :cmd :fetch-context 
-                                           :arg context)
-                                    (#(if-not suppress-reset-issue
-                                        (dissoc % :selected-issue) ;; TODO review
-                                        (identity %)))))))))
+       (fetch-and-reset! *state
+                         (assoc @*state
+                                :cmd :fetch-context 
+                                :arg [context suppress-reset-issue]))))))
 
 (defn select-first-context! [*state]
   (when (seq (:contexts @*state))
