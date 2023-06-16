@@ -1,6 +1,7 @@
 (ns ui.main.lhs.issue-detail
   (:require ["react-markdown$default" :as ReactMarkdown]
-            [ui.actions :as actions]))
+            [ui.actions :as actions]
+            [clojure.string :as str]))
 
 (defn- context-links-component [*state related-contexts]
   (when (seq related-contexts)
@@ -21,6 +22,13 @@
     {:style {:font-size "35px"}}
     [:> ReactMarkdown
      {:children title}]]
+   (when (and description (str/includes? description "https://www.youtube.com/watch")) 
+     (let [found (re-find #"https://www.youtube.com/watch.*?\s" description)
+           found (if-not found (re-find #"https://www.youtube.com/watch.*?$" description) found)
+           found (str/replace (str/trim found) "watch?v=" "embed/")]
+       [:iframe {:width "420px" 
+                 :height "315px"
+                 :src found}]))
    [:div.description
     [:> ReactMarkdown
      {:children description}]]])
