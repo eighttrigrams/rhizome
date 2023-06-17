@@ -5,6 +5,7 @@
 (defn get-title-el []
   (.getElementById js/document "search-input"))
 
+;; TODO make use of common/handle-keys*
 (defn handle-keys [*state]
   #(let [code (.-code %)]
     (.stopPropagation %)
