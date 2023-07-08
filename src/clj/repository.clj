@@ -35,8 +35,8 @@
                               selected-secondary-contexts-ids] 
                        :as   opts}]
   
-  (log/info "list-resources" (pr-str opts))
-  
+  (log/info (str "list-resources: " (pr-str opts)))
+
   #_{:clj-kondo/ignore [:unresolved-var]}
   (merge 
    {:cmd                             nil
