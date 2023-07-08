@@ -1,7 +1,8 @@
 (ns app-test
   (:require [clojure.test :refer [deftest testing is]]
             [next.jdbc :as jdbc]
-            datastore))
+            datastore
+            repository))
 
 (def db {:dbtype   "postgresql"
          :dbname   "cometoid_test"
@@ -19,8 +20,11 @@
   (jdbc/execute-one! db ["delete from contexts"])
   (jdbc/execute-one! db ["delete from issues"]))
 
-(deftest database
+(deftest repository 
   (testing "base case"
     (reset-db)
-    (let [id (:id (datastore/new-context db {:title "abc"}))]
-      (is (= "abc" (:title (datastore/get-context db {:id id})))))))
+    (repository/list-resources {:cmd :insert-context
+                                :arg {:title "abc"}} db)
+    (is (= 
+         "abc"
+         (:title (first (:contexts (repository/list-resources {:active-search :contexts} db))))))))

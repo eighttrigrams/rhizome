@@ -40,7 +40,7 @@
                               search-globally?
                               selected-context
                               selected-secondary-contexts-ids] 
-                       :as   opts}]
+                       :as   opts} db]
   
   (log-opts opts)
 
@@ -49,8 +49,7 @@
     (merge 
      {:cmd                             nil
       :arg                             nil}
-     (let [db (:db config/config)
-           search-issues #(if (or (= :issue link-issue)
+     (let [search-issues #(if (or (= :issue link-issue)
                                   search-globally?)
                             (-> opts
                                 (cond-> :selected-context
@@ -235,5 +234,5 @@
 
          ;; TODO remove :else clause. fix where there are cases where this fires but there shoulnd't be
          :else {})))
-         (catch Exception e 
-           (log/error (str "Caught and exception in list-resources: " (.getMessage e))))))
+    (catch Exception e 
+      (log/error (str "Caught and exception in list-resources: " (.getMessage e))))))
