@@ -25,9 +25,9 @@
   (let [db (:db config/config)]
     (search/search-contexts db q)))
 
-(defn- log-opts [{:keys [cmd] :as opts}]
+(defn- log-opts [{:keys [cmd q active-search] :as opts}]
   (log/info (str "list-resources - "
-                 cmd
+                 (or cmd (str active-search "(" q ")"))
                  " - "
                  (with-out-str (pp/pprint opts)))))
 
