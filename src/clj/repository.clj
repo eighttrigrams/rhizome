@@ -3,7 +3,8 @@
             [datastore.config :as config]
             datastore
             [datastore.search :as search]
-            [cambium.core :as log]))
+            [cambium.core :as log]
+            [clojure.pprint :as pp]))
 
 (mount/defstate repository
   :start (do
@@ -35,7 +36,7 @@
                               selected-secondary-contexts-ids] 
                        :as   opts}]
   
-  (log/info (str "list-resources: " (pr-str opts)))
+  (log/info (str "list-resources: " (with-out-str (pp/pprint opts))))
 
   (try 
     #_{:clj-kondo/ignore [:unresolved-var]}
