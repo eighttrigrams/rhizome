@@ -2,11 +2,25 @@
   (:require [ui.main.input :as input]
             [ui.main.rhs.issues-list-items :as issues-list-items]))
 
+(defn- scroll-into-view [id]
+  (js/setTimeout
+   #(.scrollIntoView 
+    (.getElementById js/document (str "issue-card-" id)) 
+    (clj->js  
+     {:behavior "instant" 
+      :block "center" 
+      :inline "nearest" }))
+   500))
+
 (defn- issues-list-component [*state]
   [:ul.cards
-   (for [issue (:issues @*state)]
-     ^{:key (:id issue)}
-     [issues-list-items/regular-issues-list-item-component *state issue])])
+   (map-indexed
+    (fn [idx issue]
+      [:<>
+       {:key (:id issue)}
+       [issues-list-items/regular-issues-list-item-component 
+        *state issue idx #(scroll-into-view %)]])
+    (:issues @*state))])
 
 (defn- related-issues-list-component [*state]
   [:ul.cards

@@ -173,9 +173,9 @@
           :issues           (search/search-issues db (dissoc opts :q))
           :q                nil}
          :fetch-issue
-         (do
-           (datastore/reprioritize-issue db arg)
-           {:selected-issue   (datastore/get-issue db arg)
+         (let [[issue skip-select?] arg]
+           (datastore/reprioritize-issue db issue)
+           {:selected-issue   (when-not skip-select? (datastore/get-issue db issue))
             :issues           (search/search-issues db (dissoc opts :search-globally? :q))
             :active-search    nil
             :search-globally? false

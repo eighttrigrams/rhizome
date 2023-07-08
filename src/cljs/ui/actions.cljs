@@ -55,19 +55,23 @@
   (when (seq (:contexts @*state))
     (select-context! *state (first (:contexts @*state)))))
 
-(defn select-issue! [*state issue]
-  (cond 
-    (= :issue (:link-issue @*state))
-    (fetch-and-reset! *state (assoc @*state :cmd :link-issues :arg (:id issue)))
-    (= :context (:link-issue @*state))
-    (fetch-and-reset! *state (assoc @*state :cmd :link-issue-context :arg (:id issue)))
-    :else 
-    (do
-      ;; For a snappy response in the UI, set :selected-issue immediately.
-      ;; The subsequent call to fetch-and-reset! then
-      ;; will fetch and replace it, thereby filling in the related issues.
-      (swap! *state assoc :selected-issue issue)
-      (fetch-and-reset! *state (assoc @*state :cmd :fetch-issue :arg issue)))))
+(defn select-issue! 
+  ([*state issue] (select-issue! *state issue false))
+  ([*state issue skip-select?]
+   (cond 
+     (= :issue (:link-issue @*state))
+     (fetch-and-reset! *state (assoc @*state :cmd :link-issues :arg (:id issue)))
+     (= :context (:link-issue @*state))
+     (fetch-and-reset! *state (assoc @*state :cmd :link-issue-context :arg (:id issue)))
+     :else 
+     (do
+       (when-not skip-select?
+         ;; For a snappy response in the UI, set :selected-issue immediately.
+         ;; The subsequent call to fetch-and-reset! then
+         ;; will fetch and replace it, thereby filling in the related issues.
+         (swap! *state assoc :selected-issue issue))
+       (fetch-and-reset! *state (assoc @*state :cmd 
+                                       :fetch-issue :arg [issue skip-select?]))))))
 
 (defn select-first-issue! [*state]
   (when (seq (:issues @*state))

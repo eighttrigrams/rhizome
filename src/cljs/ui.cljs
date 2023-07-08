@@ -2,7 +2,8 @@
   (:require [reagent.core :as r] 
             [ui.key-handler :as key-handler]
             [ui.main :as main]
-            [ui.modals :as modals]))
+            [ui.modals :as modals]
+            [ui.main.rhs.meta-pressed :as meta-pressed]))
 
 (def original-state {:issues                          []
                      :contexts                        []
@@ -41,7 +42,13 @@
           {;; TODO document recipe
            ;; to make the div able to listen to key events, https://stackoverflow.com/a/3149416
            :tabIndex    0
-           :on-key-down (key-handler/handle-keys *state)}
+           :on-key-up #(do
+                         (when (= 91 (.-keyCode %))
+                           (reset! meta-pressed/*meta-pressed? false)))
+           :on-key-down #(do
+                           (when (.-metaKey %)
+                             (reset! meta-pressed/*meta-pressed? true))
+                           ((key-handler/handle-keys *state) %))}
           [main/component *state]]
          [:div#modals-layer
           (when (:modal @*state)

@@ -1,7 +1,8 @@
 (ns ui.main.rhs.issues-list-items
   (:require ["react-markdown$default" :as ReactMarkdown]
             [ui.actions :as actions]
-            [ui.main.rhs.context-badges :as context-badges]))
+            [ui.main.rhs.context-badges :as context-badges]
+            [ui.main.rhs.meta-pressed :as meta-pressed]))
 
 (defn info-component [state issue]
   [:span.info
@@ -43,12 +44,19 @@
     [info-component @*state issue]
     [context-badges/component contexts]]])
 
-(defn regular-issues-list-item-component [*state issue]
+(defn regular-issues-list-item-component [*state issue idx select-fn]
   [:li.card.issue-card
+   ^{:key (:id issue)}
    {:class          (when (= (:id (:selected-issue @*state))
                              (:id issue)) :selected)
-    :on-click       #(do (swap! *state (fn [state] (dissoc state :preview-issue)))
-                         (actions/select-issue! *state issue))
+    :id             (str "issue-card-" idx)
+    :on-click       #(do 
+                       (swap! *state (fn [state] (dissoc state :preview-issue))) 
+                       (actions/select-issue! *state 
+                                              issue
+                                              (deref meta-pressed/*meta-pressed?))
+                       (when (deref meta-pressed/*meta-pressed?)
+                         (select-fn idx)))
     :on-mouse-enter #(when-not (:loading @*state)
                        (swap! *state assoc 
                               :preview-issue issue
