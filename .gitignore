@@ -12,3 +12,4 @@ resources/public/js/manifest.edn
 server.jar
 config.edn
 tracker.log
+tracker-*.log.gz
