@@ -31,11 +31,13 @@
     :on-mouse-enter #(when-not (:loading @*state)
                        (swap! *state assoc
                               :preview-issue issue
-                              :mouse? :enter))
-    :on-mouse-leave #(js/setTimeout (fn [_]
-                                      (swap! *state assoc :mouse :leave)
-                                      (when-not (= :leave (:mouse @*state))
-                                        (swap! *state dissoc :preview-issue))) 300)}
+                              :mouse :enter))
+    :on-mouse-leave #(do
+                       (swap! *state assoc :mouse :leave)
+                       (js/setTimeout (fn [_]
+                                        (when (= :leave (:mouse @*state))
+                                          (swap! *state dissoc :preview-issue)))
+                                      150))}
    [:div
     [title-component title]
     [info-component @*state issue]
@@ -47,15 +49,17 @@
                              (:id issue)) :selected)
     :on-click       #(do (swap! *state (fn [state] (dissoc state :preview-issue)))
                          (actions/select-issue! *state issue))
-    :on-mouse-enter #(when-not (:loading @*state) 
+    :on-mouse-enter #(when-not (:loading @*state)
                        (swap! *state assoc 
                               :preview-issue issue
-                              :mouse? :enter))
-    :on-mouse-leave #(js/setTimeout (fn [_]
-                                      (swap! *state assoc :mouse :leave)
-                                      (when-not (= :leave (:mouse @*state))
-                                        (swap! *state dissoc :preview-issue))
-                                      ) 300)}
+                              :mouse :enter))
+    :on-mouse-leave #(do
+                       (swap! *state assoc :mouse :leave)
+                       (js/setTimeout (fn [_]
+                                           (when (= :leave (:mouse @*state))
+                                             (swap! *state dissoc :preview-issue))
+                                           )
+                                        150))}
    [:div
     [title-component (:title issue)]
     [info-component @*state issue]

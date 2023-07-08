@@ -9,13 +9,16 @@
     (fn [& args] (.apply (.-fire dbnc) dbnc (to-array args)))))
 
 (defn save-input! [*state]
-  (swap! *state dissoc :loading))
+  (swap! *state assoc 
+         :loading false))
 
 (def save-input-debounced!
-  (debounce save-input! 1500))
+  (debounce save-input! 300))
 
 (defn reset-state! [new-state *state]
-  (reset! *state (assoc new-state :loading true)))
+  (reset! *state (assoc new-state 
+                        :loading true
+                        :preview-issue nil)))
 
 (defn- update-state [{:keys [issues contexts] :as i} 
                      state]
@@ -45,7 +48,9 @@
 
 (defn fetch-and-reset!
   [*state state]
-  (swap! *state assoc :loading true)
+  (swap! *state assoc 
+         :loading true
+         :preview-issue nil)
   (go (-> state
           fetch-resources
           <!
