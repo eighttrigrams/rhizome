@@ -6,7 +6,7 @@
             utils))
 
 (defn save-input! [[*state evt]]
-  (swap! *state assoc :q (.-value (.-target evt)))
+  (swap! *state assoc :q (.-value (or (.-target evt) evt)))
   (actions/search! *state))
 
 (def save-input-debounced!
@@ -21,7 +21,11 @@
               [:input#search-input
                {:autoComplete :off
                 :on-change    #(save-input-debounced! [*state %])
-                :on-key-down  (key-handler/handle-keys *state)}])}))
+                ;; :on-paste     #(save-input-debounced! [*state %])
+                ;; :on-cut       #(save-input-debounced! [*state %])
+                :on-key-down  #(if (= "Backspace" (.-code %))
+                                 (save-input-debounced! [*state (key-handler/get-title-el)])
+                                 ((key-handler/handle-keys *state) %))}])}))
 
 (defn component [*state]
   [:<>
