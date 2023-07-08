@@ -4,13 +4,20 @@
 
 (defn- scroll-into-view [id]
   (js/setTimeout
-   #(.scrollIntoView 
-    (.getElementById js/document (str "issue-card-" id)) 
-    (clj->js  
-     {:behavior "instant" 
-      :block "center" 
-      :inline "nearest" }))
-   500))
+   #(do
+      (.scrollIntoView
+       (.getElementById js/document (str "issue-card-" id))
+       (clj->js
+        {:behavior "instant"
+         :block "center"
+         :inline "nearest"}))
+     (.scrollIntoView 
+      (.getElementById js/document (str "issue-card-" id)) 
+      (clj->js  
+       {:behavior "smooth" 
+        :block "start" 
+        :inline "nearest" })))
+   1000))
 
 (defn- issues-list-component [*state]
   [:ul.cards
