@@ -2,17 +2,13 @@
   (:require [cljs.core.async :refer [go]]
             [cljs.core.async.interop :refer-macros [<p!]]
             api
-            [goog.async.Debouncer]))
-
-(defn debounce [f interval]
-  (let [dbnc (goog.async.Debouncer. f interval)]
-    (fn [& args] (.apply (.-fire dbnc) dbnc (to-array args)))))
+            utils))
 
 (defn save-input! [*state]
   (swap! *state assoc :loading false))
 
 (def save-input-debounced!
-  (debounce save-input! 500))
+  (utils/debounce save-input! 500))
 
 (defn reset-state! [new-state *state]
   (reset! *state new-state))

@@ -2,7 +2,15 @@
   (:require [reagent.core :as r]
             [net.eighttrigrams.cljs-text-editor.editor :as editor]
             [ui.actions :as actions]
-            [ui.main.input.key-handler :as key-handler]))
+            [ui.main.input.key-handler :as key-handler]
+            utils))
+
+(defn save-input! [[*state evt]]
+  (swap! *state assoc :q (.-value (.-target evt)))
+  (actions/search! *state))
+
+(def save-input-debounced!
+  (utils/debounce save-input! 180))
 
 (defn input-component [*state]
   (r/create-class ;; TODO simplify
@@ -12,8 +20,7 @@
     :render (fn []
               [:input#search-input
                {:autoComplete :off
-                :on-change    #(do (swap! *state assoc :q (.-value (.-target %)))
-                                   (actions/search! *state))
+                :on-change    #(save-input-debounced! [*state %])
                 :on-key-down  (key-handler/handle-keys *state)}])}))
 
 (defn component [*state]
