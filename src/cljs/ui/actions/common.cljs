@@ -13,7 +13,7 @@
          :loading false))
 
 (def save-input-debounced!
-  (debounce save-input! 300))
+  (debounce save-input! 500))
 
 (defn reset-state! [new-state *state]
   (reset! *state (assoc new-state 

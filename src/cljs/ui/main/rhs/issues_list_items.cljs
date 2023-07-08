@@ -37,7 +37,7 @@
                        (js/setTimeout (fn [_]
                                         (when (= :leave (:mouse @*state))
                                           (swap! *state dissoc :preview-issue)))
-                                      150))}
+                                      300))}
    [:div
     [title-component title]
     [info-component @*state issue]
@@ -59,7 +59,7 @@
                                            (when (= :leave (:mouse @*state))
                                              (swap! *state dissoc :preview-issue))
                                            )
-                                        150))}
+                                        300))}
    [:div
     [title-component (:title issue)]
     [info-component @*state issue]
