@@ -10,7 +10,8 @@
 
 (defn save-input! [*state]
   (swap! *state assoc 
-         :loading false))
+         :loading false
+         :preview-issue nil))
 
 (def save-input-debounced!
   (debounce save-input! 500))
