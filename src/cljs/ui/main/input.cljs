@@ -21,8 +21,8 @@
               [:input#search-input
                {:autoComplete :off
                 :on-change    #(save-input-debounced! [*state %])
-                ;; :on-paste     #(save-input-debounced! [*state %])
-                ;; :on-cut       #(save-input-debounced! [*state %])
+                :on-paste     #(save-input-debounced! [*state %])
+                :on-cut       #(save-input-debounced! [*state %])
                 :on-key-down  #(if (= "Backspace" (.-code %))
                                  (save-input-debounced! [*state (key-handler/get-title-el)])
                                  ((key-handler/handle-keys *state) %))}])}))
