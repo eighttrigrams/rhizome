@@ -12,7 +12,7 @@
       <fileNamePattern>tracker-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
        <maxFileSize>1MB</maxFileSize>    
        <maxHistory>1</maxHistory>
-       <totalSizeCap>5MB</totalSizeCap>
+       <totalSizeCap>2MB</totalSizeCap>
     </rollingPolicy>
     <encoder>
       <pattern>%msg%n</pattern>
