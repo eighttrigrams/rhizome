@@ -46,16 +46,16 @@
 
 (defn regular-issues-list-item-component [*state issue idx select-fn]
   [:li.card.issue-card
-   ^{:key (:id issue)}
    {:class          (when (= (:id (:selected-issue @*state))
                              (:id issue)) :selected)
     :id             (str "issue-card-" idx)
-    :on-click       #(do 
+    :on-click       #(let [skip-select? (and (deref meta-pressed/*meta-pressed?)
+                                             (not= :issues (:active-search @*state)))]
                        (swap! *state (fn [state] (dissoc state :preview-issue))) 
                        (actions/select-issue! *state 
                                               issue
-                                              (deref meta-pressed/*meta-pressed?))
-                       (when (deref meta-pressed/*meta-pressed?)
+                                              skip-select?)
+                       (when skip-select?
                          (select-fn idx)))
     :on-mouse-enter #(when-not (:loading @*state)
                        (swap! *state assoc 
@@ -64,10 +64,10 @@
     :on-mouse-leave #(do
                        (swap! *state assoc :mouse :leave)
                        (js/setTimeout (fn [_]
-                                           (when (= :leave (:mouse @*state))
-                                             (swap! *state dissoc :preview-issue))
-                                           )
-                                        300))}
+                                        (when (= :leave (:mouse @*state))
+                                          (swap! *state dissoc :preview-issue))
+                                        )
+                                      300))}
    [:div
     [title-component (:title issue)]
     [info-component @*state issue]
