@@ -25,6 +25,12 @@
   (let [db (:db config/config)]
     (search/search-contexts db q)))
 
+(defn- log-opts [{:keys [cmd] :as opts}]
+  (log/info (str "list-resources - "
+                 cmd
+                 " - "
+                 (with-out-str (pp/pprint opts)))))
+
 (defn list-resources [{:keys [q 
                               cmd
                               arg
@@ -36,10 +42,7 @@
                               selected-secondary-contexts-ids] 
                        :as   opts}]
   
-  (log/info (str "list-resources - " 
-                 cmd
-                 " - "
-                 (with-out-str (pp/pprint opts))))
+  (log-opts opts)
 
   (try 
     #_{:clj-kondo/ignore [:unresolved-var]}
