@@ -2,7 +2,8 @@
   (:require [mount.core :as mount]
             [datastore.config :as config]
             datastore
-            [datastore.search :as search]))
+            [datastore.search :as search]
+            [cambium.core :as log]))
 
 (mount/defstate repository
   :start (do
@@ -33,6 +34,8 @@
                               selected-context
                               selected-secondary-contexts-ids] 
                        :as   opts}]
+  
+  (log/info "list-resources" (pr-str opts))
   
   #_{:clj-kondo/ignore [:unresolved-var]}
   (merge 

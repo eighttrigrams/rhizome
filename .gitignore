@@ -11,3 +11,4 @@ resources/public/js/main.js
 resources/public/js/manifest.edn
 server.jar
 config.edn
+tracker.log
