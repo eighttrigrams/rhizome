@@ -1,6 +1,7 @@
 (ns ui.actions
   (:require [ui.actions.common :refer [fetch-and-reset!]]
-            api))
+            api
+            [goog.async.Debouncer]))
 
 (defn fetch! [*state]
   (fetch-and-reset! *state @*state))

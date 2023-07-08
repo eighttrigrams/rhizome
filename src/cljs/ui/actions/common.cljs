@@ -1,7 +1,18 @@
 (ns ui.actions.common
   (:require [cljs.core.async :refer [go]]
             [cljs.core.async.interop :refer-macros [<p!]]
-            api))
+            api
+            [goog.async.Debouncer]))
+
+(defn debounce [f interval]
+  (let [dbnc (goog.async.Debouncer. f interval)]
+    (fn [& args] (.apply (.-fire dbnc) dbnc (to-array args)))))
+
+(defn save-input! [*state]
+  (swap! *state dissoc :loading))
+
+(def save-input-debounced!
+  (debounce save-input! 1500))
 
 (defn reset-state! [new-state *state]
   (reset! *state (assoc new-state :loading true)))
@@ -30,12 +41,13 @@
           (update-state state))))
 
 (defn- dissoc-loading [_ *state]
-  (js/setTimeout (fn [_] (swap! *state dissoc :loading)) 500))
+  (save-input-debounced! *state))
 
 (defn fetch-and-reset!
-  ([*state state]
-   (go (-> state
-           fetch-resources
-           <!
-           (reset-state! *state)
-           (dissoc-loading *state)))))
+  [*state state]
+  (swap! *state assoc :loading true)
+  (go (-> state
+          fetch-resources
+          <!
+          (reset-state! *state)
+          (dissoc-loading *state))))

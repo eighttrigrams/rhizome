@@ -10,7 +10,7 @@
     <file>tracker.log</file>
     <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
       <fileNamePattern>tracker-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
-       <maxFileSize>10MB</maxFileSize>    
+       <maxFileSize>1MB</maxFileSize>    
        <maxHistory>1</maxHistory>
        <totalSizeCap>1GB</totalSizeCap>
     </rollingPolicy>
