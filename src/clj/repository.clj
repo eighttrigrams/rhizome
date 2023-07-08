@@ -36,7 +36,10 @@
                               selected-secondary-contexts-ids] 
                        :as   opts}]
   
-  (log/info (str "list-resources: " (with-out-str (pp/pprint opts))))
+  (log/info (str "list-resources - " 
+                 cmd
+                 " - "
+                 (with-out-str (pp/pprint opts))))
 
   (try 
     #_{:clj-kondo/ignore [:unresolved-var]}
