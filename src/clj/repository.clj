@@ -181,22 +181,26 @@
             :search-globally? false
             :q                nil})
          :fetch-context
-         (let [[arg change-context?] arg
-               selected-context (datastore/get-context db arg)
-               opts             {:search-globally?                false
-                                 :selected-secondary-contexts-ids #{}
-                                 :selected-context                selected-context}]
-           (datastore/reprioritize-context db arg)
-           (merge opts
-                  {:selected-context                        selected-context
-                   :issues                                  (search/search-issues db (dissoc opts :q))
-                   :active-search                           (if-not change-context? :issues nil)
-                   :context-to-fetch                        nil
-                   :selected-issue                          (if-not change-context? nil selected-issue)
-                   :secondary-contexts-inverted?            false
-                   :secondary-contexts-and?                 false
-                   :unassigned-secondary-contexts-selected? false
-                   :q                                       nil}))
+         (try
+           (let [[arg change-context?] arg
+                 selected-context (datastore/get-context db arg)
+                 opts             {:search-globally?                false
+                                   :selected-secondary-contexts-ids #{}
+                                   :selected-context                selected-context}]
+             (datastore/reprioritize-context db arg)
+             (merge opts
+                    {:selected-context                        selected-context
+                     :issues                                  (search/search-issues db (dissoc opts :q))
+                     :active-search                           (if-not change-context? :issues nil)
+                     :context-to-fetch                        nil
+                     :selected-issue                          (if-not change-context? nil selected-issue)
+                     :secondary-contexts-inverted?            false
+                     :secondary-contexts-and?                 false
+                     :unassigned-secondary-contexts-selected? false
+                     :q                                       nil}))
+           (catch Exception e
+             (log/error (str "Caught an exception in list-resources:fetch-context " (.getMessage e)))
+             (throw e)))
          :change-secondary-contexts-selection
          {:issues (search/search-issues db opts)}
          :change-secondary-contexts-unassigned-selected
@@ -235,4 +239,4 @@
          ;; TODO remove :else clause. fix where there are cases where this fires but there shoulnd't be
          :else {})))
     (catch Exception e 
-      (log/error (str "Caught and exception in list-resources: " (.getMessage e))))))
+      (log/error (str "Caught an exception in list-resources: " (.getMessage e))))))

@@ -2,6 +2,7 @@
   (:require [cheshire.core :as json]
             [next.jdbc :as jdbc]
             [honey.sql :as sql]
+            [cambium.core :as log]
             [datastore.helpers
              :refer [un-namespace-keys]]
             [datastore.contexts.core :as contexts.core]))
@@ -65,13 +66,17 @@
     (join-secondary-contexts result)))
 
 (defn get-context [db {:keys [id]}]
-  (-> (if-let [context (get-context-with-secondary-contexts db id)]
-        context
-        (-> id
-            simple-contexts-query
-            sql/format
-            (#(jdbc/execute-one! db % {:return-keys true}))))
-      contexts.core/post-process))
+  (try 
+    (-> (if-let [context (get-context-with-secondary-contexts db id)]
+          context
+          (-> id
+              simple-contexts-query
+              sql/format
+              (#(jdbc/execute-one! db % {:return-keys true}))))
+        contexts.core/post-process)
+    (catch Exception e 
+      (log/error (str "exception fetched in get-context for context with id: " id " e: " (.getMessage e)))
+      (throw e))))
 
 (defn- relate-contexts [db id secondary-contexts-ids]
   (doall
