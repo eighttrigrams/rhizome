@@ -8,7 +8,6 @@
 (def original-state {:issues                          []
                      :contexts                        []
                      :selected-context                nil
-                     :selected-secondary-contexts-ids #{}
                      :selected-issue                  nil
                      :show-events?                    false
                      ;; nil|:issues|:contexts

@@ -189,7 +189,7 @@
                                                     [:inline context-id]]]}))))
   (get-issue db selected-issue))
 
-(defn new-issue [db {title :title} context-id selected-secondary-contexts-ids]
+(defn new-issue [db {title :title} context-id selected-secondary-contexts-set]
   (let [parts       (str/split title #"\|")
         title       (if (= 1 (count parts))
                       (first parts)
@@ -214,7 +214,7 @@
                           (map (fn [ctx-id]
                                  [[:inline ctx-id]
                                   [:inline issue-id]])
-                               (conj selected-secondary-contexts-ids context-id))))]
+                               (conj selected-secondary-contexts-set context-id))))]
     (jdbc/execute! db
                    (sql/format {:insert-into [:context_issue]
                                 :columns     [:context_id :issue_id]

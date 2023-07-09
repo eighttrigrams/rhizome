@@ -123,13 +123,13 @@
                                                  (some? (:short_title %))) issues)))]
       (concat top bottom))))
 
-(defn- filter-by-selected-secondary-contexts [selected-secondary-contexts-ids 
+(defn- filter-by-selected-secondary-contexts [selected-secondary-contexts-set 
                                               unassigned-secondary-contexts-selected?
                                               secondary-contexts-inverted?
                                               secondary-contexts-and?
                                               issues]
   (if (or unassigned-secondary-contexts-selected?
-          (seq selected-secondary-contexts-ids))
+          (seq selected-secondary-contexts-set))
     ((if-not secondary-contexts-inverted? filter remove)
      (fn [issue]
        (or 
@@ -138,10 +138,10 @@
         
         (if secondary-contexts-and?
           (every? identity (map #(contains? (set (keys (:contexts issue))) %) 
-                                selected-secondary-contexts-ids))
+                                selected-secondary-contexts-set))
           (seq (set/intersection 
                 (set (keys (:contexts issue)))
-                selected-secondary-contexts-ids))))
+                selected-secondary-contexts-set))))
        )issues)
     issues))
 
@@ -154,13 +154,14 @@
   (seq (fetch-ids db q (if search-globally? nil selected-context) show-events?)))
 
 (defn- search-issues'
-  [db {:keys [selected-context 
-              show-events?
-              selected-secondary-contexts-ids
+  [db {:keys [show-events?
               unassigned-secondary-contexts-selected?
               secondary-contexts-and?
               secondary-contexts-inverted?]
+       {{:keys [selected-secondary-contexts]} :data
+        :as selected-context} :selected-context
        :as opts}]
+  (tap> [:search-issues' selected-secondary-contexts])
   
   (if-let [ids (do-fetch-ids db opts)]
     (->> ids
@@ -173,13 +174,17 @@
          (#(if (contains? #{1 2} (:search_mode selected-context))
              (re-order % (:search_mode selected-context))
              %))
-         (filter-by-selected-secondary-contexts selected-secondary-contexts-ids
+         (filter-by-selected-secondary-contexts (into #{} selected-secondary-contexts)
                                                 unassigned-secondary-contexts-selected?
                                                 secondary-contexts-inverted?
                                                 secondary-contexts-and?))
     '()))
 
-(defn search-issues [db {:keys [show-events? selected-context selected-secondary-contexts-ids] :as opts}]
+(defn search-issues [db {:keys [show-events?]
+                         {{:keys [selected-secondary-contexts]} :data  
+                          :as selected-context} :selected-context
+                         :as opts}]
+  (tap> [:ssss selected-secondary-contexts])
   (try
     (let [opts (
                 ;; TODO instead of doing this, make sure q is always at least ""
@@ -191,7 +196,7 @@
         [(search-issues' db opts) {}]
         (let [aggregated-contexts
               (->> (search-issues' db (-> opts 
-                                          (assoc :selected-secondary-contexts-ids '())
+                                          (assoc-in [:selected-context :data :selected-secondary-contexts] [])
                                           (dissoc
                                            :show-events?
                                            :unassigned-secondary-contexts-selected?
@@ -206,9 +211,13 @@
                    reverse)
               aggregated-contexts (reduce (fn [acc val]
                                             (conj acc [val (:title (contexts/get-context db {:id val}))])) 
-                                          aggregated-contexts (set/difference selected-secondary-contexts-ids
-                                                                              (set (map first aggregated-contexts))))]
-          [(search-issues' db opts) aggregated-contexts])))
+                                          aggregated-contexts (set/difference 
+                                                               (into #{} selected-secondary-contexts)
+                                                               (set (map first aggregated-contexts))))]
+          (tap> [:aggregated-contexts aggregated-contexts])
+          (let [results (search-issues' db opts)]
+            (tap> [:results results])
+            [results aggregated-contexts]))))
           (catch Exception e
             (log/error (str "error in search-issues: " (.getMessage e) " - params were: " (with-out-str (pp/pprint opts))))
             (throw e))))

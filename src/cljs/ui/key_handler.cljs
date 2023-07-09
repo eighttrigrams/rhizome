@@ -14,7 +14,7 @@
                    (actions/exit-events-view! *state)
                    selected-issue
                    (actions/deselect-issue! *state)
-                   (seq (:selected-secondary-contexts-ids @*state))
+                   (seq (:selected-secondary-contexts (:data (:selected-context @*state))))
                    (actions/deselect-secondary-contexts! *state)
                    selected-context
                    (actions/deselect-context! *state))

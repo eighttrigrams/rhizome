@@ -51,8 +51,13 @@
 
 (defn- select-secondary-context [*state id]
   (fn [_]
-    (swap! *state update :selected-secondary-contexts-ids
-           #((if (contains? % id) disj conj) % id))
+    (swap! *state assoc-in [:selected-context :data]
+           (if-not (:data (:selected-context @*state))
+             {:selected-secondary-contexts [id]}
+             (update (:data (:selected-context @*state)) :selected-secondary-contexts 
+                     #(into [] ((if (contains? (into #{} %) id) disj conj) 
+                                (into #{} %) id)))))
+    (prn ".." (:data (:selected-context @*state)))
     (actions/change-secondary-contexts-selection! *state)
     (re-focus)))
 
@@ -69,11 +74,12 @@
    "No secondary contexts"])
 
 (defn- secondary-contexts-component [*state]
-  (let [{:keys                        [selected-secondary-contexts-ids
-                                       issues
+  (let [{:keys                        [issues
                                        unassigned-secondary-contexts-selected?
                                        aggregated-contexts]
-         {{:keys [highlighted-secondary-contexts]} :data :as selected-context} :selected-context} @*state
+         {{:keys [highlighted-secondary-contexts
+                  selected-secondary-contexts]} 
+          :data :as selected-context} :selected-context} @*state
         secondary-contexts (remove (fn [[idx _v]]
                                      (= idx (:id selected-context))) 
                                    aggregated-contexts)]
@@ -86,9 +92,9 @@
                          [:li
                           {:key      id
                            :on-click (select-secondary-context *state id)} 
-                          [:span {:style (when (contains? selected-secondary-contexts-ids id)
+                          [:span {:style (when (contains? (into #{} selected-secondary-contexts) id)
                                            {:font-weight :bold})} (inc idx) ". [" id "] " title]
-                          (when (and (empty? selected-secondary-contexts-ids)
+                          (when (and (empty? (into #{} selected-secondary-contexts))
                                      (not unassigned-secondary-contexts-selected?))
                             (str " (" count ")"))])))]))
 

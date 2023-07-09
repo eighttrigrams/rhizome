@@ -66,6 +66,6 @@
               ;; TODO (not (:selected-context @*state)) not necessary?
               )
         (actions/quit-search! *state)
-        (if (seq (:selected-secondary-contexts-ids @*state))
+        (if (seq (:selected-secondary-contexts (:data (:selected-context @*state))))
           (actions/deselect-secondary-contexts! *state)
           (actions/quit-search! *state))))))

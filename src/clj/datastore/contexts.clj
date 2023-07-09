@@ -23,7 +23,8 @@
       un-namespace-keys
       (dissoc :searchable)))
 
-(defn- update-context* [db {:keys [id title short_title tags data]}] 
+(defn- update-context' [db {:keys [id title short_title tags data]}]
+  (tap> [:update-context' data])
   (jdbc/execute-one! db
                      (sql/format {:update [:contexts]
                                   :where  [:= :id [:inline id]]
@@ -91,9 +92,9 @@
 
 (defn update-context [db {:keys [context secondary-contexts-ids]}]
   (let [{:keys [id]} context]
-    (delete-secondary-contexts db id)
-    (relate-contexts db id secondary-contexts-ids)
-    (update-context* db context)
+    (delete-secondary-contexts db id)              ;; TODO remove
+    (relate-contexts db id secondary-contexts-ids) ;; TODO remove
+    (update-context' db context)
     (get-context db context)))
 
 (defn update-context-description [db {:keys [id description]}]
