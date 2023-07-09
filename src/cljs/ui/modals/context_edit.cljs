@@ -1,5 +1,6 @@
 (ns ui.modals.context-edit
-  (:require [reagent.core :as r]
+  (:require [clojure.string :as str]
+            [reagent.core :as r]
             [net.eighttrigrams.cljs-text-editor.editor :as editor]
             api))
 
@@ -10,7 +11,10 @@
   (.getElementById js/document "context-short-title"))
 
 (defn- get-tags-el []
-  (.getElementById js/document "context-tags")) ;; TODO maybe just name it "tags"
+  (.getElementById js/document "context-tags"))
+
+(defn- get-highlighted-secondary-contexts-el []
+  (.getElementById js/document "context-highlighted-secondary-contexts"))
 
 (defn component [context]
   (r/create-class 
@@ -20,6 +24,7 @@
                               (editor/create (get-tags-el) {:input-field-mode? true}))
     :reagent-render
     (fn [context]
+      (prn "data:" (:data context))
       [:<> 
        [:div
         [:input#context-title.line
@@ -32,12 +37,19 @@
        [:div
         [:input#context-tags.line
          {:autoComplete :off
-          :defaultValue (:tags context)}]]])}))
+          :defaultValue (:tags context)}]]
+       [:div
+        [:input#context-highlighted-secondary-contexts.line
+         {:autoComplete :off
+          :defaultValue (str/join " " (:highlighted-secondary-contexts
+                                       (:data context)))}]]])}))
 
 (defn get-values [id]
   {:context
    {:id          id
     :title       (.-value (get-title-el))
     :short_title (.-value (get-short-title-el))
-    :tags        (.-value (get-tags-el))}
+    :tags        (.-value (get-tags-el))
+    :data        {:highlighted-secondary-contexts
+                  (str/split (.-value (get-highlighted-secondary-contexts-el)) #" ")}}
    :secondary-contexts-ids '()})

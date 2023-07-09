@@ -1,8 +1,10 @@
 (ns datastore.contexts
-  (:require [next.jdbc :as jdbc]
+  (:require [cheshire.core :as json]
+            [next.jdbc :as jdbc]
             [honey.sql :as sql]
             [datastore.helpers
-             :refer [un-namespace-keys]]))
+             :refer [un-namespace-keys]]
+            [datastore.contexts.core :as contexts.core]))
 
 (defn new-context [db {title :title}]
   (-> (jdbc/execute-one!
@@ -20,14 +22,16 @@
       un-namespace-keys
       (dissoc :searchable)))
 
-(defn- update-context* [db {:keys [id title short_title tags]}]
+(defn- update-context* [db {:keys [id title short_title tags data]}] 
   (jdbc/execute-one! db
                      (sql/format {:update [:contexts]
                                   :where  [:= :id [:inline id]]
                                   :set    {:title       [:inline title]
                                            :short_title [:inline short_title]
                                            :tags        [:inline tags]
-                                           :updated_at  [:raw "NOW()"]}})
+                                           :updated_at  [:raw "NOW()"]
+                                           :data        [:inline (json/generate-string
+                                                                  data)]}})
                      {:return-keys true}))
 
 (defn- join-secondary-contexts [context]
@@ -67,8 +71,7 @@
             simple-contexts-query
             sql/format
             (#(jdbc/execute-one! db % {:return-keys true}))))
-      un-namespace-keys
-      (dissoc :searchable)))
+      contexts.core/post-process))
 
 (defn- relate-contexts [db id secondary-contexts-ids]
   (doall

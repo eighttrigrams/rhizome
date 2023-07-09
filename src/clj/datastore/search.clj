@@ -1,12 +1,13 @@
 (ns datastore.search
   (:require [clojure.set :as set]
+            [cambium.core :as log]
             [clojure.string :as str]
+            [clojure.pprint :as pp]
             [next.jdbc :as jdbc]
             [honey.sql :as sql]
-            [datastore.helpers
-             :refer [un-namespace-keys]]
             [datastore.issues.common :as common]
-            [datastore.contexts :as contexts]))
+            [datastore.contexts :as contexts]
+            [datastore.contexts.core :as contexts.core]))
 
 (defn- remove-some-chars [q]
   (-> q
@@ -34,20 +35,23 @@
 
 (defn search-contexts
   [ds q]
-  (->>
-   (if (= "" (or q ""))
-     (jdbc/execute! ds
-                    (sql/format {:select :*
-                                 :from [:contexts]
-                                 :order-by [[:important :desc] [:updated_at :desc]]}))
-     (jdbc/execute! ds
-                    (sql/format {:select :*
-                                 :from   [:contexts]
-                                 :where [:raw (format "searchable @@ to_tsquery('simple', '%s')" 
-                                                      (convert-q-to-query-string q))]
-                                 :order-by [[:important :desc] [:updated_at :desc]]})))
-   (map un-namespace-keys)
-   (map #(dissoc % :searchable))))
+  (try
+    (->>
+     (if (= "" (or q ""))
+       (jdbc/execute! ds
+                      (sql/format {:select :*
+                                   :from [:contexts]
+                                   :order-by [[:important :desc] [:updated_at :desc]]}))
+       (jdbc/execute! ds
+                      (sql/format {:select :*
+                                   :from   [:contexts]
+                                   :where [:raw (format "searchable @@ to_tsquery('simple', '%s')" 
+                                                        (convert-q-to-query-string q))]
+                                   :order-by [[:important :desc] [:updated_at :desc]]})))
+     (map contexts.core/post-process))
+    (catch Exception e
+      (log/error (str "error in search-contexts: " (.getMessage e) " - params were: " (with-out-str (pp/pprint opts))))
+      (throw e))))
 
 (defn- fetch-ids [ds q selected-context show-events?]
   (let [search-clause       (if (not= "" q)
@@ -176,31 +180,35 @@
     '()))
 
 (defn search-issues [db {:keys [show-events? selected-context selected-secondary-contexts-ids] :as opts}]
-  (let [opts (
+  (try
+    (let [opts (
                 ;; TODO instead of doing this, make sure q is always at least ""
-                  if (:q opts) 
-                   (update opts :q remove-some-chars)
+                if (:q opts) 
+                 (update opts :q remove-some-chars)
                  ;; for destructuring in searcj-issues' to work properly when :q is present but has nil value
-                   (dissoc opts :q))]
-    (if-not (or selected-context show-events?)
-      [(search-issues' db opts) {}]
-      (let [aggregated-contexts
-            (->> (search-issues' db (-> opts 
-                                        (assoc :selected-secondary-contexts-ids '())
-                                        (dissoc
-                                         :show-events?
-                                         :unassigned-secondary-contexts-selected?
-                                         :secondary-contexts-inverted?)))
-                 (map :contexts)
-                 (map seq)
-                 (apply concat)
-                 (group-by first)
-                 (map #(do [(count (second %)) (first (second %))]))
-                 (sort-by first)
-                 (map second)
-                 reverse)
-            aggregated-contexts (reduce (fn [acc val]
-                                          (conj acc [val (:title (contexts/get-context db {:id val}))])) 
-                                        aggregated-contexts (set/difference selected-secondary-contexts-ids
-                                                                            (set (map first aggregated-contexts))))]
-        [(search-issues' db opts) aggregated-contexts]))))
+                 (dissoc opts :q))]
+      (if-not (or selected-context show-events?)
+        [(search-issues' db opts) {}]
+        (let [aggregated-contexts
+              (->> (search-issues' db (-> opts 
+                                          (assoc :selected-secondary-contexts-ids '())
+                                          (dissoc
+                                           :show-events?
+                                           :unassigned-secondary-contexts-selected?
+                                           :secondary-contexts-inverted?)))
+                   (map :contexts)
+                   (map seq)
+                   (apply concat)
+                   (group-by first)
+                   (map #(do [(count (second %)) (first (second %))]))
+                   (sort-by first)
+                   (map second)
+                   reverse)
+              aggregated-contexts (reduce (fn [acc val]
+                                            (conj acc [val (:title (contexts/get-context db {:id val}))])) 
+                                          aggregated-contexts (set/difference selected-secondary-contexts-ids
+                                                                              (set (map first aggregated-contexts))))]
+          [(search-issues' db opts) aggregated-contexts])))
+          (catch Exception e
+            (log/error (str "error in search-issues: " (.getMessage e) " - params were: " (with-out-str (pp/pprint opts))))
+            (throw e))))

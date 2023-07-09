@@ -55,15 +55,15 @@
      [:li [unassigned-secondary-contexts-component *state]]
      (->> secondary-contexts
           (count-issues issues)
-          (map (fn [[id [title count]]]
-                 [:li
-                  {:key id
-                   :on-click (select-secondary-context *state id)} 
-                  [:span {:style (when (contains? selected-secondary-contexts-ids id)
-                                   {:font-weight :bold})} title]
-                  (when (and (empty? selected-secondary-contexts-ids)
-                             (not unassigned-secondary-contexts-selected?))
-                    (str " (" count ")"))])))]))
+          (map-indexed (fn [idx [id [title count]]]
+                         [:li
+                          {:key      id
+                           :on-click (select-secondary-context *state id)} 
+                          [:span {:style (when (contains? selected-secondary-contexts-ids id)
+                                           {:font-weight :bold})} (inc idx) ". [" id "] " title]
+                          (when (and (empty? selected-secondary-contexts-ids)
+                                     (not unassigned-secondary-contexts-selected?))
+                            (str " (" count ")"))])))]))
 
 (defn- select-invert-contexts [*state]
   (fn [_]
