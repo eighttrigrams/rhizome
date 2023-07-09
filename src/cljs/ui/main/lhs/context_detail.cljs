@@ -27,7 +27,7 @@
                                                [] highlighted-secondary-contexts)
         back                           (remove (fn [[k _v]]
                                                  (some #{k} highlighted-secondary-contexts)) secondary-contexts)]
-    (concat front back)))
+    (concat front (reverse (sort-by #(get-in % [1 1]) back)))))
 
 (defn item-component [*state]
   [:ul.cards
