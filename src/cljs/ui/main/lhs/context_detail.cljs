@@ -57,7 +57,6 @@
              (update (:data (:selected-context @*state)) :selected-secondary-contexts 
                      #(into [] ((if (contains? (into #{} %) id) disj conj) 
                                 (into #{} %) id)))))
-    (prn ".." (:data (:selected-context @*state)))
     (actions/change-secondary-contexts-selection! *state)
     (re-focus)))
 
