@@ -50,7 +50,7 @@
                                    :order-by [[:important :desc] [:updated_at :desc]]})))
      (map contexts.core/post-process))
     (catch Exception e
-      (log/error (str "error in search-contexts: " (.getMessage e) " - params were: " (with-out-str (pp/pprint opts))))
+      (log/error (str "error in search-contexts: " (.getMessage e) " - param was: " q))
       (throw e))))
 
 (defn- fetch-ids [ds q selected-context show-events?]
