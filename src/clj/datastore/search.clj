@@ -161,8 +161,6 @@
        {{:keys [selected-secondary-contexts]} :data
         :as selected-context} :selected-context
        :as opts}]
-  (tap> [:search-issues' selected-secondary-contexts])
-  
   (if-let [ids (do-fetch-ids db opts)]
     (->> ids
          (map #(:issues/id %))
@@ -184,7 +182,6 @@
                          {{:keys [selected-secondary-contexts]} :data  
                           :as selected-context} :selected-context
                          :as opts}]
-  (tap> [:ssss selected-secondary-contexts])
   (try
     (let [opts (
                 ;; TODO instead of doing this, make sure q is always at least ""
@@ -214,10 +211,7 @@
                                           aggregated-contexts (set/difference 
                                                                (into #{} selected-secondary-contexts)
                                                                (set (map first aggregated-contexts))))]
-          (tap> [:aggregated-contexts aggregated-contexts])
-          (let [results (search-issues' db opts)]
-            (tap> [:results results])
-            [results aggregated-contexts]))))
-          (catch Exception e
-            (log/error (str "error in search-issues: " (.getMessage e) " - params were: " (with-out-str (pp/pprint opts))))
-            (throw e))))
+          [(search-issues' db opts) aggregated-contexts])))
+    (catch Exception e
+      (log/error (str "error in search-issues: " (.getMessage e) " - params were: " (with-out-str (pp/pprint opts))))
+      (throw e))))
