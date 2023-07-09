@@ -80,8 +80,8 @@
     [:ul
      [:li [unassigned-secondary-contexts-component *state]]
      (->> secondary-contexts
-          (sort-secondary-contexts highlighted-secondary-contexts)
           (count-issues issues)
+          (sort-secondary-contexts highlighted-secondary-contexts)
           (map-indexed (fn [idx [id [title count]]]
                          [:li
                           {:key      id
