@@ -66,12 +66,15 @@
     (reset-db)
     (let [context-1    (create-context "context-1")
           context-2-id (:id (create-context "context-2"))
-          context-3-id (:id (create-context "context-3"))]
+          context-3-id (:id (create-context "context-3"))
+          context-4-id (:id (create-context "context-4"))]
       (update-context (assoc context-1 :data
-                             {:highlighted-secondary-contexts [(str context-3-id)]}))
+                             {:highlighted-secondary-contexts [(str context-4-id)
+                                                               (str context-3-id)]}))
       (:id (create-issue "issue-1" (:id context-1) [context-2-id])) 
       (:id (create-issue "issue-2" (:id context-1) [context-3-id]))
-      (is (= (list [context-3-id ["context-3" 1 true]]
+      (is (= (list [context-4-id ["context-4" 0 true]]
+                   [context-3-id ["context-3" 1 true]]
                    [(:id context-1) ["context-1" 2 false]]
                    [context-2-id ["context-2" 1 false]]) 
              (second (:issues (repository/list-resources {:cmd :fetch-context

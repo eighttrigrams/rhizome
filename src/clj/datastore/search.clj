@@ -188,48 +188,34 @@
        (map try-parse)
        (remove nil?)))
 
+(defn- calc-highlighted [db 
+                         secondary-contexts
+                         highlighted-secondary-contexts]
+  (reduce (fn [acc val]
+            (if (secondary-contexts val)
+              (conj acc [val (conj (secondary-contexts val) true)])
+              (if-let [title (:title (contexts/get-context db {:id val}))]
+                (conj acc [val [title 0 true]])
+                acc)))
+          [] highlighted-secondary-contexts))
+
 (defn- sort-secondary-contexts
-  [highlighted-secondary-contexts secondary-contexts]
+  [db highlighted-secondary-contexts secondary-contexts]
   (let [highlighted-secondary-contexts (pre-process-highlighted-secondary-contexts
                                         highlighted-secondary-contexts)
         secondary-contexts             (into {} secondary-contexts)
-        front                          (reduce (fn [acc val]
-                                                 (if (secondary-contexts val)
-                                                   (conj acc [val (conj (secondary-contexts val) true)])
-                                                   acc))
-                                               [] highlighted-secondary-contexts)
+        front                          (calc-highlighted db 
+                                                         secondary-contexts 
+                                                         highlighted-secondary-contexts)
         back                           (->> secondary-contexts
                                             (remove (fn [[k _v]]
                                                       (some #{k} highlighted-secondary-contexts)))
                                             (map (fn [[k [val title]]] [k [val title false]])))]
     (concat front (reverse (sort-by #(get-in % [1 1]) back)))))
 
-;; TODO review; moved over from frontend, likely delete
-#_(defn count-issues [issues secondary-contexts]
-  (let [count-reducer,,
-        #(fn [count issue]
-           (if (contains? (:contexts issue) %)
-             (inc count)
-             count))]
-    (map (fn [[id title]]
-           [id
-            [title
-             (reduce (count-reducer id) 0 issues)]])
-         secondary-contexts)))
-
-;; TODO review; forgot what this was for
-(defn- fetch-contexts
-  [db selected-secondary-contexts aggregated-contexts]
-  (reduce (fn [acc val]
-            (conj acc [val (:title (contexts/get-context db {:id val}))]))
-          aggregated-contexts (set/difference
-                               (into #{} selected-secondary-contexts)
-                               (set (map first aggregated-contexts)))))
-
 (defn- get-aggregated-contexts 
   [db 
    opts 
-   selected-secondary-contexts
    highlighted-secondary-contexts]
   (->> (search-issues' db (-> opts
                               (assoc-in [:selected-context :data :selected-secondary-contexts] [])
@@ -246,12 +232,10 @@
        (sort-by first)
        reverse
        (map (fn [[count [id title]]] [id [title count]]))
-       (sort-secondary-contexts highlighted-secondary-contexts)
-       (fetch-contexts db selected-secondary-contexts)))
+       (sort-secondary-contexts db highlighted-secondary-contexts)))
 
 (defn search-issues [db {:keys [show-events?]
-                         {{:keys [selected-secondary-contexts
-                                  highlighted-secondary-contexts]} :data  
+                         {{:keys [highlighted-secondary-contexts]} :data  
                           :as selected-context} :selected-context
                          :as opts}]
   (try
@@ -264,8 +248,8 @@
       (if-not (or selected-context show-events?)
         [(search-issues' db opts) {}]
         [(search-issues' db opts) 
-         (get-aggregated-contexts db opts 
-                                  selected-secondary-contexts
+         (get-aggregated-contexts db 
+                                  opts 
                                   highlighted-secondary-contexts)]))
     (catch Exception e
       (log/error (str "error in search-issues: " (.getMessage e) " - params were: " (with-out-str (pp/pprint opts))))
