@@ -20,21 +20,28 @@
   (jdbc/execute-one! db ["delete from contexts"])
   (jdbc/execute-one! db ["delete from issues"]))
 
+(defn- create-context [title]
+  (:selected-context (repository/list-resources {:cmd :insert-context
+                                                 :arg {:title title}} db)))
+
+(defn- create-issue [title context-id selected-secondary-contexts-ids]
+  (:selected-issue (repository/list-resources {:cmd              :insert-issue
+                                               :arg              {:title title}
+                                               :selected-context {:id   context-id
+                                                                  :data {:selected-secondary-contexts selected-secondary-contexts-ids}}} db)))
+
 (deftest repository 
   (testing "base case"
     (reset-db)
-    (let [context
-          (:selected-context (repository/list-resources {:cmd :insert-context
-                                                         :arg {:title "abc"}} db))]
+    (let [context (create-context "abc")]
       (is (= 
            "abc"
            (:title (:selected-context (repository/list-resources {:cmd :fetch-context
                                                                   :arg [context false]} db)))))))
   (testing "update a context"
     (reset-db)
-    (let [context (select-keys (:selected-context (repository/list-resources {:cmd :insert-context
-                                                                              :arg {:title "abc"}} db))
-                               [:title :id])
+    (let [context (select-keys (create-context "abc")
+                   [:title :id])
           _ (repository/list-resources 
              {:cmd :update-context
               :arg {:context (assoc context 
@@ -46,3 +53,14 @@
            {:a ["1" "2"]}
            (:data (:selected-context (repository/list-resources {:cmd :fetch-context
                                                                   :arg [context false]} db))))))))
+
+(deftest search 
+  (testing "aggregating contexts"
+    (reset-db)
+    (let [context-1-id (:id (create-context "context-1"))
+          context-2-id (:id (create-context "context-2"))
+          context-3-id (:id (create-context "context-3"))] 
+      (:id (create-issue "issue-1" context-1-id [context-2-id])) 
+      (:id (create-issue "issue-2" context-1-id [context-3-id]))
+      (tap> [:1 (second (:issues (repository/list-resources {:cmd :fetch-context
+                                                             :arg [{:id context-1-id} false]} db)))]))))
