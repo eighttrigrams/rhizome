@@ -178,6 +178,30 @@
                                                 secondary-contexts-and?))
     '()))
 
+(defn- fetch-contexts [db selected-secondary-contexts aggregated-contexts]
+  (reduce (fn [acc val]
+            (conj acc [val (:title (contexts/get-context db {:id val}))]))
+          aggregated-contexts (set/difference
+                               (into #{} selected-secondary-contexts)
+                               (set (map first aggregated-contexts)))))
+
+(defn- get-aggregated-contexts [db opts select-secondary-contexts]
+  (->> (search-issues' db (-> opts
+                              (assoc-in [:selected-context :data :selected-secondary-contexts] [])
+                              (dissoc
+                               :show-events?
+                               :unassigned-secondary-contexts-selected?
+                               :secondary-contexts-inverted?)))
+       (map :contexts)
+       (map seq)
+       (apply concat)
+       (group-by first)
+       (map #(do [(count (second %)) (first (second %))]))
+       (sort-by first)
+       (map second)
+       reverse
+       (fetch-contexts db select-secondary-contexts)))
+
 (defn search-issues [db {:keys [show-events?]
                          {{:keys [selected-secondary-contexts]} :data  
                           :as selected-context} :selected-context
@@ -191,27 +215,8 @@
                  (dissoc opts :q))]
       (if-not (or selected-context show-events?)
         [(search-issues' db opts) {}]
-        (let [aggregated-contexts
-              (->> (search-issues' db (-> opts 
-                                          (assoc-in [:selected-context :data :selected-secondary-contexts] [])
-                                          (dissoc
-                                           :show-events?
-                                           :unassigned-secondary-contexts-selected?
-                                           :secondary-contexts-inverted?)))
-                   (map :contexts)
-                   (map seq)
-                   (apply concat)
-                   (group-by first)
-                   (map #(do [(count (second %)) (first (second %))]))
-                   (sort-by first)
-                   (map second)
-                   reverse)
-              aggregated-contexts (reduce (fn [acc val]
-                                            (conj acc [val (:title (contexts/get-context db {:id val}))])) 
-                                          aggregated-contexts (set/difference 
-                                                               (into #{} selected-secondary-contexts)
-                                                               (set (map first aggregated-contexts))))]
-          [(search-issues' db opts) aggregated-contexts])))
+        [(search-issues' db opts) 
+         (get-aggregated-contexts db opts selected-secondary-contexts)]))
     (catch Exception e
       (log/error (str "error in search-issues: " (.getMessage e) " - params were: " (with-out-str (pp/pprint opts))))
       (throw e))))
