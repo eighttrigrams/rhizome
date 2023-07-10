@@ -24,7 +24,6 @@
       (dissoc :searchable)))
 
 (defn- update-context' [db {:keys [id title short_title tags data]}]
-  (tap> [:update-context' data])
   (jdbc/execute-one! db
                      (sql/format {:update [:contexts]
                                   :where  [:= :id [:inline id]]
