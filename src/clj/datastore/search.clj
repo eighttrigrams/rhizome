@@ -235,6 +235,7 @@
                               (assoc-in [:selected-context :data :selected-secondary-contexts] [])
                               (dissoc
                                :show-events?
+                               :q
                                :unassigned-secondary-contexts-selected?
                                :secondary-contexts-inverted?)))
        (map :contexts)
