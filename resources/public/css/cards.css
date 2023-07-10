@@ -50,7 +50,7 @@ li.card.issue-card span.info {
     top: 64px;
 }
 
-li.card.issue-card span.badge {
+span.badge {
     background-color: wheat;
     color: #4c2e3c;
     border-radius: 3px;

@@ -3,47 +3,9 @@
             [ui.main.lhs.list-item :as list-item]
             ["react-markdown$default" :as ReactMarkdown]))
 
-(defn- try-parse [item]
-  (let [parsed (js/parseInt item)] 
-    (if (js/isNaN parsed) 
-      nil
-      parsed)))
-
-(defn- pre-process-highlighted-secondary-contexts
-  [highlighted-secondary-contexts]
-  (->> highlighted-secondary-contexts
-       (map try-parse)
-       (remove nil?)))            
-
-(defn- sort-secondary-contexts 
-  [highlighted-secondary-contexts secondary-contexts]
-  (let [highlighted-secondary-contexts (pre-process-highlighted-secondary-contexts 
-                                        highlighted-secondary-contexts)
-        secondary-contexts             (into {} secondary-contexts)
-        front                          (reduce (fn [acc val]
-                                                 (if (secondary-contexts val)
-                                                   (conj acc [val (secondary-contexts val)])
-                                                   acc))
-                                               [] highlighted-secondary-contexts)
-        back                           (remove (fn [[k _v]]
-                                                 (some #{k} highlighted-secondary-contexts)) secondary-contexts)]
-    (concat front (reverse (sort-by #(get-in % [1 1]) back)))))
-
 (defn item-component [*state]
   [:ul.cards
    [list-item/component *state (:selected-context @*state)]])
-
-(defn count-issues [issues secondary-contexts]
-  (let [count-reducer,,
-        #(fn [count issue]
-          (if (contains? (:contexts issue) %)
-            (inc count)
-            count))]
-    (map (fn [[id title]]
-           [id
-            [title
-             (reduce (count-reducer id) 0 issues)]])
-         secondary-contexts)))
 
 (defn re-focus []
   (when-let [el (.getElementById js/document "search-input")]
@@ -73,29 +35,31 @@
    "No secondary contexts"])
 
 (defn- secondary-contexts-component [*state]
-  (let [{:keys                        [issues
-                                       unassigned-secondary-contexts-selected?
+  (let [{:keys                        [unassigned-secondary-contexts-selected?
                                        aggregated-contexts]
-         {{:keys [highlighted-secondary-contexts
-                  selected-secondary-contexts]} 
+         {{:keys [selected-secondary-contexts]} 
           :data :as selected-context} :selected-context} @*state
         secondary-contexts (remove (fn [[idx _v]]
                                      (= idx (:id selected-context))) 
                                    aggregated-contexts)]
     [:ul
      [:li [unassigned-secondary-contexts-component *state]]
-     (->> secondary-contexts
-          (count-issues issues)
-          (sort-secondary-contexts highlighted-secondary-contexts)
-          (map-indexed (fn [idx [id [title count]]]
-                         [:li
-                          {:key      id
-                           :on-click (select-secondary-context *state id)} 
-                          [:span {:style (when (contains? (into #{} selected-secondary-contexts) id)
-                                           {:font-weight :bold})} (inc idx) ". [" id "] " title]
-                          (when (and (empty? (into #{} selected-secondary-contexts))
-                                     (not unassigned-secondary-contexts-selected?))
-                            (str " (" count ")"))])))]))
+     (map-indexed
+      (fn [idx [id [title count highlighted?]]]
+        [:li
+         {:key      id
+          :on-click (select-secondary-context *state id)} 
+         [:span {:style (when (contains? (into #{} selected-secondary-contexts) id)
+                          {:font-weight :bold})} 
+          (when (and highlighted? (< idx 5))
+            (str (inc idx) " ")) 
+          [:span.badge {:style {:font-size "9px"}} id]
+          " "
+          title]
+         (when (and (empty? (into #{} selected-secondary-contexts))
+                    (not unassigned-secondary-contexts-selected?))
+           (str " (" count ")"))]) 
+      secondary-contexts)]))
 
 (defn- select-invert-contexts [*state]
   (fn [_]
