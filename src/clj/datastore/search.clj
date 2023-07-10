@@ -185,7 +185,7 @@
                                (into #{} selected-secondary-contexts)
                                (set (map first aggregated-contexts)))))
 
-(defn- get-aggregated-contexts [db opts select-secondary-contexts]
+(defn- get-aggregated-contexts [db opts selected-secondary-contexts]
   (->> (search-issues' db (-> opts
                               (assoc-in [:selected-context :data :selected-secondary-contexts] [])
                               (dissoc
@@ -200,7 +200,7 @@
        (sort-by first)
        (map second)
        reverse
-       (fetch-contexts db select-secondary-contexts)))
+       (fetch-contexts db selected-secondary-contexts)))
 
 (defn search-issues [db {:keys [show-events?]
                          {{:keys [selected-secondary-contexts]} :data  
