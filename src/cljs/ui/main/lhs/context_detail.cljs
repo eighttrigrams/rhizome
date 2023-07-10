@@ -51,8 +51,10 @@
           :on-click (select-secondary-context *state id)} 
          [:span {:style (when (contains? (into #{} selected-secondary-contexts) id)
                           {:font-weight :bold})} 
-          (when (and highlighted? (< idx 5))
-            (str (inc idx) " ")) 
+          (when highlighted?
+            (str
+             (if (< idx 5) (inc idx) "_")
+             " ")) 
           [:span.badge {:style {:font-size "9px"}} id]
           " "
           title]
