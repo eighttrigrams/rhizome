@@ -53,7 +53,7 @@
                           {:font-weight :bold})} 
           (when highlighted?
             (str
-             (if (< idx 5) (inc idx) "_")
+             (if (< idx 6) (inc idx) "_")
              " ")) 
           [:span.badge {:style {:font-size "9px"}} id]
           " "
