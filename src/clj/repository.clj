@@ -31,6 +31,78 @@
                  " - "
                  (with-out-str (pp/pprint opts)))))
 
+(defn- fetch-context [db {:keys [selected-issue]} arg]
+  (try
+    (let [[arg change-context?] arg
+          selected-context (datastore/get-context db arg)
+          opts             {:search-globally?                false
+                            :selected-context                selected-context}]
+      (datastore/reprioritize-context db arg)
+      (merge opts
+             {:selected-context                        selected-context
+              :issues                                  (search/search-issues db (dissoc opts :q))
+              :active-search                           (if-not change-context? :issues nil)
+              :context-to-fetch                        nil
+              :selected-issue                          (if-not change-context? nil selected-issue)
+              :secondary-contexts-inverted?            false
+              :secondary-contexts-and?                 false
+              :unassigned-secondary-contexts-selected? false
+              :q                                       nil}))
+    (catch Exception e
+      (log/error (str "Caught an exception in fetch-context " (.getMessage e)))
+      (throw e))))
+
+(defn- link-issue-to-selected-context 
+  "when context selected add an issue"
+  [db {:keys [selected-context] :as opts} arg]
+  (try
+    (let [selected-issue (datastore/get-issue db {:id arg})
+          context-ids   (keys (:contexts selected-issue))]
+      (datastore/link-issue-contexts db {:id arg} (vec (set (conj context-ids (:id selected-context)))))
+      {:selected-issue   nil
+       :issues           (search/search-issues db 
+                                               (-> opts
+                                                   (dissoc :search-globally? :q)
+                                                   (assoc-in [:selected-context :data :selected-secondary-contexts] [])))
+       :active-search    nil
+       :link-issue       nil
+       :search-globally? false
+       :q                nil})
+    (catch Exception e
+      (log/error (str "Caught an exception in link-issue-to-selected-context " (.getMessage e)))
+      (throw e))))
+
+(defn- link-selected-issue-to-context 
+  "when issue selected link to yet another context"
+  [db {:keys [selected-issue] :as opts} arg]
+  (try
+    (datastore/link-issue-contexts db selected-issue 
+                                   (vec (set (conj (keys (:contexts selected-issue))
+                                                   (:id arg)))))
+    {:link-context   nil
+     :selected-issue (datastore/get-issue db selected-issue)
+     :active-search  nil
+     :issues         (search/search-issues db (dissoc opts :q))
+     :q              nil}
+    (catch Exception e 
+      (log/error (str "Caught an exception in link-selected-issue-to-context " (.getMessage e)))
+      (throw e))))
+
+(defn- link-issue-to-selected-issue [db {:keys [selected-issue] :as opts} arg]
+  (try
+    (datastore/link-issue db (:id selected-issue) arg)
+    {:selected-issue   (datastore/get-issue db selected-issue)
+     :issues           (search/search-issues db (-> opts
+                                                    (dissoc :search-globally?)
+                                                    (assoc-in [:selected-context :data :selected-secondary-contexts] [])))
+     :active-search    nil
+     :link-issue       nil
+     :search-globally? false
+     :q                nil}
+    (catch Exception e
+      (log/error (str "Caught an exception in link-issue-to-selected-issue " (.getMessage e)))
+      (throw e))))
+
 (defn list-resources [{:keys [q 
                               cmd
                               arg
@@ -108,38 +180,9 @@
          (let [selected-context (datastore/cycle-search-mode db selected-context)]
            {:selected-context selected-context
             :issues           (search/search-issues db (assoc opts :selected-context selected-context))})
-         :link-issues
-         (do
-           (datastore/link-issue db (:id selected-issue) arg)
-           {:selected-issue   (datastore/get-issue db selected-issue)
-            :issues           (search/search-issues db (-> opts
-                                                           (dissoc :search-globally?)
-                                                           (assoc-in [:selected-context :data :selected-secondary-contexts] [])))
-            :active-search    nil
-            :link-issue       nil
-            :search-globally? false
-            :q                nil})
-         :link-issue-context ;; when context selected, add an issue
-         (let [selected-issue (datastore/get-issue db {:id arg})
-               context-ids   (keys (:contexts selected-issue))]
-           (datastore/link-issue-contexts db {:id arg} (vec (set (conj context-ids (:id selected-context)))))
-           {:selected-issue   nil
-            :issues           (search/search-issues db (-> opts
-                                                           (dissoc :search-globally? :q)
-                                                           (assoc-in [:selected-context :data :selected-secondary-contexts] [])))
-            :active-search    nil
-            :link-issue       nil
-            :search-globally? false
-            :q                nil})
-         :link-context ;; when issue selected, link to yet another context
-         (do
-           (datastore/link-issue-contexts db selected-issue (vec (set (conj (keys (:contexts selected-issue))
-                                                                            (:id arg)))))
-           {:link-context   nil
-            :selected-issue (datastore/get-issue db selected-issue)
-            :active-search  nil
-            :issues         (search/search-issues db (dissoc opts :q))
-            :q              nil})
+         :link-issues (link-issue-to-selected-issue db opts arg)
+         :link-issue-context (link-issue-to-selected-context db opts arg)
+         :link-context (link-selected-issue-to-context db opts arg)
          :insert-issue
          (let [selected-issue (datastore/new-issue db arg
                                                    (:id selected-context)
@@ -180,26 +223,7 @@
             :active-search    nil
             :search-globally? false
             :q                nil})
-         :fetch-context
-         (try
-           (let [[arg change-context?] arg
-                 selected-context (datastore/get-context db arg)
-                 opts             {:search-globally?                false
-                                   :selected-context                selected-context}]
-             (datastore/reprioritize-context db arg)
-             (merge opts
-                    {:selected-context                        selected-context
-                     :issues                                  (search/search-issues db (dissoc opts :q))
-                     :active-search                           (if-not change-context? :issues nil)
-                     :context-to-fetch                        nil
-                     :selected-issue                          (if-not change-context? nil selected-issue)
-                     :secondary-contexts-inverted?            false
-                     :secondary-contexts-and?                 false
-                     :unassigned-secondary-contexts-selected? false
-                     :q                                       nil}))
-           (catch Exception e
-             (log/error (str "Caught an exception in list-resources:fetch-context " (.getMessage e)))
-             (throw e)))
+         :fetch-context (fetch-context db opts arg)
          :change-secondary-contexts-selection
          (let [context (datastore/update-context db {:context (:selected-context opts)})]
            {:selected-context context
@@ -245,4 +269,4 @@
          ;; TODO remove :else clause. fix where there are cases where this fires but there shoulnd't be
          :else {})))
     (catch Exception e 
-      (log/error (str "Caught an exception in list-resources: " (.getMessage e))))))
+      (log/error (str "Caught an exception in list-resources(mainfn): " (.getMessage e))))))
