@@ -81,7 +81,9 @@
   (fetch-and-reset! *state 
                     (assoc @*state
                            :cmd :start-context-search
-                           :active-search :contexts)))
+                           :active-search :contexts
+                           :link-issue false
+                           :link-context false)))
 
 (defn start-linking-context [*state]
   (fetch-and-reset! *state
