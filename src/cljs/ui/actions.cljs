@@ -82,6 +82,7 @@
                     (assoc @*state
                            :cmd :start-context-search
                            :active-search :contexts
+                           ;; TODO maybe move those into repository; also add this to for example 'i' and other modes
                            :link-issue false
                            :link-context false)))
 
