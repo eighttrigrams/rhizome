@@ -20,6 +20,7 @@
     :render (fn []
               [:input#search-input
                {:autoComplete :off
+                :spellCheck   false
                 :on-change    #(save-input-debounced! [*state %])
                 :on-paste     #(save-input-debounced! [*state %])
                 :on-cut       #(save-input-debounced! [*state %])
