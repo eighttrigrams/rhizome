@@ -18,7 +18,7 @@
     :reagent-render (fn [item]
                       [:textarea#description-editor
                        {:defaultValue (:description item)
-                        :spellcheck false}])}))
+                        :spellCheck false}])}))
 
 (defn- handle-keys [*state item]
   (case (:modal @*state)
