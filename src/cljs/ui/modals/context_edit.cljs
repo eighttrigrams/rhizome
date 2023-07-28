@@ -24,7 +24,6 @@
                               (editor/create (get-tags-el) {:input-field-mode? true}))
     :reagent-render
     (fn [context]
-      (prn "data:" (:data context))
       [:<> 
        [:div
         [:input#context-title.line

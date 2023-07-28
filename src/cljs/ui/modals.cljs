@@ -17,7 +17,8 @@
        (.focus el))
     :reagent-render (fn [item]
                       [:textarea#description-editor
-                       {:defaultValue (:description item)}])}))
+                       {:defaultValue (:description item)
+                        :spellcheck false}])}))
 
 (defn- handle-keys [*state item]
   (case (:modal @*state)
