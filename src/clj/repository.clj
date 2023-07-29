@@ -31,7 +31,7 @@
                  " - "
                  (with-out-str (pp/pprint opts)))))
 
-(defn- fetch-context [db {:keys [selected-issue]} arg]
+(defn fetch-context [db {:keys [selected-issue]} arg]
   (try
     (let [[arg change-context?] arg
           selected-context (datastore/get-context db arg)
@@ -102,6 +102,11 @@
     (catch Exception e
       (log/error (str "Caught an exception in link-issue-to-selected-issue " (.getMessage e)))
       (throw e))))
+
+(defn update-context [db opts arg]
+  {:selected-context (datastore/update-context db arg)
+   :issues           (search/search-issues db (dissoc opts :q))
+   :q                nil})
 
 (defn list-resources [{:keys [q 
                               cmd
@@ -211,10 +216,7 @@
            {:selected-issue (datastore/update-issue db (:issue arg))
             :issues         (search/search-issues db (dissoc opts :q))
             :q              nil})
-         :update-context
-         {:selected-context (datastore/update-context db arg)
-          :issues           (search/search-issues db (dissoc opts :q))
-          :q                nil}
+         :update-context (update-context db opts arg)
          :fetch-issue
          (let [[issue skip-select?] arg]
            (datastore/reprioritize-issue db issue)

@@ -45,8 +45,10 @@
     (let [context (create-context "abc")]
       (is (= 
            "abc"
-           (:title (:selected-context (repository/list-resources {:cmd :fetch-context
-                                                                  :arg [context false]} db)))))))
+           (:title (:selected-context (repository/fetch-context
+                                       db
+                                       {}
+                                       [context false])))))))
   (testing "update a context"
     (reset-db)
     (let [context (select-keys (create-context "abc")
@@ -58,8 +60,7 @@
                                                                 :q             ""} db)))]
       (is (=
            {:a ["1" "2"]}
-           (:data (:selected-context (repository/list-resources {:cmd :fetch-context
-                                                                  :arg [context false]} db))))))))
+           (:data (:selected-context (repository/fetch-context db {} [context false]))))))))
 
 (deftest search 
   (testing "aggregating contexts"
