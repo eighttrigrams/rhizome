@@ -123,11 +123,12 @@
                                                  (some? (:short_title %))) issues)))]
       (concat top bottom))))
 
-(defn- filter-by-selected-secondary-contexts [selected-secondary-contexts-set 
-                                              unassigned-secondary-contexts-selected?
-                                              secondary-contexts-inverted?
-                                              secondary-contexts-and?
-                                              issues]
+(defn- filter-by-selected-secondary-contexts 
+  [selected-secondary-contexts-set 
+   unassigned-secondary-contexts-selected?
+   secondary-contexts-inverted?
+   secondary-contexts-and?
+   issues]
   (if (or unassigned-secondary-contexts-selected?
           (seq selected-secondary-contexts-set))
     ((if-not secondary-contexts-inverted? filter remove)
@@ -153,6 +154,14 @@
        :or   {q ""}}]
   (seq (fetch-ids db q (if search-globally? nil selected-context) show-events?)))
 
+(defn- filter-issues [{:keys [link-issue selected-issue]} issues]
+  (if-not link-issue 
+    issues
+    (let [issue-ids-to-exclude (conj (set (map :id (:related_issues selected-issue)))
+                                     (:id selected-issue))]
+      (remove #(issue-ids-to-exclude (:id %)) 
+              issues))))
+
 (defn- search-issues'
   [db {:keys [show-events?
               unassigned-secondary-contexts-selected?
@@ -175,7 +184,8 @@
          (filter-by-selected-secondary-contexts (into #{} selected-secondary-contexts)
                                                 unassigned-secondary-contexts-selected?
                                                 secondary-contexts-inverted?
-                                                secondary-contexts-and?))
+                                                secondary-contexts-and?)
+         (filter-issues opts))
     '()))
 
 (defn- try-parse [item]
@@ -222,6 +232,7 @@
                               (dissoc
                                :show-events?
                                :q
+                               :link-issue
                                :unassigned-secondary-contexts-selected?
                                :secondary-contexts-inverted?)))
        (map :contexts)

@@ -127,7 +127,8 @@
      opts))
 
 (defn start-linking-selected-issue-to-issue-with-local-search [db search-issues]
-  {:issues           (search/search-issues db (search-issues))
+  {:issues           (search/search-issues db (assoc (search-issues) 
+                                                     :link-issue :issue))
    :active-search    :issues
    :search-globally? false
    :link-issue       :issue

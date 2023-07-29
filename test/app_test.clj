@@ -36,7 +36,12 @@
     :arg              {:title title}
     :selected-context {:id   context-id
                        :data {:selected-secondary-contexts 
-                              selected-secondary-contexts-ids}}} db))
+                              selected-secondary-contexts-ids}}} db) 
+  (-> {:active-search :issues
+       :q             title}
+      (repository/list-resources db)
+      :issues
+      ffirst))
 
 (deftest repository 
   (testing "base case"
@@ -84,20 +89,23 @@
   (testing "with local search"
     (reset-db)
     (let [context-1 (create-context "context-1")
-          _ (create-issue "issue-1" (:id context-1) [])
-          _ (create-issue "issue-2" (:id context-1) []) 
-          opts {:active-search :issues
-                :q             "issue-2"}
-          opts (repository/list-resources opts db)
-          issue-2 (first (first (:issues opts)))
-          opts {:active-search :issues
-                :q             "issue-1"} 
-          opts (repository/list-resources opts db)
-          issue-1 (first (first (:issues opts)))
-          opts (repository/fetch-context db opts [context-1 true]) 
-          opts (repository/fetch-issue db opts [issue-1 false])
-          opts (merge opts (repository/start-linking-selected-issue-to-issue-with-local-search 
-                            db
-                            (repository/make-search-issues opts)))
-          opts (repository/finish-linking-selected-issue db opts (:id issue-2))]
-      (is (= "issue-2" (:title (first (:related_issues (:selected-issue opts)))))))))
+          issue-1   (create-issue "issue-1" (:id context-1) [])
+          issue-2   (create-issue "issue-2" (:id context-1) [])
+          _issue-3   (create-issue "issue-3" (:id context-1) [])
+          opts      (repository/fetch-context db {} [context-1 true]) 
+          opts      (merge opts (repository/fetch-issue db opts [issue-1 false]))
+          opts      (merge opts (repository/start-linking-selected-issue-to-issue-with-local-search 
+                                 db
+                                 (repository/make-search-issues opts)))
+          opts      (merge opts (repository/finish-linking-selected-issue db opts (:id issue-2)))
+          _         (is (= "issue-2" (:title (first (:related_issues (:selected-issue opts))))))
+          
+          opts      (merge opts (repository/start-linking-selected-issue-to-issue-with-local-search
+                                 db
+                                 (repository/make-search-issues opts)))
+          issues (-> (merge opts {:q ""})
+                     (repository/list-resources db)
+                     :issues
+                     first)]
+      (is (= 1 (count issues)))
+      (is (= "issue-3" (:title (first issues)))))))
