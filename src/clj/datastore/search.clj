@@ -54,7 +54,8 @@
       (throw e))))
 
 (defn- fetch-ids [ds q selected-context show-events?]
-  (let [search-clause       (if (not= "" q)
+  (let [selected-context (when (:id selected-context) selected-context)
+        search-clause       (if (not= "" q)
                               [:raw (format "searchable @@ to_tsquery('simple', '%s')" 
                                             (convert-q-to-query-string q))] 
                               [:=])
@@ -70,29 +71,28 @@
                                         :where  [:and
                                                  [:= :events.issue_id :issues.id]
                                                  [:not= :events.archived [:inline true]]]}]
-                              [:=])]
-    (jdbc/execute!
-     ds
-     (sql/format
-      (merge
-       {:select   [:issues.id]
-        :from     [:issues]
-        :order-by [[:important :desc] [:updated_at :desc]]
-        :join     join-clause
-        :where    [:or
-                   [:and
-                    exists-clause
-                    join-where-clause
-                    search-clause]
-                   (if (and (= "" q)
-                            (not selected-context)
-                            (not show-events?))
-                     [:= :important [:inline true]]
-                     nil)]}
-       (when (and (= "" q)
-                  (not selected-context)
-                  (not show-events?))
-         {:limit 500}))))))
+                              [:=])
+        formatted-query (sql/format (merge
+                                     {:select   [:issues.id]
+                                      :from     [:issues]
+                                      :order-by [[:important :desc] 
+                                                 [:updated_at :desc]]
+                                      :join     join-clause
+                                      :where    [:or
+                                                 [:and
+                                                  exists-clause
+                                                  join-where-clause
+                                                  search-clause]
+                                                 (if (and (= "" q)
+                                                          (not selected-context)
+                                                          (not show-events?))
+                                                   [:= :important [:inline true]]
+                                                   nil)]}
+                                     (when (and (= "" q)
+                                                (not selected-context)
+                                                (not show-events?))
+                                       {:limit 500})))]
+    (jdbc/execute! ds formatted-query)))
 
 (defn- issues-query [ids]
   {:select   [:issues.*

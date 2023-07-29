@@ -128,9 +128,21 @@
 
 (defn start-linking-selected-issue-to-issue-with-local-search [db search-issues]
   {:issues           (search/search-issues db (assoc (search-issues) 
-                                                     :link-issue :issue))
+                                                     :link-issue :issue
+                                                     :search-globally? false
+                                                     :q ""))
    :active-search    :issues
    :search-globally? false
+   :link-issue       :issue
+   :q                ""})
+
+(defn start-linking-selected-issue-to-issue-with-global-search [db search-issues]
+  {:issues           (search/search-issues db (assoc (search-issues)
+                                                     :link-issue :issue
+                                                     :search-globally? true
+                                                     :q ""))
+   :active-search    :issues
+   :search-globally? true
    :link-issue       :issue
    :q                ""})
 
@@ -159,7 +171,7 @@
                        :as   opts} db]
   
   (log-opts opts)
-
+  
   (try 
     #_{:clj-kondo/ignore [:unresolved-var]}
     (merge 
@@ -182,12 +194,7 @@
           :link-context     false
           :link-issue       nil
           :q                ""}
-         :link-with-global-search
-         {:issues           (search/search-issues db (search-issues))
-          :active-search    :issues
-          :search-globally? true
-          :link-issue       :issue
-          :q                ""}
+         :link-with-global-search (start-linking-selected-issue-to-issue-with-global-search db search-issues)
          :link-with-local-search (start-linking-selected-issue-to-issue-with-local-search db search-issues)
          :finish-link-selected-issue (finish-linking-selected-issue db opts arg)
          :link-context-with-global-search
