@@ -31,13 +31,12 @@
     :arg {:context context}} db))
 
 (defn- create-issue [title context-id selected-secondary-contexts-ids]
-  (:selected-issue 
-   (repository/list-resources 
-    {:cmd              :insert-issue
-     :arg              {:title title}
-     :selected-context {:id   context-id
-                        :data {:selected-secondary-contexts 
-                               selected-secondary-contexts-ids}}} db)))
+  (repository/list-resources 
+   {:cmd              :insert-issue
+    :arg              {:title title}
+    :selected-context {:id   context-id
+                       :data {:selected-secondary-contexts 
+                              selected-secondary-contexts-ids}}} db))
 
 (deftest repository 
   (testing "base case"
@@ -71,8 +70,8 @@
       (update-context (assoc context-1 :data
                              {:highlighted-secondary-contexts [(str context-4-id)
                                                                (str context-3-id)]}))
-      (:id (create-issue "issue-1" (:id context-1) [context-2-id])) 
-      (:id (create-issue "issue-2" (:id context-1) [context-3-id]))
+      (create-issue "issue-1" (:id context-1) [context-2-id]) 
+      (create-issue "issue-2" (:id context-1) [context-3-id])
       (is (= (list [context-4-id ["context-4" 0 true]]
                    [context-3-id ["context-3" 1 true]]
                    [(:id context-1) ["context-1" 2 false]]
@@ -80,3 +79,25 @@
              (second (:issues (repository/fetch-context db
                                                         {}
                                                         [context-1 false]))))))))
+
+(deftest link-issue-to-issue
+  (testing "with local search"
+    (reset-db)
+    (let [context-1 (create-context "context-1")
+          _ (create-issue "issue-1" (:id context-1) [])
+          _ (create-issue "issue-2" (:id context-1) []) 
+          opts {:active-search :issues
+                :q             "issue-2"}
+          opts (repository/list-resources opts db)
+          issue-2 (first (first (:issues opts)))
+          opts {:active-search :issues
+                :q             "issue-1"} 
+          opts (repository/list-resources opts db)
+          issue-1 (first (first (:issues opts)))
+          opts (repository/fetch-context db opts [context-1 true]) 
+          opts (repository/fetch-issue db opts [issue-1 false])
+          opts (merge opts (repository/start-linking-selected-issue-to-issue-with-local-search 
+                            db
+                            (repository/make-search-issues opts)))
+          opts (repository/finish-linking-selected-issue db opts (:id issue-2))]
+      (is (= "issue-2" (:title (first (:related_issues (:selected-issue opts)))))))))

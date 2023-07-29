@@ -111,13 +111,48 @@
 (defn search-contexts [db q]
   {:contexts (search/search-contexts db q)})
 
+(defn make-search-issues
+  [{:keys [link-issue
+           search-globally?]
+    :as   opts}]
+  #(if (or (= :issue link-issue)
+           search-globally?)
+     (-> opts
+         (cond-> :selected-context
+           (update :selected-context (fn [a] (dissoc a :search_mode))))
+         (assoc-in [:selected-context :data :selected-secondary-contexts] [])
+         (dissoc :show-events?
+                 :unassigned-secondary-contexts-selected?
+                 :secondary-contexts-inverted?))
+     opts))
+
+(defn start-linking-selected-issue-to-issue-with-local-search [db search-issues]
+  {:issues           (search/search-issues db (search-issues))
+   :active-search    :issues
+   :search-globally? false
+   :link-issue       :issue
+   :q                ""})
+
+(defn finish-linking-selected-issue [db {:keys [link-issue] :as opts} arg]
+  (cond (= :issue link-issue)
+        (link-issue-to-selected-issue db opts arg)
+        (= :context link-issue)
+        (link-issue-to-selected-context db opts arg)))
+
+(defn fetch-issue [db opts arg]
+  (let [[issue skip-select?] arg]
+    (datastore/reprioritize-issue db issue)
+    {:selected-issue   (when-not skip-select? (datastore/get-issue db issue))
+     :issues           (search/search-issues db (dissoc opts :search-globally? :q))
+     :active-search    nil
+     :search-globally? false
+     :q                nil}))
+
 (defn list-resources [{:keys [q 
                               cmd
                               arg
                               active-search
                               selected-issue
-                              link-issue
-                              search-globally?
                               selected-context] 
                        {{:keys [selected-secondary-contexts]} :data} :selected-context
                        :as   opts} db]
@@ -129,16 +164,7 @@
     (merge 
      {:cmd                             nil
       :arg                             nil}
-     (let [search-issues #(if (or (= :issue link-issue)
-                                  search-globally?)
-                            (-> opts
-                                (cond-> :selected-context
-                                  (update :selected-context (fn [a] (dissoc a :search_mode))))
-                                (assoc-in [:selected-context :data :selected-secondary-contexts] [])
-                                (dissoc :show-events?
-                                        :unassigned-secondary-contexts-selected?
-                                        :secondary-contexts-inverted?))
-                            opts)]
+     (let [search-issues (make-search-issues opts)]
        (case cmd
          nil
          (cond (= :issues active-search)
@@ -161,12 +187,8 @@
           :search-globally? true
           :link-issue       :issue
           :q                ""}
-         :link-with-local-search
-         {:issues           (search/search-issues db (search-issues))
-          :active-search    :issues
-          :search-globally? false
-          :link-issue       :issue
-          :q                ""}
+         :link-with-local-search (start-linking-selected-issue-to-issue-with-local-search db search-issues)
+         :finish-link-selected-issue (finish-linking-selected-issue db opts arg)
          :link-context-with-global-search
          {:issues           (search/search-issues db (search-issues))
           :active-search    :issues
@@ -188,8 +210,6 @@
          (let [selected-context (datastore/cycle-search-mode db selected-context)]
            {:selected-context selected-context
             :issues           (search/search-issues db (assoc opts :selected-context selected-context))})
-         :link-issues (link-issue-to-selected-issue db opts arg)
-         :link-issue-context (link-issue-to-selected-context db opts arg)
          :link-context (link-selected-issue-to-context db opts arg)
          :insert-issue
          (let [selected-issue (datastore/new-issue db arg
@@ -220,14 +240,7 @@
             :issues         (search/search-issues db (dissoc opts :q))
             :q              nil})
          :update-context (update-context db opts arg)
-         :fetch-issue
-         (let [[issue skip-select?] arg]
-           (datastore/reprioritize-issue db issue)
-           {:selected-issue   (when-not skip-select? (datastore/get-issue db issue))
-            :issues           (search/search-issues db (dissoc opts :search-globally? :q))
-            :active-search    nil
-            :search-globally? false
-            :q                nil})
+         :fetch-issue (fetch-issue db opts arg)
          :fetch-context (fetch-context db opts arg)
          :change-secondary-contexts-selection
          (let [context (datastore/update-context db {:context (:selected-context opts)})]
