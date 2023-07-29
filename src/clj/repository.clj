@@ -108,6 +108,9 @@
    :issues           (search/search-issues db (dissoc opts :q))
    :q                nil})
 
+(defn search-contexts [db q]
+  {:contexts (search/search-contexts db q)})
+
 (defn list-resources [{:keys [q 
                               cmd
                               arg
@@ -141,7 +144,7 @@
          (cond (= :issues active-search)
                {:issues (search/search-issues db (search-issues))}
                (= :contexts active-search)
-               {:contexts (search/search-contexts db q)}
+               (search-contexts db q)
                :else
                {:issues   (search/search-issues db opts)
                 :contexts (search/search-contexts db "")})

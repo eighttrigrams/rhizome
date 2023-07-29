@@ -1,5 +1,5 @@
 (ns app-test
-  (:require [clojure.test :refer [deftest testing is]]
+  (:require [clojure.test :refer [deftest testing is] :as t]
             [next.jdbc :as jdbc]
             datastore
             repository))
@@ -56,8 +56,7 @@
           _ (update-context (assoc context
                                    :title "abc1"
                                    :data {:a ["1" "2"]}))
-          context (first (:contexts (repository/list-resources {:active-search :contexts
-                                                                :q             ""} db)))]
+          context (first (:contexts (repository/search-contexts db "")))]
       (is (=
            {:a ["1" "2"]}
            (:data (:selected-context (repository/fetch-context db {} [context false]))))))))
@@ -78,5 +77,6 @@
                    [context-3-id ["context-3" 1 true]]
                    [(:id context-1) ["context-1" 2 false]]
                    [context-2-id ["context-2" 1 false]]) 
-             (second (:issues (repository/list-resources {:cmd :fetch-context
-                                                          :arg [context-1 false]} db))))))))
+             (second (:issues (repository/fetch-context db
+                                                        {}
+                                                        [context-1 false]))))))))
