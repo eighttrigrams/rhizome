@@ -124,3 +124,12 @@
                         (repository/list-resources db)
                         :contexts)]
       (is (= 1 (count contexts))))))
+
+(deftest link-issue-to-selected-context
+  (testing "base case"
+    (reset-db)
+    (let [context-1 (create-context "context-1")
+          context-2 (create-context "context-2")
+          _issue-1   (create-issue "issue-1" (:id context-1) [])
+          opts      (repository/fetch-context db {} [context-2 true])]
+      (prn ))))
