@@ -62,10 +62,14 @@
       {:selected-issue   nil
        :issues           (search/search-issues db 
                                                (-> opts
-                                                   (dissoc :search-globally? :q)
+                                                   (dissoc :search-globally? 
+                                                           :q
+                                                           :link-issue
+                                                           :link-context)
                                                    (assoc-in [:selected-context :data :selected-secondary-contexts] [])))
        :active-search    nil
        :link-issue       nil
+       :link-context     nil
        :search-globally? false
        :q                nil})
     (catch Exception e
@@ -159,7 +163,17 @@
    :q ""
    :active-search :contexts})
 
-(defn finish-linking-selected-issue [db {:keys [link-issue] :as opts} arg]
+(defn start-linking-issue-to-selected-context [db search-issues]
+  {:issues           (search/search-issues db (assoc (search-issues)
+                                                     :link-issue :context
+                                                     :search-globally? true
+                                                     :q ""))
+   :active-search    :issues
+   :search-globally? true
+   :link-issue       :context
+   :q                ""})
+
+(defn finish-linking-issue [db {:keys [link-issue] :as opts} arg]
   (cond (= :issue link-issue)
         (link-issue-to-selected-issue db opts arg)
         (= :context link-issue)
@@ -207,13 +221,8 @@
           :q                ""}
          :link-with-global-search (start-linking-selected-issue-to-issue-with-global-search db search-issues)
          :link-with-local-search (start-linking-selected-issue-to-issue-with-local-search db search-issues)
-         :finish-link-selected-issue (finish-linking-selected-issue db opts arg)
-         :link-context-with-global-search
-         {:issues           (search/search-issues db (search-issues))
-          :active-search    :issues
-          :search-globally? true
-          :link-issue       :context
-          :q                ""}
+         :finish-link-issue (finish-linking-issue db opts arg)
+         :link-issue-to-selected-context (start-linking-issue-to-selected-context db search-issues)
          :start-linking-selected-issue-to-context (start-linking-selected-issue-to-context-with-local-search db opts)
          :start-context-search (start-context-search db opts)
          :delete-issue

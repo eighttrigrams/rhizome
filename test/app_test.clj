@@ -131,5 +131,13 @@
     (let [context-1 (create-context "context-1")
           context-2 (create-context "context-2")
           _issue-1   (create-issue "issue-1" (:id context-1) [])
-          opts      (repository/fetch-context db {} [context-2 true])]
-      (prn ))))
+          opts      (repository/fetch-context db {} [context-2 true])
+          opts      (merge opts (repository/start-linking-issue-to-selected-context
+                                 db
+                                 (repository/make-search-issues opts)))
+          _ (is (= 1 (count (first (:issues opts)))))
+          opts      (repository/fetch-context db {} [context-1 true])
+          opts      (merge opts (repository/start-linking-issue-to-selected-context
+                                 db
+                                 (repository/make-search-issues opts)))
+          _ (is (= 0 (count (first (:issues opts)))))])))

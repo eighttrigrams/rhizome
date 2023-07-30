@@ -58,8 +58,8 @@
 (defn select-issue! 
   ([*state issue] (select-issue! *state issue false))
   ([*state issue skip-select?]
-   (if (:link-issue @*state) 
-     (fetch-and-reset! *state (assoc @*state :cmd :finish-link-selected-issue :arg (:id issue)))
+   (if (:link-issue @*state)
+     (fetch-and-reset! *state (assoc @*state :cmd :finish-link-issue :arg (:id issue)))
      (do
        (when-not skip-select?
          ;; For a snappy response in the UI, set :selected-issue immediately.
@@ -99,7 +99,7 @@
   (fetch-and-reset! *state (assoc @*state :cmd :link-with-local-search)))
 
 (defn link-context-with-global-search! [*state]
-  (fetch-and-reset! *state (assoc @*state :cmd :link-context-with-global-search)))
+  (fetch-and-reset! *state (assoc @*state :cmd :link-issue-to-selected-context)))
 
 (defn search! [*state]
   (fetch-and-reset! *state @*state))
