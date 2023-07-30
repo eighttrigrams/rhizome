@@ -97,7 +97,7 @@
           opts      (merge opts (repository/start-linking-selected-issue-to-issue-with-local-search 
                                  db
                                  (repository/make-search-issues opts)))
-          opts      (merge opts (repository/finish-linking-selected-issue db opts (:id issue-2)))
+          opts      (merge opts (repository/finish-linking-issue db opts (:id issue-2)))
           _         (is (= "issue-2" (:title (first (:related_issues (:selected-issue opts))))))
           
           opts      (merge opts (repository/start-linking-selected-issue-to-issue-with-local-search
