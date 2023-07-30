@@ -154,6 +154,11 @@
    :link-context true
    :active-search :contexts})
 
+(defn- start-context-search [db opts]
+  {:contexts (search/search-contexts db (assoc opts :q ""))
+   :q ""
+   :active-search :contexts})
+
 (defn finish-linking-selected-issue [db {:keys [link-issue] :as opts} arg]
   (cond (= :issue link-issue)
         (link-issue-to-selected-issue db opts arg)
@@ -209,7 +214,8 @@
           :search-globally? true
           :link-issue       :context
           :q                ""}
-         :start-context-search (start-linking-selected-issue-to-context-with-local-search db opts)
+         :start-linking-selected-issue-to-context (start-linking-selected-issue-to-context-with-local-search db opts)
+         :start-context-search (start-context-search db opts)
          :delete-issue
          (do (datastore/delete-issue db arg)
              {:issues         (search/search-issues db opts)
