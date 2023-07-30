@@ -108,8 +108,8 @@
    :issues           (search/search-issues db (dissoc opts :q))
    :q                nil})
 
-(defn search-contexts [db q]
-  {:contexts (search/search-contexts db q)})
+(defn search-contexts [db opts]
+  {:contexts (search/search-contexts db opts)})
 
 (defn make-search-issues
   [{:keys [link-issue
@@ -146,6 +146,14 @@
    :link-issue       :issue
    :q                ""})
 
+(defn start-linking-selected-issue-to-context-with-local-search [db opts]
+  {:contexts (search/search-contexts db (assoc opts 
+                                               :q "" 
+                                               :link-context true))
+   :q ""
+   :link-context true
+   :active-search :contexts})
+
 (defn finish-linking-selected-issue [db {:keys [link-issue] :as opts} arg]
   (cond (= :issue link-issue)
         (link-issue-to-selected-issue db opts arg)
@@ -161,8 +169,7 @@
      :search-globally? false
      :q                nil}))
 
-(defn list-resources [{:keys [q 
-                              cmd
+(defn list-resources [{:keys [cmd
                               arg
                               active-search
                               selected-issue
@@ -182,8 +189,7 @@
          nil
          (cond (= :issues active-search)
                {:issues (search/search-issues db (search-issues))}
-               (= :contexts active-search)
-               (search-contexts db q)
+               (= :contexts active-search) (search-contexts db opts)
                :else
                {:issues   (search/search-issues db opts)
                 :contexts (search/search-contexts db "")})
@@ -203,8 +209,7 @@
           :search-globally? true
           :link-issue       :context
           :q                ""}
-         :start-context-search
-         {:contexts (search/search-contexts db "")}
+         :start-context-search (start-linking-selected-issue-to-context-with-local-search db opts)
          :delete-issue
          (do (datastore/delete-issue db arg)
              {:issues         (search/search-issues db opts)

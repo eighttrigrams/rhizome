@@ -33,25 +33,39 @@
       "*"
       qs)))
 
+(def all-contexts-query (sql/format {:select :*
+                                     :from [:contexts]
+                                     :order-by [[:important :desc] [:updated_at :desc]]}))
+
+(defn- query-string-contexts-query [q]
+  (sql/format {:select :*
+               :from   [:contexts]
+               :where [:raw (format "searchable @@ to_tsquery('simple', '%s')"
+                                    (convert-q-to-query-string q))]
+               :order-by [[:important :desc] [:updated_at :desc]]}))
+
+(defn- filter-contexts [{:keys [link-context selected-issue]} contexts]
+  (if-not link-context
+    contexts
+    (let [ids-of-contexts-to-remove (set (keys (:contexts selected-issue)))]
+      (remove #(ids-of-contexts-to-remove (:id %)) contexts))))
+
 (defn search-contexts
-  [ds q]
-  (try
-    (->>
-     (if (= "" (or q ""))
-       (jdbc/execute! ds
-                      (sql/format {:select :*
-                                   :from [:contexts]
-                                   :order-by [[:important :desc] [:updated_at :desc]]}))
-       (jdbc/execute! ds
-                      (sql/format {:select :*
-                                   :from   [:contexts]
-                                   :where [:raw (format "searchable @@ to_tsquery('simple', '%s')" 
-                                                        (convert-q-to-query-string q))]
-                                   :order-by [[:important :desc] [:updated_at :desc]]})))
-     (map contexts.core/post-process))
-    (catch Exception e
-      (log/error (str "error in search-contexts: " (.getMessage e) " - param was: " q))
-      (throw e))))
+  [ds opts]
+  (let [opts (if (string? opts) 
+               {:q opts}
+               opts)
+        {:keys [q]} opts]
+    (try
+      (->>
+       (if (= "" (or q ""))
+         (jdbc/execute! ds all-contexts-query)
+         (jdbc/execute! ds (query-string-contexts-query q)))
+       (map contexts.core/post-process)
+       (filter-contexts opts))
+      (catch Exception e
+        (log/error (str "error in search-contexts: " (.getMessage e) " - param was: " q))
+        (throw e)))))
 
 (defn- fetch-ids [ds q selected-context show-events?]
   (let [selected-context (when (:id selected-context) selected-context)

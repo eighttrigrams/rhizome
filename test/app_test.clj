@@ -109,3 +109,18 @@
                      first)]
       (is (= 1 (count issues)))
       (is (= "issue-3" (:title (first issues)))))))
+
+(deftest link-selected-issue-to-context 
+  (testing "base case"
+    (reset-db)
+    (let [context-1 (create-context "context-1")
+          _context-2 (create-context "context-2")
+          issue-1   (create-issue "issue-1" (:id context-1) []) 
+          
+          opts      (repository/fetch-issue db {} [issue-1 false])
+          opts      (merge opts (repository/start-linking-selected-issue-to-context-with-local-search db opts))
+          _ (is (= 1 (count (:contexts opts))))
+          contexts  (-> (merge opts {:q ""})
+                        (repository/list-resources db)
+                        :contexts)]
+      (is (= 1 (count contexts))))))
