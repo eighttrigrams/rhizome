@@ -5,7 +5,9 @@
             utils))
 
 (defn save-input! [*state]
-  (swap! *state assoc :loading false))
+  (swap! *state assoc 
+         :loading false
+         :enter-pressed? nil))
 
 (def save-input-debounced!
   (utils/debounce save-input! 500))
