@@ -89,6 +89,7 @@
                            :active-search :contexts
                            :link-context true)))
 
+;; TODO this should be moved to the backend
 (defn unlink-selected-issue-from-selected-context [*state]
   (let [selected-context-id (:id (:selected-context @*state))
         selected-issue (:selected-issue @*state)

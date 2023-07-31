@@ -37,13 +37,15 @@
       :render              ;
       (fn []
         [:div#ui
+         {:on-mouse-leave #(reset! meta-pressed/*meta-pressed? false)
+          :on-mouse-enter #(reset! meta-pressed/*meta-pressed? false)}
          [:div#main-layer
           {;; TODO document recipe
            ;; to make the div able to listen to key events, https://stackoverflow.com/a/3149416
            :tabIndex    0
-           :on-key-up #(do
-                         (when (= 91 (.-keyCode %))
-                           (reset! meta-pressed/*meta-pressed? false)))
+           :on-key-up #(when true 
+                         #_(= 91 (.-keyCode %)) ;; TODO remove
+                        (reset! meta-pressed/*meta-pressed? false))
            :on-key-down #(do
                            (when (.-metaKey %)
                              (reset! meta-pressed/*meta-pressed? true))
