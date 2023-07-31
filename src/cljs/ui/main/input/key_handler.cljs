@@ -63,7 +63,8 @@
       (swap! *state assoc :active-search :contexts)
       (actions/start-linking-context *state))
     (when (= code "Escape")
-      (cond (or (:search-globally? @*state)
+      (cond (or (and (:search-globally? @*state)
+                     (:selected-context @*state))
                 (:selected-issue @*state)
               ;; TODO (not (:selected-context @*state)) not necessary?
                 )
