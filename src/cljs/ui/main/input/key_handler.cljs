@@ -65,6 +65,9 @@
     (when (= code "Escape")
       (cond (or (and (:search-globally? @*state)
                      (:selected-context @*state))
+                (and (not (:selected-issue @*state))
+                     (not (:selected-context @*state))
+                     (.-altKey %))
                 (:selected-issue @*state)
               ;; TODO (not (:selected-context @*state)) not necessary?
                 )
