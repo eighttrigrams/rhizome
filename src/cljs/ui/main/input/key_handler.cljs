@@ -68,8 +68,10 @@
               ;; TODO (not (:selected-context @*state)) not necessary?
                 )
             (actions/quit-search! *state)
-            (and (.-altKey %) (:selected-context @*state))
-            (actions/deselect-context! *state)
+            (and (.-altKey %)
+                 (= :issues (:active-search @*state))
+                 (:selected-context @*state))
+            (actions/quit-search! *state)
             :else
             (if (seq (:selected-secondary-contexts (:data (:selected-context @*state))))
               (actions/deselect-secondary-contexts! *state)
