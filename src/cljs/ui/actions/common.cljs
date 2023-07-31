@@ -5,15 +5,13 @@
             utils))
 
 (defn save-input! [*state]
-  (swap! *state assoc 
-         :loading false
-         :enter-pressed? nil))
+  (swap! *state assoc :loading false))
 
 (def save-input-debounced!
   (utils/debounce save-input! 500))
 
 (defn reset-state! [new-state *state]
-  (reset! *state new-state))
+  (reset! *state (dissoc new-state :enter-pressed?)))
 
 (defn- update-state [{:keys [issues contexts] :as i} 
                      state]
