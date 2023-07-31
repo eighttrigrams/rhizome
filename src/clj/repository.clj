@@ -188,10 +188,16 @@
      :search-globally? false
      :q                nil}))
 
+(defn update-issue [db {:keys [selected-issue] :as opts} arg]
+  (datastore/link-issue-contexts db selected-issue (:issue-contexts arg))
+  {:selected-issue (when-not (:deselect-issue? arg)
+                     (datastore/update-issue db (:issue arg)))
+   :issues         (search/search-issues db (dissoc opts :q))
+   :q              nil})
+
 (defn list-resources [{:keys [cmd
                               arg
                               active-search
-                              selected-issue
                               selected-context] 
                        {{:keys [selected-secondary-contexts]} :data} :selected-context
                        :as   opts} db]
@@ -261,12 +267,7 @@
           :q              nil}
          :update-context-description
          {:selected-context (datastore/update-context-description db arg)}
-         :update-issue
-         (do
-           (datastore/link-issue-contexts db selected-issue (:issue-contexts arg))
-           {:selected-issue (datastore/update-issue db (:issue arg))
-            :issues         (search/search-issues db (dissoc opts :q))
-            :q              nil})
+         :update-issue (update-issue db opts arg)
          :update-context (update-context db opts arg)
          :fetch-issue (fetch-issue db opts arg)
          :fetch-context (fetch-context db opts arg)

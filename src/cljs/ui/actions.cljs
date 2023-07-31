@@ -89,6 +89,19 @@
                            :active-search :contexts
                            :link-context true)))
 
+(defn unlink-selected-issue-from-selected-context [*state]
+  (let [selected-context-id (:id (:selected-context @*state))
+        selected-issue (:selected-issue @*state)
+        selected-issue (update selected-issue :contexts #(dissoc % selected-context-id))
+        issue-contexts-ids (keys (:contexts selected-issue))]
+    (when issue-contexts-ids
+      (fetch-and-reset! *state
+                        (-> @*state
+                            (assoc :cmd :update-issue
+                                   :arg {:issue selected-issue
+                                         :issue-contexts issue-contexts-ids
+                                         :deselect-issue? true}))))))
+
 (defn start-global-search! [*state]
   (fetch-and-reset! *state (assoc @*state :cmd :start-global-search)))
 

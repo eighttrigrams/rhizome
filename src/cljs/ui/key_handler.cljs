@@ -32,6 +32,11 @@
                (swap! *state #(assoc % :modal :edit-context))
                (and alt-pressed? (= "KeyI" code))
                (actions/start-global-search! *state)
+               (and alt-pressed? 
+                    (= "KeyT" code)
+                    selected-context
+                    selected-issue)
+               (actions/unlink-selected-issue-from-selected-context *state)
                (= "KeyI" code)
                (swap! *state #(assoc % :active-search :issues :search-globally? false))
                (and alt-pressed? selected-issue (= "KeyA" code))
