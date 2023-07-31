@@ -73,6 +73,5 @@
                  (:selected-context @*state))
             (actions/quit-search! *state)
             :else
-            (if (seq (:selected-secondary-contexts (:data (:selected-context @*state))))
-              (actions/deselect-secondary-contexts! *state)
-              (actions/quit-search! *state))))))
+            (when (seq (:selected-secondary-contexts (:data (:selected-context @*state))))
+              (actions/deselect-secondary-contexts! *state))))))
