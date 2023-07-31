@@ -14,8 +14,6 @@
                    (actions/exit-events-view! *state)
                    selected-issue
                    (actions/deselect-issue! *state)
-                   (and alt-pressed? (:selected-context @*state)) 
-                   (actions/deselect-context! *state)
                    (seq (:selected-secondary-contexts (:data (:selected-context @*state))))
                    (actions/deselect-secondary-contexts! *state)
                    selected-context
