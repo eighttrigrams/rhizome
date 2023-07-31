@@ -65,6 +65,7 @@ ul.cards {
     background-color: wheat;
     height: 100vh;
     width: 600px;
+    tab-size: 2;
 }
 
 #modal-component {
