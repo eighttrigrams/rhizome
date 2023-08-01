@@ -14,10 +14,10 @@
                    (actions/exit-events-view! *state)
                    selected-issue
                    (actions/deselect-issue! *state)
-                   (and alt-pressed? selected-context) 
-                   (actions/deselect-context! *state)
-                   (seq (:selected-secondary-contexts (:data (:selected-context @*state))))
-                   (actions/deselect-secondary-contexts! *state))
+                   (and alt-pressed? (seq (:selected-secondary-contexts (:data (:selected-context @*state)))))
+                   (actions/deselect-secondary-contexts! *state)
+                   selected-context
+                   (actions/deselect-context! *state))
              (not (:active-search @*state))
              (cond
                (= "KeyV" code)
