@@ -13,15 +13,6 @@
 
 (defn quit-search! [*state]
   (cond
-    (and (:active-search @*state)
-         (not (:selected-issue @*state))
-         (not (:selected-context @*state)))
-    (fetch-and-reset! *state (-> @*state
-                                 (dissoc :preview-issue 
-                                         :search-globally? 
-                                         :link-issue 
-                                         :active-search
-                                         :q)))
     (= :contexts (:active-search @*state))
     (fetch-and-reset! *state (-> @*state
                                  (assoc :active-search :issues)
