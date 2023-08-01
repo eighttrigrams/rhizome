@@ -70,8 +70,6 @@
                      (:selected-context @*state))
                 (and (not (:selected-issue @*state))
                      (not (:selected-context @*state)))
-                (:selected-issue @*state)
-                ;; TODO (not (:selected-context @*state)) not necessary?
-                (and (= :issues (:active-search @*state))
-                     (:selected-context @*state)))
+                (:selected-issue @*state) 
+                (:selected-context @*state))
             (actions/quit-search! *state)))))
