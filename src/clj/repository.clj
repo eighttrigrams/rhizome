@@ -1,5 +1,6 @@
 (ns repository ;; data-driven logic
-  (:require [mount.core :as mount]
+  (:require [clojure.string :as str]
+            [mount.core :as mount]
             [datastore.config :as config]
             datastore
             [datastore.search :as search]
@@ -195,6 +196,23 @@
    :issues         (search/search-issues db (dissoc opts :q))
    :q              nil})
 
+(defn split-issue [db {{selected-context-id :id} :selected-context :as opts} arg]
+  (let [issue arg 
+        secondary-contexts-ids-set (set (keys (dissoc (:contexts issue) selected-context-id)))
+        titles (str/split (:description issue) #"\n\n")]
+    (try
+      (doall (for [title titles]
+               (datastore/new-issue db
+                                    {:title title} 
+                                    selected-context-id 
+                                    secondary-contexts-ids-set)))
+      (datastore/delete-issue db issue)
+      (catch Exception e 
+        (log/error (str "Caught an split-issue " (.getMessage e)))))
+    {:issues (search/search-issues db (dissoc opts :q))
+     :selected-issue nil
+     :active-search :issues}))
+
 (defn list-resources [{:keys [cmd
                               arg
                               active-search
@@ -231,6 +249,7 @@
          :link-issue-to-selected-context (start-linking-issue-to-selected-context db search-issues)
          :start-linking-selected-issue-to-context (start-linking-selected-issue-to-context-with-local-search db opts)
          :start-context-search (start-context-search db opts)
+         :split-issue (split-issue db opts arg)
          :delete-issue
          (do (datastore/delete-issue db arg)
              {:issues         (search/search-issues db opts)

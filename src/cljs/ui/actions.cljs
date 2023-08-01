@@ -165,6 +165,10 @@
   (when (js/window.confirm "Delete currently selected issue?")
     (exec-cmd *state :delete-issue (:selected-issue @*state))))
 
+(defn split-issue! [*state]
+  (when (js/window.confirm "Split currently selected issue?")
+    (exec-cmd *state :split-issue (:selected-issue @*state))))
+
 (defn delete-context! [*state]
   (when (js/window.confirm "Delete currently selected context?")
     (exec-cmd *state :delete-context (:selected-context @*state))))
