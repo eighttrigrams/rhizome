@@ -171,4 +171,6 @@
 
 (defn delete-context! [*state]
   (when (js/window.confirm "Delete currently selected context?")
-    (exec-cmd *state :delete-context (:selected-context @*state))))
+    (when (js/window.confirm "Sure?")
+      (when (js/window.confirm "Really?")
+        (exec-cmd *state :delete-context (:selected-context @*state))))))
