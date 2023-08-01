@@ -199,13 +199,15 @@
 (defn split-issue [db {{selected-context-id :id} :selected-context :as opts} arg]
   (let [issue arg 
         secondary-contexts-ids-set (set (keys (dissoc (:contexts issue) selected-context-id)))
-        titles (str/split (:description issue) #"\n\n")]
+        titles (reverse (str/split (:description issue) #"\n\n"))]
     (try
       (doall (for [title titles]
-               (datastore/new-issue db
-                                    {:title title} 
-                                    selected-context-id 
-                                    secondary-contexts-ids-set)))
+               (do
+                 (Thread/sleep 10)
+                 (datastore/new-issue db
+                                      {:title title} 
+                                      selected-context-id 
+                                      secondary-contexts-ids-set))))
       (datastore/delete-issue db issue)
       (catch Exception e 
         (log/error (str "Caught an split-issue " (.getMessage e)))))
