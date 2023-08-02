@@ -24,7 +24,11 @@
                (actions/show-events! *state)
                (and selected-issue (= "KeyE" code))
                (swap! *state #(assoc % :modal :edit-issue))
-               (and selected-issue shift-pressed? alt-pressed? (= "KeyS" code))
+               (and selected-context
+                    selected-issue
+                    shift-pressed?
+                    alt-pressed?
+                    (= "KeyS" code))
                (actions/split-issue! *state)
                (and selected-issue (= "Delete" code))
                (actions/delete-issue! *state)
