@@ -45,8 +45,6 @@
               :active-search                           (if-not change-context? :issues nil)
               :context-to-fetch                        nil
               :selected-issue                          (if-not change-context? nil selected-issue)
-              :secondary-contexts-inverted?            false
-              :secondary-contexts-and?                 false
               :unassigned-secondary-contexts-selected? false
               :q                                       nil}))
     (catch Exception e
@@ -138,9 +136,18 @@
                     :views
                     :current
                     :selected-secondary-contexts] [])
+         (assoc-in [:selected-context
+                    :data
+                    :views
+                    :current
+                    :secondary-contexts-inverted] false)
+         (assoc-in [:selected-context
+                    :data
+                    :views
+                    :current
+                    :secondary-contexts-and] false)
          (dissoc :show-events?
-                 :unassigned-secondary-contexts-selected?
-                 :secondary-contexts-inverted?))
+                 :unassigned-secondary-contexts-selected?))
      opts))
 
 (defn start-linking-selected-issue-to-issue-with-local-search [db search-issues]

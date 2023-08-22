@@ -140,18 +140,18 @@
 (defn- filter-by-selected-secondary-contexts 
   [selected-secondary-contexts-set 
    unassigned-secondary-contexts-selected?
-   secondary-contexts-inverted?
-   secondary-contexts-and?
+   secondary-contexts-inverted
+   secondary-contexts-and
    issues]
   (if (or unassigned-secondary-contexts-selected?
           (seq selected-secondary-contexts-set))
-    ((if-not secondary-contexts-inverted? filter remove)
+    ((if-not secondary-contexts-inverted filter remove)
      (fn [issue]
        (or 
         (and unassigned-secondary-contexts-selected?
              (= 1 (count (:contexts issue))))
         
-        (if secondary-contexts-and?
+        (if secondary-contexts-and
           (every? identity (map #(contains? (set (keys (:contexts issue))) %) 
                                 selected-secondary-contexts-set))
           (seq (set/intersection 
@@ -183,10 +183,10 @@
 
 (defn- search-issues'
   [db {:keys [show-events?
-              unassigned-secondary-contexts-selected?
-              secondary-contexts-and?
-              secondary-contexts-inverted?]
-       {{{{:keys [selected-secondary-contexts]} :current} :views} :data
+              unassigned-secondary-contexts-selected?]
+       {{{{:keys [selected-secondary-contexts
+                  secondary-contexts-and
+                  secondary-contexts-inverted]} :current} :views} :data
         :as selected-context} :selected-context
        :as opts}]
   (if-let [ids (do-fetch-ids db opts)]
@@ -200,10 +200,11 @@
          (#(if (contains? #{1 2} (:search_mode selected-context))
              (re-order % (:search_mode selected-context))
              %))
-         (filter-by-selected-secondary-contexts (into #{} selected-secondary-contexts)
-                                                unassigned-secondary-contexts-selected?
-                                                secondary-contexts-inverted?
-                                                secondary-contexts-and?)
+         (filter-by-selected-secondary-contexts 
+          (into #{} selected-secondary-contexts)
+          unassigned-secondary-contexts-selected?
+          secondary-contexts-inverted
+          secondary-contexts-and)
          (filter-issues opts))
     '()))
 
@@ -248,12 +249,13 @@
    highlighted-secondary-contexts]
   (->> (search-issues' db (-> opts
                               (assoc-in [:selected-context :data :views :current :selected-secondary-contexts] [])
+                              (assoc-in [:selected-context :data :views :current :secondary-contexts-and] false)
+                              (assoc-in [:selected-context :data :views :current :secondary-contexts-inverted] false)
                               (dissoc
                                :show-events?
                                :q
                                :link-issue
-                               :unassigned-secondary-contexts-selected?
-                               :secondary-contexts-inverted?)))
+                               :unassigned-secondary-contexts-selected?)))
        (map :contexts)
        (map seq)
        (apply concat)

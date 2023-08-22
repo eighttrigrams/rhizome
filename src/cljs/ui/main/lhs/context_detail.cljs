@@ -13,8 +13,9 @@
 
 (defn- select-secondary-context [*state id]
   (fn [_]
+    ;; TODO simplify
     (swap! *state assoc-in [:selected-context :data :views :current]
-           (if-not (:data (:selected-context @*state))
+           (if-not (:current (:views (:data (:selected-context @*state))))
              {:selected-secondary-contexts [id]}
              (update (:current (:views (:data (:selected-context @*state)))) 
                      :selected-secondary-contexts
@@ -66,24 +67,41 @@
 
 (defn- select-invert-contexts [*state]
   (fn [_]
-    (swap! *state update :secondary-contexts-inverted? not)
+    ;; TODO simplify
+    (swap! *state assoc-in [:selected-context :data :views :current]
+           (if-not (:current (:views (:data (:selected-context @*state))))
+             {:secondary-contexts-inverted false}
+             (update (:current (:views (:data (:selected-context @*state))))
+                     :secondary-contexts-inverted
+                     not)))
     (actions/change-secondary-contexts-inverted! *state)
     (re-focus)))
 
 (defn- select-and-contexts [*state]
   (fn [_]
-    (swap! *state update :secondary-contexts-and? not)
+    ;; TODO simplify
+    (swap! *state assoc-in [:selected-context :data :views :current]
+           (if-not (:current (:views (:data (:selected-context @*state))))
+             {:secondary-contexts-and false}
+             (update (:current (:views (:data (:selected-context @*state))))
+                     :secondary-contexts-and
+                     not)))
     (actions/change-secondary-contexts-and! *state)
     (re-focus)))
 
 (defn- and-search-component [*state]
-  [:span {:style (when (:secondary-contexts-and? @*state)
+  [:span {:style (when (:secondary-contexts-and 
+                        (:current (:views (:data (:selected-context @*state)))))
                    {:font-weight :bold})
           :on-click (select-and-contexts *state)}
    "And"])
 
 (defn- invert-component [*state]
-  [:span {:style (when (:secondary-contexts-inverted? @*state)
+  [:span {:style (when (:secondary-contexts-inverted 
+                        (:current
+                         (:views
+                          (:data
+                           (:selected-context @*state)))))
                    {:font-weight :bold})
           :on-click (select-invert-contexts *state)}
    "Invert"])
