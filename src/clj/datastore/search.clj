@@ -168,11 +168,12 @@
        :or   {q ""}}]
   (seq (fetch-ids db q (if search-globally? nil selected-context) show-events?)))
 
-(defn- filter-issues [{:keys [link-issue 
-                              selected-issue
-                              selected-context]} issues]
+(defn- filter-issues
+  [{:keys [link-issue 
+           selected-issue
+           selected-context]} issues]
   (if-not link-issue 
-    issues
+    (remove #(= (:id selected-issue) (:id %)) issues)
     (if (= :issue link-issue)
       (let [issue-ids-to-exclude (conj (set (map :id (:related_issues selected-issue)))
                                        (:id selected-issue))]
