@@ -30,13 +30,17 @@
    {:cmd :update-context
     :arg {:context context}} db))
 
-(defn- create-issue [title context-id selected-secondary-contexts-ids]
+(defn- create-issue [title 
+                     context-id 
+                     selected-secondary-contexts-ids]
   (repository/list-resources 
    {:cmd              :insert-issue
     :arg              {:title title}
     :selected-context {:id   context-id
-                       :data {:selected-secondary-contexts 
-                              selected-secondary-contexts-ids}}} db) 
+                       :data 
+                       {:views 
+                        {:current
+                         {:selected-secondary-contexts selected-secondary-contexts-ids}}}}} db) 
   (-> {:active-search :issues
        :q             title}
       (repository/list-resources db)

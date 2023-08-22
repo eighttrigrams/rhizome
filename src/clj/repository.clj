@@ -67,7 +67,11 @@
                                                            :q
                                                            :link-issue
                                                            :link-context)
-                                                   (assoc-in [:selected-context :data :selected-secondary-contexts] [])))
+                                                   (assoc-in [:selected-context 
+                                                              :data 
+                                                              :views 
+                                                              :current 
+                                                              :selected-secondary-contexts] [])))
        :active-search    nil
        :link-issue       nil
        :link-context     nil
@@ -99,7 +103,11 @@
     {:selected-issue   (datastore/get-issue db selected-issue)
      :issues           (search/search-issues db (-> opts
                                                     (dissoc :search-globally?)
-                                                    (assoc-in [:selected-context :data :selected-secondary-contexts] [])))
+                                                    (assoc-in [:selected-context 
+                                                               :data 
+                                                               :views
+                                                               :current
+                                                               :selected-secondary-contexts] [])))
      :active-search    nil
      :link-issue       nil
      :search-globally? false
@@ -125,7 +133,11 @@
      (-> opts
          (cond-> :selected-context
            (update :selected-context (fn [a] (dissoc a :search_mode))))
-         (assoc-in [:selected-context :data :selected-secondary-contexts] [])
+         (assoc-in [:selected-context 
+                    :data 
+                    :views
+                    :current
+                    :selected-secondary-contexts] [])
          (dissoc :show-events?
                  :unassigned-secondary-contexts-selected?
                  :secondary-contexts-inverted?))
@@ -219,7 +231,7 @@
                               arg
                               active-search
                               selected-context] 
-                       {{:keys [selected-secondary-contexts]} :data} :selected-context
+                       {{{{:keys [selected-secondary-contexts]} :current} :views} :data} :selected-context
                        :as   opts} db]
   
   (log-opts opts)
@@ -305,7 +317,11 @@
          :deselect-secondary-contexts
          (let [context (datastore/update-context db {:context (:selected-context 
                                                                (assoc-in opts 
-                                                                         [:selected-context :data :selected-secondary-contexts] 
+                                                                         [:selected-context 
+                                                                          :data 
+                                                                          :views
+                                                                          :current
+                                                                          :selected-secondary-contexts] 
                                                                          []))})]
            {:issues                          (search/search-issues 
                                               db 

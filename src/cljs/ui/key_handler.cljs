@@ -14,7 +14,11 @@
                    (actions/exit-events-view! *state)
                    selected-issue
                    (actions/deselect-issue! *state)
-                   (and alt-pressed? (seq (:selected-secondary-contexts (:data (:selected-context @*state)))))
+                   (and alt-pressed? (seq (:selected-secondary-contexts 
+                                           (:current 
+                                            (:views 
+                                             (:data 
+                                              (:selected-context @*state)))))))
                    (actions/deselect-secondary-contexts! *state)
                    selected-context
                    (actions/deselect-context! *state))
@@ -56,7 +60,7 @@
                     (not ctrl-pressed?)
                     (not shift-pressed?))
                (actions/start-context-search *state)
-               (and (= "KeyD" code)
+               (and (= "KeyQ" code)
                     (not meta-pressed?)
                     (not ctrl-pressed?)
                     alt-pressed?

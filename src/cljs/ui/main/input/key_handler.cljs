@@ -63,7 +63,7 @@
          (.preventDefault e)
          (set! (.-value (get-title-el)) "")
          (actions/link-issue-to-selected-context! *state))
-       (when (and (= code "KeyD")
+       (when (and (= code "KeyY")
                   alt-pressed?
                   selected-issue)
          (swap! *state assoc :active-search :contexts)
@@ -71,7 +71,7 @@
        (when (= code "Escape")
          (cond (and alt-pressed? 
                     (seq (:selected-secondary-contexts 
-                          (:data selected-context))))
+                          (:current (:views (:data selected-context))))))
                (actions/deselect-secondary-contexts! *state)
                (or (and (:search-globally? @*state)
                         selected-context)

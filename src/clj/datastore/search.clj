@@ -186,7 +186,7 @@
               unassigned-secondary-contexts-selected?
               secondary-contexts-and?
               secondary-contexts-inverted?]
-       {{:keys [selected-secondary-contexts]} :data
+       {{{{:keys [selected-secondary-contexts]} :current} :views} :data
         :as selected-context} :selected-context
        :as opts}]
   (if-let [ids (do-fetch-ids db opts)]
@@ -247,7 +247,7 @@
    opts 
    highlighted-secondary-contexts]
   (->> (search-issues' db (-> opts
-                              (assoc-in [:selected-context :data :selected-secondary-contexts] [])
+                              (assoc-in [:selected-context :data :views :current :selected-secondary-contexts] [])
                               (dissoc
                                :show-events?
                                :q

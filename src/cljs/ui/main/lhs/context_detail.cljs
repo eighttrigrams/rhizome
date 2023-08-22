@@ -13,10 +13,11 @@
 
 (defn- select-secondary-context [*state id]
   (fn [_]
-    (swap! *state assoc-in [:selected-context :data]
+    (swap! *state assoc-in [:selected-context :data :views :current]
            (if-not (:data (:selected-context @*state))
              {:selected-secondary-contexts [id]}
-             (update (:data (:selected-context @*state)) :selected-secondary-contexts 
+             (update (:current (:views (:data (:selected-context @*state)))) 
+                     :selected-secondary-contexts
                      #(into [] ((if (contains? (into #{} %) id) disj conj) 
                                 (into #{} %) id)))))
     (actions/change-secondary-contexts-selection! *state)
@@ -37,7 +38,7 @@
 (defn- secondary-contexts-component [*state]
   (let [{:keys                        [unassigned-secondary-contexts-selected?
                                        aggregated-contexts]
-         {{:keys [selected-secondary-contexts]} 
+         {{{{:keys [selected-secondary-contexts]} :current} :views} 
           :data :as selected-context} :selected-context} @*state
         secondary-contexts (remove (fn [[idx _v]]
                                      (= idx (:id selected-context))) 
