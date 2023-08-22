@@ -190,6 +190,7 @@
   (get-issue db selected-issue))
 
 (defn new-issue [db {title :title} context-id selected-secondary-contexts-set]
+  (prn "will create new issue" title context-id selected-secondary-contexts-set)
   (let [parts       (str/split title #"\|")
         title       (if (= 1 (count parts))
                       (first parts)

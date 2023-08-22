@@ -1,75 +1,81 @@
 (ns ui.main.input.key-handler
-  (:require [ui.actions :as actions]))
+  (:require [ui.actions :as actions]
+            [ui.key-handler.common :refer [handle-keys*]]))
 
 ;; TODO shouldn't be part of key-handler
 (defn get-title-el []
   (.getElementById js/document "search-input"))
 
-;; TODO make use of common/handle-keys*
 (defn handle-keys [*state]
-  #(let [code (.-code %)]
-    (.stopPropagation %)
-    (when (and (= code "Enter"))
-      (.preventDefault %)
-      (cond
-        (or (and (.-shiftKey %)
-                 (= :contexts (:active-search @*state)))
-            (and (= :contexts (:active-search @*state))
-                 (= 0 (count (:contexts @*state)))))
-        (do
-          (actions/new-context! *state {:title (.-value (get-title-el))})
-          (set! (.-value (get-title-el)) ""))
-        (or (and (.-shiftKey %)
-                 (not (:search-globally? @*state))
-                 (:selected-context @*state)
-                 (not (:selected-issue @*state)))
-            (and (not (:search-globally? @*state))
-                 (:selected-context @*state)
-                 (not (:selected-issue @*state))
-                 (= 0 (count (:issues @*state)))))
-        (when-not (:enter-pressed? @*state)
-          (swap! *state assoc :enter-pressed? true)
-          (actions/new-issue! *state {:title (.-value (get-title-el))})
-          (set! (.-value (get-title-el)) ""))
-        #_(swap! *state dissoc nil)
-        (= :contexts (:active-search @*state))
-        (actions/select-first-context! *state)
-        (= :issues (:active-search @*state))
-        (actions/select-first-issue! *state)))
-    (when (and (.-altKey %)
-               (:selected-issue @*state)
-               (= "KeyA" code))
-      (.preventDefault %)
-      (actions/link-with-global-search! *state))
-    (when (and (= code "KeyI")
-               (.-altKey %))
-      (.preventDefault %)
-      (set! (.-value (get-title-el)) "")
-      (actions/start-global-search! *state))
-    (when (and (= code "KeyC")
-               (.-altKey %))
-      (swap! *state dissoc :search-globally? :q :active-search)
-      (actions/start-context-search *state))
-    (when (and (= code "KeyA")
-               (not (:selected-issue @*state))
-               (:selected-context @*state)
-               (.-altKey %))
-      (.preventDefault %)
-      (set! (.-value (get-title-el)) "")
-      (actions/link-issue-to-selected-context! *state))
-    (when (and (= code "KeyD")
-               (.-altKey %)
-               (:selected-issue @*state))
-      (swap! *state assoc :active-search :contexts)
-      (actions/start-linking-context *state))
-    (when (= code "Escape")
-      (cond (and (.-altKey %)
-                 (seq (:selected-secondary-contexts (:data (:selected-context @*state)))))
-            (actions/deselect-secondary-contexts! *state)
-            (or (and (:search-globally? @*state)
-                     (:selected-context @*state))
-                (and (not (:selected-issue @*state))
-                     (not (:selected-context @*state)))
-                (:selected-issue @*state) 
-                (:selected-context @*state))
-            (actions/quit-search! *state)))))
+  (handle-keys*
+   (fn [code _ctrl-pressed? _meta-pressed? alt-pressed? shift-pressed? e]
+     (let [{:keys [active-search
+                   selected-issue
+                   selected-context]} @*state]
+       (.stopPropagation e)
+       (when (= code "Enter")
+         (.preventDefault e)
+         (cond
+           (or (and shift-pressed?
+                    (= :contexts active-search))
+               (and (= :contexts active-search)
+                    (= 0 (count (:contexts @*state)))))
+           (do
+             (actions/new-context! *state {:title (.-value (get-title-el))})
+             (set! (.-value (get-title-el)) ""))
+           (and (= :issues active-search)
+                (or (and shift-pressed?
+                         (not (:search-globally? @*state))
+                         selected-context
+                         (not selected-issue))
+                    (and (not (:search-globally? @*state))
+                         selected-context
+                         (not selected-issue)
+                         (= 0 (count (:issues @*state))))))
+           (when-not (:enter-pressed? @*state)
+             (swap! *state assoc :enter-pressed? true)
+             (actions/new-issue! *state {:title (.-value (get-title-el))})
+             (set! (.-value (get-title-el)) ""))
+           #_(swap! *state dissoc nil)
+           (= :contexts active-search)
+           (actions/select-first-context! *state)
+           (= :issues active-search)
+           (actions/select-first-issue! *state))))
+     (when (and alt-pressed?
+                selected-issue
+                (= "KeyA" code))
+       (.preventDefault e)
+       (actions/link-with-global-search! *state))
+     (when (and (= code "KeyI")
+                alt-pressed?)
+       (.preventDefault e)
+       (set! (.-value (get-title-el)) "")
+       (actions/start-global-search! *state))
+     (when (and (= code "KeyC")
+                alt-pressed?)
+       (swap! *state dissoc :search-globally? :q :active-search)
+       (actions/start-context-search *state))
+     (when (and (= code "KeyA")
+                (not (:selected-issue @*state))
+                selected-context
+                alt-pressed?)
+       (.preventDefault e)
+       (set! (.-value (get-title-el)) "")
+       (actions/link-issue-to-selected-context! *state))
+     (when (and (= code "KeyD")
+                alt-pressed?
+                selected-issue)
+       (swap! *state assoc :active-search :contexts)
+       (actions/start-linking-context *state))
+     (when (= code "Escape")
+       (cond (and alt-pressed? 
+                  (seq (:selected-secondary-contexts 
+                        (:data selected-context))))
+             (actions/deselect-secondary-contexts! *state)
+             (or (and (:search-globally? @*state)
+                      selected-context)
+                 (and (not selected-issue)
+                      (not selected-context))
+                 selected-issue 
+                 selected-context)
+             (actions/quit-search! *state))))))

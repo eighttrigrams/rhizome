@@ -84,6 +84,7 @@
     (select-issue! *state (first (:issues @*state)))))
 
 (defn start-context-search [*state]
+  (prn "start")
   (fetch-and-reset! *state 
                     (assoc @*state
                            :cmd :start-context-search
