@@ -44,9 +44,9 @@
                                     (convert-q-to-query-string q))]
                :order-by [[:important :desc] [:updated_at :desc]]}))
 
-(defn- filter-contexts [{:keys [link-context selected-issue]} contexts]
+(defn- filter-contexts [{:keys [link-context selected-context selected-issue]} contexts]
   (if-not link-context
-    contexts
+    (remove #(= (:id selected-context) (:id %)) contexts)
     (let [ids-of-contexts-to-remove (set (keys (:contexts selected-issue)))]
       (remove #(ids-of-contexts-to-remove (:id %)) contexts))))
 
