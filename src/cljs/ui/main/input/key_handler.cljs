@@ -63,7 +63,7 @@
          (.preventDefault e)
          (set! (.-value (get-title-el)) "")
          (actions/link-issue-to-selected-context! *state))
-       (when (and (= code "KeyY")
+       (when (and (= code "KeyQ")
                   alt-pressed?
                   selected-issue)
          (swap! *state assoc :active-search :contexts)

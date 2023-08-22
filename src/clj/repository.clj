@@ -286,11 +286,13 @@
             :issues           (search/search-issues db (assoc opts :selected-context selected-context))})
          :link-context (link-selected-issue-to-context db opts arg)
          :insert-issue
-         (let [selected-issue (datastore/new-issue db arg
+         (let [_selected-issue (datastore/new-issue db arg
                                                    (:id selected-context)
                                                    (into #{} selected-secondary-contexts))]
            {:selected-issue nil
-            :issues         (search/search-issues db (dissoc (assoc opts :selected-issue selected-issue) :q))
+            :issues         (search/search-issues 
+                             db 
+                             (dissoc opts :q :selected-issue))
             :q              nil})
          :insert-context
          {:selected-context                        (datastore/new-context db arg)
