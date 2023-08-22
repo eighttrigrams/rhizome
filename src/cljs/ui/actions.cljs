@@ -122,7 +122,7 @@
 (defn link-with-local-search! [*state]
   (fetch-and-reset! *state (assoc @*state :cmd :link-with-local-search)))
 
-(defn link-context-with-global-search! [*state]
+(defn link-issue-to-selected-context! [*state]
   (fetch-and-reset! *state (assoc @*state :cmd :link-issue-to-selected-context)))
 
 (defn search! [*state]
