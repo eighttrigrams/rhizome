@@ -6,6 +6,7 @@
 (defn get-title-el []
   (.getElementById js/document "search-input"))
 
+;; TODO replace a couple of whens with a cond
 (defn handle-keys [*state]
   (handle-keys*
    (fn [code _ctrl-pressed? _meta-pressed? alt-pressed? shift-pressed? e]
