@@ -51,6 +51,21 @@
       (log/error (str "Caught an exception in fetch-context " (.getMessage e)))
       (throw e))))
 
+(defn insert-issue [{:keys [db]}] 
+  (fn [{:keys                                                             [selected-context]
+      {{{{:keys [selected-secondary-contexts]} :current} :views} :data} :selected-context
+      :as                                                               state} 
+     issue]
+    (let [_selected-issue (datastore/new-issue db 
+                                               issue
+                                               (:id selected-context)
+                                               (into #{} selected-secondary-contexts))]
+      {:selected-issue nil
+       :issues         (search/search-issues
+                        db
+                        (dissoc state :q :selected-issue))
+       :q              nil})))
+
 (defn- link-issue-to-selected-context 
   "when context selected add an issue"
   [db {:keys [selected-context] :as opts} arg]
@@ -234,132 +249,123 @@
      :selected-issue nil
      :active-search :issues}))
 
-(defn list-resources [{:keys [cmd
-                              arg
-                              active-search
-                              selected-context] 
-                       {{{{:keys [selected-secondary-contexts]} :current} :views} :data} :selected-context
-                       :as   opts} db]
-  
-  (log-opts opts)
-  
-  (try 
-    #_{:clj-kondo/ignore [:unresolved-var]}
-    (merge 
-     {:cmd                             nil
-      :arg                             nil}
-     (let [search-issues (make-search-issues opts)]
-       (case cmd
-         nil
-         (cond (= :issues active-search)
-               {:issues (search/search-issues db (search-issues))}
-               (= :contexts active-search) (search-contexts db opts)
-               :else
-               {:issues   (search/search-issues db opts)
-                :contexts (search/search-contexts db "")})
-         :start-global-search
-         {:issues           (search/search-issues db (search-issues))
-          :active-search    :issues
-          :search-globally? true
-          :link-context     false
-          :link-issue       nil
-          :q                ""}
-         :link-with-global-search (start-linking-selected-issue-to-issue-with-global-search db search-issues)
-         :link-with-local-search (start-linking-selected-issue-to-issue-with-local-search db search-issues)
-         :finish-link-issue (finish-linking-issue db opts arg)
-         :link-issue-to-selected-context (start-linking-issue-to-selected-context db search-issues)
-         :start-linking-selected-issue-to-context (start-linking-selected-issue-to-context-with-local-search db opts)
-         :start-context-search (start-context-search db opts)
-         :split-issue (split-issue db opts arg)
-         :delete-issue
-         (do (datastore/delete-issue db arg)
-             {:issues         (search/search-issues db opts)
-              :selected-issue nil})
-         :delete-context
-         (do (datastore/delete-context db arg)
-             {:issues           (search/search-issues db opts)
-              :contexts         (search/search-contexts db "")
-              :selected-context nil})
-         :cycle-search-mode
-         (let [selected-context (datastore/cycle-search-mode db selected-context)]
-           {:selected-context selected-context
-            :issues           (search/search-issues db (assoc opts :selected-context selected-context))})
-         :link-context (link-selected-issue-to-context db opts arg)
-         :insert-issue
-         (let [_selected-issue (datastore/new-issue db arg
-                                                   (:id selected-context)
-                                                   (into #{} selected-secondary-contexts))]
-           {:selected-issue nil
-            :issues         (search/search-issues 
-                             db 
-                             (dissoc opts :q :selected-issue))
-            :q              nil})
-         :insert-context
-         {:selected-context                        (datastore/new-context db arg)
-          :selected-issue                          nil
-          :issues                                  []
-          :q                                       nil
-          :active-search                           :issues
-          :secondary-contexts-inverted?            false
-          :secondary-contexts-and?                 false
-          :unassigned-secondary-contexts-selected? false}
-         :update-issue-description
-         {:selected-issue (datastore/update-issue-description db arg)
-          :issues         (search/search-issues db (dissoc opts :q))
-          :q              nil}
-         :update-context-description
-         {:selected-context (datastore/update-context-description db arg)}
-         :update-issue (update-issue db opts arg)
-         :update-context (update-context db opts arg)
-         :fetch-issue (fetch-issue db opts arg)
-         :fetch-context (fetch-context db opts arg)
-         :change-secondary-contexts-selection
-         (let [context (datastore/update-context db {:context (:selected-context opts)})]
-           {:selected-context context
-            :issues (search/search-issues db (assoc opts :selected-context context))})
-         :change-secondary-contexts-unassigned-selected
-         {:issues (search/search-issues db opts)}
-         :change-secondary-contexts-inverted
-         {:issues (search/search-issues db opts)}
-         :change-secondary-contexts-and
-         {:issues (search/search-issues db opts)}
-         :deselect-secondary-contexts
-         (let [context (datastore/update-context db {:context (:selected-context 
-                                                               (assoc-in opts 
-                                                                         [:selected-context 
-                                                                          :data 
-                                                                          :views
-                                                                          :current
-                                                                          :selected-secondary-contexts] 
-                                                                         []))})]
-           {:issues                          (search/search-issues 
-                                              db 
-                                              (assoc opts :selected-context context))
-            :contexts                        (search/search-contexts db "")
-            :selected-context context})
-         :exit-events-view
-         (if selected-context
-           {:show-events? false
-            :issues       (search/search-issues db (dissoc (assoc opts :show-events? false) :q))
-            :q            nil}
-           {:issues         (search/search-issues db (dissoc (assoc opts :show-events? false) :q))
-            :contexts       (search/search-contexts db "")
-            :selected-issue nil
-            :show-events?   false
-            :q              nil})
-         :enter-events-view
-         {:issues                          (search/search-issues db (assoc opts :show-events? true :q nil))
-          :contexts                        []
-          :selected-issue                  nil
-          :show-events?                    true
-          :q                               nil}
-         :deselect-context
-         {:issues           (search/search-issues db (dissoc opts :selected-context :q))
-          :contexts         (search/search-contexts db "")
-          :selected-context nil
-          :q                nil}
+(defn list-resources [{:keys [db]}]
+  (fn [{:keys                                                             [cmd
+                                                                           arg
+                                                                           active-search
+                                                                           selected-context]
+        :as                                                               opts}]
+
+    (log-opts opts)
+
+    (try
+      #_{:clj-kondo/ignore [:unresolved-var]}
+      (merge
+       {:cmd                             nil
+        :arg                             nil}
+       (let [search-issues (make-search-issues opts)]
+         (case cmd
+           nil
+           (cond (= :issues active-search)
+                 {:issues (search/search-issues db (search-issues))}
+                 (= :contexts active-search) (search-contexts db opts)
+                 :else
+                 {:issues   (search/search-issues db opts)
+                  :contexts (search/search-contexts db "")})
+           :start-global-search
+           {:issues           (search/search-issues db (search-issues))
+            :active-search    :issues
+            :search-globally? true
+            :link-context     false
+            :link-issue       nil
+            :q                ""}
+           :link-with-global-search (start-linking-selected-issue-to-issue-with-global-search db search-issues)
+           :link-with-local-search (start-linking-selected-issue-to-issue-with-local-search db search-issues)
+           :finish-link-issue (finish-linking-issue db opts arg)
+           :link-issue-to-selected-context (start-linking-issue-to-selected-context db search-issues)
+           :start-linking-selected-issue-to-context (start-linking-selected-issue-to-context-with-local-search db opts)
+           :start-context-search (start-context-search db opts)
+           :split-issue (split-issue db opts arg)
+           :delete-issue
+           (do (datastore/delete-issue db arg)
+               {:issues         (search/search-issues db opts)
+                :selected-issue nil})
+           :delete-context
+           (do (datastore/delete-context db arg)
+               {:issues           (search/search-issues db opts)
+                :contexts         (search/search-contexts db "")
+                :selected-context nil})
+           :cycle-search-mode
+           (let [selected-context (datastore/cycle-search-mode db selected-context)]
+             {:selected-context selected-context
+              :issues           (search/search-issues db (assoc opts :selected-context selected-context))})
+           :link-context (link-selected-issue-to-context db opts arg)
+           :insert-context
+           {:selected-context                        (datastore/new-context db arg)
+            :selected-issue                          nil
+            :issues                                  []
+            :q                                       nil
+            :active-search                           :issues
+            :secondary-contexts-inverted?            false
+            :secondary-contexts-and?                 false
+            :unassigned-secondary-contexts-selected? false}
+           :update-issue-description
+           {:selected-issue (datastore/update-issue-description db arg)
+            :issues         (search/search-issues db (dissoc opts :q))
+            :q              nil}
+           :update-context-description
+           {:selected-context (datastore/update-context-description db arg)}
+           :update-issue (update-issue db opts arg)
+           :update-context (update-context db opts arg)
+           :fetch-issue (fetch-issue db opts arg)
+           :fetch-context (fetch-context db opts arg)
+           :change-secondary-contexts-selection
+           (let [context (datastore/update-context db {:context (:selected-context opts)})]
+             {:selected-context context
+              :issues (search/search-issues db (assoc opts :selected-context context))})
+           :change-secondary-contexts-unassigned-selected
+           {:issues (search/search-issues db opts)}
+           :change-secondary-contexts-inverted
+           {:issues (search/search-issues db opts)}
+           :change-secondary-contexts-and
+           {:issues (search/search-issues db opts)}
+           :deselect-secondary-contexts
+           (let [context (datastore/update-context db {:context (:selected-context
+                                                                 (assoc-in opts
+                                                                           [:selected-context
+                                                                            :data
+                                                                            :views
+                                                                            :current
+                                                                            :selected-secondary-contexts]
+                                                                           []))})]
+             {:issues                          (search/search-issues
+                                                db
+                                                (assoc opts :selected-context context))
+              :contexts                        (search/search-contexts db "")
+              :selected-context context})
+           :exit-events-view
+           (if selected-context
+             {:show-events? false
+              :issues       (search/search-issues db (dissoc (assoc opts :show-events? false) :q))
+              :q            nil}
+             {:issues         (search/search-issues db (dissoc (assoc opts :show-events? false) :q))
+              :contexts       (search/search-contexts db "")
+              :selected-issue nil
+              :show-events?   false
+              :q              nil})
+           :enter-events-view
+           {:issues                          (search/search-issues db (assoc opts :show-events? true :q nil))
+            :contexts                        []
+            :selected-issue                  nil
+            :show-events?                    true
+            :q                               nil}
+           :deselect-context
+           {:issues           (search/search-issues db (dissoc opts :selected-context :q))
+            :contexts         (search/search-contexts db "")
+            :selected-context nil
+            :q                nil}
 
          ;; TODO remove :else clause. fix where there are cases where this fires but there shoulnd't be
-         :else {})))
-    (catch Exception e 
-      (log/error (str "Caught an exception in list-resources(mainfn): " (.getMessage e))))))
+           :else {})))
+      (catch Exception e
+        (log/error (str "Caught an exception in list-resources(mainfn): " (.getMessage e)))))))

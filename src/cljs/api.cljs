@@ -8,3 +8,7 @@
 
 #_{:clj-kondo/ignore [:unresolved-symbol]}
 (defn-over-http list-resources :return-value [])
+
+(declare insert-issue)
+
+(defn-over-http insert-issue :return-value [])

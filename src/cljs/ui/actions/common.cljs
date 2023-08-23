@@ -48,3 +48,18 @@
             <!
             (reset-state! *state)
             (dissoc-loading *state)))))
+
+(defn- fetch-resources-with-method
+  [state method arg]
+  (go (-> (method state arg)
+          <p!
+          (update-state state))))
+
+(defn fetch-and-reset-with-method!
+  [*state state method arg]
+  (let [state (assoc state :loading true :preview-issue nil)]
+    (reset! *state state)
+    (go (-> (fetch-resources-with-method state method arg)
+            <!
+            (reset-state! *state)
+            (dissoc-loading *state)))))

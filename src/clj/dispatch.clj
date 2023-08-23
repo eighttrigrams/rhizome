@@ -1,9 +1,8 @@
 (ns dispatch
-  (:require [net.eighttrigrams.defn-over-http.core :refer [defdispatch]]
+  (:require [net.eighttrigrams.defn-over-http.core :refer [defdispatch-with-args]]
             [datastore.config :as config]
-            [repository]))
+            [repository :refer [list-resources insert-issue]]))
 
-(defn list-resources [opts]
-  (repository/list-resources opts (:db config/config)))
-
-(defdispatch handler list-resources)
+(defdispatch-with-args handler 
+  list-resources 
+  insert-issue)

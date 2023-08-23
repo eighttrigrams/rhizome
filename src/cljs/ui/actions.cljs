@@ -1,5 +1,5 @@
 (ns ui.actions
-  (:require [ui.actions.common :refer [fetch-and-reset!]]
+  (:require [ui.actions.common :refer [fetch-and-reset! fetch-and-reset-with-method!]]
             api
             [goog.async.Debouncer]))
 
@@ -36,11 +36,10 @@
   (js/setTimeout (fn [_] (swap! *state dissoc :loading)) 500))
 
 (defn new-issue! [*state issue]
-  ;; TODO use exec-cmd ?
-  (fetch-and-reset! *state (-> @*state
-                               (dissoc :modal)
-                               (assoc :cmd :insert-issue)
-                               (assoc :arg issue))))
+  (fetch-and-reset-with-method! *state
+                                (dissoc @*state :modal)
+                                api/insert-issue
+                                issue))
 
 (defn new-context! [*state context]
   (fetch-and-reset! *state (-> @*state

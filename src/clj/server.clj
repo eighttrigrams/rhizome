@@ -16,7 +16,9 @@
 
 (defroutes api
   (-> 
-   #(response/response (dispatch/handler %)) ;; TODO simplify?
+   #(response/response (dispatch/handler (assoc-in % 
+                                                   [:body :server-args :db]
+                                                   (:db config/config))))
    json/wrap-json-response
    (json/wrap-json-body {:keywords? true})))
 
