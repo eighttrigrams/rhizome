@@ -5,7 +5,8 @@
             datastore
             [datastore.search :as search]
             [cambium.core :as log]
-            [clojure.pprint :as pp]))
+            [clojure.pprint :as pp]
+            [net.eighttrigrams.cljs-text-editor.editor :as editor]))
 
 (mount/defstate repository
   :start (do
@@ -51,20 +52,23 @@
       (log/error (str "Caught an exception in fetch-context " (.getMessage e)))
       (throw e))))
 
-(defn insert-issue [{:keys [db]}] 
+(defn insert-issue [{:keys [db]}]
   (fn [{:keys                                                             [selected-context]
       {{{{:keys [selected-secondary-contexts]} :current} :views} :data} :selected-context
       :as                                                               state} 
      issue]
-    (let [_selected-issue (datastore/new-issue db 
-                                               issue
-                                               (:id selected-context)
-                                               (into #{} selected-secondary-contexts))]
-      {:selected-issue nil
-       :issues         (search/search-issues
-                        db
-                        (dissoc state :q :selected-issue))
-       :q              nil})))
+    (try
+      (let [_selected-issue (datastore/new-issue db 
+                                                 issue
+                                                 (:id selected-context)
+                                                 (into #{} selected-secondary-contexts))]
+        {:selected-issue nil
+         :issues         (search/search-issues
+                          db
+                          (dissoc state :q :selected-issue))
+         :q              nil})
+      (catch Exception e
+        (log/error (str "Caught an exception in insert-issue " (.getMessage e)))))))
 
 (defn- link-issue-to-selected-context 
   "when context selected add an issue"
