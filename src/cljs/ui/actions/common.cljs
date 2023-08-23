@@ -59,7 +59,7 @@
   [*state state method & args]
   (let [state (assoc state :loading true :preview-issue nil)]
     (reset! *state state)
-    (go (-> (fetch-resources-with-method state method args)
+    (go (-> (apply fetch-resources-with-method state method args)
             <!
             (reset-state! *state)
             (dissoc-loading *state)))))

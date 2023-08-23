@@ -52,9 +52,9 @@
       (throw e))))
 
 (defn insert-issue [{:keys [db]}]
-  (fn [{:keys                                                             [selected-context]
+  (fn [{:keys [selected-context]
       {{{{:keys [selected-secondary-contexts]} :current} :views} :data} :selected-context
-      :as                                                               state} 
+      :as state} 
      issue]
     (try
       (let [_selected-issue (datastore/new-issue db 
