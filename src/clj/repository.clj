@@ -5,8 +5,7 @@
             datastore
             [datastore.search :as search]
             [cambium.core :as log]
-            [clojure.pprint :as pp]
-            [net.eighttrigrams.cljs-text-editor.editor :as editor]))
+            [clojure.pprint :as pp]))
 
 (mount/defstate repository
   :start (do
