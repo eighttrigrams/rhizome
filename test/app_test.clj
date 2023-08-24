@@ -22,28 +22,28 @@
 
 (defn- create-context [title]
   (:selected-context 
-   (repository/list-resources {:cmd :insert-context
-                               :arg {:title title}} db)))
+   ((repository/list-resources {:db db}) 
+    {:cmd :insert-context
+     :arg {:title title}})))
 
 (defn- update-context [context]
-  (repository/list-resources
+  ((repository/list-resources {:db db})
    {:cmd :update-context
-    :arg {:context context}} db))
+    :arg {:context context}}))
 
 (defn- create-issue [title 
                      context-id 
                      selected-secondary-contexts-ids]
-  (repository/list-resources 
-   {:cmd              :insert-issue
-    :arg              {:title title}
-    :selected-context {:id   context-id
+  ((repository/insert-issue {:db db}) 
+   {:selected-context {:id   context-id
                        :data 
                        {:views 
                         {:current
-                         {:selected-secondary-contexts selected-secondary-contexts-ids}}}}} db) 
+                         {:selected-secondary-contexts selected-secondary-contexts-ids}}}}} 
+   {:title title})
   (-> {:active-search :issues
        :q             title}
-      (repository/list-resources db)
+      ((repository/list-resources {:db db}))
       :issues
       ffirst))
 
@@ -108,7 +108,7 @@
                                  db
                                  (repository/make-search-issues opts)))
           issues (-> (merge opts {:q ""})
-                     (repository/list-resources db)
+                     ((repository/list-resources {:db db}))
                      :issues
                      first)]
       (is (= 1 (count issues)))
@@ -125,7 +125,7 @@
           opts      (merge opts (repository/start-linking-selected-issue-to-context-with-local-search db opts))
           _ (is (= 1 (count (:contexts opts))))
           contexts  (-> (merge opts {:q ""})
-                        (repository/list-resources db)
+                        ((repository/list-resources {:db db}))
                         :contexts)]
       (is (= 1 (count contexts))))))
 
