@@ -26,20 +26,32 @@
 
 (defn- select-unassigned-secondary-contexts [*state]
   (fn [_]
-    (swap! *state update :unassigned-secondary-contexts-selected? not)
+    ;; TODO simplify
+    (swap! *state assoc-in [:selected-context :data :views :current]
+           (if-not (:current (:views (:data (:selected-context @*state))))
+             {:secondary-contexts-unassigned-selected false}
+             (update (:current (:views (:data (:selected-context @*state))))
+                     :secondary-contexts-unassigned-selected
+                     not)))
     (actions/change-secondary-contexts-unassigned-selected! *state)
     (re-focus)))
 
 (defn- unassigned-secondary-contexts-component [*state]
-  [:span {:style (when (:unassigned-secondary-contexts-selected? @*state)
-                   {:font-weight :bold})
+  [:span {:style 
+          (when 
+           (:secondary-contexts-unassigned-selected 
+            (:current 
+             (:views
+              (:data 
+               (:selected-context @*state))))) 
+            {:font-weight :bold})
           :on-click (select-unassigned-secondary-contexts *state)}
    "No secondary contexts"])
 
 (defn- secondary-contexts-component [*state]
-  (let [{:keys                        [unassigned-secondary-contexts-selected?
-                                       aggregated-contexts]
-         {{{{:keys [selected-secondary-contexts]} :current} :views} 
+  (let [{:keys                        [aggregated-contexts]
+         {{{{:keys [selected-secondary-contexts
+                    secondary-contexts-unassigned-selected]} :current} :views} 
           :data :as selected-context} :selected-context} @*state
         secondary-contexts (remove (fn [[idx _v]]
                                      (= idx (:id selected-context))) 
@@ -61,7 +73,7 @@
           " "
           title]
          (when (and (empty? (into #{} selected-secondary-contexts))
-                    (not unassigned-secondary-contexts-selected?))
+                    (not secondary-contexts-unassigned-selected))
            (str " (" count ")"))]) 
       secondary-contexts)]))
 
@@ -74,7 +86,7 @@
              (update (:current (:views (:data (:selected-context @*state))))
                      :secondary-contexts-inverted
                      not)))
-    (actions/change-secondary-contexts-inverted! *state)
+    (actions/change-secondary-contexts-inverted *state)
     (re-focus)))
 
 (defn- select-and-contexts [*state]
@@ -86,7 +98,7 @@
              (update (:current (:views (:data (:selected-context @*state))))
                      :secondary-contexts-and
                      not)))
-    (actions/change-secondary-contexts-and! *state)
+    (actions/change-secondary-contexts-and *state)
     (re-focus)))
 
 (defn- and-search-component [*state]

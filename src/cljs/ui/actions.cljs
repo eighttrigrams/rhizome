@@ -1,5 +1,6 @@
 (ns ui.actions
-  (:require [ui.actions.common :refer [fetch-and-reset! fetch-and-reset-with-method!]]
+  (:require [ui.actions.common :refer [fetch-and-reset! 
+                                       fetch-and-reset-with-method!]]
             api
             [goog.async.Debouncer]))
 
@@ -128,19 +129,29 @@
   (fetch-and-reset! *state @*state))
 
 (defn deselect-secondary-contexts! [*state]
-  (exec-cmd *state :deselect-secondary-contexts))
+  (fetch-and-reset-with-method! *state
+                                @*state
+                                api/deselect-secondary-contexts))
 
 (defn change-secondary-contexts-selection! [*state]
-  (exec-cmd *state :change-secondary-contexts-selection))
+  (fetch-and-reset-with-method! *state 
+                                @*state 
+                                api/change-secondary-contexts-selection))
 
 (defn change-secondary-contexts-unassigned-selected! [*state]
-  (exec-cmd *state :change-secondary-contexts-unassigned-selected))
+  (fetch-and-reset-with-method! *state
+                                @*state
+                                api/change-secondary-contexts-unassigned-selected))
 
-(defn change-secondary-contexts-inverted! [*state]
-  (exec-cmd *state :change-secondary-contexts-inverted))
+(defn change-secondary-contexts-inverted [*state]
+  (fetch-and-reset-with-method! *state
+                                @*state
+                                api/change-secondary-contexts-inverted))
 
-(defn change-secondary-contexts-and! [*state]
-  (exec-cmd *state :change-secondary-contexts-and))
+(defn change-secondary-contexts-and [*state]
+  (fetch-and-reset-with-method! *state
+                                @*state
+                                api/change-secondary-contexts-and))
 
 (defn show-events! [*state]
   (exec-cmd *state :enter-events-view))

@@ -1,6 +1,6 @@
 (ns ui.main.input.key-handler
   (:require [ui.actions :as actions]
-            [ui.key-handler.common :refer [handle-keys*]]))
+            [ui.key-handler.common :refer [handle-keys*] :as common]))
 
 ;; TODO shouldn't be part of key-handler
 (defn get-title-el []
@@ -32,7 +32,17 @@
                     (and (not (:search-globally? @*state))
                          selected-context
                          (not selected-issue)
-                         (= 0 (count (:issues @*state))))))
+                         (= 0 (count (:issues @*state)))))
+                (not (or (:secondary-contexts-inverted
+                          (:current
+                           (:views
+                            (:data
+                             (:selected-context @*state)))))
+                         (:secondary-contexts-unassigned-selected
+                          (:current
+                           (:views
+                            (:data
+                             (:selected-context @*state))))))))
            (when-not (:enter-pressed? @*state)
              (swap! *state assoc :enter-pressed? true)
              (actions/new-issue! *state {:title (.-value (get-title-el))})
@@ -70,8 +80,7 @@
          (actions/start-linking-context *state))
        (when (= code "Escape")
          (cond (and alt-pressed? 
-                    (seq (:selected-secondary-contexts 
-                          (:current (:views (:data selected-context))))))
+                    (common/something-to-deselect? *state))
                (actions/deselect-secondary-contexts! *state)
                (or (and (:search-globally? @*state)
                         selected-context)

@@ -1,5 +1,27 @@
 (ns ui.key-handler.common)
 
+(defn something-to-deselect? [*state]
+  (or (seq (:selected-secondary-contexts
+            (:current
+             (:views
+              (:data
+               (:selected-context @*state))))))
+      (:secondary-contexts-unassigned-selected
+       (:current
+        (:views
+         (:data
+          (:selected-context @*state)))))
+      (:secondary-contexts-and
+       (:current
+        (:views
+         (:data
+          (:selected-context @*state)))))
+      (:secondary-contexts-inverted
+       (:current
+        (:views
+         (:data
+          (:selected-context @*state)))))))
+
 (defn handle-keys* [f]
   (fn [e]
     (let [code           (.-code e)

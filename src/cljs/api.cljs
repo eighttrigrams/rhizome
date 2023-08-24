@@ -12,3 +12,13 @@
 (declare insert-issue)
 
 (defn-over-http insert-issue :return-value [])
+
+(defn-over-http change-secondary-contexts-selection :return-value [])
+
+(defn-over-http change-secondary-contexts-unassigned-selected :return-value [])
+
+(defn-over-http change-secondary-contexts-inverted :return-value [])
+
+(defn-over-http change-secondary-contexts-and :return-value [])
+
+(defn-over-http deselect-secondary-contexts :return-value [])

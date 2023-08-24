@@ -51,6 +51,63 @@
       (log/error (str "Caught an exception in fetch-context " (.getMessage e)))
       (throw e))))
 
+(defn- change-secondary-contexts-operation [db]
+  (fn [opts]
+    (let [context (datastore/update-context db {:context (:selected-context opts)})]
+      {:selected-context context
+       :issues (search/search-issues db (assoc opts :selected-context context))})))
+
+(defn change-secondary-contexts-selection [{:keys [db]}]
+  (change-secondary-contexts-operation db))
+
+(defn change-secondary-contexts-unassigned-selected [{:keys [db]}]
+  (change-secondary-contexts-operation db))
+
+(defn change-secondary-contexts-inverted [{:keys [db]}]
+  (change-secondary-contexts-operation db))
+
+(defn change-secondary-contexts-and [{:keys [db]}]
+  (change-secondary-contexts-operation db))
+
+(defn deselect-secondary-contexts [{:keys [db]}]
+  (fn [opts]
+    (let [context (datastore/update-context db {:context (:selected-context
+                                                          (-> opts
+                                                              (assoc-in
+                                                               [:selected-context
+                                                                :data
+                                                                :views
+                                                                :current
+                                                                :selected-secondary-contexts]
+                                                               [])
+                                                              (assoc-in
+                                                               [:selected-context
+                                                                :data
+                                                                :views
+                                                                :current
+                                                                :secondary-contexts-inverted]
+                                                               false)
+                                                              (assoc-in
+                                                               [:selected-context
+                                                                :data
+                                                                :views
+                                                                :current
+                                                                :secondary-contexts-and]
+                                                               false)
+                                                              (assoc-in
+                                                               [:selected-context
+                                                                :data
+                                                                :views
+                                                                :current
+                                                                :secondary-contexts-unassigned-selected]
+                                                               false)
+                                                              ))})]
+      {:issues                          (search/search-issues
+                                         db
+                                         (assoc opts :selected-context context))
+       :contexts                        (search/search-contexts db "")
+       :selected-context context})))
+
 (defn insert-issue [{:keys [db]}]
   (fn [{:keys [selected-context]
       {{{{:keys [selected-secondary-contexts]} :current} :views} :data} :selected-context
@@ -322,30 +379,6 @@
            :update-context (update-context db opts arg)
            :fetch-issue (fetch-issue db opts arg)
            :fetch-context (fetch-context db opts arg)
-           :change-secondary-contexts-selection
-           (let [context (datastore/update-context db {:context (:selected-context opts)})]
-             {:selected-context context
-              :issues (search/search-issues db (assoc opts :selected-context context))})
-           :change-secondary-contexts-unassigned-selected
-           {:issues (search/search-issues db opts)}
-           :change-secondary-contexts-inverted
-           {:issues (search/search-issues db opts)}
-           :change-secondary-contexts-and
-           {:issues (search/search-issues db opts)}
-           :deselect-secondary-contexts
-           (let [context (datastore/update-context db {:context (:selected-context
-                                                                 (assoc-in opts
-                                                                           [:selected-context
-                                                                            :data
-                                                                            :views
-                                                                            :current
-                                                                            :selected-secondary-contexts]
-                                                                           []))})]
-             {:issues                          (search/search-issues
-                                                db
-                                                (assoc opts :selected-context context))
-              :contexts                        (search/search-contexts db "")
-              :selected-context context})
            :exit-events-view
            (if selected-context
              {:show-events? false

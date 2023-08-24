@@ -1,6 +1,6 @@
 (ns ui.key-handler
   (:require [ui.actions :as actions]
-            [ui.key-handler.common :refer [handle-keys*]]))
+            [ui.key-handler.common :refer [handle-keys*] :as common]))
 
 (defn handle-keys [*state]
   (handle-keys* 
@@ -14,11 +14,7 @@
                    (actions/exit-events-view! *state)
                    selected-issue
                    (actions/deselect-issue! *state)
-                   (and alt-pressed? (seq (:selected-secondary-contexts 
-                                           (:current 
-                                            (:views 
-                                             (:data 
-                                              (:selected-context @*state)))))))
+                   (and alt-pressed? (common/something-to-deselect? *state))
                    (actions/deselect-secondary-contexts! *state)
                    selected-context
                    (actions/deselect-context! *state))
