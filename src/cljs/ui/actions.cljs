@@ -69,7 +69,7 @@
   ([*state issue] (select-issue! *state issue false))
   ([*state issue skip-select?]
    (if (:link-issue @*state)
-     (fetch-and-reset! *state (assoc @*state :cmd :finish-link-issue :arg (:id issue)))
+     (fetch-and-reset-with-method! *state @*state api/finish-linking-issue (:id issue))
      (do
        (when-not skip-select?
          ;; For a snappy response in the UI, set :selected-issue immediately.

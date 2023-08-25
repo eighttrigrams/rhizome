@@ -130,7 +130,7 @@
       (is (= 1 (count contexts))))))
 
 (deftest link-issue-to-selected-context
-  (testing "base case"
+  (testing "display the correct issues"
     (reset-db)
     (let [context-1 (create-context "context-1")
           context-2 (create-context "context-2")
@@ -144,4 +144,22 @@
           opts      (merge opts (repository/start-linking-issue-to-selected-context
                                  db
                                  (repository/make-search-issues opts)))
-          _ (is (= 0 (count (first (:issues opts)))))])))
+          _ (is (= 0 (count (first (:issues opts)))))]))
+  (testing "link issue to selected context"
+    (reset-db)
+    (let [context-1 (create-context "context-1")
+          context-2 (create-context "context-2")
+          issue-1  (create-issue "issue-1" (:id context-1) [])
+          opts      (repository/fetch-context db {} [context-2 true])
+          opts      (merge opts
+                           ((repository/change-secondary-contexts-selection {:db db})
+                            (assoc-in opts
+                                      [:selected-context :data :views :current :selected-secondary-contexts]
+                                      [(:id context-1)])))
+          opts      (merge opts (repository/start-linking-issue-to-selected-context
+                                 db
+                                 (repository/make-search-issues opts)))
+          opts      (merge opts ((repository/finish-linking-issue {:db db}) 
+                                 opts (:id issue-1)))
+          _         (is (= #{"context-1" "context-2"} 
+                           (set (vals (:contexts (ffirst (:issues opts)))))))])))

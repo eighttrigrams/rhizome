@@ -268,11 +268,12 @@
    :link-issue       :context
    :q                ""})
 
-(defn finish-linking-issue [db {:keys [link-issue] :as opts} arg]
-  (cond (= :issue link-issue)
-        (link-issue-to-selected-issue db opts arg)
-        (= :context link-issue)
-        (link-issue-to-selected-context db opts arg)))
+(defn finish-linking-issue [{:keys [db]}]
+  (fn [{:keys [link-issue] :as opts} arg]
+    (cond (= :issue link-issue)
+          (link-issue-to-selected-issue db opts arg)
+          (= :context link-issue)
+          (link-issue-to-selected-context db opts arg))))
 
 (defn fetch-issue [db opts arg]
   (let [[issue skip-select?] arg]
@@ -341,7 +342,6 @@
             :q                ""}
            :link-with-global-search (start-linking-selected-issue-to-issue-with-global-search db search-issues)
            :link-with-local-search (start-linking-selected-issue-to-issue-with-local-search db search-issues)
-           :finish-link-issue (finish-linking-issue db opts arg)
            :link-issue-to-selected-context (start-linking-issue-to-selected-context db search-issues)
            :start-linking-selected-issue-to-context (start-linking-selected-issue-to-context-with-local-search db opts)
            :start-context-search (start-context-search db opts)

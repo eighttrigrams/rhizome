@@ -91,8 +91,8 @@
 
 (defn update-context [db {:keys [context secondary-contexts-ids]}]
   (let [{:keys [id]} context]
-    (delete-secondary-contexts db id)              ;; TODO remove
-    (relate-contexts db id secondary-contexts-ids) ;; TODO remove
+    (delete-secondary-contexts db id)              
+    (relate-contexts db id secondary-contexts-ids)
     (update-context' db context)
     (get-context db context)))
 
