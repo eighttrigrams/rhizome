@@ -42,9 +42,10 @@
       (merge opts
              {:selected-context                        selected-context
               :issues                                  (search/search-issues db (dissoc opts :q))
-              :active-search                           (if-not change-context? :issues nil)
+              :active-search                           (if (or change-context?
+                                                               selected-issue) 
+                                                         nil :issues)
               :context-to-fetch                        nil
-              :selected-issue                          (if-not change-context? nil selected-issue)
               :unassigned-secondary-contexts-selected? false
               :q                                       nil}))
     (catch Exception e
