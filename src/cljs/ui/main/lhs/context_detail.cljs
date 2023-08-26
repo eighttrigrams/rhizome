@@ -89,25 +89,6 @@
     (actions/change-secondary-contexts-inverted *state)
     (re-focus)))
 
-(defn- select-and-contexts [*state]
-  (fn [_]
-    ;; TODO simplify
-    (swap! *state assoc-in [:selected-context :data :views :current]
-           (if-not (:current (:views (:data (:selected-context @*state))))
-             {:secondary-contexts-and false}
-             (update (:current (:views (:data (:selected-context @*state))))
-                     :secondary-contexts-and
-                     not)))
-    (actions/change-secondary-contexts-and *state)
-    (re-focus)))
-
-(defn- and-search-component [*state]
-  [:span {:style (when (:secondary-contexts-and 
-                        (:current (:views (:data (:selected-context @*state)))))
-                   {:font-weight :bold})
-          :on-click (select-and-contexts *state)}
-   "And"])
-
 (defn- invert-component [*state]
   [:span {:style (when (:secondary-contexts-inverted 
                         (:current
@@ -135,7 +116,6 @@
        [:<>
         [:hr]
         [:h2 "Secondary contexts:"]
-        [and-search-component *state]
         [:br]
         [invert-component *state]
         [secondary-contexts-component *state]])]))

@@ -19,8 +19,6 @@
 
 (defn-over-http change-secondary-contexts-inverted :return-value {})
 
-(defn-over-http change-secondary-contexts-and :return-value {})
-
 (defn-over-http deselect-secondary-contexts :return-value {})
 
 (defn-over-http finish-linking-issue :return-value {})

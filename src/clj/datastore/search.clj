@@ -139,21 +139,21 @@
 
 (defn- filter-by-selected-secondary-contexts 
   [selected-secondary-contexts-set 
-   unassigned-secondary-contexts-selected?
+   secondary-contexts-unassigned-selected
    secondary-contexts-inverted
-   secondary-contexts-and
    issues]
-  (if (or unassigned-secondary-contexts-selected?
+  (if (or secondary-contexts-unassigned-selected
           (seq selected-secondary-contexts-set))
     ((if-not secondary-contexts-inverted filter remove)
      (fn [issue]
        (or 
-        (and unassigned-secondary-contexts-selected?
+        (and secondary-contexts-unassigned-selected
              (= 1 (count (:contexts issue))))
         
-        (if secondary-contexts-and
-          (every? identity (map #(contains? (set (keys (:contexts issue))) %) 
-                                selected-secondary-contexts-set))
+        (if-not secondary-contexts-inverted
+          (and (not secondary-contexts-unassigned-selected)
+               (every? identity (map #(contains? (set (keys (:contexts issue))) %) 
+                                     selected-secondary-contexts-set)))
           (seq (set/intersection 
                 (set (keys (:contexts issue)))
                 selected-secondary-contexts-set)))))
@@ -182,11 +182,10 @@
       (remove #((set (keys (:contexts %))) (:id selected-context)) issues))))
 
 (defn- search-issues'
-  [db {:keys [show-events?
-              unassigned-secondary-contexts-selected?]
+  [db {:keys [show-events?]
        {{{{:keys [selected-secondary-contexts
-                  secondary-contexts-and
-                  secondary-contexts-inverted]} :current} :views} :data
+                  secondary-contexts-inverted
+                  secondary-contexts-unassigned-selected]} :current} :views} :data
         :as selected-context} :selected-context
        :as opts}]
   (if-let [ids (do-fetch-ids db opts)]
@@ -202,9 +201,8 @@
              %))
          (filter-by-selected-secondary-contexts 
           (into #{} selected-secondary-contexts)
-          unassigned-secondary-contexts-selected?
-          secondary-contexts-inverted
-          secondary-contexts-and)
+          secondary-contexts-unassigned-selected
+          secondary-contexts-inverted)
          (filter-issues opts))
     '()))
 
@@ -249,13 +247,8 @@
    highlighted-secondary-contexts]
   (->> (search-issues' db (-> opts
                               (assoc-in [:selected-context :data :views :current :selected-secondary-contexts] [])
-                              (assoc-in [:selected-context :data :views :current :secondary-contexts-and] false)
                               (assoc-in [:selected-context :data :views :current :secondary-contexts-inverted] false)
-                              (dissoc
-                               :show-events?
-                               :q
-                               :link-issue
-                               :unassigned-secondary-contexts-selected?)))
+                              (assoc-in [:selected-context :data :views :current :secondary-contexts-unassigned-selected] false)))
        (map :contexts)
        (map seq)
        (apply concat)

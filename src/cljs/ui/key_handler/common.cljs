@@ -11,11 +11,6 @@
         (:views
          (:data
           (:selected-context @*state)))))
-      (:secondary-contexts-and
-       (:current
-        (:views
-         (:data
-          (:selected-context @*state)))))
       (:secondary-contexts-inverted
        (:current
         (:views

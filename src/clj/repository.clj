@@ -66,9 +66,6 @@
 (defn change-secondary-contexts-inverted [{:keys [db]}]
   (change-secondary-contexts-operation db))
 
-(defn change-secondary-contexts-and [{:keys [db]}]
-  (change-secondary-contexts-operation db))
-
 (defn deselect-secondary-contexts [{:keys [db]}]
   (fn [opts]
     (let [context (datastore/update-context db {:context (:selected-context
@@ -86,13 +83,6 @@
                                                                 :views
                                                                 :current
                                                                 :secondary-contexts-inverted]
-                                                               false)
-                                                              (assoc-in
-                                                               [:selected-context
-                                                                :data
-                                                                :views
-                                                                :current
-                                                                :secondary-contexts-and]
                                                                false)
                                                               (assoc-in
                                                                [:selected-context
@@ -220,9 +210,7 @@
                     :data
                     :views
                     :current
-                    :secondary-contexts-and] false)
-         (dissoc :show-events?
-                 :unassigned-secondary-contexts-selected?))
+                    :secondary-contexts-unassigned-selected] false))
      opts))
 
 (defn start-linking-selected-issue-to-issue-with-local-search [db search-issues]
@@ -310,6 +298,21 @@
      :selected-issue nil
      :active-search :issues}))
 
+(defn start-global-search [{:keys [db]}]
+  (fn [state]
+    {:issues           (search/search-issues
+                        db
+                        ((make-search-issues
+                          (assoc state
+                                 :q ""
+                                 :active-search    :issues
+                                 :search-globally? true))))
+     :active-search    :issues
+     :search-globally? true
+     :link-context     false
+     :link-issue       nil
+     :q                ""}))
+
 (defn list-resources [{:keys [db]}]
   (fn [{:keys                                                             [cmd
                                                                            arg
@@ -333,13 +336,7 @@
                  :else
                  {:issues   (search/search-issues db opts)
                   :contexts (search/search-contexts db "")})
-           :start-global-search
-           {:issues           (search/search-issues db (search-issues))
-            :active-search    :issues
-            :search-globally? true
-            :link-context     false
-            :link-issue       nil
-            :q                ""}
+           :start-global-search ((start-global-search {:db db}) opts)
            :link-with-global-search (start-linking-selected-issue-to-issue-with-global-search db search-issues)
            :link-with-local-search (start-linking-selected-issue-to-issue-with-local-search db search-issues)
            :link-issue-to-selected-context (start-linking-issue-to-selected-context db search-issues)
@@ -366,8 +363,6 @@
             :issues                                  []
             :q                                       nil
             :active-search                           :issues
-            :secondary-contexts-inverted?            false
-            :secondary-contexts-and?                 false
             :unassigned-secondary-contexts-selected? false}
            :update-issue-description
            {:selected-issue (datastore/update-issue-description db arg)

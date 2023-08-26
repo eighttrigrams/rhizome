@@ -6,7 +6,6 @@
                                 change-secondary-contexts-selection
                                 change-secondary-contexts-unassigned-selected
                                 change-secondary-contexts-inverted
-                                change-secondary-contexts-and
                                 deselect-secondary-contexts
                                 finish-linking-issue
                                 ]]))
@@ -17,6 +16,5 @@
   change-secondary-contexts-selection
   change-secondary-contexts-unassigned-selected
   change-secondary-contexts-inverted
-  change-secondary-contexts-and
   deselect-secondary-contexts
   finish-linking-issue)

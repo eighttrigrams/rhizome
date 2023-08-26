@@ -148,11 +148,6 @@
                                 @*state
                                 api/change-secondary-contexts-inverted))
 
-(defn change-secondary-contexts-and [*state]
-  (fetch-and-reset-with-method! *state
-                                @*state
-                                api/change-secondary-contexts-and))
-
 (defn show-events! [*state]
   (exec-cmd *state :enter-events-view))
 
