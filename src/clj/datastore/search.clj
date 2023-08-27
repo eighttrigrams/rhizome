@@ -246,6 +246,7 @@
    opts 
    highlighted-secondary-contexts]
   (->> (search-issues' db (-> opts
+                              (assoc :q "")
                               (assoc-in [:selected-context :data :views :current :selected-secondary-contexts] [])
                               (assoc-in [:selected-context :data :views :current :secondary-contexts-inverted] false)
                               (assoc-in [:selected-context :data :views :current :secondary-contexts-unassigned-selected] false)))
