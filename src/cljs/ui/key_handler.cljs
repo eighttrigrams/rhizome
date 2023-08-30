@@ -9,14 +9,14 @@
                    selected-context]} @*state]
        (cond (= "Escape" code)
              (cond (:active-search @*state)
-                   (actions/quit-search! *state)
+                   (and (not alt-pressed?) (actions/quit-search! *state))
                    (:show-events? @*state)
-                   (actions/exit-events-view! *state)
-                   selected-issue
+                   (and (not alt-pressed?)(actions/exit-events-view! *state))
+                   (and (not alt-pressed?) selected-issue)
                    (actions/deselect-issue! *state)
                    (and alt-pressed? (common/something-to-deselect? *state))
                    (actions/deselect-secondary-contexts! *state)
-                   selected-context
+                   (and (not alt-pressed?) selected-context)
                    (actions/deselect-context! *state))
              (not (:active-search @*state))
              (cond
