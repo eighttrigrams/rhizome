@@ -8,6 +8,7 @@
                                 change-secondary-contexts-inverted
                                 deselect-secondary-contexts
                                 finish-linking-issue
+                                select-issue
                                 ]]))
 
 (defdispatch-with-args handler 
@@ -17,4 +18,5 @@
   change-secondary-contexts-unassigned-selected
   change-secondary-contexts-inverted
   deselect-secondary-contexts
-  finish-linking-issue)
+  finish-linking-issue
+  select-issue)

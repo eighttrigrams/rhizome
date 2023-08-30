@@ -97,7 +97,7 @@
           issue-2   (create-issue "issue-2" (:id context-1) [])
           _issue-3   (create-issue "issue-3" (:id context-1) [])
           opts      (repository/fetch-context db {} [context-1 true]) 
-          opts      (merge opts (repository/fetch-issue db opts [issue-1 false]))
+          opts      (merge opts ((repository/select-issue {:db db}) opts issue-1 false))
           opts      (merge opts (repository/start-linking-selected-issue-to-issue-with-local-search 
                                  db
                                  (repository/make-search-issues opts)))
@@ -121,7 +121,7 @@
           _context-2 (create-context "context-2")
           issue-1   (create-issue "issue-1" (:id context-1) []) 
           
-          opts      (repository/fetch-issue db {} [issue-1 false])
+          opts      ((repository/select-issue {:db db}) {} issue-1 false)
           opts      (merge opts (repository/start-linking-selected-issue-to-context-with-local-search db opts))
           _ (is (= 1 (count (:contexts opts))))
           contexts  (-> (merge opts {:q ""})

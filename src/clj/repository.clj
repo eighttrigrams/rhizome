@@ -264,11 +264,14 @@
           (= :context link-issue)
           (link-issue-to-selected-context db opts arg))))
 
-(defn fetch-issue [db opts arg]
-  (let [[issue skip-select?] arg]
+(defn select-issue [{:keys [db]}]
+  (fn [state issue skip-select?]
     (datastore/reprioritize-issue db issue)
     {:selected-issue   (when-not skip-select? (datastore/get-issue db issue))
-     :issues           (search/search-issues db (dissoc opts :search-globally? :q))
+     :issues           (search/search-issues db (dissoc state 
+                                                        :search-globally?
+                                                        :q
+                                                        :selected-issue))
      :active-search    nil
      :search-globally? false
      :q                nil}))
@@ -373,7 +376,6 @@
            {:selected-context (datastore/update-context-description db arg)}
            :update-issue (update-issue db opts arg)
            :update-context (update-context db opts arg)
-           :fetch-issue (fetch-issue db opts arg)
            :fetch-context (fetch-context db opts arg)
            :exit-events-view
            (if selected-context

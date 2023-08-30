@@ -69,15 +69,21 @@
   ([*state issue] (select-issue! *state issue false))
   ([*state issue skip-select?]
    (if (:link-issue @*state)
-     (fetch-and-reset-with-method! *state @*state api/finish-linking-issue (:id issue))
-     (do
+     (fetch-and-reset-with-method! *state
+                                   @*state
+                                   api/finish-linking-issue 
+                                   (:id issue))
+     (do 
        (when-not skip-select?
          ;; For a snappy response in the UI, set :selected-issue immediately.
          ;; The subsequent call to fetch-and-reset! then
          ;; will fetch and replace it, thereby filling in the related issues.
          (swap! *state assoc :selected-issue issue))
-       (fetch-and-reset! *state (assoc @*state :cmd 
-                                       :fetch-issue :arg [issue skip-select?]))))))
+       (fetch-and-reset-with-method! *state
+                                     @*state 
+                                     api/select-issue 
+                                     issue 
+                                     skip-select?)))))
 
 (defn select-first-issue! [*state]
   (when (seq (:issues @*state))
