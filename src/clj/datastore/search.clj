@@ -185,8 +185,8 @@
   [db {:keys [show-events?]
        {{{{:keys [selected-secondary-contexts
                   secondary-contexts-inverted
-                  secondary-contexts-unassigned-selected]} :current} :views} :data
-        :as selected-context} :selected-context
+                  secondary-contexts-unassigned-selected
+                  search-mode]} :current} :views} :data} :selected-context
        :as opts}]
   (if-let [ids (do-fetch-ids db opts)]
     (->> ids
@@ -196,8 +196,8 @@
          (jdbc/execute! db)
          (map common/post-process)
          (#(if show-events? (sort-by :date %) %))
-         (#(if (contains? #{1 2} (:search_mode selected-context))
-             (re-order % (:search_mode selected-context))
+         (#(if (contains? #{1 2} search-mode)
+             (re-order % search-mode)
              %))
          (filter-by-selected-secondary-contexts 
           (into #{} selected-secondary-contexts)

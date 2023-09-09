@@ -105,10 +105,11 @@
      (when-not (:search-globally? @*state)
        [:<>
         [:h4 "Search mode: " 
-         (case (:search_mode (:selected-context @*state))
+         (case (:search-mode (:current (:views (:data (:selected-context @*state)))))
            0 "Normal"
            1 "A->Z,0->9"
-           2 "9->0,Z->A")]
+           2 "9->0,Z->A"
+           nil "Normal")]
         [:hr]])
      [:> ReactMarkdown
       {:children (:description (:selected-context @*state))}]

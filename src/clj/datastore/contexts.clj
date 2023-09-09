@@ -106,9 +106,12 @@
   (get-context db {:id id}))
 
 (defn cycle-search-mode [db {:keys [id] :as context}]
-  (let [context (get-context db context)]
+  (let [data (-> (get-context db context)
+                 :data
+                 (update-in [:views :current :search-mode]
+                            #(mod (inc (or % 0)) 3)))]
     (jdbc/execute-one! db (sql/format {:update [:contexts]
-                                       :set    {:search_mode [:inline (mod (inc (:search_mode context)) 3)]}
+                                       :set    {:data [:inline (json/generate-string data)]}
                                        :where  [:= :id [:inline id]]}))
     (get-context db context)))
 
