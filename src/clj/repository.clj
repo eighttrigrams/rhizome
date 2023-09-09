@@ -99,6 +99,26 @@
        :contexts                        (search/search-contexts db "")
        :selected-context context})))
 
+(defn enter-events-view [{:keys [db]}]
+  (fn [opts]
+    {:issues                          (search/search-issues db (assoc opts :show-events? true :q nil))
+     :contexts                        []
+     :selected-issue                  nil
+     :show-events?                    true
+     :q                               nil}))
+
+(defn exit-events-view [{:keys [db]}]
+  (fn [{:keys [selected-context] :as opts}]
+    (if selected-context
+      {:show-events? false
+       :issues       (search/search-issues db (dissoc (assoc opts :show-events? false) :q))
+       :q            nil}
+      {:issues         (search/search-issues db (dissoc (assoc opts :show-events? false) :q))
+       :contexts       (search/search-contexts db "")
+       :selected-issue nil
+       :show-events?   false
+       :q              nil})))
+
 (defn cycle-search-mode [{:keys [db]}]
   (fn [{:keys [selected-context] :as opts}]
     (let [selected-context (datastore/cycle-search-mode db selected-context)]
@@ -379,22 +399,6 @@
            :update-issue (update-issue db opts arg)
            :update-context (update-context db opts arg)
            :fetch-context (fetch-context db opts arg)
-           :exit-events-view
-           (if selected-context
-             {:show-events? false
-              :issues       (search/search-issues db (dissoc (assoc opts :show-events? false) :q))
-              :q            nil}
-             {:issues         (search/search-issues db (dissoc (assoc opts :show-events? false) :q))
-              :contexts       (search/search-contexts db "")
-              :selected-issue nil
-              :show-events?   false
-              :q              nil})
-           :enter-events-view
-           {:issues                          (search/search-issues db (assoc opts :show-events? true :q nil))
-            :contexts                        []
-            :selected-issue                  nil
-            :show-events?                    true
-            :q                               nil}
            :deselect-context
            {:issues           (search/search-issues db (dissoc opts :selected-context :q))
             :contexts         (search/search-contexts db "")
