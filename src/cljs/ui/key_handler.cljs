@@ -8,10 +8,13 @@
      (let [{:keys [selected-issue
                    selected-context]} @*state]
        (cond (= "Escape" code)
-             (cond (:active-search @*state)
-                   (and (not alt-pressed?) (actions/quit-search! *state))
-                   (:show-events? @*state)
-                   (and (not alt-pressed?)(actions/exit-events-view! *state))
+             (cond (and (:active-search @*state)
+                        (not alt-pressed?))
+                   (actions/quit-search! *state)
+                   (and (not alt-pressed?)
+                        (not selected-context)
+                        (:show-events? @*state))
+                   (actions/exit-events-view! *state)
                    (and (not alt-pressed?) selected-issue)
                    (actions/deselect-issue! *state)
                    (and alt-pressed? (common/something-to-deselect? *state))

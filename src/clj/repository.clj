@@ -92,6 +92,20 @@
                                                                 :current
                                                                 :secondary-contexts-unassigned-selected]
                                                                false)
+                                                              (assoc-in
+                                                               [:selected-context
+                                                                :data
+                                                                :views
+                                                                :current
+                                                                :search-mode]
+                                                               0)
+                                                              (assoc-in
+                                                               [:selected-context
+                                                                :data
+                                                                :views
+                                                                :current
+                                                                :events-view]
+                                                               0)
                                                               ))})]
       {:issues                          (search/search-issues
                                          db
@@ -100,12 +114,19 @@
        :selected-context context})))
 
 (defn enter-events-view [{:keys [db]}]
-  (fn [opts]
-    {:issues                          (search/search-issues db (assoc opts :show-events? true :q nil))
-     :contexts                        []
-     :selected-issue                  nil
-     :show-events?                    true
-     :q                               nil}))
+  (fn [{:keys [selected-context] :as opts}]
+    (if selected-context
+      (let [selected-context (datastore/cycle-events-view db selected-context)]
+        {:issues         (search/search-issues db (assoc opts :selected-context selected-context))
+         :contexts       []
+         :selected-issue nil
+         :show-events?   false
+         :q              nil})
+      {:issues                          (search/search-issues db (assoc opts :show-events? true :q nil))
+       :contexts                        []
+       :selected-issue                  nil
+       :show-events?                    true
+       :q                               nil})))
 
 (defn exit-events-view [{:keys [db]}]
   (fn [{:keys [selected-context] :as opts}]

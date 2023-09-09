@@ -181,12 +181,27 @@
                 issues))
       (remove #((set (keys (:contexts %))) (:id selected-context)) issues))))
 
+(defn- sort-issues [{:keys [show-events?]
+                     {{{{:keys [search-mode
+                                events-view]} :current} :views} :data
+                      :as selected-context} :selected-context} issues]
+  (let [in-events-view? (or (and (not selected-context) show-events?)
+                            (= 1 events-view))]
+    (->> issues
+         (#(if in-events-view?
+             (sort-by :date %) %))
+         (#(if in-events-view?
+             (filter :date %) %))
+         (#(if (and (not in-events-view?)
+                    (contains? #{1 2} search-mode))
+             (re-order % search-mode)
+             %)))))
+
 (defn- search-issues'
-  [db {:keys [show-events?]
-       {{{{:keys [selected-secondary-contexts
+  [db {{{{{:keys [selected-secondary-contexts
                   secondary-contexts-inverted
-                  secondary-contexts-unassigned-selected
-                  search-mode]} :current} :views} :data} :selected-context
+                  secondary-contexts-unassigned-selected]} 
+          :current} :views} :data} :selected-context
        :as opts}]
   (if-let [ids (do-fetch-ids db opts)]
     (->> ids
@@ -195,10 +210,7 @@
          sql/format
          (jdbc/execute! db)
          (map common/post-process)
-         (#(if show-events? (sort-by :date %) %))
-         (#(if (contains? #{1 2} search-mode)
-             (re-order % search-mode)
-             %))
+         (sort-issues opts)
          (filter-by-selected-secondary-contexts 
           (into #{} selected-secondary-contexts)
           secondary-contexts-unassigned-selected
@@ -248,6 +260,8 @@
   (->> (search-issues' db (-> opts
                               (assoc :q "")
                               (dissoc :selected-issue)
+                              (assoc-in [:selected-context :data :views :current :events-view] 0)
+                              (assoc-in [:selected-context :data :views :current :search-mode] 0)
                               (assoc-in [:selected-context :data :views :current :selected-secondary-contexts] [])
                               (assoc-in [:selected-context :data :views :current :secondary-contexts-inverted] false)
                               (assoc-in [:selected-context :data :views :current :secondary-contexts-unassigned-selected] false)))
