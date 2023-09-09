@@ -27,6 +27,4 @@
 
 (defn-over-http cycle-search-mode :return-value {})
 
-(defn-over-http enter-events-view :return-value {})
-
-(defn-over-http exit-events-view :return-value {})
+(defn-over-http cycle-events-view :return-value {})

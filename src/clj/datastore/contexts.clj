@@ -105,12 +105,12 @@
                      {:return-keys true})
   (get-context db {:id id}))
 
-;; TODO dedup this and the next fn; but first enable to have 3 modes: a) no events view b) forward ordering c) backwards ordering
+;; TODO dedup this and next fn
 (defn cycle-events-view [db {:keys [id] :as context}]
   (let [data (-> (get-context db context)
                  :data
                  (update-in [:views :current :events-view]
-                            #(mod (inc (or % 0)) 2)))]
+                            #(mod (inc (or % 0)) 3)))]
     (jdbc/execute-one! db (sql/format {:update [:contexts]
                                        :set    {:data [:inline (json/generate-string data)]}
                                        :where  [:= :id [:inline id]]}))

@@ -113,32 +113,25 @@
        :contexts                        (search/search-contexts db "")
        :selected-context context})))
 
-(defn enter-events-view [{:keys [db]}]
+(defn cycle-events-view [{:keys [db]}]
   (fn [{:keys [selected-context] :as opts}]
     (if selected-context
       (let [selected-context (datastore/cycle-events-view db selected-context)]
         {:issues         (search/search-issues db (assoc opts :selected-context selected-context))
+         :selected-context selected-context
          :contexts       []
          :selected-issue nil
-         :show-events?   false
          :q              nil})
-      {:issues                          (search/search-issues db (assoc opts :show-events? true :q nil))
-       :contexts                        []
-       :selected-issue                  nil
-       :show-events?                    true
-       :q                               nil})))
-
-(defn exit-events-view [{:keys [db]}]
-  (fn [{:keys [selected-context] :as opts}]
-    (if selected-context
-      {:show-events? false
-       :issues       (search/search-issues db (dissoc (assoc opts :show-events? false) :q))
-       :q            nil}
-      {:issues         (search/search-issues db (dissoc (assoc opts :show-events? false) :q))
-       :contexts       (search/search-contexts db "")
-       :selected-issue nil
-       :show-events?   false
-       :q              nil})))
+      (let [opts (-> opts
+                     (dissoc :q)
+                     (update :events-view #(mod (inc (or % 0)) 3)))]
+        {:issues                          (search/search-issues db opts)
+         :contexts                        (if (= 0 (:events-view opts))
+                                            (search/search-contexts db opts)
+                                            [])
+         :events-view (:events-view opts)
+         :selected-issue                  nil
+         :q                               nil}))))
 
 (defn cycle-search-mode [{:keys [db]}]
   (fn [{:keys [selected-context] :as opts}]

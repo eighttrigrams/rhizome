@@ -10,8 +10,7 @@
                                 finish-linking-issue
                                 select-issue
                                 cycle-search-mode
-                                enter-events-view
-                                exit-events-view]]))
+                                cycle-events-view]]))
 
 (defdispatch-with-args handler 
   list-resources 
@@ -23,5 +22,4 @@
   finish-linking-issue
   select-issue
   cycle-search-mode
-  enter-events-view
-  exit-events-view)
+  cycle-events-view)

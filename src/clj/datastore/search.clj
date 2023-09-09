@@ -67,7 +67,7 @@
         (log/error (str "error in search-contexts: " (.getMessage e) " - param was: " q))
         (throw e)))))
 
-(defn- fetch-ids [ds q selected-context show-events?]
+(defn- fetch-ids [ds q selected-context events-view]
   (let [selected-context (when (:id selected-context) selected-context)
         search-clause       (if (not= "" q)
                               [:raw (format "searchable @@ to_tsquery('simple', '%s')" 
@@ -79,12 +79,12 @@
         join-where-clause   (if selected-context
                               [:= :context_issue.context_id (:id selected-context)]
                               [:=])
-        exists-clause       (if show-events? 
+        exists-clause       (if (not= 0 events-view)
                               [:exists {:select [:events.id]
                                         :from   [:events]
                                         :where  [:and
                                                  [:= :events.issue_id :issues.id]
-                                                 [:not= :events.archived [:inline true]]]}]
+                                                 [:not= :events.archived [:inline (= 1 events-view)]]]}]
                               [:=])
         formatted-query (sql/format (merge
                                      {:select   [:issues.id]
@@ -96,15 +96,10 @@
                                                  [:and
                                                   exists-clause
                                                   join-where-clause
-                                                  search-clause]
-                                                 (if (and (= "" q)
-                                                          (not selected-context)
-                                                          (not show-events?))
-                                                   [:= :important [:inline true]]
-                                                   nil)]}
+                                                  search-clause]]}
                                      (when (and (= "" q)
                                                 (not selected-context)
-                                                (not show-events?))
+                                                (= 0 events-view))
                                        {:limit 500})))]
     (jdbc/execute! ds formatted-query)))
 
@@ -160,13 +155,23 @@
      issues)
     issues))
 
+(defn- get-events-view 
+  [{{{{{:keys [events-view]} :current} :views} :data
+     :as                                       selected-context} :selected-context
+    global-events-view :events-view}]
+  (or (if selected-context
+        events-view
+        global-events-view) 0))
+
 (defn- do-fetch-ids 
-  [db {:keys [q
-              selected-context
-              show-events?
-              search-globally?]
-       :or   {q ""}}]
-  (seq (fetch-ids db q (if search-globally? nil selected-context) show-events?)))
+  [db {:keys [q search-globally? selected-context]
+       :or   {q ""}
+       :as state
+       }]
+  (seq (fetch-ids db 
+                  q 
+                  (if search-globally? nil selected-context) 
+                  (get-events-view state))))
 
 (defn- filter-issues
   [{:keys [link-issue 
@@ -181,17 +186,20 @@
                 issues))
       (remove #((set (keys (:contexts %))) (:id selected-context)) issues))))
 
-(defn- sort-issues [{:keys [show-events?]
-                     {{{{:keys [search-mode
-                                events-view]} :current} :views} :data
-                      :as selected-context} :selected-context} issues]
-  (let [in-events-view? (or (and (not selected-context) show-events?)
-                            (= 1 events-view))]
+(defn- sort-issues [{{{{{:keys [search-mode]} :current} :views} :data} 
+                       :selected-context :as state} 
+                    issues]
+  (let [events-view (get-events-view state)
+        in-events-view? (not= 0 events-view)]
     (->> issues
          (#(if in-events-view?
              (sort-by :date %) %))
          (#(if in-events-view?
              (filter :date %) %))
+         (#(if (and in-events-view?
+                    (= 2 events-view))
+             (reverse %)
+             %))
          (#(if (and (not in-events-view?)
                     (contains? #{1 2} search-mode))
              (re-order % search-mode)
@@ -260,6 +268,7 @@
   (->> (search-issues' db (-> opts
                               (assoc :q "")
                               (dissoc :selected-issue)
+                              (assoc :events-view 0)
                               (assoc-in [:selected-context :data :views :current :events-view] 0)
                               (assoc-in [:selected-context :data :views :current :search-mode] 0)
                               (assoc-in [:selected-context :data :views :current :selected-secondary-contexts] [])
@@ -275,8 +284,7 @@
        (map (fn [[count [id title]]] [id [title count]]))
        (sort-secondary-contexts db highlighted-secondary-contexts)))
 
-(defn search-issues [db {:keys [show-events?]
-                         {{:keys [highlighted-secondary-contexts]} :data  
+(defn search-issues [db {{{:keys [highlighted-secondary-contexts]} :data  
                           :as selected-context} :selected-context
                          :as opts}]
   (try
@@ -286,7 +294,7 @@
                  (update opts :q remove-some-chars)
                  ;; for destructuring in searcj-issues' to work properly when :q is present but has nil value
                  (dissoc opts :q))]
-      (if-not (or selected-context show-events?)
+      (if-not selected-context
         [(search-issues' db opts) {}]
         [(search-issues' db opts) 
          (get-aggregated-contexts db 

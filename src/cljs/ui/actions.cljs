@@ -154,11 +154,8 @@
                                 @*state
                                 api/change-secondary-contexts-inverted))
 
-(defn show-events! [*state]
-  (fetch-and-reset-with-method! *state @*state api/enter-events-view))
-
-(defn exit-events-view! [*state]
-  (fetch-and-reset-with-method! *state @*state api/exit-events-view))
+(defn cycle-events-view! [*state]
+  (fetch-and-reset-with-method! *state @*state api/cycle-events-view))
 
 (defn cycle-search-mode! [*state]
   (fetch-and-reset-with-method! *state @*state api/cycle-search-mode))

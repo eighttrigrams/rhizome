@@ -11,10 +11,6 @@
              (cond (and (:active-search @*state)
                         (not alt-pressed?))
                    (actions/quit-search! *state)
-                   (and (not alt-pressed?)
-                        (not selected-context)
-                        (:show-events? @*state))
-                   (actions/exit-events-view! *state)
                    (and (not alt-pressed?) selected-issue)
                    (actions/deselect-issue! *state)
                    (and alt-pressed? (common/something-to-deselect? *state))
@@ -24,7 +20,7 @@
              (not (:active-search @*state))
              (cond
                (= "KeyV" code)
-               (actions/show-events! *state)
+               (actions/cycle-events-view! *state)
                (and selected-issue (= "KeyE" code))
                (swap! *state #(assoc % :modal :edit-issue))
                (and selected-context

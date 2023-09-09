@@ -15,6 +15,16 @@
        (:current
         (:views
          (:data
+          (:selected-context @*state)))))
+      (:search-mode
+       (:current
+        (:views
+         (:data
+          (:selected-context @*state)))))
+      (:search-view
+       (:current
+        (:views
+         (:data
           (:selected-context @*state)))))))
 
 (defn handle-keys* [f]
