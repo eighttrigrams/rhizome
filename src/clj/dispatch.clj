@@ -9,6 +9,7 @@
                                 deselect-secondary-contexts
                                 finish-linking-issue
                                 select-issue
+                                cycle-search-mode
                                 ]]))
 
 (defdispatch-with-args handler 
@@ -19,4 +20,5 @@
   change-secondary-contexts-inverted
   deselect-secondary-contexts
   finish-linking-issue
-  select-issue)
+  select-issue
+  cycle-search-mode)

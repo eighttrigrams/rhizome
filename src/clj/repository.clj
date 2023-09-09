@@ -99,6 +99,12 @@
        :contexts                        (search/search-contexts db "")
        :selected-context context})))
 
+(defn cycle-search-mode [{:keys [db]}]
+  (fn [{:keys [selected-context] :as opts}]
+    (let [selected-context (datastore/cycle-search-mode db selected-context)]
+      {:selected-context selected-context
+       :issues           (search/search-issues db (assoc opts :selected-context selected-context))})))
+
 (defn insert-issue [{:keys [db]}]
   (fn [{:keys [selected-context]
       {{{{:keys [selected-secondary-contexts]} :current} :views} :data} :selected-context
@@ -356,10 +362,6 @@
                {:issues           (search/search-issues db opts)
                 :contexts         (search/search-contexts db "")
                 :selected-context nil})
-           :cycle-search-mode
-           (let [selected-context (datastore/cycle-search-mode db selected-context)]
-             {:selected-context selected-context
-              :issues           (search/search-issues db (assoc opts :selected-context selected-context))})
            :link-context (link-selected-issue-to-context db opts arg)
            :insert-context
            {:selected-context                        (datastore/new-context db arg)

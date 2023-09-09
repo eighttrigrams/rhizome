@@ -161,7 +161,7 @@
   (exec-cmd *state :exit-events-view))
 
 (defn cycle-search-mode! [*state]
-  (fetch-and-reset! *state (assoc @*state :cmd :cycle-search-mode)))
+  (fetch-and-reset-with-method! *state @*state api/cycle-search-mode))
 
 (defn delete-issue! [*state]
   (when (js/window.confirm "Delete currently selected issue?")
