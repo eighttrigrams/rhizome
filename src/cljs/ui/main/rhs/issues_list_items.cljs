@@ -7,7 +7,9 @@
 (defn info-component [state issue]
   [:span.info
    (when (and (:selected-context state)
-              (not= 0 (:search_mode (:selected-context state)))
+              (or (nil? (:events-view (:current (:views (:data (:selected-context state))))))
+                  (= 0 (:events-view (:current (:views (:data (:selected-context state)))))))
+              #_(not= 0 (:search_mode (:selected-context state)))
               (not (and (= (:short_title_ints issue) 0)
                         (empty? (:short_title issue)))))
      (str "["
