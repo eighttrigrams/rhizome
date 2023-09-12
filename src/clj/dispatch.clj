@@ -10,7 +10,10 @@
                                 finish-linking-issue
                                 select-issue
                                 cycle-search-mode
-                                cycle-events-view]]))
+                                cycle-events-view
+                                store-current-view
+                                load-stored-context
+                                remove-stored-context]]))
 
 (defdispatch-with-args handler 
   list-resources 
@@ -22,4 +25,7 @@
   finish-linking-issue
   select-issue
   cycle-search-mode
-  cycle-events-view)
+  cycle-events-view
+  store-current-view
+  load-stored-context
+  remove-stored-context)

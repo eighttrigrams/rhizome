@@ -28,3 +28,9 @@
 (defn-over-http cycle-search-mode :return-value {})
 
 (defn-over-http cycle-events-view :return-value {})
+
+(defn-over-http store-current-view :return-value {})
+
+(defn-over-http load-stored-context :return-value {})
+
+(defn-over-http remove-stored-context :return-value {})

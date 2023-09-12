@@ -36,6 +36,24 @@
   (fetch-and-reset! *state (dissoc @*state :selected-issue :preview-issue :q))
   (js/setTimeout (fn [_] (swap! *state dissoc :loading)) 500))
 
+(defn load-stored-context [*state idx]
+  (fetch-and-reset-with-method! *state
+                                @*state
+                                api/load-stored-context
+                                idx))
+
+(defn remove-stored-context [*state idx]
+  (fetch-and-reset-with-method! *state
+                                @*state
+                                api/remove-stored-context
+                                idx))
+
+(defn store-current-view! [*state item]
+  (fetch-and-reset-with-method! *state
+                                (dissoc @*state :modal)
+                                api/store-current-view
+                                item))
+
 (defn new-issue! [*state issue]
   (fetch-and-reset-with-method! *state
                                 (dissoc @*state :modal)

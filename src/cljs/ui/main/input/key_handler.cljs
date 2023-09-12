@@ -9,7 +9,7 @@
 ;; TODO replace a couple of whens with a cond
 (defn handle-keys [*state]
   (handle-keys*
-   (fn [code _ctrl-pressed? _meta-pressed? alt-pressed? shift-pressed? e]
+   (fn [code ctrl-pressed? meta-pressed? alt-pressed? shift-pressed? e]
      (let [{:keys [active-search
                    selected-issue
                    selected-context]} @*state]
@@ -17,6 +17,13 @@
        (when (= code "Enter")
          (.preventDefault e)
          (cond
+           (and ctrl-pressed? 
+                meta-pressed? 
+                alt-pressed?
+                (= :issues active-search)
+                selected-context
+                (not selected-issue))
+           (actions/store-current-view! *state {:title (.-value (get-title-el))})
            (or (and shift-pressed?
                     (= :contexts active-search))
                (and (= :contexts active-search)

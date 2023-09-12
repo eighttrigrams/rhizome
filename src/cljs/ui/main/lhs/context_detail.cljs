@@ -99,6 +99,19 @@
           :on-click (select-invert-contexts *state)}
    "Invert"])
 
+(defn- views-component [*state]
+  [:div
+   [:h2 "views"]
+   [:ul (map-indexed (fn [idx {:keys [title]}]
+               [:li {:key idx
+                     :on-click (fn [_]
+                                 (actions/load-stored-context *state idx)
+                                 )} title "  " [:span 
+                                           {:on-click 
+                                            (fn [_] (actions/remove-stored-context *state idx))}
+                                           "[Del]"]]) 
+                     (:stored (:views (:data (:selected-context @*state)))))]])
+
 (defn component [_*state]
   (fn [*state]
     [:<>
@@ -116,6 +129,7 @@
      (when-not (:search-globally? @*state)
        [:<>
         [:hr]
+        [views-component *state]
         [:h2 "Secondary contexts:"]
         [:br]
         [invert-component *state]

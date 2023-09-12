@@ -49,6 +49,12 @@
 
 (def new-context contexts/new-context)
 
+(def store-current-view contexts/store-current-view)
+
+(def load-stored-context contexts/load-stored-context)
+
+(def remove-stored-context contexts/remove-stored-context)
+
 (defn delete-context [db {:keys [id]}]
   (doall
    (for [issue-relation ;

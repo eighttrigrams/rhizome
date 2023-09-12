@@ -105,6 +105,38 @@
                      {:return-keys true})
   (get-context db {:id id}))
 
+(defn store-current-view [db {:keys [id] :as selected-context} {:keys [title]}]
+  (let [data (:data (get-context db selected-context))
+        data (update-in data [:views :stored] conj {:title title
+                                                    :view (:current (:views data))})]
+    (jdbc/execute-one! db (sql/format {:update [:contexts]
+                                       :set    {:data [:inline (json/generate-string data)]}
+                                       :where  [:= :id [:inline id]]}))) 
+  (get-context db selected-context))
+
+(defn load-stored-context [db {:keys [id] :as selected-context} idx]
+  (let [data (:data (get-context db selected-context))
+        data (assoc-in data [:views :current] 
+                       (-> data :views :stored (get idx) :view))]
+    (jdbc/execute-one! db (sql/format {:update [:contexts]
+                                       :set    {:data [:inline (json/generate-string data)]}
+                                       :where  [:= :id [:inline id]]})))
+  (get-context db selected-context))
+
+;; https://stackoverflow.com/a/18319708
+(defn vec-remove
+  "remove elem in coll"
+  [pos coll]
+  (into (subvec coll 0 pos) (subvec coll (inc pos))))
+
+(defn remove-stored-context [db {:keys [id] :as selected-context} idx]
+  (let [data (:data (get-context db selected-context))
+        data (update-in data [:views :stored] #(vec-remove idx %))]
+    (jdbc/execute-one! db (sql/format {:update [:contexts]
+                                       :set    {:data [:inline (json/generate-string data)]}
+                                       :where  [:= :id [:inline id]]})))
+  (get-context db selected-context))
+
 ;; TODO dedup this and next fn
 (defn cycle-events-view [db {:keys [id] :as context}]
   (let [data (-> (get-context db context)

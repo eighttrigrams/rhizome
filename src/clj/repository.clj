@@ -133,6 +133,21 @@
          :selected-issue                  nil
          :q                               nil}))))
 
+(defn store-current-view [{:keys [db]}]
+  (fn [{:keys [selected-context]} item]
+    (let [selected-context (datastore/store-current-view db selected-context item)]
+      {:selected-context selected-context})))
+
+(defn load-stored-context [{:keys [db]}]
+  (fn [{:keys [selected-context]} idx]
+    (let [selected-context (datastore/load-stored-context db selected-context idx)]
+      {:selected-context selected-context})))
+
+(defn remove-stored-context [{:keys [db]}]
+  (fn [{:keys [selected-context]} idx]
+    (let [selected-context (datastore/remove-stored-context db selected-context idx)]
+      {:selected-context selected-context})))
+
 (defn cycle-search-mode [{:keys [db]}]
   (fn [{:keys [selected-context] :as opts}]
     (let [selected-context (datastore/cycle-search-mode db selected-context)]
