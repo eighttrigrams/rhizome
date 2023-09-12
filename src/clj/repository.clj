@@ -139,7 +139,7 @@
       {:selected-context selected-context})))
 
 (defn load-stored-context [{:keys [db]}]
-  (fn [{:keys [selected-context]} idx]
+  (fn [{:keys [selected-context] :as opts} idx]
     (let [selected-context (datastore/load-stored-context db selected-context idx)]
       {:selected-context selected-context
        :issues (search/search-issues db (assoc opts :selected-context selected-context))})))
