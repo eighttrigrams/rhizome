@@ -100,38 +100,31 @@
    "Invert"])
 
 (defn- views-component [*state]
-  [:div
-   [:h2 "views"]
-   [:ul (map-indexed (fn [idx {:keys [title]}]
-               [:li {:key idx} 
-                [:span 
-                 {:on-click (fn [_] (actions/load-stored-context *state idx))}
-                 title] 
-                "  "
-                [:span 
-                 {:on-click (fn [_] (actions/remove-stored-context *state idx))}
-                 "[Del]"]]) 
-                     (:stored (:views (:data (:selected-context @*state)))))]])
+  [:ul (map-indexed (fn [idx {:keys [title]}]
+                      [:li {:key             idx
+                            :on-click        (fn [_] (actions/load-stored-context *state idx))
+                            :on-context-menu (fn [e] 
+                                               (.preventDefault e)
+                                               (actions/remove-stored-context *state idx))}
+                       title]) 
+                    (:stored (:views (:data (:selected-context @*state)))))])
 
 (defn component [_*state]
   (fn [*state]
     [:<>
+     (when (not= "" (:description (:selected-context @*state)))
+       [:<>
+        [:> ReactMarkdown
+         {:children (:description (:selected-context @*state))}]
+        [:hr]])
      (when-not (:search-globally? @*state)
        [:<>
-        [:h4 "Search mode: " 
+        [:h4 "Search mode: "
          (case (:search-mode (:current (:views (:data (:selected-context @*state)))))
            0 "Normal"
            1 "A->Z,0->9"
            2 "9->0,Z->A"
            nil "Normal")]
-        [:hr]])
-     [:> ReactMarkdown
-      {:children (:description (:selected-context @*state))}]
-     (when-not (:search-globally? @*state)
-       [:<>
-        [:hr]
         [views-component *state]
-        [:h2 "Secondary contexts:"]
-        [:br]
         [invert-component *state]
         [secondary-contexts-component *state]])]))
