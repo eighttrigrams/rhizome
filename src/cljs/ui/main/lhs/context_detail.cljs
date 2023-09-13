@@ -100,14 +100,19 @@
    "Invert"])
 
 (defn- views-component [*state]
-  [:ul (map-indexed (fn [idx {:keys [title]}]
-                      [:li {:key             idx
-                            :on-click        (fn [_] (actions/load-stored-context *state idx))
-                            :on-context-menu (fn [e] 
-                                               (.preventDefault e)
-                                               (actions/remove-stored-context *state idx))}
-                       title]) 
-                    (:stored (:views (:data (:selected-context @*state)))))])
+  [:ul (doall
+        (map-indexed (fn [idx {:keys [title]}]
+                       [:li {:key             idx
+                             :style           {:font-weight (if (= (-> *state deref :selected-context :data :views :current)
+                                                                   (-> *state deref :selected-context :data :views :stored (get idx) :view))
+                                                              "bold"
+                                                              "normal")}
+                             :on-click        (fn [_] (actions/load-stored-context *state idx))
+                             :on-context-menu (fn [e] 
+                                                (.preventDefault e)
+                                                (actions/remove-stored-context *state idx))}
+                        title]) 
+                     (:stored (:views (:data (:selected-context @*state))))))])
 
 (defn component [_*state]
   (fn [*state]
