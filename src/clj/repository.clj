@@ -155,6 +155,19 @@
       {:selected-context selected-context
        :issues           (search/search-issues db (assoc opts :selected-context selected-context))})))
 
+(defn delete-selected-issue [{:keys [db]}]
+  (fn [{:keys [selected-issue] :as opts}]
+    (datastore/delete-issue db selected-issue)
+    {:issues         (search/search-issues db opts)
+     :selected-issue nil}))
+
+(defn delete-issue [{:keys [db]}]
+  (fn [opts issue]
+    (prn "---------------------delete" issue)
+    (datastore/delete-issue db issue)
+    {:issues         (search/search-issues db opts)
+     :selected-issue nil}))
+
 (defn insert-issue [{:keys [db]}]
   (fn [{:keys [selected-context]
       {{{{:keys [selected-secondary-contexts]} :current} :views} :data} :selected-context
@@ -403,10 +416,6 @@
            :start-linking-selected-issue-to-context (start-linking-selected-issue-to-context-with-local-search db opts)
            :start-context-search (start-context-search db opts)
            :split-issue (split-issue db opts arg)
-           :delete-issue
-           (do (datastore/delete-issue db arg)
-               {:issues         (search/search-issues db opts)
-                :selected-issue nil})
            :delete-context
            (do (datastore/delete-context db arg)
                {:issues           (search/search-issues db opts)

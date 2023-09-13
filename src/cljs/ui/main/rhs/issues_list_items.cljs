@@ -63,12 +63,14 @@
                        (swap! *state assoc 
                               :preview-issue issue
                               :mouse :enter))
+    :on-context-menu (fn [e]
+                       (.preventDefault e)
+                       (actions/delete-issue! *state issue))
     :on-mouse-leave #(do
                        (swap! *state assoc :mouse :leave)
                        (js/setTimeout (fn [_]
                                         (when (= :leave (:mouse @*state))
-                                          (swap! *state dissoc :preview-issue))
-                                        )
+                                          (swap! *state dissoc :preview-issue)))
                                       300))}
    [:div
     [title-component (:title issue)]

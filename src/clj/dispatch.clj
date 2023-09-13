@@ -13,7 +13,9 @@
                                 cycle-events-view
                                 store-current-view
                                 load-stored-context
-                                remove-stored-context]]))
+                                remove-stored-context
+                                delete-selected-issue
+                                delete-issue]]))
 
 (defdispatch-with-args handler 
   list-resources 
@@ -28,4 +30,6 @@
   cycle-events-view
   store-current-view
   load-stored-context
-  remove-stored-context)
+  remove-stored-context
+  delete-selected-issue
+  delete-issue)

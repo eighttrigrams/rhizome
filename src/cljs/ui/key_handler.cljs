@@ -30,7 +30,7 @@
                     (= "KeyS" code))
                (actions/split-issue! *state)
                (and selected-issue (= "Delete" code))
-               (actions/delete-issue! *state)
+               (actions/delete-selected-issue! *state)
                (and selected-context (= "Delete" code))
                (actions/delete-context! *state)
                (and selected-context (= "KeyE" code))

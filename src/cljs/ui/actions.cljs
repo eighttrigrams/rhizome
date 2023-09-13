@@ -178,9 +178,13 @@
 (defn cycle-search-mode! [*state]
   (fetch-and-reset-with-method! *state @*state api/cycle-search-mode))
 
-(defn delete-issue! [*state]
+(defn delete-selected-issue! [*state]
   (when (js/window.confirm "Delete currently selected issue?")
-    (exec-cmd *state :delete-issue (:selected-issue @*state))))
+    (fetch-and-reset-with-method! *state @*state api/delete-selected-issue)))
+
+(defn delete-issue! [*state idx]
+  (when (js/window.confirm "Delete this issue?")
+    (fetch-and-reset-with-method! *state @*state api/delete-issue idx)))
 
 (defn split-issue! [*state]
   (when (js/window.confirm "Split currently selected issue?")
