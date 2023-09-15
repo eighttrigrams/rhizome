@@ -47,34 +47,40 @@
     [context-badges/component contexts]]])
 
 (defn regular-issues-list-item-component [*state issue idx select-fn]
-  [:li.card.issue-card
-   {:class          (when (= (:id (:selected-issue @*state))
-                             (:id issue)) :selected)
-    :id             (str "issue-card-" idx)
-    :on-click       #(let [skip-select? (and (deref meta-pressed/*meta-pressed?)
-                                             (not= :issues (:active-search @*state)))]
-                       (swap! *state (fn [state] (dissoc state :preview-issue))) 
-                       (actions/select-issue! *state 
-                                              issue
-                                              skip-select?)
-                       (when skip-select?
-                         (select-fn idx)))
-    :on-mouse-enter #(when-not (:loading @*state)
-                       (swap! *state assoc 
-                              :preview-issue issue
-                              :mouse :enter))
-    :on-context-menu (fn [e]
-                       (.preventDefault e)
-                       (actions/delete-issue! *state issue))
-    :on-mouse-leave #(do
-                       (swap! *state assoc :mouse :leave)
-                       (js/setTimeout (fn [_]
-                                        (when (= :leave (:mouse @*state))
-                                          (swap! *state dissoc :preview-issue)))
-                                      300))}
-   [:div
-    [title-component (:title issue)]
-    [info-component @*state issue]
-    [context-badges/component (remove #(= (:id (:selected-context @*state))
-                                          (first %)) 
-                                      (:contexts issue))]]])
+  (let [simple-card? false]
+    [:li.issue-card
+     {:class          (str (if simple-card? 
+                             "simple-card"
+                             "card") (when (= (:id (:selected-issue @*state))
+                                     (:id issue)) " selected"))
+      :id             (str "issue-card-" idx)
+      :on-click       #(let [skip-select? (and (deref meta-pressed/*meta-pressed?)
+                                               (not= :issues (:active-search @*state)))]
+                         (swap! *state (fn [state] (dissoc state :preview-issue))) 
+                         (actions/select-issue! *state 
+                                                issue
+                                                skip-select?)
+                         (when skip-select?
+                           (select-fn idx)))
+      :on-mouse-enter #(when-not (or (:loading @*state)
+                                     simple-card?)
+                         (swap! *state assoc 
+                                :preview-issue issue
+                                :mouse :enter))
+      :on-context-menu (fn [e]
+                         (.preventDefault e)
+                         (actions/delete-issue! *state issue))
+      :on-mouse-leave #(do
+                         (swap! *state assoc :mouse :leave)
+                         (js/setTimeout (fn [_]
+                                          (when (= :leave (:mouse @*state))
+                                            (swap! *state dissoc :preview-issue)))
+                                        300))}
+     [:div
+      [title-component (:title issue)]
+      (when-not simple-card?
+        [:<>
+         [info-component @*state issue]
+         [context-badges/component (remove #(= (:id (:selected-context @*state))
+                                               (first %)) 
+                                           (:contexts issue))]])]]))

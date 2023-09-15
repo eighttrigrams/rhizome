@@ -39,6 +39,11 @@ li.card.issue-card span.title {
     -webkit-box-orient: vertical;
 }
 
+li.simple-card span.title p {
+    margin-bottom: 10px;
+    margin-top: 10px;
+}
+
 li.card.issue-card span.contexts {
     position: absolute;
     top: 95px;
