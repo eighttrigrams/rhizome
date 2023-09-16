@@ -32,25 +32,27 @@
                  " - "
                  (with-out-str (pp/pprint opts)))))
 
-(defn fetch-context [db {:keys [selected-issue]} arg]
-  (try
-    (let [[arg change-context?] arg
-          selected-context (datastore/get-context db arg)
-          opts             {:search-globally?                false
-                            :selected-context                selected-context}]
-      (datastore/reprioritize-context db arg)
-      (merge opts
-             {:selected-context                        selected-context
-              :issues                                  (search/search-issues db (dissoc opts :q))
-              :active-search                           (if (or change-context?
-                                                               selected-issue) 
-                                                         nil :issues)
-              :context-to-fetch                        nil
-              :unassigned-secondary-contexts-selected? false
-              :q                                       nil}))
-    (catch Exception e
-      (log/error (str "Caught an exception in fetch-context " (.getMessage e)))
-      (throw e))))
+(defn fetch-context [{:keys [db]}]
+  (fn [{:keys [selected-issue]} [arg suppress-reset-issue?]]
+    (try
+      (let [_ (prn "arg" suppress-reset-issue?)
+            selected-context      (datastore/get-context db arg)
+            opts                  {:search-globally? false
+                                   :selected-context selected-context}]
+        (datastore/reprioritize-context db arg)
+        (merge opts
+               {:selected-context                        selected-context
+                :issues                                  (search/search-issues db (dissoc opts :q))
+                :active-search                           (when-not suppress-reset-issue?
+                                                           :issues)
+                :context-to-fetch                        nil
+                :unassigned-secondary-contexts-selected? false
+                :q                                       nil}
+               (when (not suppress-reset-issue?)
+                 {:selected-issue nil})))
+      (catch Exception e
+        (log/error (str "Caught an exception in fetch-context " (.getMessage e)))
+        (throw e)))))
 
 (defn- change-secondary-contexts-operation [db]
   (fn [opts]
@@ -437,7 +439,6 @@
            {:selected-context (datastore/update-context-description db arg)}
            :update-issue (update-issue db opts arg)
            :update-context (update-context db opts arg)
-           :fetch-context (fetch-context db opts arg)
            :deselect-context
            {:issues           (search/search-issues db (dissoc opts :selected-context :q))
             :contexts         (search/search-contexts db "")

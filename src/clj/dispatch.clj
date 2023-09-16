@@ -15,7 +15,8 @@
                                 load-stored-context
                                 remove-stored-context
                                 delete-selected-issue
-                                delete-issue]]))
+                                delete-issue
+                                fetch-context]]))
 
 (defdispatch-with-args handler 
   list-resources 
@@ -32,4 +33,5 @@
   load-stored-context
   remove-stored-context
   delete-selected-issue
-  delete-issue)
+  delete-issue
+  fetch-context)

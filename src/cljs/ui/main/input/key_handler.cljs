@@ -24,6 +24,10 @@
                 selected-context
                 (not selected-issue))
            (actions/store-current-view! *state {:title (.-value (get-title-el))})
+           (and (= :contexts active-search)
+                shift-pressed?
+                selected-issue)
+           (actions/select-first-context! *state true)
            (or (and shift-pressed?
                     (= :contexts active-search))
                (and (= :contexts active-search)
@@ -56,7 +60,7 @@
              (set! (.-value (get-title-el)) ""))
            #_(swap! *state dissoc nil)
            (= :contexts active-search)
-           (actions/select-first-context! *state)
+           (actions/select-first-context! *state false)
            (= :issues active-search)
            (actions/select-first-issue! *state)))
        (when (and alt-pressed?
