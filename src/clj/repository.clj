@@ -33,10 +33,9 @@
                  (with-out-str (pp/pprint opts)))))
 
 (defn fetch-context [{:keys [db]}]
-  (fn [{:keys [selected-issue]} [arg suppress-reset-issue?]]
+  (fn [_opts [arg suppress-reset-issue?]]
     (try
-      (let [_ (prn "arg" suppress-reset-issue?)
-            selected-context      (datastore/get-context db arg)
+      (let [selected-context      (datastore/get-context db arg)
             opts                  {:search-globally? false
                                    :selected-context selected-context}]
         (datastore/reprioritize-context db arg)
