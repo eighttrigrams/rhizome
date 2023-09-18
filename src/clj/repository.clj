@@ -164,7 +164,6 @@
 
 (defn delete-issue [{:keys [db]}]
   (fn [opts issue]
-    (prn "---------------------delete" issue)
     (datastore/delete-issue db issue)
     {:issues         (search/search-issues db opts)
      :selected-issue nil}))

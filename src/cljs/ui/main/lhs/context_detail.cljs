@@ -117,7 +117,8 @@
 (defn component [_*state]
   (fn [*state]
     [:<>
-     (when (not= "" (:description (:selected-context @*state)))
+     (when (and (not= "" (:description (:selected-context @*state)))
+                (not (nil? (:description (:selected-context @*state)))))
        [:<>
         [:> ReactMarkdown
          {:children (:description (:selected-context @*state))}]
