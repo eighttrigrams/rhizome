@@ -6,6 +6,10 @@
 (defn get-title-el []
   (.getElementById js/document "search-input"))
 
+(defn- issue-creation-permitted? 
+  [{{{{{:keys [secondary-contexts-unassigned-selected]} :current} :views} :data} :selected-context}]
+  (not secondary-contexts-unassigned-selected))
+
 ;; TODO replace a couple of whens with a cond
 (defn handle-keys [*state]
   (handle-keys*
@@ -36,6 +40,7 @@
              (actions/new-context! *state {:title (.-value (get-title-el))})
              (set! (.-value (get-title-el)) ""))
            (and (= :issues active-search)
+                (not (:enter-pressed? @*state))
                 (or (and shift-pressed?
                          (not (:search-globally? @*state))
                          selected-context
@@ -44,17 +49,8 @@
                          selected-context
                          (not selected-issue)
                          (= 0 (count (:issues @*state)))))
-                (not (or (:secondary-contexts-inverted
-                          (:current
-                           (:views
-                            (:data
-                             (:selected-context @*state)))))
-                         (:secondary-contexts-unassigned-selected
-                          (:current
-                           (:views
-                            (:data
-                             (:selected-context @*state))))))))
-           (when-not (:enter-pressed? @*state)
+                (issue-creation-permitted? @*state))
+           (do
              (swap! *state assoc :enter-pressed? true)
              (actions/new-issue! *state {:title (.-value (get-title-el))})
              (set! (.-value (get-title-el)) ""))

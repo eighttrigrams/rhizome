@@ -189,8 +189,28 @@
                                                     [:inline context-id]]]}))))
   (get-issue db selected-issue))
 
+(defn- create-new-issue! [db title short_title]
+  (:issues/id (jdbc/execute-one!
+               db
+               (sql/format {:insert-into [:issues]
+                            :columns     [:inserted_at
+                                          :updated_at
+                                          :title
+                                          :short_title]
+                            :values      [[[:raw "NOW()"]
+                                           [:raw "NOW()"]
+                                           title
+                                           short_title]]})
+
+               {:return-keys true})))
+
+(defn- insert-issue-relations! [db values]
+  (jdbc/execute! db
+                 (sql/format {:insert-into [:context_issue]
+                              :columns     [:context_id :issue_id]
+                              :values      values})))
+
 (defn new-issue [db {title :title} context-id selected-secondary-contexts-set]
-  (prn "will create new issue" title context-id selected-secondary-contexts-set)
   (let [parts       (str/split title #"\|")
         title       (if (= 1 (count parts))
                       (first parts)
@@ -198,28 +218,13 @@
         short_title (if (= 1 (count parts))
                       ""
                       (first parts))
-        issue-id    (:issues/id (jdbc/execute-one!
-                                 db
-                                 (sql/format {:insert-into [:issues]
-                                              :columns     [:inserted_at
-                                                            :updated_at
-                                                            :title
-                                                            :short_title]
-                                              :values      [[[:raw "NOW()"]
-                                                             [:raw "NOW()"]
-                                                             title
-                                                             short_title]]})
-
-                                 {:return-keys true}))
+        issue-id    (create-new-issue! db title short_title)
         values      (vec (doall
                           (map (fn [ctx-id]
                                  [[:inline ctx-id]
                                   [:inline issue-id]])
                                (conj selected-secondary-contexts-set context-id))))]
-    (jdbc/execute! db
-                   (sql/format {:insert-into [:context_issue]
-                                :columns     [:context_id :issue_id]
-                                :values      values}))
+    (insert-issue-relations! db values)
     (get-issue db {:id issue-id})))
 
 (defn link-issue [db issue-id related-issue-id]
