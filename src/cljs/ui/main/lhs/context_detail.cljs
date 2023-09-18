@@ -125,18 +125,20 @@
         [:hr]])
      (when-not (:search-globally? @*state)
        [:<>
-        [:h4 "Search mode: "
-         (case (:search-mode (:current (:views (:data (:selected-context @*state)))))
-           0 "Normal"
-           1 "A->Z,0->9"
-           2 "9->0,Z->A"
-           nil "Normal")]
-        [:h4 "Events View: "
-         (case (:events-view (:current (:views (:data (:selected-context @*state)))))
-           0 "Normal"
-           1 "Events"
-           2 "Archived"
-           nil "Normal")]
+        (if (or (= 0 (:events-view (:current (:views (:data (:selected-context @*state))))))
+                (nil? (:events-view (:current (:views (:data (:selected-context @*state)))))))
+          [:h4 "Search mode: "
+           (case (:search-mode (:current (:views (:data (:selected-context @*state)))))
+             0 "Normal"
+             1 "A->Z,0->9"
+             2 "9->0,Z->A"
+             nil "Normal")]
+          [:h4 "Events View: "
+           (case (:events-view (:current (:views (:data (:selected-context @*state)))))
+             0 "Normal"
+             1 "Events"
+             2 "Archived"
+             nil "Normal")])
         [views-component *state]
         [invert-component *state]
         [secondary-contexts-component *state]])]))
