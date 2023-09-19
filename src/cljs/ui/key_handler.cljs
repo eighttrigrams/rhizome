@@ -58,7 +58,6 @@
                (and (= "KeyQ" code)
                     (not meta-pressed?)
                     (not ctrl-pressed?)
-                    alt-pressed?
                     (not shift-pressed?)
                     selected-issue)
                (actions/start-linking-context *state)
