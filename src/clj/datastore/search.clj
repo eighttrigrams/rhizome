@@ -136,9 +136,11 @@
   [selected-secondary-contexts-set 
    secondary-contexts-unassigned-selected
    secondary-contexts-inverted
+   link-issue?
    issues]
-  (if (or secondary-contexts-unassigned-selected
-          (seq selected-secondary-contexts-set))
+  (if (and (not link-issue?)
+           (or secondary-contexts-unassigned-selected
+               (seq selected-secondary-contexts-set)))
     ((if-not secondary-contexts-inverted filter remove)
      (fn [issue]
        (or 
@@ -206,11 +208,11 @@
              %)))))
 
 (defn- search-issues'
-  [db {{{{{:keys [selected-secondary-contexts
+  [db {:keys                                                                                                                                [link-issue]
+       {{{{:keys [selected-secondary-contexts
                   secondary-contexts-inverted
-                  secondary-contexts-unassigned-selected]} 
-          :current} :views} :data} :selected-context
-       :as opts}]
+                  secondary-contexts-unassigned-selected]} :current} :views} :data} :selected-context
+       :as                                                                                                                                  opts}]
   (if-let [ids (do-fetch-ids db opts)]
     (->> ids
          (map #(:issues/id %))
@@ -222,7 +224,8 @@
          (filter-by-selected-secondary-contexts 
           (into #{} selected-secondary-contexts)
           secondary-contexts-unassigned-selected
-          secondary-contexts-inverted)
+          secondary-contexts-inverted
+          (= :issue link-issue))
          (filter-issues opts))
     '()))
 
