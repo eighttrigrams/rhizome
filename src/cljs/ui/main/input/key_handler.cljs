@@ -44,18 +44,16 @@
              (set! (.-value (get-title-el)) ""))
            (and (= :issues active-search)
                 (not (:enter-pressed? @*state))
-                (or (and shift-pressed?
-                         (not (:search-globally? @*state))
-                         selected-context
-                         (not selected-issue))
-                    (and (not (:search-globally? @*state))
-                         selected-context
-                         (not selected-issue)
-                         (= 0 (count (:issues @*state)))))
+                (not (:search-globally? @*state))
+                selected-context
+                (not selected-issue)
+                (or shift-pressed?
+                    alt-pressed?
+                    (= 0 (count (:issues @*state))))
                 (issue-creation-permitted? @*state))
            (do
              (swap! *state assoc :enter-pressed? true)
-             (actions/new-issue! *state {:title (.-value (get-title-el))})
+             (actions/new-issue! *state {:title (.-value (get-title-el))} alt-pressed?)
              (set! (.-value (get-title-el)) ""))
            #_(swap! *state dissoc nil)
            (= :contexts active-search)

@@ -169,11 +169,12 @@
      :selected-issue nil}))
 
 (defn insert-issue [{:keys [db]}]
-  (fn [{:keys [selected-context]
-      {{{{:keys [selected-secondary-contexts
-                 secondary-contexts-inverted]} :current} :views} :data} :selected-context
-      :as state} 
-     issue]
+  (fn [{:keys                                                                                         [selected-context]
+        {{{{:keys [selected-secondary-contexts
+                   secondary-contexts-inverted]} :current} :views} :data} :selected-context
+        :as                                                                                           state} 
+       issue
+       split-short-title?]
     (try
       (let [selected-secondary-contexts-set (into #{}
                                                   (when-not secondary-contexts-inverted
@@ -181,7 +182,8 @@
             _selected-issue (datastore/new-issue db 
                                                  issue
                                                  (:id selected-context)
-                                                 selected-secondary-contexts-set)]
+                                                 selected-secondary-contexts-set
+                                                 split-short-title?)]
         {:selected-issue nil
          :issues         (search/search-issues
                           db

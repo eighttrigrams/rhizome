@@ -54,11 +54,12 @@
                                 api/store-current-view
                                 item))
 
-(defn new-issue! [*state issue]
+(defn new-issue! [*state issue split-short-title?]
   (fetch-and-reset-with-method! *state
                                 (dissoc @*state :modal)
                                 api/insert-issue
-                                issue))
+                                issue
+                                split-short-title?))
 
 (defn new-context! [*state context]
   (fetch-and-reset! *state (-> @*state

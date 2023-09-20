@@ -210,8 +210,12 @@
                               :columns     [:context_id :issue_id]
                               :values      values})))
 
-(defn new-issue [db {title :title} context-id selected-secondary-contexts-set]
-  (let [parts       (str/split title #"\|")
+(defn new-issue [db 
+                 {title :title} 
+                 context-id 
+                 selected-secondary-contexts-set
+                 split-short-title?]
+  (let [parts       (if split-short-title? (str/split title #"\|") (list title))
         title       (if (= 1 (count parts))
                       (first parts)
                       (second parts))
