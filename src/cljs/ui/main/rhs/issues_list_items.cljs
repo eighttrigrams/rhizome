@@ -47,7 +47,7 @@
     [context-badges/component contexts]]])
 
 (defn regular-issues-list-item-component [*state issue idx select-fn]
-  (let [simple-card? false]
+  (let [simple-card? (:notes-mode (:current (:views (:data (:selected-context @*state)))))]
     [:li.issue-card
      {:class          (str (if simple-card? 
                              "simple-card"

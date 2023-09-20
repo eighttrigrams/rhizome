@@ -70,4 +70,12 @@
                (and selected-context
                     (not selected-issue)
                     (= "KeyS" code))
-               (actions/cycle-search-mode! *state)))))))
+               (actions/cycle-search-mode! *state)
+               (and selected-context
+                    (not selected-issue)
+                    (= "KeyB" code)
+                    (or (nil? (-> selected-context :data :views :current :events-view))
+                        (= 0 (-> selected-context :data :views :current :events-view)))
+                    (or (nil? (-> selected-context :data :views :current :search-mode))
+                        (= 0 (-> selected-context :data :views :current :search-mode))))
+               (actions/cycle-notes-mode! *state)))))))

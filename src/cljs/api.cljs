@@ -29,6 +29,8 @@
 
 (defn-over-http cycle-events-view :return-value {})
 
+(defn-over-http cycle-notes-mode :return-value {})
+
 (defn-over-http store-current-view :return-value {})
 
 (defn-over-http load-stored-context :return-value {})

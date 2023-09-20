@@ -11,6 +11,7 @@
                                 select-issue
                                 cycle-search-mode
                                 cycle-events-view
+                                cycle-notes-mode
                                 store-current-view
                                 load-stored-context
                                 remove-stored-context
@@ -29,6 +30,7 @@
   select-issue
   cycle-search-mode
   cycle-events-view
+  cycle-notes-mode
   store-current-view
   load-stored-context
   remove-stored-context

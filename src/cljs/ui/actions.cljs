@@ -182,6 +182,9 @@
 (defn cycle-search-mode! [*state]
   (fetch-and-reset-with-method! *state @*state api/cycle-search-mode))
 
+(defn cycle-notes-mode! [*state]
+  (fetch-and-reset-with-method! *state @*state api/cycle-notes-mode))
+
 (defn delete-selected-issue! [*state]
   (when (js/window.confirm "Delete currently selected issue?")
     (fetch-and-reset-with-method! *state @*state api/delete-selected-issue)))

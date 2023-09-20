@@ -158,6 +158,16 @@
                                        :where  [:= :id [:inline id]]}))
     (get-context db context)))
 
+(defn cycle-notes-mode [db {:keys [id] :as context}]
+  (let [data (-> (get-context db context)
+                 :data
+                 (update-in [:views :current :notes-mode]
+                            #(if (nil? %) true (not %))))]
+    (jdbc/execute-one! db (sql/format {:update [:contexts]
+                                       :set    {:data [:inline (json/generate-string data)]}
+                                       :where  [:= :id [:inline id]]})))
+  (get-context db context))
+
 (defn reprioritize-context [db {:keys [id]}]
   (jdbc/execute! db (sql/format {:update [:contexts]
                                  :set {:updated_at [:raw "NOW()"]}

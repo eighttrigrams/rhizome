@@ -19,7 +19,8 @@
    (fn [code ctrl-pressed? meta-pressed? alt-pressed? shift-pressed? e]
      (let [{:keys [active-search
                    selected-issue
-                   selected-context]} @*state]
+                   selected-context]} @*state
+           in-notes-mode? (-> *state deref :selected-context :data :views :current :notes-mode)]
        (.stopPropagation e)
        (when (= code "Enter")
          (.preventDefault e)
@@ -49,11 +50,14 @@
                 (not selected-issue)
                 (or shift-pressed?
                     alt-pressed?
-                    (= 0 (count (:issues @*state))))
+                    (= 0 (count (:issues @*state)))
+                    in-notes-mode?)
                 (issue-creation-permitted? @*state))
            (do
              (swap! *state assoc :enter-pressed? true)
-             (actions/new-issue! *state {:title (.-value (get-title-el))} alt-pressed?)
+             (actions/new-issue! *state {:title (.-value (get-title-el))}
+                                 (when-not in-notes-mode?
+                                   alt-pressed?))
              (set! (.-value (get-title-el)) ""))
            #_(swap! *state dissoc nil)
            (= :contexts active-search)

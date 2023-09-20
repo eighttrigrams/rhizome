@@ -107,6 +107,13 @@
                                                                 :current
                                                                 :events-view]
                                                                0)
+                                                              (assoc-in
+                                                               [:selected-context
+                                                                :data
+                                                                :views
+                                                                :current
+                                                                :notes-mode]
+                                                               false)
                                                               ))})]
       {:issues                          (search/search-issues
                                          db
@@ -155,6 +162,11 @@
     (let [selected-context (datastore/cycle-search-mode db selected-context)]
       {:selected-context selected-context
        :issues           (search/search-issues db (assoc opts :selected-context selected-context))})))
+
+(defn cycle-notes-mode [{:keys [db]}]
+  (fn [{:keys [selected-context] :as _opts}]
+    (let [selected-context (datastore/cycle-notes-mode db selected-context)]
+      {:selected-context selected-context})))
 
 (defn delete-selected-issue [{:keys [db]}]
   (fn [{:keys [selected-issue] :as opts}]
