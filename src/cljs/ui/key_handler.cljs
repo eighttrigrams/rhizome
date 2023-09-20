@@ -6,7 +6,8 @@
   (handle-keys* 
    (fn [code ctrl-pressed? meta-pressed? alt-pressed? shift-pressed? _e]
      (let [{:keys [selected-issue
-                   selected-context]} @*state]
+                   selected-context]} @*state
+           in-notes-mode? (-> *state deref :selected-context :data :views :current :notes-mode)]
        (cond (= "Escape" code)
              (cond (and (:active-search @*state)
                         (not alt-pressed?))
@@ -48,7 +49,7 @@
                (actions/link-with-global-search! *state)
                (and (not alt-pressed?) selected-issue (= "KeyA" code))
                (actions/link-with-local-search! *state)
-               (and selected-context (not selected-issue) (= "KeyA" code))
+               (and selected-context (not selected-issue) (not in-notes-mode?) (= "KeyA" code))
                (actions/link-issue-to-selected-context! *state)
                (and (= "KeyC" code)
                     (not meta-pressed?)
