@@ -20,7 +20,7 @@
                    (actions/deselect-context! *state))
              (not (:active-search @*state))
              (cond 
-               (and (= "KeyG" code) ctrl-pressed?)
+               (and (= "KeyG" code) ctrl-pressed? shift-pressed?)
                (actions/flip-privacy! *state)
                (= "KeyV" code)
                (actions/cycle-events-view! *state)
