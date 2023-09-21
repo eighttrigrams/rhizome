@@ -18,12 +18,12 @@
 (defn- api [mode]
   (fn [req]
     (prn "..." @privacy/*public?)
-    (if (and (= :private mode) 
+    (if (and (= :private mode)
              (not @privacy/*public?))
       {:status 403}
       ((context "" []
-         (-> 
-          #(response/response (dispatch/handler (assoc-in % 
+         (->
+          #(response/response (dispatch/handler (assoc-in %
                                                           [:body :server-args :db]
                                                           (:db config/config))))
           json/wrap-json-response
