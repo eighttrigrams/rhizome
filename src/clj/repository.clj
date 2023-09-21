@@ -418,6 +418,7 @@
                                                                            selected-context]
         :as                                                               opts}]
 
+    (prn "privacy-mode" privacy-mode)
     (log-opts opts)
     (try
       #_{:clj-kondo/ignore [:unresolved-var]}
