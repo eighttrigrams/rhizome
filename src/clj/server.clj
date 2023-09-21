@@ -17,7 +17,7 @@
 
 (defn- api [mode]
   (fn [req]
-    (prn "..." mode @privacy/*public?)
+    (prn "..." mode @privacy/*public? (:remote-addr req))
     (if (and (= :private mode)
              (not @privacy/*public?))
       {:status 403}
