@@ -34,10 +34,10 @@
                  (with-out-str (pp/pprint opts)))))
 
 ;; TODO move to other place
-(defn flip-privacy [{}]
+(defn flip-privacy [{:keys [privacy-mode]}]
   (fn [_opts]
     (swap! privacy/*public? not)
-    {:public? @privacy/*public?}))
+    {:public? (and @privacy/*public? (not (= :private privacy-mode)))}))
 
 (defn fetch-context [{:keys [db]}]
   (fn [_opts [arg suppress-reset-issue?]]
@@ -411,7 +411,7 @@
      :link-issue       nil
      :q                ""}))
 
-(defn list-resources [{:keys [db]}]
+(defn list-resources [{:keys [db privacy-mode]}]
   (fn [{:keys                                                             [cmd
                                                                            arg
                                                                            active-search
@@ -433,7 +433,7 @@
                  :else
                  {:issues   (search/search-issues db opts)
                   :contexts (search/search-contexts db "")
-                  :public?  @privacy/*public?})
+                  :public?  (and @privacy/*public? (not (= :private privacy-mode)))})
            :start-global-search ((start-global-search {:db db}) opts)
            :link-with-global-search (start-linking-selected-issue-to-issue-with-global-search db search-issues)
            :link-with-local-search (start-linking-selected-issue-to-issue-with-local-search db search-issues)

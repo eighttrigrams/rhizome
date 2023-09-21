@@ -23,9 +23,13 @@
       {:status 403}
       ((context "" []
          (->
-          #(response/response (dispatch/handler (assoc-in %
-                                                          [:body :server-args :db]
-                                                          (:db config/config))))
+          #(response/response (dispatch/handler (-> % 
+                                                    (assoc-in
+                                                     [:body :server-args :db]
+                                                     (:db config/config))
+                                                    (assoc-in
+                                                     [:body :server-args :privacy-mode]
+                                                     (:db config/config)))))
           json/wrap-json-response
           (json/wrap-json-body {:keywords? true})))
        req))))

@@ -6,6 +6,7 @@
 (defn component [*state]
   (actions/fetch! *state)
   (fn [*state]
+    (prn "---" (:public? @*state))
     (if (:public? @*state)
       [:div {:style {:height "100px"
                      :width "100px"
