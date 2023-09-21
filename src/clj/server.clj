@@ -29,7 +29,7 @@
                                                      (:db config/config))
                                                     (assoc-in
                                                      [:body :server-args :privacy-mode]
-                                                     mode)))
+                                                     mode))))
           json/wrap-json-response
           (json/wrap-json-body {:keywords? true})))
        req))))
