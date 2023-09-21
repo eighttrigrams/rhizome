@@ -19,7 +19,9 @@
                    (and (not alt-pressed?) selected-context)
                    (actions/deselect-context! *state))
              (not (:active-search @*state))
-             (cond
+             (cond 
+               (and (= "KeyG" code) ctrl-pressed?)
+               (actions/flip-privacy! *state)
                (= "KeyV" code)
                (actions/cycle-events-view! *state)
                (and selected-issue (= "KeyE" code))

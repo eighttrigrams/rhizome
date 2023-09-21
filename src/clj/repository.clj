@@ -3,6 +3,7 @@
             [mount.core :as mount]
             [datastore.config :as config]
             datastore
+            privacy
             [datastore.search :as search]
             [cambium.core :as log]
             [clojure.pprint :as pp]))
@@ -31,6 +32,12 @@
                  (or cmd (str active-search "(" q ")"))
                  " - "
                  (with-out-str (pp/pprint opts)))))
+
+;; TODO move to other place
+(defn flip-privacy [{}]
+  (fn [_opts]
+    (swap! privacy/*public? not)
+    {:public? @privacy/*public?}))
 
 (defn fetch-context [{:keys [db]}]
   (fn [_opts [arg suppress-reset-issue?]]
@@ -412,7 +419,6 @@
         :as                                                               opts}]
 
     (log-opts opts)
-
     (try
       #_{:clj-kondo/ignore [:unresolved-var]}
       (merge
@@ -426,7 +432,8 @@
                  (= :contexts active-search) (search-contexts db opts)
                  :else
                  {:issues   (search/search-issues db opts)
-                  :contexts (search/search-contexts db "")})
+                  :contexts (search/search-contexts db "")
+                  :public?  @privacy/*public?})
            :start-global-search ((start-global-search {:db db}) opts)
            :link-with-global-search (start-linking-selected-issue-to-issue-with-global-search db search-issues)
            :link-with-local-search (start-linking-selected-issue-to-issue-with-local-search db search-issues)

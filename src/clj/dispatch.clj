@@ -17,7 +17,8 @@
                                 remove-stored-context
                                 delete-selected-issue
                                 delete-issue
-                                fetch-context]]))
+                                fetch-context
+                                flip-privacy]]))
 
 (defdispatch-with-args handler 
   list-resources 
@@ -36,4 +37,5 @@
   remove-stored-context
   delete-selected-issue
   delete-issue
-  fetch-context)
+  fetch-context
+  flip-privacy)

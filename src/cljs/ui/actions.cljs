@@ -185,6 +185,9 @@
 (defn cycle-notes-mode! [*state]
   (fetch-and-reset-with-method! *state @*state api/cycle-notes-mode))
 
+(defn flip-privacy! [*state]
+  (fetch-and-reset-with-method! *state @*state api/flip-privacy))
+
 (defn delete-selected-issue! [*state]
   (when (js/window.confirm "Delete currently selected issue?")
     (fetch-and-reset-with-method! *state @*state api/delete-selected-issue)))

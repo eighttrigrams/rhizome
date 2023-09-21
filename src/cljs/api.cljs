@@ -42,3 +42,5 @@
 (defn-over-http delete-issue :return-value {})
 
 (defn-over-http fetch-context :return-value {})
+
+(defn-over-http flip-privacy :return-value {})

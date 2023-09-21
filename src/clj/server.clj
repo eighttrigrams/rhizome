@@ -1,5 +1,6 @@
 (ns server
   (:require [ring.adapter.jetty :as j]
+            privacy
             [compojure.core :refer [defroutes context GET POST]]
             [ring.util.response :as response]
             [ring.middleware.json :as json]
@@ -14,27 +15,41 @@
   (tap> [:resources (r/list-resources)])
   {:body {:echo msg}})
 
-(defroutes api
-  (-> 
-   #(response/response (dispatch/handler (assoc-in % 
-                                                   [:body :server-args :db]
-                                                   (:db config/config))))
-   json/wrap-json-response
-   (json/wrap-json-body {:keywords? true})))
+(defn- api [mode]
+  (fn [req]
+    (prn "..." @privacy/*public?)
+    (if (and (= :private mode) 
+             (not @privacy/*public?))
+      {:status 403}
+      ((context "" []
+         (-> 
+          #(response/response (dispatch/handler (assoc-in % 
+                                                          [:body :server-args :db]
+                                                          (:db config/config))))
+          json/wrap-json-response
+          (json/wrap-json-body {:keywords? true})))
+       req))))
 
-(defroutes routes
-  (context "/api" []
-    (POST "/" [] api))
-  (GET "/" [] (response/resource-response "public/index.html"))) ;; TODO use route/resources (see cljsc-webstacks)
+(defn- routes [mode]
+  (fn [req]
+    (
+     (context "/" []
+       (context "/api" []
+         (POST "/" [] (api mode)))
+       (GET "/" [] (response/resource-response "public/index.html")))
+     req))) ;; TODO use route/resources (see cljsc-webstacks)
 
-(def app
-  (-> routes
-      wrap-env-defaults
-      (wrap-resource "public")))
+(defn app [mode]
+  (fn [req]
+    ((-> (routes mode)
+          wrap-env-defaults
+          (wrap-resource "public"))
+     req)))
 
 (mount/defstate ^{:on-reload :noop} http-server
   :start
-  (future (j/run-jetty app {:port (:port config/config)}))
+  (do (future (j/run-jetty (app :public) {:port (:port config/config)})) 
+      (future (j/run-jetty (app :private) {:port (+ (:port config/config) 2)})))
   :stop 0)
 
 (defn -main
