@@ -19,8 +19,8 @@
 (defn- api [mode]
   (fn [req]
     (if (or (and (= :public mode)
-                 true
-                 #_(or (not @privacy/*public?)
+                 #_true
+                 (or (not @privacy/*public?)
                      (and (not (:dev? config/config))
                           (or (not (= (:public-addr config/config) (:remote-addr req)))
                               (not (= (:public-user-agent config/config) (get-in req [:headers "user-agent"])))))))
@@ -68,14 +68,22 @@
                (or (nil? (:private-addr config/config))
                    (not (string? (:private-addr config/config)))))
       (throw (Exception. "config invalid")))
-    (future (j/run-jetty (app :private) (if (:dev? config/config)
-                                          {:port (:port config/config)}
-                                          {:ssl?     true
-                                           :http?    false
-                                           :keystore "keystore.jks"
-                                           :key-password (:key-password config/config)
-                                           :ssl-port (:port config/config)}))) 
-    #_(future (j/run-jetty (app :public) {:port (+ (:port config/config) 2)})))
+    (do [port (:port config/config)]
+        (future (j/run-jetty (app :private) (if (:dev? config/config)
+                                              {:port port}
+                                              {:ssl?     true
+                                               :http?    false
+                                               :keystore "keystore.jks"
+                                               :key-password (:key-password config/config)
+                                               :ssl-port port})))) 
+    (do [port (+ (:port config/config) 2)]
+        (future (j/run-jetty (app :public) (if (:dev? config/config)
+                                             {:port port}
+                                             {:ssl?     true
+                                              :http?    false
+                                              :keystore "keystore.jks"
+                                              :key-password (:key-password config/config)
+                                              :ssl-port port})))))
   :stop 0)
 
 (defn -main
