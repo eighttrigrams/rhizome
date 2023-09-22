@@ -68,7 +68,7 @@
                (or (nil? (:private-addr config/config))
                    (not (string? (:private-addr config/config)))))
       (throw (Exception. "config invalid")))
-    (do [port (:port config/config)]
+    (let [port (:port config/config)]
         (future (j/run-jetty (app :private) (if (:dev? config/config)
                                               {:port port}
                                               {:ssl?     true
@@ -76,7 +76,7 @@
                                                :keystore "keystore.jks"
                                                :key-password (:key-password config/config)
                                                :ssl-port port})))) 
-    (do [port (+ (:port config/config) 2)]
+    (let [port (+ (:port config/config) 2)]
         (future (j/run-jetty (app :public) (if (:dev? config/config)
                                              {:port port}
                                              {:ssl?     true
