@@ -63,8 +63,9 @@
   :start
   (do
     (prn "config valid?" config/config)
-    (when (or (nil? (:private-addr config/config))
-              (not (string? (:private-addr config/config))))
+    (when (and (not (:dev? config/config)) 
+               (or (nil? (:private-addr config/config))
+                   (not (string? (:private-addr config/config)))))
       (throw (Exception. "config invalid")))
     (future (j/run-jetty (app :private) {:port (:port config/config)})) 
     (future (j/run-jetty (app :public) {:port (+ (:port config/config) 2)})))
