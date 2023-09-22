@@ -22,7 +22,8 @@
                  (not @privacy/*public?))
             (and (not (:dev? config/config))
                  (= :private mode)
-                 (not (= (:private-addr config/config) (:remote-addr req)))))
+                 (or (not (= (:private-addr config/config) (:remote-addr req)))
+                     (not (= (:private-user-agent config/config) (get-in req [:headers "user-agent"]))))))
       (do
         (log/warn (pr-str req))
         {:status 403})
