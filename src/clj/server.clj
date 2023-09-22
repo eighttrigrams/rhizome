@@ -20,7 +20,7 @@
   (fn [req]
     (if (or (and (= :public mode)
                  (not @privacy/*public?))
-            (and (true? (:prod? config/config))
+            (and (false? (:dev? config/config))
                  (= :private mode)
                  (not (= (:private-addr config/config) (:remote-addr req)))))
       (do
@@ -57,8 +57,13 @@
 
 (mount/defstate ^{:on-reload :noop} http-server
   :start
-  (do (future (j/run-jetty (app :private) {:port (:port config/config)})) 
-      (future (j/run-jetty (app :public) {:port (+ (:port config/config) 2)})))
+  (do
+    (prn "config valid?" config/config)
+    (when (or (nil? (:private-addr config/config))
+              (not (string? (:private-addr config/config))))
+      (throw (Exception. "config invalid")))
+    (future (j/run-jetty (app :private) {:port (:port config/config)})) 
+    (future (j/run-jetty (app :public) {:port (+ (:port config/config) 2)})))
   :stop 0)
 
 (defn -main
