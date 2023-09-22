@@ -73,6 +73,7 @@
                                           {:ssl?     true
                                            :http?    false
                                            :keystore "keystore.jks"
+                                           :key-password (:key-password config/config)
                                            :ssl-port (:port config/config)}))) 
     #_(future (j/run-jetty (app :public) {:port (+ (:port config/config) 2)})))
   :stop 0)
