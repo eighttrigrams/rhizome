@@ -5,5 +5,7 @@
   :user     ""
   :password ""
   :port     5432
-  :hostname "127.0.0.1"}}
+  :hostname "127.0.0.1"
+  :private-addr "b"
+  :prod? false}}
  

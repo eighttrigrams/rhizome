@@ -37,7 +37,7 @@
 (defn flip-privacy [{:keys [privacy-mode]}]
   (fn [_opts]
     (swap! privacy/*public? not)
-    {:public? (and @privacy/*public? (= :public privacy-mode))}))
+    {:public? (and @privacy/*public? (= :private privacy-mode))}))
 
 (defn fetch-context [{:keys [db]}]
   (fn [_opts [arg suppress-reset-issue?]]
@@ -434,7 +434,7 @@
                  :else
                  {:issues   (search/search-issues db opts)
                   :contexts (search/search-contexts db "")
-                  :public?  (and @privacy/*public? (= :public privacy-mode))})
+                  :public?  (and @privacy/*public? (= :private privacy-mode))})
            :start-global-search ((start-global-search {:db db}) opts)
            :link-with-global-search (start-linking-selected-issue-to-issue-with-global-search db search-issues)
            :link-with-local-search (start-linking-selected-issue-to-issue-with-local-search db search-issues)

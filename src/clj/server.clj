@@ -9,6 +9,7 @@
             [datastore.config :as config]
             [repository :as r]
             dispatch
+            [cambium.core :as log]
             [ring.middleware.resource :refer [wrap-resource]]))
 
 (defn api-handler [{{msg :msg} :body}]
@@ -17,11 +18,14 @@
 
 (defn- api [mode]
   (fn [req]
-    (prn "..." mode @privacy/*public? req)
-    (if (or (and (= :private mode)
+    (if (or (and (= :public mode)
                  (not @privacy/*public?))
-            (not (= "[0:0:0:0:0:0:0:1]" (:remote-addr req))))
-      {:status 403}
+            (and (true? (:prod? config/config))
+                 (= :private mode)
+                 (not (= (:private-addr config/config) (:remote-addr req)))))
+      (do
+        (log/warn (pr-str req))
+        {:status 403})
       ((context "" []
          (->
           #(response/response (dispatch/handler (-> % 
@@ -53,8 +57,8 @@
 
 (mount/defstate ^{:on-reload :noop} http-server
   :start
-  (do (future (j/run-jetty (app :public) {:port (:port config/config)})) 
-      (future (j/run-jetty (app :private) {:port (+ (:port config/config) 2)})))
+  (do (future (j/run-jetty (app :private) {:port (:port config/config)})) 
+      (future (j/run-jetty (app :public) {:port (+ (:port config/config) 2)})))
   :stop 0)
 
 (defn -main
