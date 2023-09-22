@@ -25,9 +25,8 @@
                  (or (not (= (:private-addr config/config) (:remote-addr req)))
                      (not (= (:private-user-agent config/config) (get-in req [:headers "user-agent"]))))))
       (do
-        (log/warn 
-         
-         (str "a)" (get-in req [:headers])
+        (log/warn
+         (str "a)" (get-in req [:headers])
               "b)" (get-in req [:headers "user-agent"])
               "c)" (:private-user-agent config/config)
               "d)" (pr-str req)))
