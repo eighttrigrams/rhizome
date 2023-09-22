@@ -19,7 +19,10 @@
 (defn- api [mode]
   (fn [req]
     (if (or (and (= :public mode)
-                 (not @privacy/*public?))
+                 (or (not @privacy/*public?)
+                     (and (not (:dev? config/config))
+                          (or (not (= (:public-addr config/config) (:remote-addr req)))
+                              (not (= (:public-user-agent config/config) (get-in req [:headers "user-agent"])))))))
             (and (= :private mode)
                  (not (:dev? config/config))
                  (or (not (= (:private-addr config/config) (:remote-addr req)))
