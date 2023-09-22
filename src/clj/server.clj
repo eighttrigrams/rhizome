@@ -20,7 +20,7 @@
   (fn [req]
     (if (or (and (= :public mode)
                  (not @privacy/*public?))
-            (and (false? (:dev? config/config))
+            (and (not (:dev? config/config))
                  (= :private mode)
                  (not (= (:private-addr config/config) (:remote-addr req)))))
       (do
