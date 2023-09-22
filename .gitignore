@@ -13,3 +13,6 @@ server.jar
 config.edn
 tracker.log
 tracker-*.log*
+*.jks
+*.pkcs12
+*.pem

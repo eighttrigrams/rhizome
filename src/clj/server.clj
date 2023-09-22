@@ -68,7 +68,12 @@
                (or (nil? (:private-addr config/config))
                    (not (string? (:private-addr config/config)))))
       (throw (Exception. "config invalid")))
-    (future (j/run-jetty (app :private) {:port (:port config/config)})) 
+    (future (j/run-jetty (app :private) (if (:dev? config/config)
+                                          {:port (:port config/config)}
+                                          {:ssl?     true
+                                           :http?    false
+                                           :keystore "keystore.jks"
+                                           :ssl-port (:port config/config)}))) 
     #_(future (j/run-jetty (app :public) {:port (+ (:port config/config) 2)})))
   :stop 0)
 
