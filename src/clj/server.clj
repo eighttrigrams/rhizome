@@ -28,9 +28,7 @@
                  (or (not (= (:private-addr config/config) (:remote-addr req)))
                      (not (= (:private-user-agent config/config) (get-in req [:headers "user-agent"]))))))
       (do
-        (if (not (= (:private-user-agent config/config) (get-in req [:headers "user-agent"])))
-          (log/warn (str (:private-user-agent config/config) "-" (get-in req [:headers "user-agent"])))
-          (log/warn (pr-str req)))
+        (log/warn (pr-str req))
         {:status 403})
       ((context "" []
          (->
