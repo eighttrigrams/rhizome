@@ -20,12 +20,17 @@
   (fn [req]
     (if (or (and (= :public mode)
                  (not @privacy/*public?))
-            (and (not (:dev? config/config))
-                 (= :private mode)
+            (and (= :private mode)
+                 (not (:dev? config/config))
                  (or (not (= (:private-addr config/config) (:remote-addr req)))
                      (not (= (:private-user-agent config/config) (get-in req [:headers "user-agent"]))))))
       (do
-        (log/warn (pr-str req))
+        (log/warn 
+         
+         (str "a)" (get-in req [:headers])
+              "b)" (get-in req [:headers "user-agent"])
+              "c)" (:private-user-agent config/config)
+              "d)" (pr-str req)))
         {:status 403})
       ((context "" []
          (->
