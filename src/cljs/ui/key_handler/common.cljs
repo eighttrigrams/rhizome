@@ -34,4 +34,5 @@
           meta-pressed?  (.-metaKey e)
           alt-pressed?   (.-altKey e)
           shift-pressed? (.-shiftKey e)]
+      (prn "code:" code "meta-pressed:" meta-pressed? "alt-pressed?" alt-pressed?)
       (f code ctrl-pressed? meta-pressed? alt-pressed? shift-pressed? e))))
