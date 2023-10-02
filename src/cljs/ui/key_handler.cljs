@@ -9,7 +9,10 @@
                    selected-context]} @*state
            in-notes-mode? (-> *state deref :selected-context :data :views :current :notes-mode)]
        (cond (= "Escape" code)
-             (cond (and (:active-search @*state)
+             (cond (and (not selected-context)
+                        (not= 0 (:events-view @*state)))
+                   (actions/deselect-events! *state)
+                   (and (:active-search @*state)
                         (not alt-pressed?))
                    (actions/quit-search! *state)
                    (and (not alt-pressed?) selected-issue)
@@ -22,8 +25,10 @@
              (cond 
                (and (= "KeyG" code) ctrl-pressed? shift-pressed?)
                (actions/flip-privacy! *state)
+               (and (= "KeyV" code) alt-pressed?)
+               (actions/show-past-events! *state)
                (= "KeyV" code)
-               (actions/cycle-events-view! *state)
+               (actions/show-events! *state)
                (and selected-issue (= "KeyE" code))
                (swap! *state #(assoc % :modal :edit-issue))
                (and selected-context

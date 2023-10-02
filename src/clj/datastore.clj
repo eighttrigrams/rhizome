@@ -37,7 +37,11 @@
 
 (def cycle-search-mode contexts/cycle-search-mode)
 
-(def cycle-events-view contexts/cycle-events-view)
+(def show-events contexts/show-events)
+
+(def show-past-events contexts/show-past-events)
+
+(def deselect-events contexts/deselect-events)
 
 (def cycle-notes-mode contexts/cycle-notes-mode)
 

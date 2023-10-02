@@ -137,12 +137,28 @@
                                        :where  [:= :id [:inline id]]})))
   (get-context db selected-context))
 
-;; TODO dedup this and next fn
-(defn cycle-events-view [db {:keys [id] :as context}]
+(defn show-events [db {:keys [id] :as context}]
   (let [data (-> (get-context db context)
                  :data
-                 (update-in [:views :current :events-view]
-                            #(mod (inc (or % 0)) 3)))]
+                 (assoc-in [:views :current :events-view] 1))]
+    (jdbc/execute-one! db (sql/format {:update [:contexts]
+                                       :set    {:data [:inline (json/generate-string data)]}
+                                       :where  [:= :id [:inline id]]}))
+    (get-context db context)))
+
+(defn show-past-events [db {:keys [id] :as context}]
+  (let [data (-> (get-context db context)
+                 :data
+                 (assoc-in [:views :current :events-view] 2))]
+    (jdbc/execute-one! db (sql/format {:update [:contexts]
+                                       :set    {:data [:inline (json/generate-string data)]}
+                                       :where  [:= :id [:inline id]]}))
+    (get-context db context)))
+
+(defn deselect-events [db {:keys [id] :as context}]
+  (let [data (-> (get-context db context)
+                 :data
+                 (assoc-in [:views :current :events-view] 0))]
     (jdbc/execute-one! db (sql/format {:update [:contexts]
                                        :set    {:data [:inline (json/generate-string data)]}
                                        :where  [:= :id [:inline id]]}))

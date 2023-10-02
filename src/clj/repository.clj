@@ -128,10 +128,10 @@
        :contexts                        (search/search-contexts db "")
        :selected-context context})))
 
-(defn cycle-events-view [{:keys [db]}]
+(defn- make-events-fn [db mode-number db-fn]
   (fn [{:keys [selected-context] :as opts}]
     (if selected-context
-      (let [selected-context (datastore/cycle-events-view db selected-context)]
+      (let [selected-context (db-fn db selected-context)]
         {:issues         (search/search-issues db (assoc opts :selected-context selected-context))
          :selected-context selected-context
          :contexts       []
@@ -139,7 +139,7 @@
          :q              nil})
       (let [opts (-> opts
                      (dissoc :q)
-                     (update :events-view #(mod (inc (or % 0)) 3)))]
+                     (assoc :events-view mode-number))]
         {:issues                          (search/search-issues db opts)
          :contexts                        (if (= 0 (:events-view opts))
                                             (search/search-contexts db opts)
@@ -147,6 +147,17 @@
          :events-view (:events-view opts)
          :selected-issue                  nil
          :q                               nil}))))
+
+(defn show-events [{:keys [db]}]
+  (make-events-fn db 1 datastore/show-events))
+
+(defn show-past-events [{:keys [db]}]
+  ;; currently only used in global mode, so the else branch won't execute
+  (make-events-fn db 2 datastore/show-past-events))
+
+(defn deselect-events [{:keys [db]}]
+  ;; currently only used in global mode, so the else branch won't execute
+  (make-events-fn db 0 datastore/deselect-events))
 
 (defn store-current-view [{:keys [db]}]
   (fn [{:keys [selected-context]} item]
@@ -416,9 +427,7 @@
                                                                            arg
                                                                            active-search
                                                                            selected-context]
-        :as                                                               opts}]
-
-    (prn "privacy-mode" privacy-mode)
+        :as                                                               opts}] 
     (log-opts opts)
     (try
       #_{:clj-kondo/ignore [:unresolved-var]}
@@ -432,9 +441,11 @@
                  {:issues (search/search-issues db (search-issues))}
                  (= :contexts active-search) (search-contexts db opts)
                  :else
-                 {:issues   (search/search-issues db opts)
-                  :contexts (search/search-contexts db "")
-                  :public?  (and @privacy/*public? (= :private privacy-mode))})
+                 (merge {:issues   (search/search-issues db opts)
+                         :public?  (and @privacy/*public? (= :private privacy-mode))}
+                        (when-not (and (not= 0 (:events-view opts)) 
+                                       (not selected-context))
+                          {:contexts (search/search-contexts db "")})))
            :start-global-search ((start-global-search {:db db}) opts)
            :link-with-global-search (start-linking-selected-issue-to-issue-with-global-search db search-issues)
            :link-with-local-search (start-linking-selected-issue-to-issue-with-local-search db search-issues)

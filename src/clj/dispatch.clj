@@ -10,7 +10,9 @@
                                 finish-linking-issue
                                 select-issue
                                 cycle-search-mode
-                                cycle-events-view
+                                show-events
+                                show-past-events
+                                deselect-events
                                 cycle-notes-mode
                                 store-current-view
                                 load-stored-context
@@ -30,7 +32,9 @@
   finish-linking-issue
   select-issue
   cycle-search-mode
-  cycle-events-view
+  show-events
+  show-past-events
+  deselect-events
   cycle-notes-mode
   store-current-view
   load-stored-context
