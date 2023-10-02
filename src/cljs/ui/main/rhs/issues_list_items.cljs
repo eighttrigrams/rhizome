@@ -2,7 +2,7 @@
   (:require ["react-markdown$default" :as ReactMarkdown]
             [ui.actions :as actions]
             [ui.main.rhs.context-badges :as context-badges]
-            [ui.main.rhs.meta-pressed :as meta-pressed]))
+            [ui.main.rhs.modifiers :as modifiers]))
 
 (defn info-component [state issue]
   [:span.info
@@ -55,7 +55,7 @@
                              "card") (when (= (:id (:selected-issue @*state))
                                      (:id issue)) " selected"))
       :id             (str "issue-card-" idx)
-      :on-click       #(let [skip-select? (and (deref meta-pressed/*meta-pressed?)
+      :on-click       #(let [skip-select? (and (deref modifiers/*alt-pressed?)
                                                (not= :issues (:active-search @*state)))]
                          (swap! *state (fn [state] (dissoc state :preview-issue))) 
                          (actions/select-issue! *state 

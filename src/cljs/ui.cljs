@@ -3,7 +3,7 @@
             [ui.key-handler :as key-handler]
             [ui.main :as main]
             [ui.modals :as modals]
-            [ui.main.rhs.meta-pressed :as meta-pressed]))
+            [ui.main.rhs.modifiers :as modifiers]))
 
 (def original-state {:issues                          []
                      :contexts                        []
@@ -36,18 +36,17 @@
       :render              ;
       (fn []
         [:div#ui
-         {:on-mouse-leave #(reset! meta-pressed/*meta-pressed? false)
-          :on-mouse-enter #(reset! meta-pressed/*meta-pressed? false)}
+         {:on-mouse-leave #(reset! modifiers/*alt-pressed? false)
+          :on-mouse-enter #(reset! modifiers/*alt-pressed? false)}
          [:div#main-layer
           {;; TODO document recipe
            ;; to make the div able to listen to key events, https://stackoverflow.com/a/3149416
            :tabIndex    0
            :on-key-up #(when true 
-                         #_(= 91 (.-keyCode %)) ;; TODO remove
-                        (reset! meta-pressed/*meta-pressed? false))
+                        (reset! modifiers/*alt-pressed? false))
            :on-key-down #(do
-                           (when (.-metaKey %)
-                             (reset! meta-pressed/*meta-pressed? true))
+                           (when (.-altKey %)
+                             (reset! modifiers/*alt-pressed? true))
                            ((key-handler/handle-keys *state) %))}
           [main/component *state]]
          [:div#modals-layer
