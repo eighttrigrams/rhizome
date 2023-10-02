@@ -8,7 +8,8 @@
 (defn save-input! [[*state evt]]
   (swap! *state assoc :q (.-value (or (.-target evt) evt)))
   (when-not (and (-> *state deref :selected-context :data :views :current :notes-mode)
-                 (not (-> *state deref :search-globally?)))
+                 (not (-> *state deref :search-globally?))
+                 (not (= :contexts (:active-search @*state))))
     (actions/search! *state)))
 
 (def save-input-debounced!
