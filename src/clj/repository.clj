@@ -297,43 +297,56 @@
   [{:keys [link-issue
            search-globally?]
     :as   opts}]
-  #(if (or (= :issue link-issue)
-           search-globally?)
-     (-> opts
-         (cond-> :selected-context
-           (update :selected-context (fn [a] (dissoc a :search_mode))))
-         (assoc-in [:selected-context 
-                    :data 
-                    :views
-                    :current
-                    :selected-secondary-contexts] [])
-         (assoc-in [:selected-context
-                    :data
-                    :views
-                    :current
-                    :secondary-contexts-inverted] false)
-         (assoc-in [:selected-context
-                    :data
-                    :views
-                    :current
-                    :secondary-contexts-unassigned-selected] false))
-     opts))
+  (if (or (= :issue link-issue)
+          search-globally?)
+    (-> opts
+        (cond-> :selected-context
+          (update :selected-context (fn [a] (dissoc a :search_mode))))
+        (assoc :events-view 0)
+        (assoc-in [:selected-context 
+                   :data 
+                   :views
+                   :current
+                   :selected-secondary-contexts] [])
+        (assoc-in [:selected-context
+                   :data
+                   :views
+                   :current
+                   :secondary-contexts-inverted] false)
+        (assoc-in [:selected-context
+                   :data
+                   :views
+                   :current
+                   :secondary-contexts-unassigned-selected] false)
+        (assoc-in [:selected-context
+                   :data
+                   :views
+                   :current
+                   :events-view] 0)
+        (assoc-in [:selected-context
+                   :data
+                   :views
+                   :current
+                   :search-mode] 0))
+    opts))
 
-(defn start-linking-selected-issue-to-issue-with-local-search [db search-issues]
-  {:issues           (search/search-issues db (assoc (search-issues) 
-                                                     :link-issue :issue
-                                                     :search-globally? false
-                                                     :q ""))
+(defn start-linking-selected-issue-to-issue-with-local-search [db opts]
+  {:issues           (search/search-issues db (make-search-issues
+                                               (assoc opts
+                                                      :link-issue :issue
+                                                      :search-globally? false
+                                                      :q "")))
    :active-search    :issues
    :search-globally? false
    :link-issue       :issue
    :q                ""})
 
-(defn start-linking-selected-issue-to-issue-with-global-search [db search-issues]
-  {:issues           (search/search-issues db (assoc (search-issues)
-                                                     :link-issue :issue
-                                                     :search-globally? true
-                                                     :q ""))
+(defn start-linking-selected-issue-to-issue-with-global-search [db opts]
+  {:issues           (search/search-issues db (make-search-issues
+                                               (assoc opts
+                                                      :link-issue :issue
+                                                      :search-globally? true
+                                                      :q "")))
    :active-search    :issues
    :search-globally? true
    :link-issue       :issue
@@ -352,11 +365,12 @@
    :q ""
    :active-search :contexts})
 
-(defn start-linking-issue-to-selected-context [db search-issues]
-  {:issues           (search/search-issues db (assoc (search-issues)
-                                                     :link-issue :context
-                                                     :search-globally? true
-                                                     :q ""))
+(defn start-linking-issue-to-selected-context [db opts]
+  {:issues           (search/search-issues db (make-search-issues 
+                                               (assoc opts
+                                                      :link-issue :context
+                                                      :search-globally? true
+                                                      :q "")))
    :active-search    :issues
    :search-globally? true
    :link-issue       :context
@@ -434,53 +448,52 @@
       (merge
        {:cmd                             nil
         :arg                             nil}
-       (let [search-issues (make-search-issues opts)]
-         (case cmd
-           nil
-           (cond (= :issues active-search)
-                 {:issues (search/search-issues db (search-issues))}
-                 (= :contexts active-search) (search-contexts db opts)
-                 :else
-                 (merge {:issues   (search/search-issues db opts)
-                         :public?  (and @privacy/*public? (= :private privacy-mode))}
-                        (when-not (and (not= 0 (:events-view opts)) 
-                                       (not selected-context))
-                          {:contexts (search/search-contexts db "")})))
-           :start-global-search ((start-global-search {:db db}) opts)
-           :link-with-global-search (start-linking-selected-issue-to-issue-with-global-search db search-issues)
-           :link-with-local-search (start-linking-selected-issue-to-issue-with-local-search db search-issues)
-           :link-issue-to-selected-context (start-linking-issue-to-selected-context db search-issues)
-           :start-linking-selected-issue-to-context (start-linking-selected-issue-to-context-with-local-search db opts)
-           :start-context-search (start-context-search db opts)
-           :split-issue (split-issue db opts arg)
-           :delete-context
-           (do (datastore/delete-context db arg)
-               {:issues           (search/search-issues db opts)
-                :contexts         (search/search-contexts db "")
-                :selected-context nil})
-           :link-context (link-selected-issue-to-context db opts arg)
-           :insert-context
-           {:selected-context                        (datastore/new-context db arg)
-            :selected-issue                          nil
-            :issues                                  []
-            :q                                       nil
-            :active-search                           :issues
-            :unassigned-secondary-contexts-selected? false}
-           :update-issue-description
-           {:selected-issue (datastore/update-issue-description db arg)
-            :issues         (search/search-issues db (dissoc opts :q))
-            :q              nil}
-           :update-context-description
-           {:selected-context (datastore/update-context-description db arg)}
-           :update-issue (update-issue db opts arg)
-           :update-context (update-context db opts arg)
-           :deselect-context
-           {:issues           (search/search-issues db (dissoc opts :selected-context :q))
-            :contexts         (search/search-contexts db "")
-            :selected-context nil
-            :q                nil}
+       (case cmd
+         nil
+         (cond (= :issues active-search)
+               {:issues (search/search-issues db (make-search-issues opts))}
+               (= :contexts active-search) (search-contexts db opts)
+               :else
+               (merge {:issues   (search/search-issues db opts)
+                       :public?  (and @privacy/*public? (= :private privacy-mode))}
+                      (when-not (and (not= 0 (:events-view opts)) 
+                                     (not selected-context))
+                        {:contexts (search/search-contexts db "")})))
+         :start-global-search ((start-global-search {:db db}) opts)
+         :link-with-global-search (start-linking-selected-issue-to-issue-with-global-search db opts)
+         :link-with-local-search (start-linking-selected-issue-to-issue-with-local-search db opts)
+         :link-issue-to-selected-context (start-linking-issue-to-selected-context db opts)
+         :start-linking-selected-issue-to-context (start-linking-selected-issue-to-context-with-local-search db opts)
+         :start-context-search (start-context-search db opts)
+         :split-issue (split-issue db opts arg)
+         :delete-context
+         (do (datastore/delete-context db arg)
+             {:issues           (search/search-issues db opts)
+              :contexts         (search/search-contexts db "")
+              :selected-context nil})
+         :link-context (link-selected-issue-to-context db opts arg)
+         :insert-context
+         {:selected-context                        (datastore/new-context db arg)
+          :selected-issue                          nil
+          :issues                                  []
+          :q                                       nil
+          :active-search                           :issues
+          :unassigned-secondary-contexts-selected? false}
+         :update-issue-description
+         {:selected-issue (datastore/update-issue-description db arg)
+          :issues         (search/search-issues db (dissoc opts :q))
+          :q              nil}
+         :update-context-description
+         {:selected-context (datastore/update-context-description db arg)}
+         :update-issue (update-issue db opts arg)
+         :update-context (update-context db opts arg)
+         :deselect-context
+         {:issues           (search/search-issues db (dissoc opts :selected-context :q))
+          :contexts         (search/search-contexts db "")
+          :selected-context nil
+          :q                nil}
 
          ;; TODO remove :else clause. fix where there are cases where this fires but there shoulnd't be
-           :else {})))
+         :else {}))
       (catch Exception e
         (log/error (str "Caught an exception in list-resources(mainfn): " (.getMessage e)))))))
