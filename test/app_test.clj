@@ -40,7 +40,8 @@
                        {:views 
                         {:current
                          {:selected-secondary-contexts selected-secondary-contexts-ids}}}}} 
-   {:title title})
+   {:title title}
+   nil)
   (-> {:active-search :issues
        :q             title}
       ((repository/list-resources {:db db}))
@@ -53,8 +54,8 @@
     (let [context (create-context "abc")]
       (is (= 
            "abc"
-           (:title (:selected-context (repository/fetch-context
-                                       db
+           (:title (:selected-context ((repository/fetch-context
+                                        {:db db})
                                        {}
                                        [context false])))))))
   (testing "update a context"
@@ -67,7 +68,7 @@
           context (first (:contexts (repository/search-contexts db "")))]
       (is (=
            {:a ["1" "2"]}
-           (:data (:selected-context (repository/fetch-context db {} [context false]))))))))
+           (:data (:selected-context ((repository/fetch-context {:db db}) {} [context false]))))))))
 
 (deftest search 
   (testing "aggregating contexts"
@@ -85,7 +86,7 @@
                    [context-3-id ["context-3" 1 true]]
                    [(:id context-1) ["context-1" 2 false]]
                    [context-2-id ["context-2" 1 false]]) 
-             (second (:issues (repository/fetch-context db
+             (second (:issues ((repository/fetch-context {:db db})
                                                         {}
                                                         [context-1 false]))))))))
 
@@ -96,7 +97,7 @@
           issue-1   (create-issue "issue-1" (:id context-1) [])
           issue-2   (create-issue "issue-2" (:id context-1) [])
           _issue-3   (create-issue "issue-3" (:id context-1) [])
-          opts      (repository/fetch-context db {} [context-1 true]) 
+          opts      ((repository/fetch-context {:db db}) {} [context-1 true]) 
           opts      (merge opts ((repository/select-issue {:db db}) opts issue-1 false))
           opts      (merge opts (repository/start-linking-selected-issue-to-issue-with-local-search 
                                  db
@@ -135,12 +136,12 @@
     (let [context-1 (create-context "context-1")
           context-2 (create-context "context-2")
           _issue-1   (create-issue "issue-1" (:id context-1) [])
-          opts      (repository/fetch-context db {} [context-2 true])
+          opts      ((repository/fetch-context {:db db}) {} [context-2 true])
           opts      (merge opts (repository/start-linking-issue-to-selected-context
                                  db
                                  (repository/make-search-issues opts)))
           _ (is (= 1 (count (first (:issues opts)))))
-          opts      (repository/fetch-context db {} [context-1 true])
+          opts      ((repository/fetch-context {:db db}) {} [context-1 true])
           opts      (merge opts (repository/start-linking-issue-to-selected-context
                                  db
                                  (repository/make-search-issues opts)))
@@ -150,7 +151,7 @@
     (let [context-1 (create-context "context-1")
           context-2 (create-context "context-2")
           issue-1  (create-issue "issue-1" (:id context-1) [])
-          opts      (repository/fetch-context db {} [context-2 true])
+          opts      ((repository/fetch-context {:db db}) {} [context-2 true])
           opts      (merge opts
                            ((repository/change-secondary-contexts-selection {:db db})
                             (assoc-in opts
