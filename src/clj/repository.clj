@@ -425,11 +425,11 @@
   (fn [state]
     {:issues           (search/search-issues
                         db
-                        ((make-search-issues
-                          (assoc state
-                                 :q ""
-                                 :active-search    :issues
-                                 :search-globally? true))))
+                        (make-search-issues
+                         (assoc state
+                                :q ""
+                                :active-search    :issues
+                                :search-globally? true)))
      :active-search    :issues
      :search-globally? true
      :link-context     false
