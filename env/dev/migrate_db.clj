@@ -28,8 +28,6 @@
               ["insert into collections (container_id,item_id) values (?,?)" 
                new-issue-id contained-issue-id])
              ))
-    ;; TODO !! there are issues that, when linked only to that context
-    ;; will get deleted; make sure that doesn't happen
     (datastore/delete-context db {:id id} {:dont-delete-issues true})))
 
 (defn- create-context! [db]
