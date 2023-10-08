@@ -1,6 +1,7 @@
 (ns migrate-db
   (:require [next.jdbc :as jdbc]
             [honey.sql :as sql]
+            [clojure.test :as t]
             [datastore.contexts :as contexts]
             datastore
             [datastore.issues :as issues]
@@ -24,15 +25,20 @@
   (let [{:keys [id]} (contexts/new-context db {:title "test-context-1"})
         _ (issues/new-issue db {:title "test-issue-1"} id #{} false)]))
 
+(defn- test-results [db]
+  ;; TODO test that everything is ok, based on seed-data
+  (t/is (= "test-context-1" (:title (ffirst (search/search-issues db {})))))
+  )
+
 (comment
   (let [db  (:db (read-string (slurp "./config.edn")))
         _ (seed-data db)
-       context (first (filter #(not= "migrated" (:title %)) (search/search-contexts db {})))
         {:keys [id]} (contexts/new-context db {:title "migrated"})]
-    (prn (migrate-single-context db context id))
+    (doall (for [context (filter #(not= "migrated" (:title %)) (search/search-contexts db {}))]
+             (migrate-single-context db context id)))
     
     #_(jdbc/execute! db (sql/format {:select :contexts.*
                                      :from [:contexts]
                                      
                                      :limit 1}))
-    ))
+    (test-results db)))
