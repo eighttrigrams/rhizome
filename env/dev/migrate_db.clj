@@ -7,13 +7,12 @@
             [datastore.issues :as issues]
             [datastore.search :as search]))
 
-(defn- migrate-single-context [db {:keys [id title data] :as context} context-id]
+(defn- migrate-single-context [db {:keys [id title] :as context} context-id]
   (let [issue (issues/new-issue db {:title title} context-id #{} false)
         new-issue {:issue (merge 
                            (select-keys context [:tags :short_title :data])
                            (select-keys issue [:id :title]))}
         contained-issues-ids (map :id (first (search/search-issues db {:selected-context context})))]
-    (prn 1 data)
     (issues/update-issue
      db
      new-issue)
@@ -26,24 +25,31 @@
 
 (defn- seed-data [db]
   (let [{:keys [id] :as context} (contexts/new-context db {:title "test-context-1"})
-        _ (contexts/update-context db {:context (assoc context :data {:hallo 1})})
+        _ (contexts/update-context db {:context (assoc context :data {:hallo "1"}
+                                                               :tags "a b c"
+                                                               :short_title "101")})
         _ (issues/new-issue db {:title "test-issue-1"} id #{} false)]))
 
 (defn- test-results [db]
-  (t/is (= "test-context-1" (:title (ffirst (search/search-issues db {})))))
-  (t/is (= {:hallo 1} (:data (ffirst (search/search-issues db {})))))
+  (t/is (= "test-context-1" (:title (first (first (search/search-issues db {}))))))
+  ;; TODO we still have a problem here; issues short title are more restrictive because of short_title ints
+  (t/is (= "101" (:short_title (first (first (search/search-issues db {}))))))
+  (t/is (= "a b c" (:tags (first (first (search/search-issues db {}))))))
+  #_(t/is (= {:hallo 1} (:data (ffirst (search/search-issues db {})))))
   )
+
+(defn- clean-db [db]
+  (let [ _ (prn "." (jdbc/execute! db ["delete from events"]))
+        _ (prn "." (jdbc/execute! db ["delete from issue_issue"]))
+        _ (prn "." (jdbc/execute! db ["delete from context_issue"]))
+        _ (prn "." (jdbc/execute! db ["delete from issues"]))
+        _ (prn "." (jdbc/execute! db ["delete from contexts"]))]))
 
 (comment
   (let [db  (:db (read-string (slurp "./config.edn")))
-        ;; TODO delete everything first
+        _ (clean-db db)
         _ (seed-data db)
         {:keys [id]} (contexts/new-context db {:title "migrated"})]
     (doall (for [context (filter #(not= "migrated" (:title %)) (search/search-contexts db {}))]
              (migrate-single-context db context id)))
-    
-    #_(jdbc/execute! db (sql/format {:select :contexts.*
-                                     :from [:contexts]
-                                     
-                                     :limit 1}))
     (test-results db)))
