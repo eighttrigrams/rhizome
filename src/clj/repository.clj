@@ -57,7 +57,7 @@
                (when (not suppress-reset-issue?)
                  {:selected-issue nil})))
       (catch Exception e
-        (log/error (str "Caught an exception in fetch-context " (.getMessage e)))
+        (log/error e (str "Caught an exception in fetch-context " (.getMessage e)))
         (throw e)))))
 
 (defn- change-secondary-contexts-operation [db]

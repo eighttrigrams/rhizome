@@ -35,14 +35,14 @@
 
 (defn- related-issues-query [id]
   {:select [:issues.*
-            [[:array_agg :contexts.id] :context_ids]
-            [[:array_agg :contexts.title] :context_titles]
+            [[:array_agg :issues_o.id] :context_ids]
+            [[:array_agg :issues_o.title] :context_titles]
             {:select :date
              :from   [:events]
              :where  [:= :events.issue_id :issues.id]}]
    :from   [:issues]
-   :join   [:context_issue [:= :issues.id :context_issue.issue_id]
-            :contexts [:= :context_issue.context_id :contexts.id]]
+   :join   [:collections [:= :issues.id :collections.item_id]
+            [:issues :issues_o] [:= :collections.container_id :issues_o.id]]
    :group-by [:issues.id]
    :where  [:= :issues.id [:inline id]]})
 
@@ -82,6 +82,7 @@
                                                   [[:inline related-issue-id] [:inline id]]]})))))
 
 (defn- issues-query [id]
+  (prn "normal-issues-query")
   {:select   [:issues.*
               {:select :date
                :from   [:events]
@@ -90,13 +91,13 @@
                :from   [:events]
                :where  [:= :events.issue_id :issues.id]}
               [[:array_agg :related_issues.id] :related_issues_ids]
-              [[:array_agg :contexts.id] :context_ids]
-              [[:array_agg :contexts.title] :context_titles]]
+              [[:array_agg :issues_o.id] :context_ids]
+              [[:array_agg :issues_o.title] :context_titles]]
    :from     [:issues]
    :join     [:issue_issue [:= :issues.id :issue_issue.left_id]
               [:issues :related_issues] [:= :related_issues.id :issue_issue.right_id]
-              :context_issue [:= :issues.id :context_issue.issue_id]
-              :contexts [:= :context_issue.context_id :contexts.id]]
+              :collections [:= :issues.id :collections.item_id]
+              [:issues :issues_o] [:= :collections.container_id :issues_o.id]]
    :where    [:= :issues.id [:inline id]]
    :group-by [:issues.id]
    :order-by [[:issues.updated_at :desc]]}) ;; TODO remove
@@ -109,11 +110,11 @@
               {:select [[:archived :event_archived?]]
                :from   [:events]
                :where  [:= :events.issue_id :issues.id]}
-              [[:array_agg :contexts.id] :context_ids]
-              [[:array_agg :contexts.title] :context_titles]]
+              [[:array_agg :issues_o.id] :context_ids]
+              [[:array_agg :issues_o.title] :context_titles]]
    :from     [:issues]
-   :join     [:context_issue [:= :issues.id :context_issue.issue_id]
-              :contexts [:= :context_issue.context_id :contexts.id]]
+   :join     [:collections [:= :issues.id :collections.item_id]
+              [:issues :issues_o] [:= :collections.container_id :issues_o.id]]
    :where    [:= :issues.id [:inline id]]
    :group-by [:issues.id] ;; TODO remove
    :order-by [[:issues.updated_at :desc]]}) ;; TODO remove
@@ -122,6 +123,7 @@
   (when-let [result (-> id
                         issues-query
                         sql/format
+                        ((fn   [wh] (prn "formatted" wh) wh))
                         (#(jdbc/execute-one! db % {:return-keys true})))]
     (join-related-issues db result)))
 
@@ -143,11 +145,15 @@
    }
    "
   [db {:keys [id]}]
-  (-> (if-let [issue (get-issue-with-related-issues db id)]
-        issue
+  (try
+    (-> (if-let [issue (get-issue-with-related-issues db id)]
+          issue
         ;; if there are no related issues, the former query returns an empty result set
-        (get-issue-without-related-issues db id))
-      common/post-process))
+          (get-issue-without-related-issues db id))
+        common/post-process)
+    (catch java.lang.Exception e
+     (prn "get-issue-----" e)
+     (throw e))))
 
 (defn update-issue [db {:keys [issue related-issues-ids]}]
   (let [{:keys [date id event_archived?]} issue]
@@ -169,8 +175,8 @@
 
 (defn delete-issue [db {:keys [id]}]
   (delete-date db id)
-  (jdbc/execute! db (sql/format {:delete-from [:context_issue]
-                                 :where [:= :issue_id [:inline id]]}))
+  (jdbc/execute! db (sql/format {:delete-from [:collections]
+                                 :where [:= :item_id [:inline id]]}))
   (jdbc/execute! db (sql/format {:delete-from [:issue_issue]
                                  :where [:or
                                          [:= :left_id [:inline id]]
@@ -184,11 +190,11 @@
                                  :where [:= :id [:inline id]]})))
 
 (defn link-issue-contexts [db selected-issue link-issue-contexts]
-  (jdbc/execute! db (sql/format {:delete-from [:context_issue]
-                                 :where [:= :issue_id [:inline (:id selected-issue)]]}))
+  (jdbc/execute! db (sql/format {:delete-from [:collections]
+                                 :where [:= :item_id [:inline (:id selected-issue)]]}))
   (doall (for [context-id link-issue-contexts]
-           (jdbc/execute! db (sql/format {:insert-into [:context_issue]
-                                          :columns [:issue_id :context_id]
+           (jdbc/execute! db (sql/format {:insert-into [:collections]
+                                          :columns [:item_id :container_id]
                                           :values [[[:inline (:id selected-issue)]
                                                     [:inline context-id]]]}))))
   (get-issue db selected-issue))
@@ -210,8 +216,8 @@
 
 (defn- insert-issue-relations! [db values]
   (jdbc/execute! db
-                 (sql/format {:insert-into [:context_issue]
-                              :columns     [:context_id :issue_id]
+                 (sql/format {:insert-into [:collections]
+                              :columns     [:container_id :item_id]
                               :values      values})))
 
 (defn new-issue [db 

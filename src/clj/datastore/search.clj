@@ -34,12 +34,12 @@
       qs)))
 
 (def all-contexts-query (sql/format {:select :*
-                                     :from [:contexts]
+                                     :from [:issues]
                                      :order-by [[:updated_at :desc]]}))
 
 (defn- query-string-contexts-query [q]
   (sql/format {:select :*
-               :from   [:contexts]
+               :from   [:issues]
                :where [:raw (format "searchable @@ to_tsquery('simple', '%s')"
                                     (convert-q-to-query-string q))]
                :order-by [[:updated_at :desc]]}))
@@ -74,10 +74,10 @@
                                             (convert-q-to-query-string q))] 
                               [:=])
         join-clause         (if selected-context
-                              [:context_issue [:= :issues.id :context_issue.issue_id]]
+                              [:collections [:= :issues.id :collections.item_id]]
                               [])
         join-where-clause   (if selected-context
-                              [:= :context_issue.context_id (:id selected-context)]
+                              [:= :collections.container_id (:id selected-context)]
                               [:=])
         exists-clause       (if (not= 0 events-view)
                               [:exists {:select [:events.id]
@@ -107,11 +107,11 @@
               {:select :date
                :from   [:events]
                :where  [:= :events.issue_id :issues.id]}
-              [[:array_agg :contexts.id] :context_ids]
-              [[:array_agg :contexts.title] :context_titles]]
+              [[:array_agg :issues_o.id] :context_ids]
+              [[:array_agg :issues_o.title] :context_titles]]
    :from     [:issues]
-   :join     [:context_issue [:= :issues.id :context_issue.issue_id]
-              :contexts [:= :context_issue.context_id :contexts.id]]
+   :join     [:collections [:= :issues.id :collections.item_id]
+              [:issues :issues_o] [:= :collections.container_id :issues_o.id]]
    :where    [:in :issues.id [:inline ids]]
    :group-by [:issues.id]
    :order-by [[:issues.updated_at :desc]]})
