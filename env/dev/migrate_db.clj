@@ -11,9 +11,11 @@
         new-issue {:issue (merge 
                            (select-keys context [:tags :short_title])
                            (select-keys issue [:id :title]))}]
+    ;; TODO get all issue-ids of issues contained in the original context
     (issues/update-issue
      db
      new-issue)
+    ;; TODO insert contained-in relations from issues to issues
     (datastore/delete-context db {:id id})))
 
 (comment
