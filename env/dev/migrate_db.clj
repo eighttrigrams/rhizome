@@ -7,21 +7,28 @@
             [datastore.issues :as issues]
             [datastore.search :as search]))
 
+;; create table collections (id serial primary key, container_id integer not null, foreign key (container_id) references issues (id), item_id integer not null, foreign key (item_id) references issues (id));
+
 (defn- migrate-single-context [db {:keys [id title] :as context} context-id]
-  (let [issue (issues/new-issue db {:title title} context-id #{} false)
+  (let [{new-issue-id :id :as issue} (issues/new-issue db {:title title} context-id #{} false)
         new-issue {:issue (merge 
-                           (select-keys context [:tags :short_title :data])
-                           (select-keys issue [:id :title]))}
+                 (select-keys context [:tags :short_title :data])
+                 (select-keys issue [:id :title]))}
         contained-issues-ids (map :id (first (search/search-issues db {:selected-context context})))]
     (issues/update-issue
      db
      new-issue)
+    (prn ".." new-issue-id contained-issues-ids)
     (doall (for [contained-issue-id contained-issues-ids]
              ;; TODO insert contained-in relation from issue to issue
-             (prn "." contained-issue-id)))
+             (jdbc/execute! 
+              db 
+              ["insert into collections (container_id,item_id) values (?,?)" 
+               new-issue-id contained-issue-id])
+             ))
     ;; TODO !! there are issues that, when linked only to that context
     ;; will get deleted; make sure that doesn't happen
-    (datastore/delete-context db {:id id})))
+    (datastore/delete-context db {:id id} {:dont-delete-issues true})))
 
 (defn- seed-data [db]
   (let [{:keys [id] :as context} (contexts/new-context db {:title "test-context-1"})
@@ -40,11 +47,12 @@
   ;; TODO we still have a problem here; issues short title are more restrictive because of short_title ints
     (t/is (= "101" (:short_title issue)))
     (t/is (= "a b c" (:tags issue)))
+    ;; TODO description
     #_ (t/is (= {:hallo 1} (:data (ffirst (search/search-issues db {}))))))
   )
 
 (defn- clean-db [db]
-  (jdbc/execute! db ["delete from events; delete from issue_issue; delete from context_issue; delete from issues; delete from contexts;"]))
+  (jdbc/execute! db ["delete from events; delete from collections; delete from issue_issue; delete from context_issue; delete from issues; delete from contexts;"]))
 
 (comment
   (let [db  (:db (read-string (slurp "./config.edn")))
