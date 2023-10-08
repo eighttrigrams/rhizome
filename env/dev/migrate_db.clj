@@ -38,7 +38,7 @@
   (let [{:keys [id]
          :as   context} (contexts/new-context db {:title "test-context-1"})]
     (contexts/update-context-description db {:id id :description "test-context-1-description"})
-    (contexts/update-context db {:context (assoc context :data {:hallo "1"}
+    (contexts/update-context db {:context (assoc context :data {:hallo 1}
                                                  :tags "a b c"
                                                  :short_title "101")})))
 
@@ -56,7 +56,7 @@
     (t/is (= "101" (:short_title issue)))
     (t/is (= "a b c" (:tags issue)))
     (t/is (= "test-context-1-description" (:description issue)))
-    #_ (t/is (= {:hallo 1} (:data (ffirst (search/search-issues db {}))))))
+    (t/is (= {:hallo 1} (:data (ffirst (search/search-issues db {}))))))
   )
 
 (defn- clean-db [db]

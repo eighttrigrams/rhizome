@@ -1,5 +1,6 @@
 (ns datastore.issues.common
-  (:require [datastore.helpers
+  (:require [cheshire.core :as json]
+            [datastore.helpers
              :refer [un-namespace-keys simplify-date]]))
 
 (defn- join-contexts [issue]
@@ -10,9 +11,17 @@
              (zipmap (.getArray (:context_ids issue))
                      (.getArray (:context_titles issue))))))
 
+;; TODO dedup with datastore.contexts.core/parse-data
+(defn- parse-data [context]
+  (if (:data context)
+    (update context :data #(json/parse-string (.toString %) true))
+    context))
+
+;; TODO try unify with datastore.contexts.core/post-process
 (defn post-process [query-result]
   (-> query-result
       un-namespace-keys
       join-contexts
       simplify-date
+      parse-data
       (dissoc :searchable)))

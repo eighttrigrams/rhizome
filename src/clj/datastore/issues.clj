@@ -1,5 +1,6 @@
 (ns datastore.issues
   (:require [clojure.string :as str]
+            [cheshire.core :as json]
             [next.jdbc :as jdbc]
             [honey.sql :as sql]
             [datastore.issues.common :as common]))
@@ -19,13 +20,16 @@
                                              [:raw "NOW()"]
                                              [:inline event_archived?]]]})))
 
-(defn- update-issue* [db {:keys [id title short_title tags]}]
+(defn- update-issue* [db {:keys [id title short_title tags data]}]
   (jdbc/execute-one! db
                      (sql/format {:update [:issues]
                                   :where  [:= :id [:inline id]]
                                   :set    {:title       [:inline title]
                                            :short_title [:inline short_title]
                                            :tags        [:inline tags]
+                                           :data        [:inline (json/generate-string
+                                                                  ;; TODO review
+                                                                  (or data {}))]
                                            :updated_at  [:raw "NOW()"]}})
                      {:return-keys true}))
 
