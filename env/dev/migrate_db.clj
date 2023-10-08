@@ -28,6 +28,7 @@
         _ (contexts/update-context db {:context (assoc context :data {:hallo "1"}
                                                                :tags "a b c"
                                                                :short_title "101")})
+        ;; TODO in iteration 2 of this script, allow to create issues without associating them to an existing context
         {:keys [id]} (issues/new-issue db {:title "test-issue-1"} id #{} false)]
     [id]))
 
