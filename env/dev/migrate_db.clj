@@ -7,12 +7,13 @@
             [datastore.issues :as issues]
             [datastore.search :as search]))
 
-(defn- migrate-single-context [db {:keys [id title] :as context} context-id]
+(defn- migrate-single-context [db {:keys [id title data] :as context} context-id]
   (let [issue (issues/new-issue db {:title title} context-id #{} false)
         new-issue {:issue (merge 
-                           (select-keys context [:tags :short_title])
+                           (select-keys context [:tags :short_title :data])
                            (select-keys issue [:id :title]))}
         contained-issues-ids (map :id (first (search/search-issues db {:selected-context context})))]
+    (prn 1 data)
     (issues/update-issue
      db
      new-issue)
@@ -24,16 +25,18 @@
     (datastore/delete-context db {:id id})))
 
 (defn- seed-data [db]
-  (let [{:keys [id]} (contexts/new-context db {:title "test-context-1"})
+  (let [{:keys [id] :as context} (contexts/new-context db {:title "test-context-1"})
+        _ (contexts/update-context db {:context (assoc context :data {:hallo 1})})
         _ (issues/new-issue db {:title "test-issue-1"} id #{} false)]))
 
 (defn- test-results [db]
-  ;; TODO test that everything is ok, based on seed-data
   (t/is (= "test-context-1" (:title (ffirst (search/search-issues db {})))))
+  (t/is (= {:hallo 1} (:data (ffirst (search/search-issues db {})))))
   )
 
 (comment
   (let [db  (:db (read-string (slurp "./config.edn")))
+        ;; TODO delete everything first
         _ (seed-data db)
         {:keys [id]} (contexts/new-context db {:title "migrated"})]
     (doall (for [context (filter #(not= "migrated" (:title %)) (search/search-contexts db {}))]
