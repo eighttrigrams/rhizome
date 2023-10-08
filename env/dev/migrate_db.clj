@@ -10,16 +10,23 @@
   (let [issue (issues/new-issue db {:title title} context-id #{} false)
         new-issue {:issue (merge 
                            (select-keys context [:tags :short_title])
-                           (select-keys issue [:id :title]))}]
-    ;; TODO get all issue-ids of issues contained in the original context
+                           (select-keys issue [:id :title]))}
+        contained-issues-ids (map :id (first (search/search-issues db {:selected-context context})))]
     (issues/update-issue
      db
      new-issue)
-    ;; TODO insert contained-in relations from issues to issues
+    (doall (for [contained-issue-id contained-issues-ids]
+             ;; TODO insert contained-in relation from issue to issue
+             (prn "." contained-issue-id)))
     (datastore/delete-context db {:id id})))
+
+(defn- seed-data [db]
+  (let [{:keys [id]} (contexts/new-context db {:title "test-context-1"})
+        _ (issues/new-issue db {:title "test-issue-1"} id #{} false)]))
 
 (comment
   (let [db  (:db (read-string (slurp "./config.edn")))
+        _ (seed-data db)
        context (first (filter #(not= "migrated" (:title %)) (search/search-contexts db {})))
         {:keys [id]} (contexts/new-context db {:title "migrated"})]
     (prn (migrate-single-context db context id))
