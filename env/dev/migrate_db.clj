@@ -28,14 +28,18 @@
         _ (contexts/update-context db {:context (assoc context :data {:hallo "1"}
                                                                :tags "a b c"
                                                                :short_title "101")})
-        _ (issues/new-issue db {:title "test-issue-1"} id #{} false)]))
+        {:keys [id]} (issues/new-issue db {:title "test-issue-1"} id #{} false)]
+    [id]))
 
-(defn- test-results [db]
-  (t/is (= "test-context-1" (:title (first (first (search/search-issues db {}))))))
+(defn- test-results [db ids]
+  (let [issues (remove #(contains? ids (:id %)) 
+                        (first (search/search-issues db {})))
+        issue (first issues)]
+    (t/is (= "test-context-1" (:title issue)))
   ;; TODO we still have a problem here; issues short title are more restrictive because of short_title ints
-  (t/is (= "101" (:short_title (first (first (search/search-issues db {}))))))
-  (t/is (= "a b c" (:tags (first (first (search/search-issues db {}))))))
-  #_(t/is (= {:hallo 1} (:data (ffirst (search/search-issues db {})))))
+    (t/is (= "101" (:short_title issue)))
+    (t/is (= "a b c" (:tags issue)))
+    #_ (t/is (= {:hallo 1} (:data (ffirst (search/search-issues db {}))))))
   )
 
 (defn- clean-db [db]
@@ -44,8 +48,8 @@
 (comment
   (let [db  (:db (read-string (slurp "./config.edn")))
         _ (clean-db db)
-        _ (seed-data db)
+        ids (seed-data db)
         {:keys [id]} (contexts/new-context db {:title "migrated"})]
     (doall (for [context (filter #(not= "migrated" (:title %)) (search/search-contexts db {}))]
              (migrate-single-context db context id)))
-    (test-results db)))
+    (test-results db ids)))
