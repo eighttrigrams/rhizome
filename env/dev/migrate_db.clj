@@ -19,6 +19,8 @@
     (doall (for [contained-issue-id contained-issues-ids]
              ;; TODO insert contained-in relation from issue to issue
              (prn "." contained-issue-id)))
+    ;; TODO !! there are issues that, when linked only to that context
+    ;; will get deleted; make sure that doesn't happen
     (datastore/delete-context db {:id id})))
 
 (defn- seed-data [db]
