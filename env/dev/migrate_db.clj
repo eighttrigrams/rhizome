@@ -26,8 +26,7 @@
              (jdbc/execute! 
               db 
               ["insert into collections (container_id,item_id) values (?,?)" 
-               new-issue-id contained-issue-id])
-             ))
+               new-issue-id contained-issue-id])))
     (datastore/delete-context db {:id id} {:dont-delete-issues true})))
 
 (defn- create-context! [db]
