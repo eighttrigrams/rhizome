@@ -13,12 +13,10 @@
        (sql/format {:insert-into [:contexts]
                     :columns     [:inserted_at
                                   :updated_at
-                                  :title
-                                  :search_mode]
+                                  :title]
                     :values      [[[:raw "NOW()"]
                                    [:raw "NOW()"]
-                                   [:inline title]
-                                   [:inline 0]]]})
+                                   [:inline title]]]})
        {:return-keys true})
       un-namespace-keys
       (dissoc :searchable)))

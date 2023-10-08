@@ -35,14 +35,14 @@
 
 (def all-contexts-query (sql/format {:select :*
                                      :from [:contexts]
-                                     :order-by [[:important :desc] [:updated_at :desc]]}))
+                                     :order-by [[:updated_at :desc]]}))
 
 (defn- query-string-contexts-query [q]
   (sql/format {:select :*
                :from   [:contexts]
                :where [:raw (format "searchable @@ to_tsquery('simple', '%s')"
                                     (convert-q-to-query-string q))]
-               :order-by [[:important :desc] [:updated_at :desc]]}))
+               :order-by [[:updated_at :desc]]}))
 
 (defn- filter-contexts [{:keys [link-context selected-context selected-issue]} contexts]
   (if-not link-context
@@ -89,8 +89,7 @@
         formatted-query (sql/format (merge
                                      {:select   [:issues.id]
                                       :from     [:issues]
-                                      :order-by [[:important :desc] 
-                                                 [:updated_at :desc]]
+                                      :order-by [[:updated_at :desc]]
                                       :join     join-clause
                                       :where    [:or
                                                  [:and
@@ -115,7 +114,7 @@
               :contexts [:= :context_issue.context_id :contexts.id]]
    :where    [:in :issues.id [:inline ids]]
    :group-by [:issues.id]
-   :order-by [[:issues.important :desc] [:issues.updated_at :desc]]})
+   :order-by [[:issues.updated_at :desc]]})
 
 (defn- re-order [issues search-mode]
   (if (= 1 search-mode)

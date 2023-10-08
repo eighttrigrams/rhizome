@@ -95,7 +95,7 @@
               :contexts [:= :context_issue.context_id :contexts.id]]
    :where    [:= :issues.id [:inline id]]
    :group-by [:issues.id]
-   :order-by [[:issues.important :desc] [:issues.updated_at :desc]]}) ;; TODO remove
+   :order-by [[:issues.updated_at :desc]]}) ;; TODO remove
 
 (defn- simple-issues-query [id]
   {:select   [:issues.*
@@ -112,7 +112,7 @@
               :contexts [:= :context_issue.context_id :contexts.id]]
    :where    [:= :issues.id [:inline id]]
    :group-by [:issues.id] ;; TODO remove
-   :order-by [[:issues.important :desc] [:issues.updated_at :desc]]}) ;; TODO remove
+   :order-by [[:issues.updated_at :desc]]}) ;; TODO remove
 
 (defn- get-issue-with-related-issues [db id]
   (when-let [result (-> id

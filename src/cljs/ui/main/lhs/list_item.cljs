@@ -7,5 +7,4 @@
                        (:id context)) :selected)
     :on-click #(actions/select-context! *state context)}
    [:div
-    {:class (when (:important context) :important)}
     (:title context)]])
