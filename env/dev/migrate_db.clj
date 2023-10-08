@@ -7,6 +7,8 @@
             [datastore.issues :as issues]
             [datastore.search :as search]))
 
+;; TODO when migration complete, limit contexts in overview to 500
+
 ;; create table collections (id serial primary key, container_id integer not null, foreign key (container_id) references issues (id), item_id integer not null, foreign key (item_id) references issues (id));
 
 (defn- migrate-single-context [db {:keys [id title] :as context} context-id]
@@ -30,13 +32,17 @@
     ;; will get deleted; make sure that doesn't happen
     (datastore/delete-context db {:id id} {:dont-delete-issues true})))
 
+(defn- create-context! [db]
+  (let [{:keys [id]
+         :as   context} (contexts/new-context db {:title "test-context-1"})]
+    (contexts/update-context-description db {:id id :description "text-context-1-desciption"})
+    (contexts/update-context db {:context (assoc context :data {:hallo "1"}
+                                                 :tags "a b c"
+                                                 :short_title "101")})))
+
 (defn- seed-data [db]
-  (let [{:keys [id] :as context} (contexts/new-context db {:title "test-context-1"})
-        _ (contexts/update-context db {:context (assoc context :data {:hallo "1"}
-                                                               :tags "a b c"
-                                                               :short_title "101")})
-        ;; TODO in iteration 2 of this script, allow to create issues without associating them to an existing context
-        {:keys [id]} (issues/new-issue db {:title "test-issue-1"} id #{} false)]
+  (let [{:keys [id] :as _context} (create-context! db)
+       {:keys [id]} (issues/new-issue db {:title "test-issue-1"} id #{} false)]
     [id]))
 
 (defn- test-results [db ids]
