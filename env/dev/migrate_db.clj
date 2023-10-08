@@ -9,8 +9,6 @@
 
 ;; TODO when migration complete, limit contexts in overview to 500
 
-;; create table collections (id serial primary key, container_id integer not null, foreign key (container_id) references issues (id), item_id integer not null, foreign key (item_id) references issues (id));
-
 (defn- migrate-single-context [db {:keys [id title description] :as context} context-id]
   (let [{new-issue-id :id :as issue} (issues/new-issue db {:title title} context-id #{} false)
         new-issue {:issue (merge 
