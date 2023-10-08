@@ -11,16 +11,18 @@
 
 ;; create table collections (id serial primary key, container_id integer not null, foreign key (container_id) references issues (id), item_id integer not null, foreign key (item_id) references issues (id));
 
-(defn- migrate-single-context [db {:keys [id title] :as context} context-id]
+(defn- migrate-single-context [db {:keys [id title description] :as context} context-id]
   (let [{new-issue-id :id :as issue} (issues/new-issue db {:title title} context-id #{} false)
         new-issue {:issue (merge 
-                 (select-keys context [:tags :short_title :data])
-                 (select-keys issue [:id :title]))}
+                           (select-keys context [:tags :short_title :data])
+                           (select-keys issue [:id :title]))}
         contained-issues-ids (map :id (first (search/search-issues db {:selected-context context})))]
     (issues/update-issue
      db
      new-issue)
-    (prn ".." new-issue-id contained-issues-ids)
+    (issues/update-issue-description
+     db
+     {:id new-issue-id :description description})
     (doall (for [contained-issue-id contained-issues-ids]
              ;; TODO insert contained-in relation from issue to issue
              (jdbc/execute! 
@@ -35,7 +37,7 @@
 (defn- create-context! [db]
   (let [{:keys [id]
          :as   context} (contexts/new-context db {:title "test-context-1"})]
-    (contexts/update-context-description db {:id id :description "text-context-1-desciption"})
+    (contexts/update-context-description db {:id id :description "test-context-1-description"})
     (contexts/update-context db {:context (assoc context :data {:hallo "1"}
                                                  :tags "a b c"
                                                  :short_title "101")})))
@@ -50,10 +52,10 @@
                         (first (search/search-issues db {})))
         issue (first issues)]
     (t/is (= "test-context-1" (:title issue)))
-  ;; TODO we still have a problem here; issues short title are more restrictive because of short_title ints
+    ;; TODO we still have a problem here; issues short title are more restrictive because of short_title ints
     (t/is (= "101" (:short_title issue)))
     (t/is (= "a b c" (:tags issue)))
-    ;; TODO description
+    (t/is (= "test-context-1-description" (:description issue)))
     #_ (t/is (= {:hallo 1} (:data (ffirst (search/search-issues db {}))))))
   )
 
