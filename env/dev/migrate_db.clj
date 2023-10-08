@@ -50,8 +50,7 @@
     (t/is (= "101" (:short_title issue)))
     (t/is (= "a b c" (:tags issue)))
     (t/is (= "test-context-1-description" (:description issue)))
-    (t/is (= {:hallo 1} (:data (ffirst (search/search-issues db {}))))))
-  )
+    (t/is (= {:hallo 1} (:data (ffirst (search/search-issues db {})))))))
 
 (defn- clean-db [db]
   (jdbc/execute! db ["delete from events; delete from collections; delete from issue_issue; delete from context_issue; delete from issues; delete from contexts;"]))
