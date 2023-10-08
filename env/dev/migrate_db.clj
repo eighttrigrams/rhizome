@@ -39,11 +39,7 @@
   )
 
 (defn- clean-db [db]
-  (let [ _ (prn "." (jdbc/execute! db ["delete from events"]))
-        _ (prn "." (jdbc/execute! db ["delete from issue_issue"]))
-        _ (prn "." (jdbc/execute! db ["delete from context_issue"]))
-        _ (prn "." (jdbc/execute! db ["delete from issues"]))
-        _ (prn "." (jdbc/execute! db ["delete from contexts"]))]))
+  (jdbc/execute! db ["delete from events; delete from issue_issue; delete from context_issue; delete from issues; delete from contexts;"]))
 
 (comment
   (let [db  (:db (read-string (slurp "./config.edn")))
