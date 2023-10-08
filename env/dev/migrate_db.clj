@@ -22,7 +22,6 @@
      db
      {:id new-issue-id :description description})
     (doall (for [contained-issue-id contained-issues-ids]
-             ;; TODO insert contained-in relation from issue to issue
              (jdbc/execute! 
               db 
               ["insert into collections (container_id,item_id) values (?,?)" 
