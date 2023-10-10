@@ -70,28 +70,23 @@
           (map un-namespace-keys 
                (jdbc/execute! db
                               (sql/format {:select :*
-                                           :from   [:context_issue]
-                                           :where  [:= :context_id id]})
+                                           :from   [:collections]
+                                           :where  [:= :container_id id]})
                               {:return-keys true}))]
       (let [context-relations (map un-namespace-keys 
                                    (jdbc/execute! db
                                                   (sql/format {:select :*
-                                                               :from   [:context_issue]
-                                                               :where  [:= :issue_id (:issue_id issue-relation)]})
+                                                               :from   [:collections]
+                                                               :where  [:= :item_id (:item_id issue-relation)]})
                                                   {:return-keys true}))]
         (if (and (not dont-delete-issues)
                  (= 1 (count context-relations)))
-          (issues/delete-issue db {:id (:issue_id issue-relation)})
+          (issues/delete-issue db {:id (:item_id issue-relation)})
           (jdbc/execute! db
-                         (sql/format {:delete-from [:context_issue]
+                         (sql/format {:delete-from [:collections]
                                       :where [:and 
-                                              [:= :context_id id]
-                                              [:= :issue_id (:issue_id issue-relation)]]}))))))
-   (jdbc/execute! db ;; TODO maybe use fn from contexts ns
-                  (sql/format {:delete-from [:context_context]
-                               :where [:or 
-                                       [:= :parent_id id]
-                                       [:= :child_id id]]}))
+                                              [:= :container_id id]
+                                              [:= :item_id (:item_id issue-relation)]]}))))))
    (jdbc/execute! db
-                  (sql/format {:delete-from [:contexts]
+                  (sql/format {:delete-from [:issues]
                                :where [:= :id id]}))))

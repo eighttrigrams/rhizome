@@ -27,11 +27,9 @@
   (let [db (:db config/config)]
     (search/search-contexts db q)))
 
-(defn- log-opts [{:keys [cmd q active-search] :as opts}]
+(defn- log-opts [{:keys [cmd q active-search] :as _opts}]
   (log/info (str "list-resources - "
-                 (or cmd (str active-search "(" q ")"))
-                 " - "
-                 (with-out-str (pp/pprint opts)))))
+                 (or cmd (str active-search "(" q ")")))))
 
 ;; TODO move to other place
 (defn flip-privacy [{:keys [privacy-mode]}]

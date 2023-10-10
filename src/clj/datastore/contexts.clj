@@ -13,10 +13,12 @@
        (sql/format {:insert-into [:issues]
                     :columns     [:inserted_at
                                   :updated_at
-                                  :title]
+                                  :title
+                                  :is_context]
                     :values      [[[:raw "NOW()"]
                                    [:raw "NOW()"]
-                                   [:inline title]]]})
+                                   [:inline title]
+                                   true]]})
        {:return-keys true})
       un-namespace-keys
       (dissoc :searchable)))
@@ -33,56 +35,25 @@
                                                                   data)]}})
                      {:return-keys true}))
 
-#_(defn- join-secondary-contexts [context]
-  (-> context
-      (dissoc :secondary_contexts_ids)
-      (dissoc :secondary_contexts_titles)
-      (assoc :secondary_contexts
-             (zipmap (.getArray (:secondary_contexts_ids context))
-                     (.getArray (:secondary_contexts_titles context))))))
-
-(defn- simple-contexts-query [id]
+(defn- contexts-query [id]
   {:select   [:issues.*]
    :from     [:issues]
    :where    [:= :issues.id [:inline id]]})
 
-(defn- contexts-query [id]
-  {:select   [:issues.*
-              ;; [[:array_agg :secondary_contexts.id] :secondary_contexts_ids]
-              ;; [[:array_agg :secondary_contexts.title] :secondary_contexts_titles]
-              ]
-   :from     [:issues]
-   :join     [;:context_context [:= :contexts.id :context_context.parent_id]
-              ;;[:issues :secondary_contexts] [:= :secondary_contexts.id :context_context.child_id]
-              ]
-   :where    [:= :issues.id [:inline id]]
-   :group-by [:issues.id]})
-
-(defn- get-context-with-secondary-contexts [db id]
-  (when-let [result (-> id
-                        contexts-query
-                        sql/format
-                        (#(jdbc/execute-one! db % {:return-keys true})))]
-    #_(join-secondary-contexts result)
-    result))
-
 (defn get-context [db {:keys [id]}]
-  (try 
-    (-> (if-let [context (get-context-with-secondary-contexts db id)]
-          context
-          (-> id
-              simple-contexts-query
-              sql/format
-              (#(jdbc/execute-one! db % {:return-keys true}))))
+  (try
+    (-> id
+        contexts-query
+        sql/format
+        (#(jdbc/execute-one! db % {:return-keys true}))
         contexts.core/post-process)
     (catch Exception e 
       (log/error e (str "exception fetched in get-context for context with id: " id " e: " (.getMessage e)))
       (throw e))))
 
-(defn update-context [db {:keys [context secondary-contexts-ids]}]
-  (let [{:keys [id]} context]
-    (update-context' db context)
-    (get-context db context)))
+(defn update-context [db {:keys [context]}]
+  (update-context' db context)
+  (get-context db context))
 
 (defn update-context-description [db {:keys [id description]}]
   (jdbc/execute-one! db
