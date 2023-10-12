@@ -1,4 +1,4 @@
-(ns datastore.get-issue
+(ns datastore.get-item
   (:require [next.jdbc :as jdbc]
             [honey.sql :as sql]
             [datastore.issues.common :as common]))
@@ -84,7 +84,7 @@
       sql/format
       (#(jdbc/execute-one! db % {:return-keys true}))))
 
-(defn get-issue
+(defn get-item
   "Gets an issue, including related issues.
    
    {:id 123
