@@ -13,11 +13,8 @@
 
 (defn reset-db []
   (jdbc/execute-one! db ["delete from events"])
+  (jdbc/execute-one! db ["delete from collections"])
   (jdbc/execute-one! db ["delete from issue_issue"])
-  (jdbc/execute-one! db ["delete from context_issue"])
-  (jdbc/execute-one! db ["delete from context_context"])
-  (jdbc/execute-one! db ["delete from texts"])
-  (jdbc/execute-one! db ["delete from contexts"])
   (jdbc/execute-one! db ["delete from issues"]))
 
 (defn- create-context [title]

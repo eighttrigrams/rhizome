@@ -181,7 +181,6 @@
   [{:keys [link-issue 
            selected-issue
            selected-context]} issues]
-  (prn "count issues" (count issues))
   (if-not link-issue 
     (remove #(= (:id selected-issue) (:id %)) issues)
     (if (= :issue link-issue)
