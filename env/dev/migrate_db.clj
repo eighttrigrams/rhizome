@@ -50,16 +50,32 @@
     (t/is (= "101" (:short_title issue)))
     (t/is (= "a b c" (:tags issue)))
     (t/is (= "test-context-1-description" (:description issue)))
+    (t/is (= true (:is_context issue)))
     (t/is (= {:hallo 1} (:data (ffirst (search/search-issues db {})))))))
 
 (defn- clean-db [db]
   (jdbc/execute! db ["delete from events; delete from collections; delete from issue_issue; delete from context_issue; delete from issues; delete from contexts;"]))
 
+(defn- migrate-data [db]
+  (let [{:keys [id]} (contexts/new-context db {:title "migrated"})]
+    (doall (for [context (filter #(not= "migrated" (:title %)) (search/search-contexts db {}))]
+             (try
+               (migrate-single-context db context id)
+               (catch Exception e (tap> [:e (.getMessage e)])))))))
+
 (comment
   (let [db  (:db (read-string (slurp "./config.edn")))
         _ (clean-db db)
-        ids (seed-data db)
-        {:keys [id]} (contexts/new-context db {:title "migrated"})]
-    (doall (for [context (filter #(not= "migrated" (:title %)) (search/search-contexts db {}))]
-             (migrate-single-context db context id)))
+        ids (seed-data db)]
+    (migrate-data db)
     (test-results db ids)))
+
+(comment
+  "do-migration"
+  (let [db {:dbtype   "postgresql"
+            :dbname   "cometoid"
+            :user     "daniel"
+            :password "abcdef"
+            :port     5437
+            :hostname "127.0.0.1"}]
+    (migrate-data db)))
