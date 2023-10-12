@@ -123,7 +123,6 @@
   (when-let [result (-> id
                         issues-query
                         sql/format
-                        ((fn   [wh] (prn "formatted" wh) wh))
                         (#(jdbc/execute-one! db % {:return-keys true})))]
     (join-related-issues db result)))
 
