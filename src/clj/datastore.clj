@@ -62,31 +62,28 @@
 (def remove-stored-context contexts/remove-stored-context)
 
 (defn delete-context
-  ([db context] (delete-context db context {}))
-  ([db {:keys [id]} {:keys [;; this option was introduced for the migration
-                            dont-delete-issues] :as _opts}]
-   (doall
-    (for [issue-relation ;
-          (map un-namespace-keys 
-               (jdbc/execute! db
-                              (sql/format {:select :*
-                                           :from   [:collections]
-                                           :where  [:= :container_id id]})
-                              {:return-keys true}))]
-      (let [context-relations (map un-namespace-keys 
-                                   (jdbc/execute! db
-                                                  (sql/format {:select :*
-                                                               :from   [:collections]
-                                                               :where  [:= :item_id (:item_id issue-relation)]})
-                                                  {:return-keys true}))]
-        (if (and (not dont-delete-issues)
-                 (= 1 (count context-relations)))
-          (issues/delete-issue db {:id (:item_id issue-relation)})
-          (jdbc/execute! db
-                         (sql/format {:delete-from [:collections]
-                                      :where [:and 
-                                              [:= :container_id id]
-                                              [:= :item_id (:item_id issue-relation)]]}))))))
-   (jdbc/execute! db
-                  (sql/format {:delete-from [:issues]
-                               :where [:= :id id]}))))
+  [db {:keys [id]}]
+  (doall
+   (for [issue-relation ;
+         (map un-namespace-keys 
+              (jdbc/execute! db
+                             (sql/format {:select :*
+                                          :from   [:collections]
+                                          :where  [:= :container_id id]})
+                             {:return-keys true}))]
+     (let [context-relations (map un-namespace-keys 
+                                  (jdbc/execute! db
+                                                 (sql/format {:select :*
+                                                              :from   [:collections]
+                                                              :where  [:= :item_id (:item_id issue-relation)]})
+                                                 {:return-keys true}))]
+       (if (= 1 (count context-relations))
+         (issues/delete-issue db {:id (:item_id issue-relation)})
+         (jdbc/execute! db
+                        (sql/format {:delete-from [:collections]
+                                     :where       [:and 
+                                                   [:= :container_id id]
+                                                   [:= :item_id (:item_id issue-relation)]]}))))))
+  (jdbc/execute! db
+                 (sql/format {:delete-from [:issues]
+                              :where [:= :id id]})))
