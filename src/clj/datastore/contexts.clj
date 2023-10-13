@@ -22,17 +22,19 @@
       un-namespace-keys
       (dissoc :searchable)))
 
-(defn- update-context' [db {:keys [id title short_title tags data]}]
-  (jdbc/execute-one! db
-                     (sql/format {:update [:issues]
-                                  :where  [:= :id [:inline id]]
-                                  :set    {:title       [:inline title]
-                                           :short_title [:inline short_title]
-                                           :tags        [:inline tags]
-                                           :updated_at  [:raw "NOW()"]
-                                           :data        [:inline (json/generate-string
-                                                                  data)]}})
-                     {:return-keys true}))
+(defn- update-context' [db {:keys [id title short_title tags data] :as item}]
+  (let [old-data (:data (get-context db item))]
+    (jdbc/execute-one! db
+                       (sql/format {:update [:issues]
+                                    :where  [:= :id [:inline id]]
+                                    :set    {:title       [:inline title]
+                                             :short_title [:inline short_title]
+                                             :tags        [:inline tags]
+                                             :updated_at  [:raw "NOW()"]
+                                             :data        [:inline (json/generate-string
+                                                                    (merge old-data
+                                                                           data))]}})
+                       {:return-keys true})))
 
 (defn update-context [db {:keys [context]}]
   (update-context' db context)

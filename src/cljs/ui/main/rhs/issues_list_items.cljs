@@ -25,7 +25,8 @@
    [:> ReactMarkdown
     {:children title}]])
 
-(defn related-issues-list-item-component [*state {:keys [id title contexts] :as issue}]
+(defn related-issues-list-item-component [*state {:keys [id title contexts
+                                                         is_context] :as issue}]
   [:li.card.issue-card
    {:on-click #(do (swap! *state (fn [state] ;; TODO review and dedup with issues-list-item/component
                                    (-> state
@@ -84,4 +85,6 @@
          [info-component @*state issue]
          [context-badges/component (remove #(= (:id (:selected-context @*state))
                                                (first %)) 
-                                           (:contexts issue))]])]]))
+                                           (merge (when (:is_context issue) 
+                                                    {0 "⭕"})
+                                                  (:contexts issue)))]])]]))

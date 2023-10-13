@@ -17,6 +17,7 @@
                                (assoc :arg item))))
 
 (defn update-issue! [*state issue issue-contexts]
+  (prn "update-issue!" issue)
   (fetch-and-reset! *state 
                     (-> @*state
                         (assoc :cmd :update-issue)

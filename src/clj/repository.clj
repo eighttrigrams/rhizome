@@ -397,10 +397,18 @@
      :q                nil}))
 
 (defn update-issue [db opts arg]
-  (let [{:keys [data]}
-        (datastore/link-issue-contexts db (:issue (:issue arg)) (:issue-contexts arg))]
+  (let [contexts  (datastore/link-issue-contexts db 
+                                                 (:issue (:issue arg))
+                                                 (:issue-contexts arg))
+        {:keys [data]} (get-item/get-item db (:issue (:issue arg)))]
     {:selected-issue (when-not (:deselect-issue? arg)
-                       (datastore/update-issue db (assoc-in (:issue arg) [:issue :data] data)))
+                       (datastore/update-issue db 
+                                               (assoc-in (:issue arg) 
+                                                         [:issue :data]
+                                                         (merge 
+                                                          data
+                                                          (:data (:issue (:issue arg)))
+                                                          {:contexts contexts}))))
      :issues         (search/search-issues db (dissoc opts :q))
      :q              nil}))
 

@@ -81,13 +81,15 @@
                                  :set {:updated_at [:raw "NOW()"]}
                                  :where [:= :id [:inline id]]})))
 
-(defn update-data [db {:keys [id data]}]
-  (jdbc/execute-one! db
-                     (sql/format {:update [:issues]
-                                  :where  [:= :id [:inline id]]
-                                  :set    {:data        [:inline (json/generate-string
-                                                                  data)]}})
-                     {}))
+(defn update-contexts [db {:keys [id] :as item} contexts]
+  (let [data (:data (get-issue db item))
+        data (assoc data :contexts contexts)]
+    (jdbc/execute-one! db
+                       (sql/format {:update [:issues]
+                                    :where  [:= :id [:inline id]]
+                                    :set    {:data        [:inline (json/generate-string
+                                                                    data)]}})
+                       {})))
 
 (defn link-issue-contexts [db selected-issue link-issue-contexts]
   (jdbc/execute! db (sql/format {:delete-from [:collections]
@@ -97,16 +99,12 @@
                                           :columns [:item_id :container_id]
                                           :values [[[:inline (:id selected-issue)]
                                                     [:inline context-id]]]}))))
-  (let [contexts (->> link-issue-contexts
-                      (map #(do {:id %}))
-                      (map (partial get-issue db))
-                      (map (fn [item] [(:id item)
-                                       (:title item)]))
-                      (into {}))]
-    (update-data db (assoc-in selected-issue
-                                     [:data :contexts]
-                                     contexts)))
-  (get-issue db selected-issue))
+  (->> link-issue-contexts
+       (map #(do {:id %}))
+       (map (partial get-issue db))
+       (map (fn [item] [(:id item)
+                        (:title item)]))
+       (into {})))
 
 (defn- create-new-issue! [db title short_title]
   (:issues/id (jdbc/execute-one!
