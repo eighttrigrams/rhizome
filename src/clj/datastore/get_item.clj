@@ -16,16 +16,7 @@
    :group-by [:issues.id]
    :where  [:= :issues.id [:inline id]]})
 
-(defn- perform-query-and-post-process [query db]
-  (-> query
-      sql/format
-      (#(jdbc/execute-one! db % {:return-keys true}))
-      common/post-process))
-
-(defn- get-related-issue [db id]
-  (-> id
-      related-issues-query
-      (perform-query-and-post-process db)))
+(declare get-item)
 
 (defn- join-related-issues [db issue]
   (-> issue
@@ -34,7 +25,7 @@
              (->> issue
                   :related_issues_ids
                   .getArray
-                  (map #(get-related-issue db %))
+                  (map #(get-item db {:id %} true))
                   set))))
 
 (defn- basic-issues-query [id]
@@ -96,14 +87,17 @@
                        :contexts {224 \"some-context-title\"}})
    }
    "
-  [db {:keys [id]}]
-  (try
-    (let [collections (:contexts (get-collections db id))
-          relations (:related_issues (get-issue-with-related-issues db id))]
-      (-> (get-issue-without-related-issues db id)
-          common/post-process-without-join-contexts
-          (assoc :contexts (or collections {}))
-          (assoc :related_issues (or relations #{}))))
-    (catch java.lang.Exception e
-      (prn "get-issue-----" e)
-      (throw e))))
+  ([db item] (get-item db item false))
+  ([db {:keys [id]} skip-relations?]
+   (try
+     (let [collections (:contexts (get-collections db id))
+           relations (if-not skip-relations?
+                       (:related_issues (get-issue-with-related-issues db id))
+                       nil)]
+       (-> (get-issue-without-related-issues db id)
+           common/post-process-without-join-contexts
+           (assoc :contexts (or collections {}))
+           (assoc :related_issues (or relations #{}))))
+     (catch java.lang.Exception e
+       (prn "get-issue-----" (.getMessage e))
+       (throw e)))))
