@@ -48,3 +48,5 @@
 (defn-over-http fetch-context :return-value {})
 
 (defn-over-http flip-privacy :return-value {})
+
+(defn-over-http update-issue :return-value {})

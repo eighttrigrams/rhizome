@@ -17,6 +17,7 @@
                                 store-current-view
                                 load-stored-context
                                 remove-stored-context
+                                update-issue
                                 delete-selected-issue
                                 delete-issue
                                 fetch-context
@@ -41,5 +42,6 @@
   remove-stored-context
   delete-selected-issue
   delete-issue
+  update-issue
   fetch-context
   flip-privacy)

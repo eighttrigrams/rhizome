@@ -396,21 +396,25 @@
      :search-globally? false
      :q                nil}))
 
-(defn update-issue [db opts arg]
-  (let [contexts  (datastore/link-issue-contexts db 
-                                                 (:issue (:issue arg))
-                                                 (:issue-contexts arg))
-        {:keys [data]} (get-item/get-item db (:issue (:issue arg)))]
-    {:selected-issue (when-not (:deselect-issue? arg)
-                       (datastore/update-issue db 
-                                               (assoc-in (:issue arg) 
-                                                         [:issue :data]
-                                                         (merge 
-                                                          data
-                                                          (:data (:issue (:issue arg)))
-                                                          {:contexts contexts}))))
-     :issues         (search/search-issues db (dissoc opts :q))
-     :q              nil}))
+(defn update-issue [{:keys [db]}] 
+  (fn [opts arg]
+    (try 
+      (let [contexts       (datastore/link-issue-contexts db 
+                                                          (:issue (:issue arg))
+                                                          (:issue-contexts arg))
+            {:keys [data]} (get-item/get-item db (:issue (:issue arg)))]
+        {:selected-issue (when-not (:deselect-issue? arg)
+                           (datastore/update-issue db 
+                                                   (assoc-in (:issue arg) 
+                                                             [:issue :data]
+                                                             (merge 
+                                                              data
+                                                              (:data (:issue (:issue arg)))
+                                                              {:contexts contexts}))))
+         :issues         (search/search-issues db (dissoc opts :q))
+         :q              nil})
+      (catch Exception e
+        (log/error (str "Caught an update-issue " (.getMessage e)))))))
 
 (defn split-issue [db {{selected-context-id :id} :selected-context :as opts} arg]
   (let [issue arg 
@@ -495,7 +499,6 @@
           :q              nil}
          :update-context-description
          {:selected-context (datastore/update-context-description db arg)}
-         :update-issue (update-issue db opts arg)
          :update-context (update-context db opts arg)
          :deselect-context
          {:issues           (search/search-issues db (dissoc opts :selected-context :q))
