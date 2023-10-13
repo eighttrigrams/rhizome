@@ -133,7 +133,8 @@
         selected-issue (:selected-issue @*state)
         selected-issue (update selected-issue :contexts #(dissoc % selected-context-id))
         issue-contexts-ids (keys (:contexts selected-issue))]
-    (when issue-contexts-ids
+    (when (or issue-contexts-ids
+              (:is_context selected-issue))
       (fetch-and-reset-with-method! *state
                                     @*state
                                     api/update-issue

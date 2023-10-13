@@ -99,12 +99,13 @@
                                           :columns [:item_id :container_id]
                                           :values [[[:inline (:id selected-issue)]
                                                     [:inline context-id]]]}))))
-  (->> link-issue-contexts
-       (map #(do {:id %}))
-       (map (partial get-issue db))
-       (map (fn [item] [(:id item)
-                        (:title item)]))
-       (into {})))
+  (update-contexts db selected-issue
+   (->> link-issue-contexts
+        (map #(do {:id %}))
+        (map (partial get-issue db))
+        (map (fn [item] [(:id item)
+                         (:title item)]))
+        (into {}))))
 
 (defn- create-new-issue! [db title short_title]
   (:issues/id (jdbc/execute-one!

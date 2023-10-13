@@ -6,7 +6,8 @@
             privacy
             [datastore.search :as search]
             [datastore.get-item :as get-item]
-            [cambium.core :as log]))
+            [cambium.core :as log]
+            [datastore.issues :as issues]))
 
 (mount/defstate repository
   :start (do
@@ -225,7 +226,7 @@
   [db {:keys [selected-context] :as opts} arg]
   (try
     (let [selected-issue (datastore/get-issue db {:id arg})
-          context-ids   (keys (:contexts selected-issue))]
+          context-ids   (keys (:contexts selected-issue))] 
       (datastore/link-issue-contexts db {:id arg} (vec (set (conj context-ids (:id selected-context)))))
       {:selected-issue   nil
        :issues           (search/search-issues db 
@@ -255,7 +256,7 @@
                            (get-item/get-item db selected-context))
         contexts (merge (:contexts selected-issue)
                         {(:id arg) (:title arg)})]
-    (log/info (str "repository/link-selected-issue-to-context " selected-issue))
+    (log/info (str "repository/link-selected-item-to-context " selected-issue))
     (try
       (datastore/link-issue-contexts db selected-issue (vec (set (keys contexts))))
       {:link-context   nil
@@ -264,7 +265,7 @@
        :issues         (search/search-issues db (dissoc opts :q))
        :q              nil}
       (catch Exception e 
-        (log/error (str "Caught an exception in link-selected-issue-to-context " (.getMessage e)))
+        (log/error (str "Caught an exception in link-selected-item-to-context " (.getMessage e)))
         (throw e)))))
 
 (defn- link-issue-to-selected-issue [db {:keys [selected-issue] :as opts} arg]
@@ -400,19 +401,18 @@
   (fn [opts arg]
     (log/info (str "repository/update-issue " arg))
     (try 
-      (let [contexts       (datastore/link-issue-contexts db 
-                                                          (or (:issue (:issue arg))
-                                                              (:issue arg))
-                                                          (:issue-contexts arg))
-            {:keys [data]} (get-item/get-item db (:issue (:issue arg)))]
+      (datastore/link-issue-contexts db
+                                     (or (:issue (:issue arg))
+                                         (:issue arg))
+                                     (:issue-contexts arg))
+      (let [{:keys [data]} (get-item/get-item db (:issue (:issue arg)))]
         {:selected-issue (when-not (:deselect-issue? arg)
                            (datastore/update-issue db 
                                                    (assoc-in (:issue arg) 
                                                              [:issue :data]
                                                              (merge 
                                                               data
-                                                              (:data (:issue (:issue arg)))
-                                                              {:contexts contexts}))))
+                                                              (:data (:issue (:issue arg)))))))
          :issues         (search/search-issues db (dissoc opts :q))
          :q              nil})
       (catch Exception e
