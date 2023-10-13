@@ -1,4 +1,4 @@
-(ns ui.main.rhs.context-badges)
+(ns ui.main.context-badges)
 
 (defn component [contexts]
   [:span.contexts

@@ -54,7 +54,7 @@
       (remove #(ids-of-contexts-to-remove (:id %)) contexts))))
 
 (defn search-contexts
-  [ds opts]
+  [db opts]
   (let [opts (if (string? opts) 
                {:q opts}
                opts)
@@ -62,9 +62,10 @@
     (try
       (let [result (->>
                     (if (= "" (or q ""))
-                      (jdbc/execute! ds all-contexts-query)
-                      (jdbc/execute! ds (query-string-contexts-query q)))
+                      (jdbc/execute! db all-contexts-query)
+                      (jdbc/execute! db (query-string-contexts-query q)))
                     (map contexts.core/post-process)
+                    (map (partial get-item/get-item db))
                     (filter-contexts opts))]
         result)
       (catch Exception e

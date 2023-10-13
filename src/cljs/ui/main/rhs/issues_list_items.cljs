@@ -1,7 +1,7 @@
 (ns ui.main.rhs.issues-list-items
   (:require ["react-markdown$default" :as ReactMarkdown]
             [ui.actions :as actions]
-            [ui.main.rhs.context-badges :as context-badges]
+            [ui.main.context-badges :as context-badges]
             [ui.main.rhs.modifiers :as modifiers]))
 
 (defn info-component [state issue]
