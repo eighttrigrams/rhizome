@@ -36,7 +36,8 @@
 (def all-contexts-query (sql/format {:select :*
                                      :from [:issues]
                                      :where [:= :issues.is_context true]
-                                     :order-by [[:updated_at :desc]]}))
+                                     :order-by [[:updated_at :desc]]
+                                     :limit 100}))
 
 (defn- query-string-contexts-query [q]
   (sql/format {:select :*
@@ -45,7 +46,8 @@
                        [:raw (format "searchable @@ to_tsquery('simple', '%s')"
                                      (convert-q-to-query-string q))]
                        [:= :issues.is_context true]]
-               :order-by [[:updated_at :desc]]}))
+               :order-by [[:updated_at :desc]]
+               :limit 100}))
 
 (defn- filter-contexts [{:keys [link-context selected-context selected-issue]} contexts]
   (if-not link-context
