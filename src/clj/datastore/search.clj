@@ -33,21 +33,19 @@
       "*"
       qs)))
 
-(def all-contexts-query (sql/format {:select :issues.id
+(def all-contexts-query (sql/format {:select :*
                                      :from [:issues]
                                      :where [:= :issues.is_context true]
-                                     :order-by [[:updated_at :desc]]
-                                     :limit 100}))
+                                     :order-by [[:updated_at :desc]]}))
 
 (defn- query-string-contexts-query [q]
-  (sql/format {:select :issues.id
+  (sql/format {:select :*
                :from   [:issues]
                :where [:and
                        [:raw (format "searchable @@ to_tsquery('simple', '%s')"
                                      (convert-q-to-query-string q))]
                        [:= :issues.is_context true]]
-               :order-by [[:updated_at :desc]]
-               :limit 100}))
+               :order-by [[:updated_at :desc]]}))
 
 (defn- filter-contexts [{:keys [link-context selected-context selected-issue]} contexts]
   (if-not link-context
@@ -67,7 +65,7 @@
                       (jdbc/execute! db all-contexts-query)
                       (jdbc/execute! db (query-string-contexts-query q)))
                     (map contexts.core/post-process)
-                    (map (partial get-item/get-item db))
+                    #_(map (partial get-item/get-item db))
                     (filter-contexts opts))]
         result)
       (catch Exception e
