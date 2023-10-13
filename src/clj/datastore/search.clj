@@ -55,7 +55,6 @@
 
 (defn search-contexts
   [ds opts]
-  (prn "search-contexts")
   (let [opts (if (string? opts) 
                {:q opts}
                opts)
