@@ -401,7 +401,7 @@
   (fn [{:keys [selected-issue]}]
     (try
       (log/info (str "repository/upgrade-issue-to-context" (:id selected-issue)))
-      {:selected-issue (datastore/upgrade-issue-to-context db selected-issue)}
+      {:selected-issue (datastore/upgrade-issue-to-context! db selected-issue)}
       (catch Exception e
         (log/error (str "Caught an repository/upgrade-issue-to-context " (.getMessage e)))))))
 

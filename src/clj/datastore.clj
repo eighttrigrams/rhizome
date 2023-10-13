@@ -71,7 +71,7 @@
                                                     (:title item)]))
                                    (into {}))))
 
-(defn upgrade-issue-to-context [db {:keys [id] :as item}]
+(defn upgrade-issue-to-context! [db {:keys [id] :as item}]
   (jdbc/execute-one! db
                      (sql/format {:update [:issues]
                                   :where  [:= :id [:inline id]]
