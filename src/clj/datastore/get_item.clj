@@ -68,7 +68,6 @@
 
 (defn- issues-query [id skip-relations?]
   (cond-> (basic-issues-query id)
-    true (add-in-collections)
     (not skip-relations?) (add-in-relations)))
 
 (defn- get-issue-with-related-issues [db id]
@@ -84,6 +83,13 @@
       sql/format
       (#(jdbc/execute-one! db % {:return-keys true}))))
 
+(defn- get-collections [db id]
+  (when-let [result (-> (basic-issues-query id)
+                        (add-in-collections)
+                        sql/format
+                        (#(jdbc/execute-one! db % {:return-keys true})))]
+    (-> result common/post-process common/join-contexts)))
+
 (defn get-item
   "Gets an issue, including related issues.
    
@@ -97,11 +103,13 @@
    "
   [db {:keys [id]}]
   (try
-    (-> (if-let [issue (get-issue-with-related-issues db id)]
-          issue
-        ;; if there are no related issues, the former query returns an empty result set
-          (get-issue-without-related-issues db id))
-        common/post-process)
+    (let [collections (:contexts (get-collections db id))
+          relations (:related_issues (get-issue-with-related-issues db id))]
+      (-> (get-issue-without-related-issues db id)
+          common/post-process
+          (assoc :contexts (or collections {}))
+          (assoc :related_issues (or relations #{})))
+      )
     (catch java.lang.Exception e
       (prn "get-issue-----" e)
       (throw e))))
