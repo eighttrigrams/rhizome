@@ -251,11 +251,11 @@
 (defn- link-selected-issue-to-context 
   "when issue selected link to yet another context"
   [db {:keys [selected-issue selected-context] :as opts} arg]
-
   (let [selected-issue (or selected-issue
                            (get-item/get-item db selected-context))
         contexts (merge (:contexts selected-issue)
                         {(:id arg) (:title arg)})]
+    (log/info (str "repository/link-selected-issue-to-context " selected-issue))
     (try
       (datastore/link-issue-contexts db selected-issue (vec (set (keys contexts))))
       {:link-context   nil
@@ -398,9 +398,11 @@
 
 (defn update-issue [{:keys [db]}] 
   (fn [opts arg]
+    (log/info (str "repository/update-issue " arg))
     (try 
       (let [contexts       (datastore/link-issue-contexts db 
-                                                          (:issue (:issue arg))
+                                                          (or (:issue (:issue arg))
+                                                              (:issue arg))
                                                           (:issue-contexts arg))
             {:keys [data]} (get-item/get-item db (:issue (:issue arg)))]
         {:selected-issue (when-not (:deselect-issue? arg)
