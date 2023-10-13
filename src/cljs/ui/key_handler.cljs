@@ -45,6 +45,10 @@
                (swap! *state #(assoc % :modal :edit-context))
                (and alt-pressed? (= "KeyI" code))
                (actions/start-global-search! *state)
+               (and alt-pressed?
+                    (= "KeyU" code)
+                    selected-issue)
+               (actions/upgrade-issue-to-context! *state)
                (and alt-pressed? 
                     (= "KeyT" code)
                     selected-context

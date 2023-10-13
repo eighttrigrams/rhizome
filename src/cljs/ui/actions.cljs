@@ -142,6 +142,9 @@
                                      :issue-contexts issue-contexts-ids
                                      :deselect-issue? true}))))
 
+(defn upgrade-issue-to-context! [*state]
+  (fetch-and-reset-with-method! *state @*state api/upgrade-issue-to-context))
+
 (defn start-global-search! [*state]
   (fetch-and-reset! *state (assoc @*state :cmd :start-global-search)))
 

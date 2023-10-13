@@ -397,6 +397,14 @@
      :search-globally? false
      :q                nil}))
 
+(defn upgrade-issue-to-context [{:keys [db]}]
+  (fn [{:keys [selected-issue]}]
+    (try
+      (log/info (str "repository/upgrade-issue-to-context" (:id selected-issue)))
+      {:selected-issue (datastore/upgrade-issue-to-context db selected-issue)}
+      (catch Exception e
+        (log/error (str "Caught an repository/upgrade-issue-to-context " (.getMessage e)))))))
+
 (defn update-issue [{:keys [db]}] 
   (fn [opts arg]
     (log/info (str "repository/update-issue " arg))

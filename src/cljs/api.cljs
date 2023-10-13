@@ -50,3 +50,5 @@
 (defn-over-http flip-privacy :return-value {})
 
 (defn-over-http update-issue :return-value {})
+
+(defn-over-http upgrade-issue-to-context :return-value {})

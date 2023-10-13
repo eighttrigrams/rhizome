@@ -20,6 +20,7 @@
                                 update-issue
                                 delete-selected-issue
                                 delete-issue
+                                upgrade-issue-to-context
                                 fetch-context
                                 flip-privacy]]))
 
@@ -41,7 +42,8 @@
   load-stored-context
   remove-stored-context
   delete-selected-issue
-  delete-issue
+  delete-issue 
   update-issue
+  upgrade-issue-to-context
   fetch-context
   flip-privacy)

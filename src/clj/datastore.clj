@@ -34,6 +34,15 @@
 
 (def link-issue-contexts issues/link-issue-contexts)
 
+(defn upgrade-issue-to-context [db {:keys [id] :as item}]
+  (jdbc/execute-one! db
+                     (sql/format {:update [:issues]
+                                  :where  [:= :id [:inline id]]
+                                  :set    {:is_context true
+                                           :updated_at  [:raw "NOW()"]}})
+                     {:return-keys true})
+  (issues/update-contexts db item))
+
 (def delete-issue issues/delete-issue)
 
 (def cycle-search-mode contexts/cycle-search-mode)
