@@ -129,18 +129,7 @@
 
 ;; TODO this should be moved to the backend
 (defn unlink-selected-issue-from-selected-context [*state]
-  (let [selected-context-id (:id (:selected-context @*state))
-        selected-issue (:selected-issue @*state)
-        selected-issue (update selected-issue :contexts #(dissoc % selected-context-id))
-        issue-contexts-ids (keys (:contexts selected-issue))]
-    (when (or issue-contexts-ids
-              (:is_context selected-issue))
-      (fetch-and-reset-with-method! *state
-                                    @*state
-                                    api/update-issue
-                                    {:issue selected-issue
-                                     :issue-contexts issue-contexts-ids
-                                     :deselect-issue? true}))))
+  (fetch-and-reset-with-method! *state @*state api/unlink-selected-item-from-container))
 
 (defn upgrade-issue-to-context! [*state]
   (fetch-and-reset-with-method! *state @*state api/upgrade-issue-to-context))
@@ -194,6 +183,9 @@
 
 (defn cycle-notes-mode! [*state]
   (fetch-and-reset-with-method! *state @*state api/cycle-notes-mode))
+
+(defn cycle-context-preview! [*state]
+  (fetch-and-reset-with-method! *state @*state api/cycle-context-preview))
 
 (defn flip-privacy! [*state]
   (fetch-and-reset-with-method! *state @*state api/flip-privacy))

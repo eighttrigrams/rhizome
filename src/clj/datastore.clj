@@ -92,6 +92,8 @@
 
 (def cycle-notes-mode contexts/cycle-notes-mode)
 
+(def cycle-context-preview contexts/cycle-context-preview)
+
 (def update-context-description contexts/update-context-description)
 
 (def update-context contexts/update-context)

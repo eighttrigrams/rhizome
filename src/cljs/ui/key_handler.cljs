@@ -86,6 +86,10 @@
                (actions/cycle-search-mode! *state)
                (and selected-context
                     (not selected-issue)
+                    (= "KeyF" code))
+               (actions/cycle-context-preview! *state)
+               (and selected-context
+                    (not selected-issue)
                     (= "KeyB" code)
                     (or (nil? (-> selected-context :data :views :current :events-view))
                         (= 0 (-> selected-context :data :views :current :events-view)))

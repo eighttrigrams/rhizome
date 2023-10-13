@@ -1,6 +1,7 @@
 (ns ui.modals.actions
   (:require api
-            [ui.actions.common :refer [fetch-and-reset!]]))
+            [ui.actions.common :refer [fetch-and-reset!
+                                       fetch-and-reset-with-method!]]))
 
 (defn cancel-modal! [*state]
   (reset! *state (-> @*state
@@ -17,13 +18,11 @@
                                (assoc :arg item))))
 
 (defn update-issue! [*state issue issue-contexts]
-  (prn "update-issue!" issue)
-  (fetch-and-reset! *state 
-                    (-> @*state
-                        (assoc :cmd :update-issue)
-                        (assoc :arg {:issue issue 
-                                     :issue-contexts issue-contexts})
-                        (dissoc :modal))))
+  (fetch-and-reset-with-method! *state 
+                               (dissoc @*state :modal)
+                               api/update-issue
+                               {:issue          issue 
+                                :issue-contexts issue-contexts}))
 
 (defn update-context! [*state context]
   (fetch-and-reset! *state

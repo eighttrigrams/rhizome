@@ -180,6 +180,11 @@
       {:selected-context selected-context
        :issues           (search/search-issues db (assoc opts :selected-context selected-context))})))
 
+(defn cycle-context-preview [{:keys [db]}]
+  (fn [{:keys [selected-context]}]
+    (let [selected-context (datastore/cycle-context-preview db selected-context)]
+      {:selected-context selected-context})))
+
 (defn cycle-notes-mode [{:keys [db]}]
   (fn [{:keys [selected-context] :as _opts}]
     (let [selected-context (datastore/cycle-notes-mode db selected-context)]
@@ -405,22 +410,34 @@
       (catch Exception e
         (log/error (str "Caught an repository/upgrade-issue-to-context " (.getMessage e)))))))
 
-(defn update-issue [{:keys [db]}] 
+(defn unlink-selected-item-from-container [{:keys [db]}]
+  (fn [{:keys [selected-issue selected-context]}]
+    (try 
+      (log/info (str "repository/unlink-selected-item-from-container" (:id selected-issue)))
+      (let [selected-context-id (:id selected-context)
+            selected-issue (update selected-issue :contexts #(dissoc % selected-context-id))
+            issue-contexts-ids (keys (:contexts selected-issue))]
+        {:selected-issue (datastore/set-containers-of-item! db
+                                                            selected-issue
+                                                            issue-contexts-ids)})
+      (catch Exception e
+        (log/error (str "Caught an repository/unlink-selected-item-from-container " (.getMessage e)))))))
+
+(defn update-issue [{:keys [db]}]
   (fn [opts arg]
     (log/info (str "repository/update-issue " arg))
-    (try 
+    (try
       (datastore/set-containers-of-item! db
                                      (or (:issue (:issue arg))
                                          (:issue arg))
                                      (:issue-contexts arg))
       (let [{:keys [data]} (get-item/get-item db (:issue (:issue arg)))]
-        {:selected-issue (when-not (:deselect-issue? arg)
-                           (datastore/update-issue db 
-                                                   (assoc-in (:issue arg) 
-                                                             [:issue :data]
-                                                             (merge 
-                                                              data
-                                                              (:data (:issue (:issue arg)))))))
+        {:selected-issue (datastore/update-issue db 
+                                                 (assoc-in (:issue arg) 
+                                                           [:issue :data]
+                                                           (merge 
+                                                            data
+                                                            (:data (:issue (:issue arg))))))
          :issues         (search/search-issues db (dissoc opts :q))
          :q              nil})
       (catch Exception e
