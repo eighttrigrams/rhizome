@@ -33,14 +33,14 @@
       "*"
       qs)))
 
-(def all-contexts-query (sql/format {:select :*
+(def all-contexts-query (sql/format {:select :issues.id
                                      :from [:issues]
                                      :where [:= :issues.is_context true]
                                      :order-by [[:updated_at :desc]]
                                      :limit 100}))
 
 (defn- query-string-contexts-query [q]
-  (sql/format {:select :*
+  (sql/format {:select :issues.id
                :from   [:issues]
                :where [:and
                        [:raw (format "searchable @@ to_tsquery('simple', '%s')"
