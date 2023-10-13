@@ -70,7 +70,9 @@
                                 :mouse :enter))
       :on-context-menu (fn [e]
                          (.preventDefault e)
-                         (actions/delete-issue! *state issue))
+                         (if (:is_context issue)
+                           (actions/select-context! *state issue)
+                           (actions/delete-issue! *state issue)))
       :on-mouse-leave #(do
                          (swap! *state assoc :mouse :leave)
                          (js/setTimeout (fn [_]
