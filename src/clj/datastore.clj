@@ -3,6 +3,7 @@
             [honey.sql :as sql]
             [datastore.issues :as issues]
             [datastore.contexts :as contexts]
+            [datastore.get-item :as get-item]
             [datastore.helpers
              :refer [un-namespace-keys]]))
 
@@ -21,7 +22,7 @@
 
 (def update-issue issues/update-issue)
 
-(def get-issue issues/get-issue)
+(def get-issue get-item/get-item)
 
 (def update-issue-description issues/update-issue-description)
 
@@ -51,7 +52,7 @@
 
 (def reprioritize-context contexts/reprioritize-context)
 
-(def get-context contexts/get-context)
+(def get-context get-item/get-item)
 
 (def new-context contexts/new-context)
 

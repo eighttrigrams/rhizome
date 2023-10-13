@@ -3,7 +3,7 @@
             [datastore.helpers
              :refer [un-namespace-keys simplify-date]]))
 
-(defn join-contexts [issue]
+(defn- join-contexts [issue]
   (-> issue
       (dissoc :context_ids)
       (dissoc :context_titles)
@@ -19,6 +19,16 @@
 
 ;; TODO try unify with datastore.contexts.core/post-process
 (defn post-process [query-result]
+  (-> query-result
+      un-namespace-keys
+      join-contexts
+      simplify-date
+      parse-data
+      (#(dissoc % :searchable))
+      (dissoc :searchable)))
+
+;; TODO dedup with fn above
+(defn post-process-without-join-contexts [query-result]
   (-> query-result
       un-namespace-keys
       simplify-date

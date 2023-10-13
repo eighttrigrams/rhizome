@@ -6,8 +6,8 @@
             [next.jdbc :as jdbc]
             [honey.sql :as sql]
             [datastore.issues.common :as common]
-            [datastore.contexts :as contexts]
-            [datastore.contexts.core :as contexts.core]))
+            [datastore.contexts.core :as contexts.core]
+            [datastore.get-item :as get-item]))
 
 (defn- remove-some-chars [q]
   (-> q
@@ -55,17 +55,19 @@
 
 (defn search-contexts
   [ds opts]
+  (prn "search-contexts")
   (let [opts (if (string? opts) 
                {:q opts}
                opts)
         {:keys [q]} opts]
     (try
-      (->>
-       (if (= "" (or q ""))
-         (jdbc/execute! ds all-contexts-query)
-         (jdbc/execute! ds (query-string-contexts-query q)))
-       (map contexts.core/post-process)
-       (filter-contexts opts))
+      (let [result (->>
+                    (if (= "" (or q ""))
+                      (jdbc/execute! ds all-contexts-query)
+                      (jdbc/execute! ds (query-string-contexts-query q)))
+                    (map contexts.core/post-process)
+                    (filter-contexts opts))]
+        result)
       (catch Exception e
         (log/error (str "error in search-contexts: " (.getMessage e) " - param was: " q))
         (throw e)))))
@@ -247,7 +249,7 @@
   (reduce (fn [acc val]
             (if (secondary-contexts val)
               (conj acc [val (conj (secondary-contexts val) true)])
-              (if-let [title (:title (contexts/get-context db {:id val}))]
+              (if-let [title (:title (get-item/get-item db {:id val}))]
                 (conj acc [val [title 0 true]])
                 acc)))
           [] highlighted-secondary-contexts))

@@ -2,10 +2,9 @@
   (:require [cheshire.core :as json]
             [next.jdbc :as jdbc]
             [honey.sql :as sql]
-            [cambium.core :as log]
             [datastore.helpers
              :refer [un-namespace-keys]]
-            [datastore.contexts.core :as contexts.core]))
+            [datastore.get-item :refer [get-item] :rename {get-item get-context}]))
 
 (defn new-context [db {title :title}]
   (-> (jdbc/execute-one!
@@ -34,22 +33,6 @@
                                            :data        [:inline (json/generate-string
                                                                   data)]}})
                      {:return-keys true}))
-
-(defn- contexts-query [id]
-  {:select   [:issues.*]
-   :from     [:issues]
-   :where    [:= :issues.id [:inline id]]})
-
-(defn get-context [db {:keys [id]}]
-  (try
-    (-> id
-        contexts-query
-        sql/format
-        (#(jdbc/execute-one! db % {:return-keys true}))
-        contexts.core/post-process)
-    (catch Exception e 
-      (log/error e (str "exception fetched in get-context for context with id: " id " e: " (.getMessage e)))
-      (throw e))))
 
 (defn update-context [db {:keys [context]}]
   (update-context' db context)
