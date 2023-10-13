@@ -67,7 +67,8 @@
                     (not meta-pressed?)
                     (not ctrl-pressed?)
                     (not shift-pressed?)
-                    selected-issue)
+                    (or selected-issue
+                        selected-context))
                (actions/start-linking-context *state)
                (and
                 (or

@@ -5,8 +5,8 @@
             datastore
             privacy
             [datastore.search :as search]
-            [cambium.core :as log]
-            [clojure.pprint :as pp]))
+            [datastore.get-item :as get-item]
+            [cambium.core :as log]))
 
 (mount/defstate repository
   :start (do
@@ -250,19 +250,22 @@
 
 (defn- link-selected-issue-to-context 
   "when issue selected link to yet another context"
-  [db {:keys [selected-issue] :as opts} arg]
-  (try
-    (datastore/link-issue-contexts db selected-issue 
-                                   (vec (set (conj (keys (:contexts selected-issue))
-                                                   (:id arg)))))
-    {:link-context   nil
-     :selected-issue (datastore/get-issue db selected-issue)
-     :active-search  nil
-     :issues         (search/search-issues db (dissoc opts :q))
-     :q              nil}
-    (catch Exception e 
-      (log/error (str "Caught an exception in link-selected-issue-to-context " (.getMessage e)))
-      (throw e))))
+  [db {:keys [selected-issue selected-context] :as opts} arg]
+
+  (let [selected-issue (or selected-issue
+                           (get-item/get-item db selected-context))
+        contexts (merge (:contexts selected-issue)
+                        {(:id arg) (:title arg)})]
+    (try
+      (datastore/link-issue-contexts db selected-issue (vec (set (keys contexts))))
+      {:link-context   nil
+       :selected-issue (datastore/get-issue db selected-issue)
+       :active-search  nil
+       :issues         (search/search-issues db (dissoc opts :q))
+       :q              nil}
+      (catch Exception e 
+        (log/error (str "Caught an exception in link-selected-issue-to-context " (.getMessage e)))
+        (throw e)))))
 
 (defn- link-issue-to-selected-issue [db {:keys [selected-issue] :as opts} arg]
   (try
@@ -393,12 +396,13 @@
      :search-globally? false
      :q                nil}))
 
-(defn update-issue [db {:keys [selected-issue] :as opts} arg]
-  (datastore/link-issue-contexts db selected-issue (:issue-contexts arg))
-  {:selected-issue (when-not (:deselect-issue? arg)
-                     (datastore/update-issue db (:issue arg)))
-   :issues         (search/search-issues db (dissoc opts :q))
-   :q              nil})
+(defn update-issue [db opts arg]
+  (let [{:keys [data]}
+        (datastore/link-issue-contexts db (:issue (:issue arg)) (:issue-contexts arg))]
+    {:selected-issue (when-not (:deselect-issue? arg)
+                       (datastore/update-issue db (assoc-in (:issue arg) [:issue :data] data)))
+     :issues         (search/search-issues db (dissoc opts :q))
+     :q              nil}))
 
 (defn split-issue [db {{selected-context-id :id} :selected-context :as opts} arg]
   (let [issue arg 
