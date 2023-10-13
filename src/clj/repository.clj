@@ -227,7 +227,7 @@
   (try
     (let [selected-issue (datastore/get-issue db {:id arg})
           context-ids   (keys (:contexts selected-issue))] 
-      (datastore/link-issue-contexts db {:id arg} (vec (set (conj context-ids (:id selected-context)))))
+      (datastore/set-containers-of-item! db {:id arg} (vec (set (conj context-ids (:id selected-context)))))
       {:selected-issue   nil
        :issues           (search/search-issues db 
                                                (-> opts
@@ -258,7 +258,7 @@
                         {(:id arg) (:title arg)})]
     (log/info (str "repository/link-selected-item-to-context " selected-issue))
     (try
-      (datastore/link-issue-contexts db selected-issue (vec (set (keys contexts))))
+      (datastore/set-containers-of-item! db selected-issue (vec (set (keys contexts))))
       {:link-context   nil
        :selected-issue (datastore/get-issue db selected-issue)
        :active-search  nil
@@ -409,7 +409,7 @@
   (fn [opts arg]
     (log/info (str "repository/update-issue " arg))
     (try 
-      (datastore/link-issue-contexts db
+      (datastore/set-containers-of-item! db
                                      (or (:issue (:issue arg))
                                          (:issue arg))
                                      (:issue-contexts arg))

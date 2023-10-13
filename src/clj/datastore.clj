@@ -1,6 +1,7 @@
 (ns datastore
   (:require [next.jdbc :as jdbc]
             [honey.sql :as sql]
+            [cheshire.core :as json]
             [datastore.issues :as issues]
             [datastore.contexts :as contexts]
             [datastore.get-item :as get-item]
@@ -32,7 +33,43 @@
 
 (def reprioritize-issue issues/reprioritize-issue) 
 
-(def link-issue-contexts issues/link-issue-contexts)
+(defn derive-containers-of-item!
+  "Sets the :contexts property under :data to either the provided
+   value or takes it by calculating the contexts via get-item.
+   @returns the updated item."
+  ([db item] (derive-containers-of-item! db item nil))
+  ([db {:keys [id] :as item} contexts]
+   (let [item (get-item/get-item db item)
+         data (:data item)
+         data (assoc data :contexts (or contexts
+                                        (:contexts item)))]
+     (jdbc/execute-one! db
+                        (sql/format {:update [:issues]
+                                     :where  [:= :id [:inline id]]
+                                     :set    {:data        [:inline (json/generate-string
+                                                                     data)]}})
+                        {}))
+   (get-issue db item)))
+
+(defn set-containers-of-item!
+  "Sets the containers of a given item and calculated the derived ones.
+   @params container-ids
+   @returns the updated item."
+  [db selected-issue container-ids]
+  (jdbc/execute! db (sql/format {:delete-from [:collections]
+                                 :where [:= :item_id [:inline (:id selected-issue)]]}))
+  (doall (for [container-id container-ids]
+           (jdbc/execute! db (sql/format {:insert-into [:collections]
+                                          :columns [:item_id :container_id]
+                                          :values [[[:inline (:id selected-issue)]
+                                                    [:inline container-id]]]}))))
+  (derive-containers-of-item! db selected-issue
+                              (->> container-ids
+                                   (map #(do {:id %}))
+                                   (map (partial get-issue db))
+                                   (map (fn [item] [(:id item)
+                                                    (:title item)]))
+                                   (into {}))))
 
 (defn upgrade-issue-to-context [db {:keys [id] :as item}]
   (jdbc/execute-one! db
@@ -41,7 +78,7 @@
                                   :set    {:is_context true
                                            :updated_at  [:raw "NOW()"]}})
                      {:return-keys true})
-  (issues/update-contexts db item))
+  (derive-containers-of-item! db item))
 
 (def delete-issue issues/delete-issue)
 

@@ -81,39 +81,6 @@
                                  :set {:updated_at [:raw "NOW()"]}
                                  :where [:= :id [:inline id]]})))
 
-(defn update-contexts 
-  "Sets the :contexts property under :data to either the provided
-   value or takes it by calculating the contexts via get-item"
-  ([db item] (update-contexts db item nil))
-  ([db {:keys [id] :as item} contexts]
-   (let [item (get-issue db item)
-         data (:data item)
-         data (assoc data :contexts (or contexts
-                                        (:contexts item)))]
-     (jdbc/execute-one! db
-                        (sql/format {:update [:issues]
-                                     :where  [:= :id [:inline id]]
-                                     :set    {:data        [:inline (json/generate-string
-                                                                     data)]}})
-                        {}))
-   (get-issue db item)))
-
-(defn link-issue-contexts [db selected-issue link-issue-contexts]
-  (jdbc/execute! db (sql/format {:delete-from [:collections]
-                                 :where [:= :item_id [:inline (:id selected-issue)]]}))
-  (doall (for [context-id link-issue-contexts]
-           (jdbc/execute! db (sql/format {:insert-into [:collections]
-                                          :columns [:item_id :container_id]
-                                          :values [[[:inline (:id selected-issue)]
-                                                    [:inline context-id]]]}))))
-  (update-contexts db selected-issue
-   (->> link-issue-contexts
-        (map #(do {:id %}))
-        (map (partial get-issue db))
-        (map (fn [item] [(:id item)
-                         (:title item)]))
-        (into {}))))
-
 (defn- create-new-issue! [db title short_title]
   (:issues/id (jdbc/execute-one!
                db
