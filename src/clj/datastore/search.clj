@@ -50,7 +50,9 @@
 (defn- filter-contexts [{:keys [link-context selected-context selected-issue]} contexts]
   (if-not link-context
     (remove #(= (:id selected-context) (:id %)) contexts)
-    (let [ids-of-contexts-to-remove (set (keys (:contexts selected-issue)))]
+    (let [ids-of-contexts-to-remove (conj (set (keys (or (:contexts selected-issue)
+                                                         (:contexts selected-context))))
+                                          (:id (or selected-issue selected-context)))]
       (remove #(ids-of-contexts-to-remove (:id %)) contexts))))
 
 (defn search-contexts
@@ -65,7 +67,6 @@
                       (jdbc/execute! db all-contexts-query)
                       (jdbc/execute! db (query-string-contexts-query q)))
                     (map contexts.core/post-process)
-                    #_(map (partial get-item/get-item db))
                     (filter-contexts opts))]
         result)
       (catch Exception e
