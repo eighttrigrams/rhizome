@@ -304,9 +304,12 @@
       (throw e))))
 
 (defn update-context [db opts arg]
-  {:selected-context (datastore/update-context db arg)
-   :issues           (search/search-issues db (dissoc opts :q))
-   :q                nil})
+  (let [selected-context (datastore/update-context db arg)]
+    {:selected-context selected-context
+     :issues           (search/search-issues db (-> opts
+                                                    (dissoc :q)
+                                                    (assoc :selected-context selected-context)))
+     :q                nil}))
 
 (defn search-contexts [db opts]
   {:contexts (search/search-contexts db opts)})
