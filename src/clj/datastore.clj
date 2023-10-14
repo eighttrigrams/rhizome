@@ -21,13 +21,9 @@
 ;; TODO move to search ns, explore varags here, make tut about varargs and destructuring?
 ;; TODO in minimals, show examples which use substitution/formatting
 
-(def update-issue issues/update-issue)
-
 (def get-issue get-item/get-item)
 
 (def update-issue-description issues/update-issue-description)
-
-(def new-issue issues/new-issue)
 
 (def link-issue issues/link-issue)
 
@@ -50,6 +46,15 @@
                                                                      data)]}})
                         {}))
    (get-issue db item)))
+
+(defn update-issue [db {:keys [issue] :as args}] 
+  (derive-containers-of-item! db issue)
+  (issues/update-issue db args))
+
+(defn new-issue [db & args]
+  (let [issue (apply issues/new-issue db args)]
+    (derive-containers-of-item! db issue)
+    issue))
 
 (defn set-containers-of-item!
   "Sets the containers of a given item and calculated the derived ones.

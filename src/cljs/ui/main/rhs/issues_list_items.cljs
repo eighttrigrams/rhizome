@@ -25,7 +25,7 @@
    [:> ReactMarkdown
     {:children title}]])
 
-(defn related-issues-list-item-component [*state {:keys [id title contexts] :as issue}]
+(defn related-issues-list-item-component [*state {:keys [id title] :as issue}]
   [:li.card.issue-card
    {:on-click #(do (swap! *state (fn [state] ;; TODO review and dedup with issues-list-item/component
                                    (-> state
@@ -44,7 +44,7 @@
    [:div
     [title-component title]
     [info-component @*state issue]
-    [context-badges/component contexts]]])
+    [context-badges/component (:contexts (:data issue))]]])
 
 (defn regular-issues-list-item-component [*state issue idx select-fn]
   (let [simple-card? (and (:notes-mode (:current (:views (:data (:selected-context @*state)))))
@@ -53,7 +53,7 @@
      {:class          (str (if simple-card? 
                              "simple-card"
                              "card") (when (= (:id (:selected-issue @*state))
-                                     (:id issue)) " selected"))
+                                              (:id issue)) " selected"))
       :id             (str "issue-card-" idx)
       :on-click       #(let [skip-select? (and (deref modifiers/*alt-pressed?)
                                                (not= :issues (:active-search @*state)))]
@@ -88,4 +88,4 @@
                                                (first %)) 
                                            (merge (when (:is_context issue) 
                                                     {0 "⭕"})
-                                                  (:contexts issue)))]])]]))
+                                                  (:contexts (:data issue))))]])]]))

@@ -3,19 +3,6 @@
             [honey.sql :as sql]
             [datastore.issues.common :as common]))
 
-(defn- related-issues-query [id]
-  {:select [:issues.*
-            [[:array_agg :issues_o.id] :context_ids]
-            [[:array_agg :issues_o.title] :context_titles]
-            {:select :date
-             :from   [:events]
-             :where  [:= :events.issue_id :issues.id]}]
-   :from   [:issues]
-   :join   [:collections [:= :issues.id :collections.item_id]
-            [:issues :issues_o] [:= :collections.container_id :issues_o.id]]
-   :group-by [:issues.id]
-   :where  [:= :issues.id [:inline id]]})
-
 (declare get-item)
 
 (defn- join-related-issues [db issue]
@@ -25,7 +12,8 @@
              (->> issue
                   :related_issues_ids
                   .getArray
-                  (map #(get-item db {:id %} true))
+                  (map #(get-item db {:id %} {:skip-relations? true
+                                              :skip-containers? true}))
                   set))))
 
 (defn- basic-issues-query [id]
@@ -87,10 +75,13 @@
                        :contexts {224 \"some-context-title\"}})
    }
    "
-  ([db item] (get-item db item false))
-  ([db {:keys [id]} skip-relations?]
+  ([db item] (get-item db item {:skip-relations? false
+                                :skip-containers? false}))
+  ([db {:keys [id]} {:keys [skip-relations? skip-containers?]}]
    (try
-     (let [collections (:contexts (get-collections db id))
+     (let [collections (if-not skip-containers?
+                         (:contexts (get-collections db id))
+                         nil)
            relations (if-not skip-relations?
                        (:related_issues (get-issue-with-related-issues db id))
                        nil)]
