@@ -127,7 +127,6 @@
                            :active-search :contexts
                            :link-context true)))
 
-;; TODO this should be moved to the backend
 (defn unlink-selected-issue-from-selected-context [*state]
   (fetch-and-reset-with-method! *state @*state api/unlink-selected-item-from-container))
 
