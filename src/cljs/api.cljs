@@ -56,3 +56,5 @@
 (defn-over-http unlink-selected-item-from-container :return-value {})
 
 (defn-over-http cycle-context-preview :return-value {})
+
+(defn-over-http delete-context :return-value {})

@@ -74,17 +74,20 @@
                opts)
         {:keys [q]} opts]
     (try
-      (->>
-       (if (= "" (or q ""))
-         (jdbc/execute! db all-contexts-query)
-         (jdbc/execute! db (query-string-contexts-query q)))
-       (map :issues/id)
-       (ids-query)
-       (jdbc/execute! db)
-       (map common/post-process)
-       (filter-contexts opts))
+      (let [ids (->> (if (= "" (or q ""))
+                       all-contexts-query
+                       (query-string-contexts-query q))
+                     (jdbc/execute! db)
+                     (map :issues/id))]
+        (if (> (count ids) 0)
+          (->> ids
+               (ids-query)
+               (jdbc/execute! db)
+               (map common/post-process)
+               (filter-contexts opts))
+          '()))
       (catch Exception e
-        (log/error (str "error in search-contexts: " (.getMessage e) " - param was: " q))
+        (log/error (str "error in search/search-contexts: " e " - param was: " q))
         (throw e)))))
 
 (defn- fetch-ids [ds q selected-context events-view]
@@ -187,8 +190,8 @@
 (defn- do-fetch-ids 
   [db {:keys [q search-globally? selected-context]
        :or   {q ""}
-       :as state
-       }]
+       :as state}]
+       
   (seq (fetch-ids db 
                   q 
                   (if search-globally? nil selected-context) 
@@ -208,7 +211,7 @@
       (remove #((set (keys (:contexts %))) (:id selected-context)) issues))))
 
 (defn- sort-issues [{{{{{:keys [search-mode]} :current} :views} :data} 
-                       :selected-context :as state} 
+                     :selected-context :as state} 
                     issues]
   (let [events-view (get-events-view state)
         in-events-view? (not= 0 events-view)]

@@ -23,6 +23,7 @@
                                 upgrade-issue-to-context
                                 unlink-selected-item-from-container
                                 fetch-context
+                                delete-context
                                 cycle-context-preview
                                 flip-privacy]]))
 
@@ -50,4 +51,5 @@
   unlink-selected-item-from-container
   upgrade-issue-to-context
   fetch-context
+  delete-context
   flip-privacy)

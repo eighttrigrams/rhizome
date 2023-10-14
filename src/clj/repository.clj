@@ -202,6 +202,17 @@
     {:issues         (search/search-issues db opts)
      :selected-issue nil}))
 
+(defn delete-context [{:keys [db]}]
+  (fn [opts arg]
+    (try 
+      (datastore/delete-context db arg)
+      {:issues           (search/search-issues db opts)
+       :contexts         (search/search-contexts db "")
+       :selected-context nil}
+      (catch Exception e
+        (log/error (str "Caught an exception in repository/delete-context " e))
+        {}))))
+
 (defn insert-issue [{:keys [db]}]
   (fn [{:keys                                                                                         [selected-context]
         {{{{:keys [selected-secondary-contexts
@@ -507,11 +518,6 @@
          :start-linking-selected-issue-to-context (start-linking-selected-issue-to-context-with-local-search db opts)
          :start-context-search (start-context-search db opts)
          :split-issue (split-issue db opts arg)
-         :delete-context
-         (do (datastore/delete-context db arg)
-             {:issues           (search/search-issues db opts)
-              :contexts         (search/search-contexts db "")
-              :selected-context nil})
          :link-context (link-selected-issue-to-context db opts arg)
          :insert-context
          {:selected-context                        (datastore/new-context db arg)

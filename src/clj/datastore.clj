@@ -1,6 +1,7 @@
 (ns datastore
   (:require [next.jdbc :as jdbc]
             [honey.sql :as sql]
+            [cambium.core :as log]
             [cheshire.core :as json]
             [datastore.issues :as issues]
             [datastore.contexts :as contexts]
@@ -87,6 +88,7 @@
 
 (defn delete-context
   [db {:keys [id]}]
+  (log/info (str "Prepare deleting context with id '" id "'"))
   (doall
    (for [issue-relation ;
          (map un-namespace-keys 
@@ -102,7 +104,9 @@
                                                               :where  [:= :item_id (:item_id issue-relation)]})
                                                  {:return-keys true}))]
        (if (= 1 (count context-relations))
-         (issues/delete-issue db {:id (:item_id issue-relation)})
+         (do
+           (log/info (str "Delete Issue relation: '" (:id issue-relation) "'"))
+           (issues/delete-issue db {:id (:item_id issue-relation)}))
          (jdbc/execute! db
                         (sql/format {:delete-from [:collections]
                                      :where       [:and 
