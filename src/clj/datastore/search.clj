@@ -6,7 +6,6 @@
             [next.jdbc :as jdbc]
             [honey.sql :as sql]
             [datastore.issues.common :as common]
-            [datastore.contexts.core :as contexts.core]
             [datastore.get-item :as get-item]))
 
 (defn- remove-some-chars [q]
