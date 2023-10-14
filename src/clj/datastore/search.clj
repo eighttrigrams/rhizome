@@ -112,8 +112,12 @@
   {:select   [:issues.*
               {:select :date
                :from   [:events]
-               :where  [:= :events.issue_id :issues.id]}]
+               :where  [:= :events.issue_id :issues.id]}
+              [[:array_agg :issues_o.id] :context_ids]
+              [[:array_agg :issues_o.title] :context_titles]]
    :from     [:issues]
+   :join     [:collections [:= :issues.id :collections.item_id]
+              [:issues :issues_o] [:= :collections.container_id :issues_o.id]]
    :where    [:in :issues.id [:inline ids]]
    :group-by [:issues.id]
    :order-by [[:issues.updated_at :desc]]})
@@ -220,7 +224,7 @@
          issues-query
          sql/format
          (jdbc/execute! db)
-         (map common/post-process-without-join-contexts)
+         (map common/post-process)
          (sort-issues opts)
          (filter-by-selected-secondary-contexts 
           (into #{} selected-secondary-contexts)
