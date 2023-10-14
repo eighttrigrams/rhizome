@@ -84,8 +84,11 @@
       (when-not simple-card?
         [:<>
          [info-component @*state issue]
-         [context-badges/component (remove #(= (:id (:selected-context @*state))
+         [context-badges/component (remove #(= (str (:id (:selected-context @*state)))
                                                (first %)) 
                                            (merge (when (:is_context issue) 
-                                                    {0 "⭕"})
-                                                  (:contexts (:data issue))))]])]]))
+                                                    {"0" "⭕"})
+                                                  (into {}
+                                                        (map (fn [[k v]] 
+                                                               [(name k) v]) 
+                                                             (:contexts (:data issue))))))]])]]))
