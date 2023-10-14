@@ -422,15 +422,17 @@
         (log/error (str "Caught an repository/upgrade-issue-to-context " (.getMessage e)))))))
 
 (defn unlink-selected-item-from-container [{:keys [db]}]
-  (fn [{:keys [selected-issue selected-context]}]
+  (fn [{:keys [selected-issue selected-context] :as state}]
     (try 
       (log/info (str "repository/unlink-selected-item-from-container" (:id selected-issue)))
       (let [selected-context-id (:id selected-context)
             selected-issue (update selected-issue :contexts #(dissoc % selected-context-id))
             issue-contexts-ids (keys (:contexts selected-issue))]
-        {:selected-issue (datastore/set-containers-of-item! db
-                                                            selected-issue
-                                                            issue-contexts-ids)})
+        (datastore/set-containers-of-item! db
+                                           selected-issue
+                                           issue-contexts-ids)
+        {:selected-issue nil
+         :issues (search/search-issues db state)})
       (catch Exception e
         (log/error (str "Caught an repository/unlink-selected-item-from-container " (.getMessage e)))))))
 
