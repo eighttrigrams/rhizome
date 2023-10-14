@@ -24,7 +24,6 @@
       join-contexts
       simplify-date
       parse-data
-      (#(dissoc % :searchable))
       (dissoc :searchable)))
 
 ;; TODO dedup with fn above

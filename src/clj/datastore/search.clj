@@ -33,19 +33,30 @@
       "*"
       qs)))
 
-(def all-contexts-query (sql/format {:select :*
+(def all-contexts-query (sql/format {:select [:issues.*
+                                              [[:array_agg :issues_o.id] :context_ids]
+                                              [[:array_agg :issues_o.title] :context_titles]]
                                      :from [:issues]
                                      :where [:= :issues.is_context true]
-                                     :order-by [[:updated_at :desc]]}))
+                                     :left-join [:collections [:= :issues.id :collections.item_id]
+                                                [:issues :issues_o] [:= :collections.container_id :issues_o.id]]
+                                     :order-by [[:updated_at :desc]]
+                                     :group-by [:issues.id]
+                                     :limit 500}))
 
 (defn- query-string-contexts-query [q]
-  (sql/format {:select :*
+  (sql/format {:select [:issues.*
+                        [[:array_agg :issues_o.id] :context_ids]
+                        [[:array_agg :issues_o.title] :context_titles]]
                :from   [:issues]
                :where [:and
                        [:raw (format "searchable @@ to_tsquery('simple', '%s')"
                                      (convert-q-to-query-string q))]
                        [:= :issues.is_context true]]
-               :order-by [[:updated_at :desc]]}))
+               :left-join [:collections [:= :issues.id :collections.item_id]
+                          [:issues :issues_o] [:= :collections.container_id :issues_o.id]]
+               :order-by [[:updated_at :desc]]
+               :group-by [:issues.id]}))
 
 (defn- filter-contexts [{:keys [link-context selected-context selected-issue]} contexts]
   (if-not link-context
@@ -66,7 +77,7 @@
                     (if (= "" (or q ""))
                       (jdbc/execute! db all-contexts-query)
                       (jdbc/execute! db (query-string-contexts-query q)))
-                    (map contexts.core/post-process)
+                    (map common/post-process)
                     (filter-contexts opts))]
         result)
       (catch Exception e
