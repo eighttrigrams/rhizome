@@ -122,8 +122,7 @@
                 (-> *state deref :selected-context :data :views :current :context-preview))
        [:<>
         [:> ReactMarkdown
-         {:children (:description (:selected-context @*state))}]
-        [:hr]])
+         {:children (:description (:selected-context @*state))}]])
      (when-not (or (:search-globally? @*state)
                    (-> *state deref :selected-context :data :views :current :context-preview)) 
        [:<>
