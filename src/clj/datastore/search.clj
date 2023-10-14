@@ -32,30 +32,32 @@
       "*"
       qs)))
 
-(def all-contexts-query (sql/format {:select [:issues.*
-                                              [[:array_agg :issues_o.id] :context_ids]
-                                              [[:array_agg :issues_o.title] :context_titles]]
+(def all-contexts-query (sql/format {:select :issues.id
                                      :from [:issues]
                                      :where [:= :issues.is_context true]
-                                     :left-join [:collections [:= :issues.id :collections.item_id]
-                                                [:issues :issues_o] [:= :collections.container_id :issues_o.id]]
                                      :order-by [[:updated_at :desc]]
-                                     :group-by [:issues.id]
                                      :limit 500}))
 
 (defn- query-string-contexts-query [q]
-  (sql/format {:select [:issues.*
-                        [[:array_agg :issues_o.id] :context_ids]
-                        [[:array_agg :issues_o.title] :context_titles]]
+  (sql/format {:select :issues.id
                :from   [:issues]
                :where [:and
                        [:raw (format "searchable @@ to_tsquery('simple', '%s')"
                                      (convert-q-to-query-string q))]
                        [:= :issues.is_context true]]
-               :left-join [:collections [:= :issues.id :collections.item_id]
-                          [:issues :issues_o] [:= :collections.container_id :issues_o.id]]
-               :order-by [[:updated_at :desc]]
-               :group-by [:issues.id]}))
+               :order-by [[:updated_at :desc]]}))
+
+(defn- ids-query [ids]
+  (sql/format
+   {:select    [:issues.*
+                [[:array_agg :issues_o.id] :context_ids]
+                [[:array_agg :issues_o.title] :context_titles]]
+    :from      [:issues]
+    :where     [:in :issues.id [:inline ids]]
+    :left-join [:collections [:= :issues.id :collections.item_id]
+                [:issues :issues_o] [:= :collections.container_id :issues_o.id]]
+    :group-by [:issues.id]
+    :order-by  [[:updated_at :desc]]}))
 
 (defn- filter-contexts [{:keys [link-context selected-context selected-issue]} contexts]
   (if-not link-context
@@ -72,13 +74,15 @@
                opts)
         {:keys [q]} opts]
     (try
-      (let [result (->>
-                    (if (= "" (or q ""))
-                      (jdbc/execute! db all-contexts-query)
-                      (jdbc/execute! db (query-string-contexts-query q)))
-                    (map common/post-process)
-                    (filter-contexts opts))]
-        result)
+      (->>
+       (if (= "" (or q ""))
+         (jdbc/execute! db all-contexts-query)
+         (jdbc/execute! db (query-string-contexts-query q)))
+       (map :issues/id)
+       (jdbc/execute! db
+                      (ids-query ids))
+       (map common/post-process)
+       (filter-contexts opts))
       (catch Exception e
         (log/error (str "error in search-contexts: " (.getMessage e) " - param was: " q))
         (throw e)))))
