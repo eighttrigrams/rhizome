@@ -79,8 +79,8 @@
          (jdbc/execute! db all-contexts-query)
          (jdbc/execute! db (query-string-contexts-query q)))
        (map :issues/id)
-       (jdbc/execute! db
-                      (ids-query ids))
+       (ids-query)
+       (jdbc/execute! db)
        (map common/post-process)
        (filter-contexts opts))
       (catch Exception e
