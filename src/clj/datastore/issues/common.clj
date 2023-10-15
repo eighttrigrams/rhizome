@@ -4,16 +4,16 @@
              :refer [un-namespace-keys simplify-date]]))
 
 (defn- join-contexts [issue]
-  (let [contexts (zipmap (zipmap (.getArray (:context_ids issue))
-                                 (.getArray (:context_titles issue)))
-                         (.getArray (:context_short_titles issue)))
-        contexts (into {} (map (fn [[[id title] short-title]]
-                                 [id (if (and short-title
-                                              (not= "" short-title))
-                                       short-title
-                                       title)]
-                                 )contexts))
-        contexts (dissoc contexts nil)]
+  (let [contexts (-> (into {}
+                           (map (fn [id title short_title]
+                                  [id (if (and short_title
+                                               (not= "" short_title))
+                                        short_title
+                                        title)])
+                                (.getArray (:context_ids issue))
+                                (.getArray (:context_titles issue))
+                                (.getArray (:context_short_titles issue))))
+                     (dissoc nil))]
     (-> issue
         (dissoc :context_ids)
         (dissoc :context_titles)
