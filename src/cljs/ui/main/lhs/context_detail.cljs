@@ -144,6 +144,7 @@
       [secondary-contexts-component *state]]]))
 
 (defn component [*state]
-  (if-not (-> *state deref :selected-context :data :views :current :context-preview)
+  [context-detail-component *state]
+  #_(if-not (-> *state deref :selected-context :data :views :current :context-preview)
     [context-detail-component *state]
     [issue-detail/component *state true]))

@@ -184,7 +184,18 @@
   (fetch-and-reset-with-method! *state @*state api/cycle-notes-mode))
 
 (defn cycle-context-preview! [*state]
-  (fetch-and-reset-with-method! *state @*state api/cycle-context-preview))
+  (fetch-and-reset-with-method! *state
+                                @*state
+                                api/select-issue
+                                (:selected-context @*state)
+                                false))
+
+(defn cycle-context-preview-2! [*state]
+  (prn "yoooooo")
+  (fetch-and-reset-with-method! *state
+                                @*state
+                                api/fetch-context
+                                [(:selected-context @*state) false]))
 
 (defn flip-privacy! [*state]
   (fetch-and-reset-with-method! *state @*state api/flip-privacy))

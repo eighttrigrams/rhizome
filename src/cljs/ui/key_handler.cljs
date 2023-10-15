@@ -90,6 +90,10 @@
                     (not selected-issue)
                     (= "KeyF" code))
                (actions/cycle-context-preview! *state)
+               (and selected-issue
+                    (:is_context selected-issue)
+                    (= "KeyF" code))
+               (actions/cycle-context-preview-2! *state)
                (and selected-context
                     (not selected-issue)
                     (= "KeyB" code)
