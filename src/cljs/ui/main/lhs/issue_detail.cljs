@@ -34,19 +34,21 @@
     [:> ReactMarkdown
      {:children description}]]])
 
-(defn component [*state]
+(defn component [*state suppress-switcher?]
   (let [{:keys [selected-issue selected-context]} @*state
         {:keys [contexts]} selected-issue]
     [:<>
-     [:h4 (if selected-context 
-            
-            [:div
-             {:on-click #(actions/deselect-issue! *state)}
-             (str "[" (:title selected-context) "]")] 
-            
-            "[Overview]")]
-     [context-links-component *state contexts]
-     [:hr]
+     [:h4 (when-not suppress-switcher?
+            (if selected-context
+              [:div
+               {:on-click #(actions/deselect-issue! *state)}
+               (str "[" (:title selected-context) "]")] 
+              
+              "[Overview]"))]
+     (when-not suppress-switcher?
+       [:<>
+        [context-links-component *state contexts]
+        [:hr]])
      [the-issue-itself-component (or selected-issue
                                      selected-context)]]))
 

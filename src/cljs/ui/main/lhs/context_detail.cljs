@@ -146,4 +146,4 @@
 (defn component [*state]
   (if-not (-> *state deref :selected-context :data :views :current :context-preview)
     [context-detail-component *state]
-    [issue-detail/component *state]))
+    [issue-detail/component *state true]))
