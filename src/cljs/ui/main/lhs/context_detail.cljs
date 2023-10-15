@@ -118,34 +118,32 @@
 (defn context-detail-component []
   (fn [*state]
     [:<>
-     (when (and (not= "" (:description (:selected-context @*state)))
-                (not (nil? (:description (:selected-context @*state)))))
-       [:<>
-        [:> ReactMarkdown
-         {:children (:description (:selected-context @*state))}]])
-     (when-not (or (:search-globally? @*state)
-                   (-> *state deref :selected-context :data :views :current :context-preview))
-       [:<>
-        (if (or (= 0 (:events-view (:current (:views (:data (:selected-context @*state))))))
-                (nil? (:events-view (:current (:views (:data (:selected-context @*state)))))))
-          [:h4 "Search mode: "
-           (case (:search-mode (:current (:views (:data (:selected-context @*state)))))
-             0 "Normal"
-             1 "A->Z,0->9"
-             2 "9->0,Z->A"
-             nil "Normal")]
-          [:h4 "Events View: "
-           (case (:events-view (:current (:views (:data (:selected-context @*state)))))
-             0 "Normal"
-             1 "Events"
-             2 "Archived"
-             nil "Normal")])
-        [views-component *state]
-        [invert-component *state]
-        [secondary-contexts-component *state]])]))
+     #_(when (and (not= "" (:description (:selected-context @*state)))
+                  (not (nil? (:description (:selected-context @*state)))))
+         [:<>
+          [:> ReactMarkdown
+           {:children (:description (:selected-context @*state))}]])
+     
+     [:<>
+      (if (or (= 0 (:events-view (:current (:views (:data (:selected-context @*state))))))
+              (nil? (:events-view (:current (:views (:data (:selected-context @*state)))))))
+        [:h4 "Search mode: "
+         (case (:search-mode (:current (:views (:data (:selected-context @*state)))))
+           0 "Normal"
+           1 "A->Z,0->9"
+           2 "9->0,Z->A"
+           nil "Normal")]
+        [:h4 "Events View: "
+         (case (:events-view (:current (:views (:data (:selected-context @*state)))))
+           0 "Normal"
+           1 "Events"
+           2 "Archived"
+           nil "Normal")])
+      [views-component *state]
+      [invert-component *state]
+      [secondary-contexts-component *state]]]))
 
 (defn component [*state]
-  (prn "->" (-> *state deref :selected-context :data :views :current :context-preview))
   (if-not (-> *state deref :selected-context :data :views :current :context-preview)
     [context-detail-component *state]
     [issue-detail/component *state]))

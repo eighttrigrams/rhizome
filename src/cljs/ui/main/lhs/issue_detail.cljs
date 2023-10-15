@@ -47,7 +47,8 @@
             "[Overview]")]
      [context-links-component *state contexts]
      [:hr]
-     [the-issue-itself-component selected-issue]]))
+     [the-issue-itself-component (or selected-issue
+                                     selected-context)]]))
 
 (defn preview-component [issue]
   (the-issue-itself-component issue))
