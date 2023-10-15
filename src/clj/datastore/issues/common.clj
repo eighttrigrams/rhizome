@@ -9,19 +9,16 @@
                          (.getArray (:context_short_titles issue)))
         contexts (into {} (map (fn [[[id title] short-title]]
                                  [id (if (and short-title
-                                                (not= "" short-title))
+                                              (not= "" short-title))
                                        short-title
                                        title)]
-                                 ) contexts))
-        contexts (dissoc contexts nil)
-        result
-        (-> issue
-            (dissoc :context_ids)
-            (dissoc :context_titles)
-            (dissoc :context_short_titles)
-            (assoc :contexts contexts))]
-    (prn "result" contexts)
-    result))
+                                 )contexts))
+        contexts (dissoc contexts nil)]
+    (-> issue
+        (dissoc :context_ids)
+        (dissoc :context_titles)
+        (dissoc :context_short_titles)
+        (assoc :contexts contexts))))
 
 (defn- parse-data [context]
   (if (:data context)
