@@ -1,6 +1,7 @@
 (ns ui.main.lhs.context-detail
   (:require [ui.actions :as actions]
             [ui.main.lhs.list-item :as list-item]
+            [ui.main.lhs.issue-detail :as issue-detail]
             ["react-markdown$default" :as ReactMarkdown]))
 
 (defn item-component [*state]
@@ -114,17 +115,16 @@
                         title]) 
                      (:stored (:views (:data (:selected-context @*state))))))])
 
-(defn component [_*state]
+(defn context-detail-component []
   (fn [*state]
     [:<>
      (when (and (not= "" (:description (:selected-context @*state)))
-                (not (nil? (:description (:selected-context @*state))))
-                (-> *state deref :selected-context :data :views :current :context-preview))
+                (not (nil? (:description (:selected-context @*state)))))
        [:<>
         [:> ReactMarkdown
          {:children (:description (:selected-context @*state))}]])
      (when-not (or (:search-globally? @*state)
-                   (-> *state deref :selected-context :data :views :current :context-preview)) 
+                   (-> *state deref :selected-context :data :views :current :context-preview))
        [:<>
         (if (or (= 0 (:events-view (:current (:views (:data (:selected-context @*state))))))
                 (nil? (:events-view (:current (:views (:data (:selected-context @*state)))))))
@@ -143,3 +143,9 @@
         [views-component *state]
         [invert-component *state]
         [secondary-contexts-component *state]])]))
+
+(defn component [*state]
+  (prn "->" (-> *state deref :selected-context :data :views :current :context-preview))
+  (if-not (-> *state deref :selected-context :data :views :current :context-preview)
+    [context-detail-component *state]
+    [issue-detail/component *state]))

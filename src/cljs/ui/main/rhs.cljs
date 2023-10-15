@@ -31,7 +31,8 @@
 
 (defn- related-issues-list-component [*state]
   [:ul.cards
-   (for [related-issue (:related_issues (:selected-issue @*state))]
+   (for [related-issue (:related_issues (or (:selected-issue @*state)
+                                            (:selected-context @*state)))]
      ^{:key (:id related-issue)}
      [issues-list-items/related-issues-list-item-component *state related-issue])])
 
@@ -43,7 +44,8 @@
          [input/component *state])
        [:div.scrollable
         {:class (when (= :issues (:active-search state)) :search-active)}
-        (if (or (not (:selected-issue state))
-                (= :issues (:active-search state)))
+        (if (and (or (not (:selected-issue state))
+                     (= :issues (:active-search state)))
+                 (not (-> *state deref :selected-context :data :views :current :context-preview)))
           [issues-list-component *state]
           [related-issues-list-component *state])]])))
