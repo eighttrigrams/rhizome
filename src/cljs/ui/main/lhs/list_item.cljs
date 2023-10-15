@@ -9,4 +9,4 @@
     :on-click #(actions/select-context! *state context)}
    [:div
     [:span.title.title1 (:title context)]
-    [context-badges/component (dissoc (:contexts context) nil)]]])
+    [context-badges/component (:contexts context)]]])

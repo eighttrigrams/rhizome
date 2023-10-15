@@ -33,7 +33,8 @@
   (-> (if (:join query) query (assoc query :join []))
       (update :select conj
               [[:array_agg :issues_o.id] :context_ids]
-              [[:array_agg :issues_o.title] :context_titles])
+              [[:array_agg :issues_o.title] :context_titles]
+              [[:array_agg :issues_o.short_title] :context_short_titles])
       (update :join conj
               :collections [:= :issues.id :collections.item_id]
               [:issues :issues_o] [:= :collections.container_id :issues_o.id])))
