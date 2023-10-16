@@ -44,8 +44,7 @@
          [input/component *state])
        [:div.scrollable
         {:class (when (= :issues (:active-search state)) :search-active)}
-        (if (and (or (not (:selected-issue state))
-                     (= :issues (:active-search state)))
-                 (not (-> *state deref :selected-context :data :views :current :context-preview)))
+        (if (or (not (:selected-issue state))
+                (= :issues (:active-search state)))
           [issues-list-component *state]
           [related-issues-list-component *state])]])))

@@ -180,15 +180,6 @@
       {:selected-context selected-context
        :issues           (search/search-issues db (assoc opts :selected-context selected-context))})))
 
-(defn cycle-context-preview [{:keys [db]}]
-  (fn [{:keys [selected-context] :as state}]
-    (let [selected-context (datastore/cycle-context-preview db selected-context)]
-      {:selected-context selected-context
-       :issues (search/search-issues 
-                db
-                (update-in state [:selected-context :data :views :current :context-preview] 
-                           not))})))
-
 (defn cycle-notes-mode [{:keys [db]}]
   (fn [{:keys [selected-context] :as _opts}]
     (let [selected-context (datastore/cycle-notes-mode db selected-context)]

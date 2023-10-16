@@ -183,15 +183,14 @@
 (defn cycle-notes-mode! [*state]
   (fetch-and-reset-with-method! *state @*state api/cycle-notes-mode))
 
-(defn cycle-context-preview! [*state]
+(defn show-context-as-issue! [*state]
   (fetch-and-reset-with-method! *state
                                 @*state
                                 api/select-issue
                                 (:selected-context @*state)
                                 false))
 
-(defn cycle-context-preview-2! [*state]
-  (prn "yoooooo")
+(defn show-context-as-context-again! [*state]
   (fetch-and-reset-with-method! *state
                                 @*state
                                 api/fetch-context

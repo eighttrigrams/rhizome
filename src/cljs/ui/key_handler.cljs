@@ -89,11 +89,11 @@
                (and selected-context
                     (not selected-issue)
                     (= "KeyF" code))
-               (actions/cycle-context-preview! *state)
+               (actions/show-context-as-issue! *state)
                (and selected-issue
                     (:is_context selected-issue)
                     (= "KeyF" code))
-               (actions/cycle-context-preview-2! *state)
+               (actions/show-context-as-context-again! *state)
                (and selected-context
                     (not selected-issue)
                     (= "KeyB" code)

@@ -108,16 +108,6 @@
                                        :where  [:= :id [:inline id]]}))
     (get-context db context)))
 
-(defn cycle-context-preview [db {:keys [id] :as context}]
-  (let [data (-> (get-context db context)
-                 :data
-                 (update-in [:views :current :context-preview]
-                            not))]
-    (jdbc/execute-one! db (sql/format {:update [:issues]
-                                       :set    {:data [:inline (json/generate-string data)]}
-                                       :where  [:= :id [:inline id]]}))
-    (get-context db context)))
-
 (defn cycle-search-mode [db {:keys [id] :as context}]
   (let [data (-> (get-context db context)
                  :data

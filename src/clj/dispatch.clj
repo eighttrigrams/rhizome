@@ -24,7 +24,6 @@
                                 unlink-selected-item-from-container
                                 fetch-context
                                 delete-context
-                                cycle-context-preview
                                 flip-privacy]]))
 
 (defdispatch-with-args handler 
@@ -47,7 +46,6 @@
   delete-selected-issue
   delete-issue 
   update-issue
-  cycle-context-preview
   unlink-selected-item-from-container
   upgrade-issue-to-context
   fetch-context
