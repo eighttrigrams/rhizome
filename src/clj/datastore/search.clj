@@ -131,6 +131,9 @@
               {:select :date
                :from   [:events]
                :where  [:= :events.issue_id :issues.id]}
+              {:select :archived
+               :from   [:events]
+               :where  [:= :events.issue_id :issues.id]}
               [[:array_agg :issues_o.id] :context_ids]
               [[:array_agg :issues_o.title] :context_titles]
               [[:array_agg :issues_o.short_title] :context_short_titles]]
@@ -141,7 +144,7 @@
    :group-by [:issues.id]
    :order-by [[:issues.updated_at :desc]]})
 
-(defn- re-order [issues search-mode]
+(defn- re-order [search-mode issues]
   (if (= 1 search-mode)
     (let [top (sort-by #(:short_title %) 
                        (filter #(and (some? (:short_title %))
@@ -155,6 +158,19 @@
                                    (filter #(and (= (:short_title_ints %) 0)
                                                  (some? (:short_title %))) issues)))]
       (concat top bottom))))
+
+(defn- expired-filter [issue]
+  (and
+   (not (:archived issue))
+   (:date issue)
+   (= 1 (.compareTo (java.time.Instant/now)
+                    (java.time.Instant/parse (str (:date issue) "T00:00:00Z"))))))
+
+;; TODO extract common pattern (top,bottom) with #re-order
+(defn- pin-events [issues]
+  (let [top (filter expired-filter issues)
+        bottom (remove  expired-filter issues)]
+    (concat top bottom)))
 
 (defn- filter-by-selected-secondary-contexts 
   [selected-secondary-contexts-set 
@@ -212,24 +228,30 @@
                 issues))
       (remove #((set (keys (:contexts %))) (:id selected-context)) issues))))
 
-(defn- sort-issues [{{{{{:keys [search-mode]} :current} :views} :data} 
-                     :selected-context :as state} 
+(defn- sort-for-events-view 
+  [issues events-view]
+  (->> issues 
+       (sort-by :date)
+       (filter :date)
+       (#(if (= 2 events-view)
+           (reverse %)
+           %))))
+
+(defn- sort-for-regular-view 
+  [issues 
+   {{{{{:keys [search-mode]} :current} :views} :data} :selected-context}]
+  (cond->> issues
+    (#{1 2} search-mode)
+    (re-order search-mode)
+    true pin-events))
+
+(defn- sort-issues [state 
                     issues]
   (let [events-view (get-events-view state)
         in-events-view? (not= 0 events-view)]
-    (->> issues
-         (#(if in-events-view?
-             (sort-by :date %) %))
-         (#(if in-events-view?
-             (filter :date %) %))
-         (#(if (and in-events-view?
-                    (= 2 events-view))
-             (reverse %)
-             %))
-         (#(if (and (not in-events-view?)
-                    (contains? #{1 2} search-mode))
-             (re-order % search-mode)
-             %)))))
+    (if in-events-view? 
+      (sort-for-events-view issues events-view)
+      (sort-for-regular-view issues state))))
 
 (defn- search-issues'
   [db {:keys                                                                                                                                [link-issue]

@@ -32,12 +32,3 @@
       simplify-date
       parse-data
       (dissoc :searchable)))
-
-;; TODO dedup with fn above
-(defn post-process-without-join-contexts [query-result]
-  (-> query-result
-      un-namespace-keys
-      simplify-date
-      parse-data
-      (#(dissoc % :searchable))
-      (dissoc :searchable)))
