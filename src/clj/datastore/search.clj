@@ -164,7 +164,7 @@
    (not (:archived issue))
    (:date issue)
    (= 1 (.compareTo (java.time.Instant/now)
-                    (java.time.Instant/parse (str (:date issue) "T07:45:00Z"))))))
+                    (java.time.Instant/parse (str (:date issue) "T05:45:00Z"))))))
 
 ;; TODO extract common pattern (top,bottom) with #re-order
 (defn- pin-events [issues]
