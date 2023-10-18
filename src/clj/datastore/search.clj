@@ -239,11 +239,12 @@
 
 (defn- sort-for-regular-view 
   [issues 
-   {{{{{:keys [search-mode]} :current} :views} :data} :selected-context}]
+   {{{{{:keys [search-mode]} :current} :views} :data} :selected-context
+    :keys [link-issue]}]
   (cond->> issues
     (#{1 2} search-mode)
     (re-order search-mode)
-    true pin-events))
+    (not link-issue) pin-events))
 
 (defn- sort-issues [state 
                     issues]
