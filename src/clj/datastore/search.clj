@@ -108,7 +108,9 @@
                                         #_[:+ :events.date [:raw "interval '6 hours'"]] 
                                         [:raw "NOW()"]]]}]})
         urgent-issues-ids 
-        (if (or link-issue (not= 0 events-view))
+        (if (or link-issue 
+                (not= 0 events-view)
+                selected-context)
           '()
           (jdbc/execute! 
            ds 
