@@ -110,7 +110,8 @@
         urgent-issues-ids 
         (if (or link-issue 
                 (not= 0 events-view)
-                selected-context)
+                selected-context
+                (and (string? q) (not= "" q)))
           '()
           (jdbc/execute! 
            ds 
