@@ -401,6 +401,7 @@
 
 (defn select-issue [{:keys [db]}]
   (fn [state issue skip-select?]
+    (prn "repository/select-issue")
     (datastore/reprioritize-issue db issue)
     {:selected-issue   (when-not skip-select? (datastore/get-issue db issue))
      :issues           (search/search-issues db (dissoc state 

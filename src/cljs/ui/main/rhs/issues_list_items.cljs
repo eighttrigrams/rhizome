@@ -26,6 +26,8 @@
     {:children title}]])
 
 (defn related-issues-list-item-component [*state {:keys [id title] :as issue}]
+  (prn "related-issues-list-item-component"
+       issue)
   [:li.card.issue-card
    {:on-click #(do (swap! *state (fn [state] ;; TODO review and dedup with issues-list-item/component
                                    (-> state
@@ -44,7 +46,7 @@
    [:div
     [title-component title]
     [info-component @*state issue]
-    [context-badges/component (:contexts (:data issue))]]])
+    [context-badges/component (:contexts issue)]]])
 
 (defn regular-issues-list-item-component [*state issue idx select-fn]
   (let [simple-card? (and (:notes-mode (:current (:views (:data (:selected-context @*state)))))

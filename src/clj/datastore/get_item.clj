@@ -5,7 +5,7 @@
 
 (declare get-item)
 
-(defn- join-related-issues [db issue]
+(defn- join-related-issues [db issue recursion-depth]
   (-> issue
       (dissoc :related_issues_ids)
       (assoc :related_issues
@@ -13,7 +13,9 @@
                   :related_issues_ids
                   .getArray
                   (map #(get-item db {:id %} {:skip-relations? true
-                                              :skip-containers? true}))
+                                              ;; precautionary measure
+                                              :skip-containers? (= 0 recursion-depth)
+                                              :recursion-depth (dec recursion-depth)}))
                   set))))
 
 (defn- basic-issues-query [id]
@@ -46,12 +48,12 @@
               :issue_issue [:= :issues.id :issue_issue.left_id]
               [:issues :related_issues] [:= :related_issues.id :issue_issue.right_id])))
 
-(defn- get-issue-with-related-issues [db id]
+(defn- get-issue-with-related-issues [db id recursion-depth]
   (when-let [result (-> (basic-issues-query id)
                         (add-in-relations)
                         sql/format
                         (#(jdbc/execute-one! db % {:return-keys true})))]
-    (join-related-issues db result)))
+    (join-related-issues db result recursion-depth)))
 
 (defn- get-issue-without-related-issues [db id]
   (-> (basic-issues-query id)
@@ -78,13 +80,14 @@
    "
   ([db item] (get-item db item {:skip-relations? false
                                 :skip-containers? false}))
-  ([db {:keys [id]} {:keys [skip-relations? skip-containers?]}]
+  ([db {:keys [id]} {:keys [skip-relations? skip-containers? recursion-depth] :as m
+                     :or {recursion-depth 3}}]
    (try
      (let [collections (if-not skip-containers?
                          (:contexts (get-collections db id))
                          nil)
            relations (if-not skip-relations?
-                       (:related_issues (get-issue-with-related-issues db id))
+                       (:related_issues (get-issue-with-related-issues db id recursion-depth))
                        nil)]
        (-> (get-issue-without-related-issues db id)
            common/post-process-without-join-contexts
