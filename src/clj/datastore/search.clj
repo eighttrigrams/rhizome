@@ -47,7 +47,7 @@
                        [:= :issues.is_context true]]
                :order-by [[:updated_at :desc]]}))
 
-(defn- ids-query [ids]
+(defn- context-ids-query [ids]
   (sql/format
    {:select    [:issues.*
                 [[:array_agg :issues_o.id] :context_ids]
@@ -82,7 +82,7 @@
                      (map :issues/id))]
         (if (> (count ids) 0)
           (->> ids
-               (ids-query)
+               (context-ids-query)
                (jdbc/execute! db)
                (map common/post-process)
                (filter-contexts opts))
@@ -91,8 +91,30 @@
         (log/error (str "error in search/search-contexts: " e " - param was: " q))
         (throw e)))))
 
-(defn- fetch-ids [ds q selected-context events-view]
-  (let [selected-context (when (:id selected-context) selected-context)
+(defn- fetch-issue-ids [ds q selected-context events-view link-issue]
+  (let [urgent-events-query
+        (sql/format
+         {:select   [:issues.id]
+          :from     [:issues]
+          :order-by [[:updated_at :desc]]
+          :where    [:exists {:select [:events.id]
+                              :from   [:events]
+                              :where  [:and
+                                       [:= :events.issue_id :issues.id]
+                                       [:not= :events.archived true]
+                                       [:< 
+                                        :events.date
+                                        ;; we sort later
+                                        #_[:+ :events.date [:raw "interval '6 hours'"]] 
+                                        [:raw "NOW()"]]]}]})
+        urgent-issues-ids 
+        (if (or link-issue (not= 0 events-view))
+          '()
+          (jdbc/execute! 
+           ds 
+           urgent-events-query))
+        urgent-issues-ids (map #(:issues/id %) urgent-issues-ids)
+        selected-context (when (:id selected-context) selected-context)
         search-clause       (if (not= "" q)
                               [:raw (format "searchable @@ to_tsquery('simple', '%s')" 
                                             (convert-q-to-query-string q))] 
@@ -123,8 +145,14 @@
                                      (when (and (= "" q)
                                                 (not selected-context)
                                                 (= 0 events-view))
-                                       {:limit 500})))]
-    (jdbc/execute! ds formatted-query)))
+                                       {:limit 500})))
+        issues-ids (jdbc/execute! ds formatted-query)
+        issues-ids (map #(:issues/id %) issues-ids)
+        all-issues-ids (concat urgent-issues-ids 
+                               issues-ids 
+                               ;; duplicates don't matter
+                               #_(remove #(contains? (set urgent-issues-ids) %) issues-ids))]
+    all-issues-ids))
 
 (defn- issues-query [ids]
   {:select   [:issues.*
@@ -206,14 +234,15 @@
         global-events-view) 0))
 
 (defn- do-fetch-ids 
-  [db {:keys [q search-globally? selected-context]
+  [db {:keys [q search-globally? selected-context link-issue]
        :or   {q ""}
        :as state}]
        
-  (seq (fetch-ids db 
-                  q 
-                  (if search-globally? nil selected-context) 
-                  (get-events-view state))))
+  (seq (fetch-issue-ids db 
+                        q 
+                        (if search-globally? nil selected-context) 
+                        (get-events-view state)
+                        link-issue)))
 
 (defn- filter-issues
   [{:keys [link-issue 
@@ -244,7 +273,9 @@
   (cond->> issues
     (#{1 2} search-mode)
     (re-order search-mode)
-    (not link-issue) pin-events))
+    (and (not link-issue)
+         (not (#{1 2} search-mode))) 
+    pin-events))
 
 (defn- sort-issues [state 
                     issues]
@@ -262,7 +293,6 @@
        :as                                                                                                                                  opts}]
   (if-let [ids (do-fetch-ids db opts)]
     (->> ids
-         (map #(:issues/id %))
          issues-query
          sql/format
          (jdbc/execute! db)
