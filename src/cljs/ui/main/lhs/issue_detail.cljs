@@ -30,6 +30,18 @@
                  :height "315px"
                  :src found
                  :allowFullScreen true}]))
+   (when (or (str/ends-with? title ".png")
+             (str/ends-with? title ".jpg")
+             (str/ends-with? title ".PNG")
+             (str/ends-with? title ".JPG")
+             (str/ends-with? title ".JPEG")
+             (str/ends-with? title ".jpeg"))
+     [:img {:src (str "/imgs/" title)
+            :style {:visibility :hidden
+                    :width "0px"}
+            :on-load (fn [t]
+                       (set! (-> (.-target t) .-style .-width) "300px")
+                       (set! (.. t -target -style -visibility) "visible"))}])
    [:div.description
     [:> ReactMarkdown
      {:children description}]]])
