@@ -10,7 +10,8 @@
             [repository :as r]
             dispatch
             [cambium.core :as log]
-            [ring.middleware.resource :refer [wrap-resource]]))
+            [ring.middleware.resource :refer [wrap-resource]]
+            [ring.middleware.file :refer [wrap-file]]))
 
 (defn api-handler [{{msg :msg} :body}]
   (tap> [:resources (r/list-resources)])
@@ -57,7 +58,8 @@
   (fn [req]
     ((-> (routes mode)
           wrap-env-defaults
-          (wrap-resource "public"))
+          (wrap-resource "public")
+          (wrap-file "./public"))
      req)))
 
 (mount/defstate ^{:on-reload :noop} http-server
