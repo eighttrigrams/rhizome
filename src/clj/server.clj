@@ -59,7 +59,7 @@
     ((-> (routes mode)
           wrap-env-defaults
           (wrap-resource "public")
-          (wrap-file "./public"))
+          (wrap-file "./public" {:allow-symlinks? true}))
      req)))
 
 (mount/defstate ^{:on-reload :noop} http-server
