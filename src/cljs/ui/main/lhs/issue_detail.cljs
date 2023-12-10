@@ -42,7 +42,7 @@
             :style {:visibility :hidden
                     :width "0px"}
             :on-load (fn [t]
-                       (set! (-> (.-target t) .-style .-width) "300px")
+                       (set! (-> (.-target t) .-style .-width) "540px")
                        (set! (.. t -target -style -visibility) "visible"))}])
    [:div.description
     [:> ReactMarkdown
