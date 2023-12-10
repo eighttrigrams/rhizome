@@ -453,26 +453,7 @@
          :issues         (search/search-issues db (dissoc opts :q))
          :q              nil})
       (catch Exception e
-        (log/error (str "Caught an update-issue " (.getMessage e)))))))
-
-(defn split-issue [db {{selected-context-id :id} :selected-context :as opts} arg]
-  (let [issue arg 
-        secondary-contexts-ids-set (set (keys (dissoc (:contexts issue) selected-context-id)))
-        titles (reverse (str/split (:description issue) #"\n\n"))]
-    (try
-      (doall (for [title titles]
-               (do
-                 (Thread/sleep 10)
-                 (datastore/new-issue db
-                                      {:title title} 
-                                      selected-context-id 
-                                      secondary-contexts-ids-set))))
-      (datastore/delete-item db issue)
-      (catch Exception e 
-        (log/error (str "Caught an split-issue " (.getMessage e)))))
-    {:issues (search/search-issues db (dissoc opts :q))
-     :selected-issue nil
-     :active-search :issues}))
+        (log/error (str "Caught an update-issue " (.getMessage e)))))))[]
 
 (defn start-global-search [{:keys [db]}]
   (fn [state]
@@ -518,7 +499,6 @@
          :link-issue-to-selected-context (start-linking-issue-to-selected-context db opts)
          :start-linking-selected-issue-to-context (start-linking-selected-issue-to-context-with-local-search db opts)
          :start-context-search (start-context-search db opts)
-         :split-issue (split-issue db opts arg)
          :link-context (link-selected-issue-to-context db opts arg)
          :insert-context
          {:selected-context                        (datastore/new-context db arg)

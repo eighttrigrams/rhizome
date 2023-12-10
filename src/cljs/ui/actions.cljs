@@ -207,10 +207,6 @@
   (when (js/window.confirm "Delete this issue?")
     (fetch-and-reset-with-method! *state @*state api/delete-issue idx)))
 
-(defn split-issue! [*state]
-  (when (js/window.confirm "Split currently selected issue?")
-    (exec-cmd *state :split-issue (:selected-issue @*state))))
-
 (defn delete-context! [*state]
   (when (js/window.confirm "Delete currently selected context?")
     (when (js/window.confirm "Sure?")
