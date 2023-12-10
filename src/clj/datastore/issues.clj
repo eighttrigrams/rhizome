@@ -5,7 +5,7 @@
             [honey.sql :as sql]
             [datastore.get-item :refer [get-item] :rename {get-item get-issue}]))
 
-(defn- delete-date [db issue-id]
+(defn delete-date [db issue-id]
   (jdbc/execute! db
                  (sql/format {:delete-from [:events]
                               :where [:= :issue_id [:inline issue-id]]})))
@@ -64,17 +64,6 @@
                                            :updated_at [:raw "NOW()"]}
                                   :where  [:= :id [:inline id]]}))
   (get-issue db issue))
-
-(defn delete-issue [db {:keys [id]}]
-  (delete-date db id)
-  (jdbc/execute! db (sql/format {:delete-from [:collections]
-                                 :where [:= :item_id [:inline id]]}))
-  (jdbc/execute! db (sql/format {:delete-from [:issue_issue]
-                                 :where [:or
-                                         [:= :left_id [:inline id]]
-                                         [:= :right_id [:inline id]]]}))
-  (jdbc/execute! db (sql/format {:delete-from [:issues]
-                                 :where [:= :id [:inline id]]})))
 
 (defn reprioritize-issue [db {:keys [id]}]
   (jdbc/execute! db (sql/format {:update [:issues]

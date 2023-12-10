@@ -56,8 +56,6 @@
                      {:return-keys true})
   (get-item/get-item db item))
 
-(def delete-issue issues/delete-issue)
-
 (def cycle-search-mode contexts/cycle-search-mode)
 
 (def show-events contexts/show-events)
@@ -84,32 +82,23 @@
 
 (def remove-stored-context contexts/remove-stored-context)
 
-(defn delete-context
+(defn delete-item
   [db {:keys [id]}]
-  (log/info (str "Prepare deleting context with id '" id "'"))
-  (doall
-   (for [issue-relation ;
-         (map un-namespace-keys 
-              (jdbc/execute! db
-                             (sql/format {:select :*
-                                          :from   [:collections]
-                                          :where  [:= :container_id id]})
-                             {:return-keys true}))]
-     (let [context-relations (map un-namespace-keys 
-                                  (jdbc/execute! db
-                                                 (sql/format {:select :*
-                                                              :from   [:collections]
-                                                              :where  [:= :item_id (:item_id issue-relation)]})
-                                                 {:return-keys true}))]
-       (if (= 1 (count context-relations))
-         (do
-           (log/info (str "Delete Issue relation: '" (:id issue-relation) "'"))
-           (issues/delete-issue db {:id (:item_id issue-relation)}))
-         (jdbc/execute! db
-                        (sql/format {:delete-from [:collections]
-                                     :where       [:and 
-                                                   [:= :container_id id]
-                                                   [:= :item_id (:item_id issue-relation)]]}))))))
-  (jdbc/execute! db
-                 (sql/format {:delete-from [:issues]
-                              :where [:= :id id]})))
+  (log/info (str "Prepare deleting item with id '" id "'"))
+  (let [contained-items-count
+        (count (jdbc/execute! db
+                              (sql/format {:select :*
+                                           :from   [:collections]
+                                           :where  [:= :container_id id]})
+                              {:return-keys true}))]
+    (if (> contained-items-count 0)
+      (log/info (str "Doing nothing. Item to be deleted still contains items."))
+      (do (issues/delete-date db id)
+          (jdbc/execute! db (sql/format {:delete-from [:collections]
+                                         :where [:= :item_id [:inline id]]}))
+          (jdbc/execute! db (sql/format {:delete-from [:issue_issue]
+                                         :where [:or
+                                                 [:= :left_id [:inline id]]
+                                                 [:= :right_id [:inline id]]]}))
+          (jdbc/execute! db (sql/format {:delete-from [:issues]
+                                         :where [:= :id [:inline id]]}))))))
