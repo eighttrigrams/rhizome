@@ -76,9 +76,11 @@
                (sql/format {:insert-into [:issues]
                             :columns     [:inserted_at
                                           :updated_at
+                                          :updated_at_ctx
                                           :title
                                           :short_title]
                             :values      [[[:raw "NOW()"]
+                                           [:raw "NOW()"]
                                            [:raw "NOW()"]
                                            title
                                            short_title]]})

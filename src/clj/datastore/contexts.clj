@@ -12,9 +12,11 @@
        (sql/format {:insert-into [:issues]
                     :columns     [:inserted_at
                                   :updated_at
+                                  :updated_at_ctx
                                   :title
                                   :is_context]
                     :values      [[[:raw "NOW()"]
+                                   [:raw "NOW()"]
                                    [:raw "NOW()"]
                                    [:inline title]
                                    true]]})
@@ -27,13 +29,13 @@
     (jdbc/execute-one! db
                        (sql/format {:update [:issues]
                                     :where  [:= :id [:inline id]]
-                                    :set    {:title       [:inline title]
-                                             :short_title [:inline short_title]
-                                             :tags        [:inline tags]
-                                             :updated_at  [:raw "NOW()"]
-                                             :data        [:inline (json/generate-string
-                                                                    (merge old-data
-                                                                           data))]}})
+                                    :set    {:title          [:inline title]
+                                             :short_title    [:inline short_title]
+                                             :tags           [:inline tags]
+                                             :updated_at_ctx [:raw "NOW()"]
+                                             :data           [:inline (json/generate-string
+                                                                       (merge old-data
+                                                                              data))]}})
                        {:return-keys true})))
 
 (defn update-context [db {:keys [context]}]
@@ -43,8 +45,8 @@
 (defn update-context-description [db {:keys [id description]}]
   (jdbc/execute-one! db
                      (sql/format {:update [:issues]
-                                  :set    {:description [:inline description]
-                                           :updated_at  [:raw "NOW()"]}
+                                  :set    {:description    [:inline description]
+                                           :updated_at_ctx [:raw "NOW()"]}
                                   :where  [:= :id [:inline id]]})
                      {:return-keys true})
   (get-context db {:id id}))
@@ -130,5 +132,5 @@
 
 (defn reprioritize-context [db {:keys [id]}]
   (jdbc/execute! db (sql/format {:update [:issues]
-                                 :set {:updated_at [:raw "NOW()"]}
+                                 :set {:updated_at_ctx [:raw "NOW()"]}
                                  :where [:= :id [:inline id]]})))
