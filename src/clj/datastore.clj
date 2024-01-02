@@ -52,6 +52,7 @@
                      (sql/format {:update [:issues]
                                   :where  [:= :id [:inline id]]
                                   :set    {:is_context true
+                                           :updated_at_ctx [:raw "NOW()"]
                                            :updated_at  [:raw "NOW()"]}})
                      {:return-keys true})
   (get-item/get-item db item))
