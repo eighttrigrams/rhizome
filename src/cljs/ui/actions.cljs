@@ -209,6 +209,4 @@
 
 (defn delete-context! [*state]
   (when (js/window.confirm "Delete currently selected context?")
-    (when (js/window.confirm "Sure?")
-      (when (js/window.confirm "Really?")
-        (fetch-and-reset-with-method! *state @*state api/delete-context (:selected-context @*state))))))
+    (fetch-and-reset-with-method! *state @*state api/delete-context (:selected-context @*state))))
