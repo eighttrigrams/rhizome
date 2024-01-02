@@ -258,7 +258,8 @@
                                        (:id selected-issue))]
         (remove #(issue-ids-to-exclude (:id %)) 
                 issues))
-      (remove #((set (keys (:contexts %))) (:id selected-context)) issues))))
+      (remove #(or ((set (keys (:contexts %))) (:id selected-context))
+                   (= (:id %) (:id selected-context))) issues))))
 
 (defn- sort-for-events-view 
   [issues events-view]
