@@ -1,6 +1,5 @@
 (ns datastore.issues
-  (:require [clojure.string :as str]
-            [cheshire.core :as json]
+  (:require [cheshire.core :as json]
             [next.jdbc :as jdbc]
             [honey.sql :as sql]
             [datastore.get-item :refer [get-item] :rename {get-item get-issue}]))

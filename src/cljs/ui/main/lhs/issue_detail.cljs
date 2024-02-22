@@ -15,13 +15,13 @@
               title])
            related-contexts)]]))
 
-(defn- the-issue-itself-component [{:keys [title description date]}]
+(defn- display-youtube-video [description data]
   [:<>
-   (when date [:b date])
-   [:span
-    {:style {:font-size "35px"}}
-    [:> ReactMarkdown
-     {:children title}]]
+   (when-let [youtube-link (:youtube (:resource-links data))]
+     [:iframe {:width "420px" 
+               :height "315px"
+               :src (str/replace (str/trim youtube-link) "watch?v=" "embed/")
+               :allowFullScreen true}])
    (when (and description (str/includes? description "https://www.youtube.com/watch")) 
      (let [found (re-find #"https://www.youtube.com/watch.*?\s" description)
            found (if-not found (re-find #"https://www.youtube.com/watch.*?$" description) found)
@@ -29,7 +29,18 @@
        [:iframe {:width "420px" 
                  :height "315px"
                  :src found
-                 :allowFullScreen true}]))
+                 :allowFullScreen true}]))])
+
+(defn- the-issue-itself-component [{:keys [title description date data]}]
+  [:<>
+   (when date [:b date])
+   [:span
+    {:style {:font-size "35px"}}
+    [:> ReactMarkdown
+     {:children (str (when-let [youtube-link (:youtube (:resource-links data))]
+                       (str "[youtube]( " youtube-link ") "))
+                     title)}]] 
+   (display-youtube-video description data)
    (when (and
           (string? title)
           (or (str/ends-with? title ".png")

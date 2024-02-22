@@ -20,10 +20,12 @@
    [:span.date (:date issue)]])
 
 ;; TODO extract ns
-(defn title-component [title]
+(defn title-component [title data]
   [:span.title
    [:> ReactMarkdown
-    {:children title}]])
+    {:children (str (when-let [youtube-link (:youtube (:resource-links data))]
+                       (str "[youtube]( " youtube-link ") "))
+                     title)}]])
 
 (defn related-issues-list-item-component [*state {:keys [id title] :as issue}]
   (prn "related-issues-list-item-component"
@@ -82,7 +84,7 @@
                                             (swap! *state dissoc :preview-issue)))
                                         300))}
      [:div
-      [title-component (:title issue)]
+      [title-component (:title issue) (:data issue)]
       (when-not simple-card?
         [:<>
          [info-component @*state issue]

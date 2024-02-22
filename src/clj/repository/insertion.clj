@@ -3,7 +3,9 @@
             [cheshire.core :as json]
             [clj-http.client :as http]
             [ring.util.codec :refer [url-encode]]
-            datastore))
+            datastore
+            [datastore.get-item :as get-item]
+            [datastore.issues :as issues]))
 
 (defn- normal-issue-insertion 
   [db 
@@ -40,16 +42,31 @@
 (defn save-youtube-video
   [db 
    url 
-   selected-context-id
-   selected-secondary-contexts-set]
-  (let [{:keys [title author_name] :as _response} (query url)
-        title (str "[youtube](" url ") [" author_name "] " title)]
-    #_(tap> [:response response])
-    (datastore/new-issue db 
-                         title
-                         ""
-                         selected-context-id
-                         selected-secondary-contexts-set)))
+   selected-context-id]
+  (let [{:keys [title 
+                author_name
+                author_url] :as _response} (query url)
+        youtube-channels-id (:id (get-item/get-item-by-title db {:title "YouTube Channels"}))]
+    (when-not youtube-channels-id (throw (Exception. "no youtube-channels-id")))
+    (let [channel-handle-simple (str/replace author_url "https://www.youtube.com/" "")
+          channel-handle (str "YT" channel-handle-simple)
+          channel-id (:id (get-item/get-item-by-short-title db {:short_title channel-handle}))
+          channel-id (or channel-id
+                         (let [channel
+                               (datastore/new-issue db 
+                                                    (str channel-handle-simple " - " author_name)
+                                                    channel-handle
+                                                    youtube-channels-id
+                                                    #{})]
+                           (:id (datastore/upgrade-issue-to-context! db channel))))]
+      (let [issue (datastore/new-issue db 
+                                       title
+                                       ""
+                                       selected-context-id
+                                       #{channel-id})
+            issue (datastore/update-issue db {:issue (update issue :data (fn [data] (assoc data :resource-links {:youtube url})))
+                                              :related-issues-ids '()})]
+        issue))))
 
 (defn insert-issue 
   [db 
@@ -59,5 +76,5 @@
    split-short-title?]
   (let [selected-context-id (:id selected-context)]
     (if (re-matches #"https://www.youtube.com/watch\?v=[.|[^&]]*" title)
-      (save-youtube-video db title selected-context-id selected-secondary-contexts-set)
+      (save-youtube-video db title selected-context-id)
       (normal-issue-insertion db title selected-context-id selected-secondary-contexts-set split-short-title?))))
