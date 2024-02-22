@@ -209,26 +209,42 @@
         {}))))
 
 (defn- get-selected-secondary-contexts-set 
-  [{:keys                                                                                         [selected-context]
-    {{{{:keys [selected-secondary-contexts
-               secondary-contexts-inverted]} :current} :views} :data} :selected-context
-    :as                                                                                           state}]
+  [{{{{{:keys [selected-secondary-contexts
+               secondary-contexts-inverted]} :current} :views} :data} :selected-context}]
   (into #{}  (when-not 
                secondary-contexts-inverted
                selected-secondary-contexts)))
 
+(defn- normal-issue-insertion 
+  [db 
+   title 
+   selected-context 
+   selected-secondary-contexts-set
+   split-short-title?]
+  (let [parts           (if split-short-title? (str/split title #"\|") (list title))
+        title           (if (= 1 (count parts)) 
+                          (first parts) 
+                          (second parts))
+        short-title     (if (= 1 (count parts))
+                          ""
+                          (first parts))
+        _selected-issue (datastore/new-issue db 
+                                             title
+                                             short-title
+                                             (:id selected-context)
+                                             selected-secondary-contexts-set)]))
+
 (defn insert-issue [{:keys [db]}]
   (fn [{:keys [selected-context]
         :as state} 
-       issue
+       {:keys [title]}
        split-short-title?]
     (try
-      (let [selected-secondary-contexts-set (get-selected-secondary-contexts-set state)
-            _selected-issue (datastore/new-issue db 
-                                                 issue
-                                                 (:id selected-context)
-                                                 selected-secondary-contexts-set
-                                                 split-short-title?)]
+      (let [_ (normal-issue-insertion db 
+                                      title
+                                      selected-context 
+                                      (get-selected-secondary-contexts-set state)
+                                      split-short-title?)]
         {:selected-issue nil
          :issues         (search/search-issues
                           db
