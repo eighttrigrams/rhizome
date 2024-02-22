@@ -17,7 +17,7 @@
 
 (defn- display-youtube-video [description data]
   [:<>
-   (when-let [youtube-link (:youtube (:resource-links data))]
+   (when-let [youtube-link (:youtube-video (:resource-links data))]
      [:iframe {:width "420px" 
                :height "315px"
                :src (str/replace (str/trim youtube-link) "watch?v=" "embed/")
