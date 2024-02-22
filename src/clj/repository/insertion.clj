@@ -57,14 +57,19 @@
                                                     (str channel-handle-simple " - " author_name)
                                                     channel-handle
                                                     youtube-channels-id
-                                                    #{})]
+                                                    #{})
+                               channel (datastore/update-issue db
+                                                               {:issue (update channel :data
+                                                                               (fn [data] (assoc data :resource-links {:youtube-channel author_url})))
+                                                                :related-issues-ids '()})]
                            (:id (datastore/upgrade-issue-to-context! db channel))))]
       (let [issue (datastore/new-issue db 
                                        title
                                        ""
                                        selected-context-id
                                        #{channel-id})
-            issue (datastore/update-issue db {:issue (update issue :data (fn [data] (assoc data :resource-links {:youtube url})))
+            issue (datastore/update-issue db {:issue (update issue :data 
+                                                             (fn [data] (assoc data :resource-links {:youtube-video url})))
                                               :related-issues-ids '()})]
         issue))))
 
