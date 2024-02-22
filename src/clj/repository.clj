@@ -208,17 +208,22 @@
         (log/error (str "Caught an exception in repository/delete-item " e))
         {}))))
 
+(defn- get-selected-secondary-contexts-set 
+  [{:keys                                                                                         [selected-context]
+    {{{{:keys [selected-secondary-contexts
+               secondary-contexts-inverted]} :current} :views} :data} :selected-context
+    :as                                                                                           state}]
+  (into #{}  (when-not 
+               secondary-contexts-inverted
+               selected-secondary-contexts)))
+
 (defn insert-issue [{:keys [db]}]
-  (fn [{:keys                                                                                         [selected-context]
-        {{{{:keys [selected-secondary-contexts
-                   secondary-contexts-inverted]} :current} :views} :data} :selected-context
-        :as                                                                                           state} 
+  (fn [{:keys [selected-context]
+        :as state} 
        issue
        split-short-title?]
     (try
-      (let [selected-secondary-contexts-set (into #{}
-                                                  (when-not secondary-contexts-inverted
-                                                    selected-secondary-contexts))
+      (let [selected-secondary-contexts-set (get-selected-secondary-contexts-set state)
             _selected-issue (datastore/new-issue db 
                                                  issue
                                                  (:id selected-context)
