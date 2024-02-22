@@ -1,13 +1,12 @@
 (ns repository ;; data-driven logic
-  (:require [clojure.string :as str]
-            [mount.core :as mount]
+  (:require [mount.core :as mount]
             [datastore.config :as config]
             datastore
             privacy
             [datastore.search :as search]
             [datastore.get-item :as get-item]
             [cambium.core :as log]
-            [datastore.issues :as issues]))
+            [repository.insertion :as insertion]))
 
 (mount/defstate repository
   :start (do
@@ -215,32 +214,13 @@
                secondary-contexts-inverted
                selected-secondary-contexts)))
 
-(defn- normal-issue-insertion 
-  [db 
-   title 
-   selected-context 
-   selected-secondary-contexts-set
-   split-short-title?]
-  (let [parts           (if split-short-title? (str/split title #"\|") (list title))
-        title           (if (= 1 (count parts)) 
-                          (first parts) 
-                          (second parts))
-        short-title     (if (= 1 (count parts))
-                          ""
-                          (first parts))
-        _selected-issue (datastore/new-issue db 
-                                             title
-                                             short-title
-                                             (:id selected-context)
-                                             selected-secondary-contexts-set)]))
-
 (defn insert-issue [{:keys [db]}]
   (fn [{:keys [selected-context]
         :as state} 
        {:keys [title]}
        split-short-title?]
     (try
-      (let [_ (normal-issue-insertion db 
+      (let [_ (insertion/insert-issue db 
                                       title
                                       selected-context 
                                       (get-selected-secondary-contexts-set state)
