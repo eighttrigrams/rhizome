@@ -1,9 +1,9 @@
 (ns repository.insertion
   (:require [clojure.string :as str]
             datastore
-            [datastore.get-item :as get-item]
             [repository.insertion.substack :as substack]
-            [repository.insertion.youtube :as youtube]))
+            [repository.insertion.youtube :as youtube]
+            [repository.insertion.homefolder :as homefolder]))
 
 (defn- normal-issue-insertion 
   [db 
@@ -24,21 +24,7 @@
                                              selected-context-id
                                              selected-secondary-contexts-set)]))
 
-(defn- save-file [db title selected-context-id]
-  (let [files-context-id (:id (get-item/get-item-by-title db {:title "Files"}))
-        _ (when-not files-context-id (throw (Exception. "no files-context-id")))
-        item (datastore/new-issue db 
-                                   title
-                                   ""
-                                   selected-context-id
-                                   #{files-context-id})
-        item (datastore/update-issue
-              db {:issue (update item 
-                                 :data(fn [data] 
-                                             (assoc data :resource-links {:file title})))
-                         :related-issues-ids '()})]
-    item))
-
+;; TODO i could use multimethods
 (defn insert-issue 
   [db 
    title 
@@ -53,6 +39,6 @@
           (or (str/ends-with? (str/lower-case title) ".mp4")
               (str/ends-with? (str/lower-case title) ".mp3")
               (str/ends-with? (str/lower-case title) ".pdf"))
-          (save-file db title selected-context-id)
+          (homefolder/save-file db title selected-context-id)
           :else 
           (normal-issue-insertion db title selected-context-id selected-secondary-contexts-set split-short-title?))))
