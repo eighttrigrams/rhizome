@@ -142,3 +142,27 @@
     (catch java.lang.Exception e
       (prn "get-issue-----" (.getMessage e))
       (throw e))))
+
+(defn- basic-substack-query [url]
+  {:select   [:issues.*]
+   :from     [:issues]
+   :where    [:= [:raw "data->'resource-links'->>'substack'"] [:inline url]]
+   :group-by [:issues.id] ;; TODO remove
+   :order-by [[:issues.updated_at :desc]]})
+
+(defn- get-issue-without-related-issues-by-substack [db url]
+  (-> (basic-substack-query url)
+      sql/format
+      (#(jdbc/execute-one! db % {:return-keys true}))))
+
+(defn get-item-by-substack
+  [db url]
+  (try
+    (-> (get-issue-without-related-issues-by-substack db url)
+        common/post-process-without-join-contexts
+        (assoc :contexts {})
+        (assoc :related_issues {}))
+    (catch java.lang.Exception e
+      (prn "get-issue-----" (.getMessage e))
+      (throw e))))
+

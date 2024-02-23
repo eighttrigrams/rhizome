@@ -1,14 +1,11 @@
 (ns repository.insertion
   (:require [clojure.string :as str] 
             [cheshire.core :as json]
-            [hickory.core :as html]
-            [clojure.zip :as zip]
-            [hickory.zip :as hickory.zip]
-            [hickory.select :as select]
             [clj-http.client :as http]
             [ring.util.codec :refer [url-encode]]
             datastore
-            [datastore.get-item :as get-item]))
+            [datastore.get-item :as get-item]
+            [repository.insertion.substack :as substack]))
 
 (defn- normal-issue-insertion 
   [db 
@@ -78,45 +75,6 @@
                                               :related-issues-ids '()})]
         issue))))
 
-(defn- get-post-title [url]
-  (let [tree (html/as-hickory (html/parse (:body (http/get url))))
-        title (first (:content (first (select/select (select/and (select/tag "h1")
-                                                   (select/class "post-title")) tree))))]
-    title))
-
-(defn- save-substack-article [db url selected-context-id]
-  (let [substacks-id (:id (get-item/get-item-by-title db {:title "Substacks"}))
-        articles-id (:id (get-item/get-item-by-title db {:title "Articles"}))]
-    (when-not substacks-id (throw (Exception. "no substacks-id")))
-    (when-not articles-id (throw (Exception. "no articles-id")))
-    (let [idx (str/index-of url ".substack")
-          su (subs url 0 idx)
-          subdomain (str/replace su "https://" "")]
-      (let [channel-handle (str "Substack@" subdomain)
-            substack-id (:id (get-item/get-item-by-short-title db {:short_title channel-handle}))
-            substack-id (or substack-id
-                            (let [substack (datastore/new-issue db 
-                                                                (str subdomain ".substack.com")
-                                                                channel-handle
-                                                                substacks-id
-                                                                #{})
-                                  substack (datastore/update-issue db
-                                                                   {:issue              (update substack :data
-                                                                                                (fn [data] (assoc data :resource-links {:substack (str "https://" subdomain ".substack.com")})))
-                                                                    :related-issues-ids '()})]
-                              (:id (datastore/upgrade-issue-to-context! db substack))))]
-        (let [title (get-post-title url)
-              _ (when-not title (throw (Exception. "no post title")))
-              issue (datastore/new-issue db 
-                                         (get-post-title url)
-                                         ""
-                                         selected-context-id
-                                         #{substack-id articles-id})
-              issue (datastore/update-issue db {:issue (update issue :data 
-                                                               (fn [data] (assoc data :resource-links {:substack-article url})))
-                                                :related-issues-ids '()})]
-        issue)))))
-
 (defn insert-issue 
   [db 
    title 
@@ -127,6 +85,6 @@
     (cond (re-matches #"https://www.youtube.com/watch\?v=[.[^&]]*" title) 
           (save-youtube-video db title selected-context-id) 
           (re-matches #"https://.*\.substack.com\/p\/.*" title)
-          (save-substack-article db title selected-context-id) 
+          (substack/save-article db title selected-context-id) 
           :else 
           (normal-issue-insertion db title selected-context-id selected-secondary-contexts-set split-short-title?))))
