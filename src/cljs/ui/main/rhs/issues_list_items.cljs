@@ -21,13 +21,19 @@
 
 ;; TODO extract ns
 (defn title-component [title data]
+  (prn "data..." data)
   [:span.title
    [:> ReactMarkdown
-    {:children (str (when-let [youtube-link (:youtube-video (:resource-links data))]
-                       (str "[youtube]( " youtube-link ") "))
-                    (when-let [youtube-link (:youtube-channel (:resource-links data))]
-                       (str "[youtube]( " youtube-link ")"))
-                     title)}]])
+    {:children (if (:substack (:resource-links data)) 
+                 (let [substack-link (:substack (:resource-links data))]
+                   (str "[" title "]( " substack-link ") "))
+                 (str (when-let [article-link (:substack-article (:resource-links data))]
+                        (str "[substack]( " article-link ") "))
+                      (when-let [youtube-link (:youtube-video (:resource-links data))]
+                        (str "[youtube]( " youtube-link ") "))
+                      (when-let [youtube-link (:youtube-channel (:resource-links data))]
+                        (str "[youtube]( " youtube-link ")"))
+                      title))}]])
 
 (defn related-issues-list-item-component [*state {:keys [id title] :as issue}]
   (prn "related-issues-list-item-component"
