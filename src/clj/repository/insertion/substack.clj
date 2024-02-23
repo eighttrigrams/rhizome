@@ -41,6 +41,31 @@
      subdomain-url
      subdomain-full-url]))
 
+(defn- insert-article 
+  [db 
+   url 
+   selected-context-id 
+   substack-platform-id 
+   substack-id 
+   articles-id]
+  (let [issue (datastore/new-issue db (get-post-title url)
+                                           ""
+                                           selected-context-id
+                                           #{substack-id articles-id substack-platform-id})]
+    (datastore/update-issue db {:issue              (update issue :data 
+                                                              (fn [data] (assoc data :resource-links {:substack-article url})))
+                                  :related-issues-ids '()})))
+
+(defn- create-or-take-substack-id [db identifiers substack-platform-id substacks-id]
+  (let [substack-id (:id (get-item/get-item-by-path db 
+                                                    "data->'resource-links'->>'substack'" 
+                                                    (last identifiers)))
+        substack-id (or substack-id (get-substack-id db 
+                                                     identifiers 
+                                                     substack-platform-id
+                                                     substacks-id))]
+    substack-id))
+
 (defn save-article [db url selected-context-id]
   (let [substack-platform-id (:id (get-item/get-item-by-title db {:title "Substack"}))
         substacks-id (:id (get-item/get-item-by-title db {:title "Substacks"}))
@@ -49,18 +74,16 @@
     (when-not substacks-id (throw (Exception. "no substacks-id")))
     (when-not articles-id (throw (Exception. "no articles-id")))
     (let [identifiers (convert url)
-          substack-id (:id (get-item/get-item-by-substack db (last identifiers)))
-          substack-id (or substack-id (get-substack-id db 
-                                                       identifiers 
-                                                       substack-platform-id
-                                                       substacks-id))
           title       (get-post-title url)
+          substack-id (create-or-take-substack-id db identifiers substack-platform-id substacks-id)
           _           (when-not title (throw (Exception. "no post title")))
-          issue       (datastore/new-issue db 
-                                           (get-post-title url)
-                                           ""
-                                           selected-context-id
-                                           #{substack-id articles-id substack-platform-id})]
-      (datastore/update-issue db {:issue              (update issue :data 
-                                                              (fn [data] (assoc data :resource-links {:substack-article url})))
-                                  :related-issues-ids '()}))))
+          _ (when (:id (get-item/get-item-by-path db 
+                                                  "data->'resource-links'->>'substack-article'" 
+                                                  url))
+              (throw (Exception. "substack article already exists!")))]
+      (insert-article db 
+                      url 
+                      selected-context-id
+                      substack-platform-id
+                      substack-id
+                      articles-id))))

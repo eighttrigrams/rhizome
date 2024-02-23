@@ -143,22 +143,20 @@
       (prn "get-issue-----" (.getMessage e))
       (throw e))))
 
-(defn- basic-substack-query [url]
+(defn- basic-find-query [path match]
   {:select   [:issues.*]
    :from     [:issues]
-   :where    [:= [:raw "data->'resource-links'->>'substack'"] [:inline url]]
-   :group-by [:issues.id] ;; TODO remove
-   :order-by [[:issues.updated_at :desc]]})
+   :where    [:= path [:inline match]]})
 
-(defn- get-issue-without-related-issues-by-substack [db url]
-  (-> (basic-substack-query url)
+(defn- get-issue-without-related-issues-by-path [db path url]
+  (-> (basic-find-query [:raw path] url)
       sql/format
       (#(jdbc/execute-one! db % {:return-keys true}))))
 
-(defn get-item-by-substack
-  [db url]
+(defn get-item-by-path
+  [db path url]
   (try
-    (-> (get-issue-without-related-issues-by-substack db url)
+    (-> (get-issue-without-related-issues-by-path db path url)
         common/post-process-without-join-contexts
         (assoc :contexts {})
         (assoc :related_issues {}))
