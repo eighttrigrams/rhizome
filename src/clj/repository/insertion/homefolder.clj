@@ -1,13 +1,8 @@
 (ns repository.insertion.homefolder
   (:require [clojure.string :as str]
             datastore
+            [utils :refer [condx]]
             [repository.insertion.common :as common]))
-
-;; TODO move to some util
-(defn- condx [p & pairs]
-  (first (keep (fn [[v f]]
-                 (when (p v) f))
-               (partition 2 pairs))))
 
 (defn- get-additional-context-ids' [title]
   (condx #(str/ends-with? (str/lower-case title) %) 
@@ -20,24 +15,6 @@
         additional-context-ids 
           (mapv #(common/get-item-or-throw-error db %) additional-context-titles)]
     additional-context-ids))
-
-;; TODO extract this common pattern of new-issue update-issue
-(defn- create-item 
-  [db 
-   title
-   selected-context-id 
-   additional-contexts-ids]
-  (let [item (datastore/new-issue db
-                                   title
-                                   ""
-                                   selected-context-id
-                                   additional-contexts-ids)
-        item (datastore/update-issue
-              db {:issue (update item 
-                                 :data(fn [data] 
-                                             (assoc data :resource-links {:file title})))
-                         :related-issues-ids '()})]
-    item))
 
 (defn save-file [db title selected-context-id]
   (let [files-context-id (common/get-item-or-throw-error db "Files")

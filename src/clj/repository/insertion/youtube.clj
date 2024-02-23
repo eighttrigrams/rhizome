@@ -37,9 +37,6 @@
                          (:id (datastore/upgrade-issue-to-context! db channel))))]
     channel-id))
 
-
-
-;; TODO pass in a callback to create new-issue
 (defn save-video
   [db 
    url 
