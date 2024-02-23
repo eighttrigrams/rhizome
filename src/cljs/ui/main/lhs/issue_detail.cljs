@@ -31,6 +31,22 @@
                  :src found
                  :allowFullScreen true}]))])
 
+(defn- image-component [title]
+  (when (and
+          (string? title)
+          (or (str/ends-with? title ".png")
+              (str/ends-with? title ".jpg")
+              (str/ends-with? title ".PNG")
+              (str/ends-with? title ".JPG")
+              (str/ends-with? title ".JPEG")
+              (str/ends-with? title ".jpeg")))
+     [:img {:src (str "/imgs/" title)
+            :style {:visibility :hidden
+                    :width "0px"}
+            :on-load (fn [t]
+                       (set! (-> (.-target t) .-style .-width) "540px")
+                       (set! (.. t -target -style -visibility) "visible"))}]))
+
 (defn- the-issue-itself-component [{:keys [title description date data]}]
   [:<>
    (when date [:b date])
@@ -44,20 +60,7 @@
                              youtube-link ")"))
                      " " title)}]] 
    (display-youtube-video description data)
-   (when (and
-          (string? title)
-          (or (str/ends-with? title ".png")
-              (str/ends-with? title ".jpg")
-              (str/ends-with? title ".PNG")
-              (str/ends-with? title ".JPG")
-              (str/ends-with? title ".JPEG")
-              (str/ends-with? title ".jpeg")))
-     [:img {:src (str "/imgs/" title)
-            :style {:visibility :hidden
-                    :width "0px"}
-            :on-load (fn [t]
-                       (set! (-> (.-target t) .-style .-width) "540px")
-                       (set! (.. t -target -style -visibility) "visible"))}])
+   [image-component title]
    [:div.description
     [:> ReactMarkdown
      {:children description}]]])

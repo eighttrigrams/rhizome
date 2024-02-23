@@ -101,4 +101,6 @@
                                                (first %)) 
                                            (merge (when (:is_context issue) 
                                                     {0 "⭕"})
+                                                  (when-let [file (:file (:resource-links (:data issue)))]
+                                                    {:file file})
                                                   (:contexts issue)))]])]]))

@@ -4,5 +4,13 @@
   [:span.contexts
    (doall
     (map (fn [[idx title]]
-           [:span.badge {:key idx}
-            title]) contexts))])
+           (prn title (js/encodeURI title))
+           (if (= :file idx)
+             [:span.badge 
+              {:key idx
+               :on-click (fn [_]
+                           (js/fetch (str "/open/" (js/encodeURI title))))}
+              "🟢"]
+             [:span.badge {:key idx}
+              title])) 
+         contexts))])
