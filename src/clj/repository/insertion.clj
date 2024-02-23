@@ -46,8 +46,10 @@
   (let [{:keys [title 
                 author_name
                 author_url] :as _response} (query url)
-        youtube-channels-id (:id (get-item/get-item-by-title db {:title "YouTube Channels"}))]
+        youtube-channels-id (:id (get-item/get-item-by-title db {:title "YouTube Channels"}))
+        youtube-videos-id (:id (get-item/get-item-by-title db {:title "YouTube Videos"}))]
     (when-not youtube-channels-id (throw (Exception. "no youtube-channels-id")))
+    (when-not youtube-videos-id (throw (Exception. "no youtube-videos-id")))
     (let [channel-handle-simple (str/replace author_url "https://www.youtube.com/" "")
           channel-handle (str "YT" channel-handle-simple)
           channel-id (:id (get-item/get-item-by-short-title db {:short_title channel-handle}))
@@ -67,7 +69,7 @@
                                        title
                                        ""
                                        selected-context-id
-                                       #{channel-id})
+                                       #{channel-id youtube-videos-id})
             issue (datastore/update-issue db {:issue (update issue :data 
                                                              (fn [data] (assoc data :resource-links {:youtube-video url})))
                                               :related-issues-ids '()})]
@@ -80,6 +82,6 @@
    selected-secondary-contexts-set
    split-short-title?]
   (let [selected-context-id (:id selected-context)]
-    (if (re-matches #"https://www.youtube.com/watch\?v=[.|[^&]]*" title)
+    (if (re-matches #"https://www.youtube.com/watch\?v=[.[^&]]*" title)
       (save-youtube-video db title selected-context-id)
       (normal-issue-insertion db title selected-context-id selected-secondary-contexts-set split-short-title?))))

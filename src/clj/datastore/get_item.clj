@@ -132,7 +132,7 @@
       sql/format
       (#(jdbc/execute-one! db % {:return-keys true}))))
 
-(defn get-item-by-short-title 
+(defn get-item-by-short-title
   [db {:keys [short_title]}]
   (try
     (-> (get-issue-without-related-issues-by-short-title db short_title)
