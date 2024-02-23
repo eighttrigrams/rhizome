@@ -1,5 +1,6 @@
 (ns ui.main.rhs.issues-list-items
-  (:require ["react-markdown$default" :as ReactMarkdown]
+  (:require [clojure.string :as str]
+            ["react-markdown$default" :as ReactMarkdown]
             [ui.actions :as actions]
             [ui.main.context-badges :as context-badges]
             [ui.main.rhs.modifiers :as modifiers]))
@@ -21,19 +22,19 @@
 
 ;; TODO extract ns
 (defn title-component [title data]
-  (prn "data..." data)
   [:span.title
    [:> ReactMarkdown
     {:children (if (:substack (:resource-links data)) 
                  (let [substack-link (:substack (:resource-links data))]
-                   (str "[" title "]( " substack-link ") "))
+                   (str "[" title "]( " substack-link ")"))
                  (str (when-let [article-link (:substack-article (:resource-links data))]
-                        (str "[substack]( " article-link ") "))
+                        (str "[substack]( " article-link ")"))
                       (when-let [youtube-link (:youtube-video (:resource-links data))]
-                        (str "[youtube]( " youtube-link ") "))
+                        (str "[youtube]( " youtube-link ")")) 
                       (when-let [youtube-link (:youtube-channel (:resource-links data))]
-                        (str "[youtube]( " youtube-link ")"))
-                      title))}]])
+                        (str "[YT" (str/replace youtube-link "https://www.youtube.com/" "") "](" 
+                             youtube-link ")"))
+                      " " title))}]])
 
 (defn related-issues-list-item-component [*state {:keys [id title] :as issue}]
   (prn "related-issues-list-item-component"

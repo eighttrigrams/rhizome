@@ -1,13 +1,7 @@
 (ns ui.main.lhs.list-item
-  (:require ["react-markdown$default" :as ReactMarkdown]
-            [ui.actions :as actions]
-            [ui.main.context-badges :as context-badges]))
-
-;; TODO dedup with title-component form issues-list-items
-(defn title-component [title]
-  [:span.title
-   [:> ReactMarkdown
-    {:children title}]])
+  (:require [ui.actions :as actions]
+            [ui.main.context-badges :as context-badges]
+            [ui.main.rhs.issues-list-items :as ili]))
 
 (defn component [*state context]
   [:li.card.issue-card
@@ -15,5 +9,5 @@
                        (:id context)) :selected)
     :on-click #(actions/select-context! *state context)}
    [:div
-    [title-component (:title context)]
+    [ili/title-component (:title context) (:data context)]
     [context-badges/component (:contexts context)]]])

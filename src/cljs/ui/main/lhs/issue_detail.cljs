@@ -40,8 +40,9 @@
      {:children (str (when-let [youtube-link (:youtube-video (:resource-links data))]
                        (str "[youtube]( " youtube-link ") "))
                      (when-let [youtube-link (:youtube-channel (:resource-links data))]
-                       (str "[youtube]( " youtube-link ")"))
-                     title)}]] 
+                        (str "[YT" (str/replace youtube-link "https://www.youtube.com/" "") "](" 
+                             youtube-link ")"))
+                     " " title)}]] 
    (display-youtube-video description data)
    (when (and
           (string? title)

@@ -120,29 +120,6 @@
       (prn "get-issue-----" (.getMessage e))
       (throw e))))
 
-(defn- basic-short-title-query [short_title]
-  {:select   [:issues.*]
-   :from     [:issues]
-   :where    [:= :issues.short_title [:inline short_title]]
-   :group-by [:issues.id] ;; TODO remove
-   :order-by [[:issues.updated_at :desc]]})
-
-(defn- get-issue-without-related-issues-by-short-title [db id]
-  (-> (basic-short-title-query id)
-      sql/format
-      (#(jdbc/execute-one! db % {:return-keys true}))))
-
-(defn get-item-by-short-title
-  [db {:keys [short_title]}]
-  (try
-    (-> (get-issue-without-related-issues-by-short-title db short_title)
-        common/post-process-without-join-contexts
-        (assoc :contexts {})
-        (assoc :related_issues {}))
-    (catch java.lang.Exception e
-      (prn "get-issue-----" (.getMessage e))
-      (throw e))))
-
 (defn- basic-find-query [path match]
   {:select   [:issues.*]
    :from     [:issues]
