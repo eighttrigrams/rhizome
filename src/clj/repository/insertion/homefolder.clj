@@ -1,7 +1,7 @@
 (ns repository.insertion.homefolder
   (:require [clojure.string :as str]
             datastore
-            [datastore.get-item :as get-item]))
+            [repository.insertion.common :as common]))
 
 ;; TODO move to some util
 (defn- condx [p & pairs]
@@ -15,15 +15,10 @@
          "mp4" ["MP4s" "Video"]
          "pdf" ["PDFs"]))
 
-(defn- get-item-or-throw-error [db title]
-  (let [id (:id (get-item/get-item-by-title db {:title title}))
-        _ (when-not id (throw (Exception. (str "no id for " title))))]
-    id))
-
 (defn- get-additional-context-ids [db title]
   (let [additional-context-titles (get-additional-context-ids' title)
         additional-context-ids 
-          (mapv #(get-item-or-throw-error db %) additional-context-titles)]
+          (mapv #(common/get-item-or-throw-error db %) additional-context-titles)]
     additional-context-ids))
 
 ;; TODO extract this common pattern of new-issue update-issue
@@ -45,9 +40,10 @@
     item))
 
 (defn save-file [db title selected-context-id]
-  (let [files-context-id (get-item-or-throw-error db "Files")
+  (let [files-context-id (common/get-item-or-throw-error db "Files")
         additional-context-ids (get-additional-context-ids db title)]
-    (create-item db 
-                 title 
-                 selected-context-id 
-                 (conj additional-context-ids files-context-id))))
+    (common/insert-item db 
+                        title 
+                        selected-context-id 
+                        (conj additional-context-ids files-context-id)
+                        {:file title})))

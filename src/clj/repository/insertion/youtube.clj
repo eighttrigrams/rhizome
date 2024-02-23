@@ -4,7 +4,8 @@
             [clj-http.client :as http]
             [ring.util.codec :refer [url-encode]]
             datastore
-            [datastore.get-item :as get-item]))
+            [datastore.get-item :as get-item]
+            [repository.insertion.common :as common]))
 
 (defn make-query-string [m]
   (->> (for [[k v] m]
@@ -36,16 +37,7 @@
                          (:id (datastore/upgrade-issue-to-context! db channel))))]
     channel-id))
 
-(defn- insert-video [db channel-id selected-context-id youtube-videos-id title url]
-  (let [issue (datastore/new-issue db 
-                                     title
-                                     ""
-                                     selected-context-id
-                                     #{channel-id youtube-videos-id})
-          issue (datastore/update-issue db {:issue (update issue :data 
-                                                           (fn [data] (assoc data :resource-links {:youtube-video url})))
-                                            :related-issues-ids '()})]
-    issue))
+
 
 ;; TODO pass in a callback to create new-issue
 (defn save-video
@@ -55,10 +47,10 @@
   (let [{:keys [title 
                 author_name
                 author_url] :as _response} (query url)
-        youtube-channels-id (:id (get-item/get-item-by-title db {:title "YouTube Channels"}))
-        youtube-videos-id (:id (get-item/get-item-by-title db {:title "YouTube Videos"}))]
-    (when-not youtube-channels-id (throw (Exception. "no youtube-channels-id")))
-    (when-not youtube-videos-id (throw (Exception. "no youtube-videos-id")))
+        youtube-channels-id (common/get-item-or-throw-error db "YouTube Channels")
+        youtube-videos-id (common/get-item-or-throw-error db "YouTube Videos")
+        video-id (common/get-item-or-throw-error db "Video")]
+    
     (let [channel-id (create-channel-or-take-existing db 
                                                       author_name
                                                       author_url
@@ -67,4 +59,8 @@
                                                   "data->'resource-links'->>'youtube-video'" 
                                                   url))
               (throw (Exception. "youtube video already exists!")))]
-      (insert-video db channel-id selected-context-id youtube-videos-id title url))))
+      (common/insert-item db 
+                          title
+                          selected-context-id 
+                          #{channel-id youtube-videos-id video-id} 
+                          {:youtube-video url}))))
