@@ -4,7 +4,7 @@
             [clojure.string :as str]))
 
 (defn- resolve-it [file-id]
-  (let [suffix-id (str/index-of file-id ".")
+  (let [suffix-id (str/last-index-of file-id ".")
         suffix (subs file-id (inc suffix-id))]
     (case suffix
       ("mp3" "mp4" "MP3" "MP4") "Music" 
