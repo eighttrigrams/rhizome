@@ -50,7 +50,9 @@
           (youtube/save-video db title selected-context-id) 
           (re-matches #"https://.*\.substack.com\/p\/.*" title)
           (substack/save-article db title selected-context-id) 
-          (str/ends-with? (str/lower-case title) ".mp4")
+          (or (str/ends-with? (str/lower-case title) ".mp4")
+              (str/ends-with? (str/lower-case title) ".mp3")
+              (str/ends-with? (str/lower-case title) ".pdf"))
           (save-file db title selected-context-id)
           :else 
           (normal-issue-insertion db title selected-context-id selected-secondary-contexts-set split-short-title?))))
