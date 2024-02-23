@@ -8,6 +8,7 @@
             [mount.core :as mount]
             [datastore.config :as config]
             [repository :as r]
+            opener
             dispatch
             [cambium.core :as log]
             [ring.middleware.resource :refer [wrap-resource]]
@@ -16,6 +17,11 @@
 (defn api-handler [{{msg :msg} :body}]
   (tap> [:resources (r/list-resources)])
   {:body {:echo msg}})
+
+(defn- open [{{:keys [file-id]} :route-params  
+              :as _req}]
+  (opener/open file-id)
+  {:status 200})
 
 (defn- api [mode]
   (fn [req]
@@ -51,6 +57,7 @@
      (context "/" []
        (context "/api" []
          (POST "/" [] (api mode)))
+       (GET "/open/:file-id" [] open)
        (GET "/" [] (response/resource-response "public/index.html")))
      req))) ;; TODO use route/resources (see cljsc-webstacks)
 
