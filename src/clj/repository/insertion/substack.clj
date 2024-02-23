@@ -14,15 +14,16 @@
 
 (defn- get-substack-id 
   [db 
-   [subdomain-url 
-    subdomain-handle 
+   [subdomain-handle
+    subdomain-url 
     subdomain-full-url] 
+   substack-platform-id
    substacks-id]
   (let [substack (datastore/new-issue db 
                                       subdomain-url
                                       subdomain-handle
                                       substacks-id
-                                      #{})
+                                      #{substack-platform-id})
         substack (datastore/update-issue db
                                          {:issue              (update substack :data
                                                                       (fn [data] (assoc data :resource-links {:substack subdomain-full-url})))
@@ -41,20 +42,25 @@
      subdomain-full-url]))
 
 (defn save-article [db url selected-context-id]
-  (let [substacks-id (:id (get-item/get-item-by-title db {:title "Substacks"}))
+  (let [substack-platform-id (:id (get-item/get-item-by-title db {:title "Substack"}))
+        substacks-id (:id (get-item/get-item-by-title db {:title "Substacks"}))
         articles-id (:id (get-item/get-item-by-title db {:title "Articles"}))]
+    (when-not substacks-id (throw (Exception. "no substack-platform-id")))
     (when-not substacks-id (throw (Exception. "no substacks-id")))
     (when-not articles-id (throw (Exception. "no articles-id")))
     (let [identifiers (convert url)
           substack-id (:id (get-item/get-item-by-substack db (last identifiers)))
-          substack-id (or substack-id (get-substack-id db identifiers substacks-id))
+          substack-id (or substack-id (get-substack-id db 
+                                                       identifiers 
+                                                       substack-platform-id
+                                                       substacks-id))
           title       (get-post-title url)
           _           (when-not title (throw (Exception. "no post title")))
           issue       (datastore/new-issue db 
                                            (get-post-title url)
                                            ""
                                            selected-context-id
-                                           #{substack-id articles-id})]
+                                           #{substack-id articles-id substack-platform-id})]
       (datastore/update-issue db {:issue              (update issue :data 
                                                               (fn [data] (assoc data :resource-links {:substack-article url})))
                                   :related-issues-ids '()}))))
