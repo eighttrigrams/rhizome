@@ -1,5 +1,6 @@
 (ns repository.insertion
-  (:require [clojure.string :as str]
+  (:require [cambium.core :as log]
+            [clojure.string :as str]
             datastore
             [repository.homefolder :as home]
             [repository.insertion.substack :as substack]
@@ -30,6 +31,7 @@
    selected-context
    selected-secondary-contexts-set
    alternative-behaviour?]
+  (log/info (str "Import for " title))
   (let [context-ids-set (into #{} (conj selected-secondary-contexts-set (:id selected-context)))]
     (cond (= "IMPORT" title)
           (homefolder/batch-insertion db)
