@@ -4,11 +4,13 @@
             [utils :refer [condx]]
             [repository.insertion.common :as common]))
 
+;; TODO make condx work to match multiple cases, like case
 (defn- classify [title]
   (condx #(str/ends-with? (str/lower-case title) %) 
          "mp3" ["MP3s" "Audio"] 
          "mp4" ["MP4s" "Video"]
          "pdf" ["PDFs"]
+         "jpg" ["JPEGs" "Image"]
          "jpeg" ["JPEGs" "Image"]
          "png" ["PNGs" "Image"]))
 
