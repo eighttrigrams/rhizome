@@ -82,7 +82,7 @@
 (defn match? [title]
   (re-matches #"https://.*\.substack.com\/p\/.*" title))
 
-(defn save-article [db url context-ids-set _]
+(defn save-article [db url context-ids-set should-capture-summary?]
   (let [substack-platform-id (:id (get-item/get-item-by-title db {:title "Substack"}))
         substacks-id (:id (get-item/get-item-by-title db {:title "Substacks"}))
         articles-id (:id (get-item/get-item-by-title db {:title "Articles"}))]
@@ -105,7 +105,7 @@
                                   substack-platform-id
                                   substack-id
                                   articles-id)]
-      (when (and issue summary)
+      (when (and issue should-capture-summary? summary)
         (datastore/update-issue-description db (assoc issue :description 
                                                       (str "--- ChatGPT | " 
                                                            (:model (chatgpt/configuration))
