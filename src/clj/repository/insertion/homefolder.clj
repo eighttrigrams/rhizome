@@ -49,7 +49,7 @@
     (log/info (str "2 " (doall (home/list-files))))
     (doall 
      (for [file-name (home/list-files)]
-       (do
+       (when (home/supported-file-type? file-name)
          (log/info (str "Importing " file-name " ... "))
          (try
            (save-file db file-name #{import-id})

@@ -43,5 +43,4 @@
 (defn list-files []
   (->> (vec (file-seq (io/file "/Users/daniel/Downloads/Tracked/")))
        (filter #(not (.isDirectory %)))
-       (map #(.getName %))
-       (filter #(not (= ".DS_Store" %)))))
+       (map #(.getName %))))
