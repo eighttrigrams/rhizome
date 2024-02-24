@@ -7,11 +7,27 @@
             [datastore.get-item :as get-item]
             [repository.insertion.common :as common]))
 
-(defn- get-post-title [url]
+(defn extract-text [content]
+  (str/join (doall (reduce (fn [acc val]
+                             (cond (string? val)
+                                   (concat acc [val])
+                                   (and (= :element (:type val)) 
+                                        (:content val))
+                                   (concat acc (extract-text (:content val)))
+                                   :else acc))
+                           [] 
+                           content))))
+
+(defn- get-post [url]
   (let [tree (html/as-hickory (html/parse (:body (http/get url))))
         title (first (:content (first (select/select (select/and (select/tag "h1")
-                                                   (select/class "post-title")) tree))))]
-    title))
+                                                   (select/class "post-title"))
+                                                     tree))))
+        content (:content (first (:content (first (select/select
+                                                          (select/and 
+                                                           (select/tag "div")
+                                                           (select/class "available-content")) tree)))))]
+    [title (extract-text content)]))
 
 (defn- get-substack-id 
   [db 
@@ -41,12 +57,13 @@
 (defn- insert-article 
   [db 
    url 
+   title
    context-ids-set 
    substack-platform-id 
    substack-id 
    articles-id]
   (common/insert-item db 
-                      (get-post-title url) 
+                      title 
                       "" 
                       (conj context-ids-set substack-id articles-id substack-platform-id) 
                       {:substack-article url}))
@@ -72,8 +89,9 @@
     (when-not substacks-id (throw (Exception. "no substacks-id")))
     (when-not articles-id (throw (Exception. "no articles-id")))
     (let [identifiers (convert url)
-          title       (get-post-title url)
+          [title content] (get-post url)
           _           (when-not (seq title) (throw (Exception. "no post title")))
+          _ (tap> [:content content])
           substack-id (create-or-take-substack-id db identifiers substack-platform-id substacks-id)
           _ (when (:id (get-item/get-item-by-path db 
                                                   "data->'resource-links'->>'substack-article'" 
@@ -81,6 +99,7 @@
               (throw (Exception. "substack article already exists!")))]
       (insert-article db 
                       url 
+                      title
                       context-ids-set
                       substack-platform-id
                       substack-id
