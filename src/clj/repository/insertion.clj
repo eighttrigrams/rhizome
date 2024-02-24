@@ -2,10 +2,10 @@
   (:require [cambium.core :as log]
             [clojure.string :as str]
             datastore
-            [repository.homefolder :as home]
             [repository.insertion.substack :as substack]
             [repository.insertion.youtube :as youtube]
-            [repository.insertion.homefolder :as homefolder]))
+            [repository.insertion.file :as file]
+            [repository.insertion.batch :as batch]))
 
 (defn- normal-issue-insertion 
   [db 
@@ -18,13 +18,12 @@
                           (second parts))
         short-title     (if (= 1 (count parts))
                           ""
-                          (first parts))
-        _selected-issue (datastore/new-issue db 
-                                             title
-                                             short-title
-                                             context-ids-set)]))
+                          (first parts))] 
+    (datastore/new-issue db 
+                         title
+                         short-title
+                         context-ids-set)))
 
-;; TODO i could use multimethods
 (defn insert-issue 
   [db 
    title 
@@ -33,22 +32,13 @@
    alternative-behaviour?]
   (log/info (str "Import for " title))
   (let [context-ids-set (into #{} (conj selected-secondary-contexts-set (:id selected-context)))]
-    (cond (= "IMPORT" title)
-          (homefolder/batch-insertion db)
-          (re-matches #"https://www.youtube.com/watch\?v=[.[^&]]*" title) 
-          (youtube/save-video db 
-                              title 
-                              context-ids-set) 
-          (re-matches #"https://.*\.substack.com\/p\/.*" title)
-          (substack/save-article db 
-                                 title 
-                                 context-ids-set) 
-          (home/supported-file-type? title)
-          (homefolder/save-file db 
-                                title 
-                                context-ids-set)
+    (cond (batch/match? title)
+          (batch/ingest db nil nil nil)
+          (youtube/match? title) 
+          (youtube/ingest db title context-ids-set nil) 
+          (substack/match? title)
+          (substack/save-article db title context-ids-set nil) 
+          (file/match? title)
+          (file/ingest db title context-ids-set nil)
           :else 
-          (normal-issue-insertion db 
-                                  title 
-                                  context-ids-set
-                                  alternative-behaviour?))))
+          (normal-issue-insertion db title context-ids-set alternative-behaviour?))))

@@ -61,7 +61,10 @@
                                                      substacks-id))]
     substack-id))
 
-(defn save-article [db url context-ids-set]
+(defn match? [title]
+  (re-matches #"https://.*\.substack.com\/p\/.*" title))
+
+(defn save-article [db url context-ids-set _]
   (let [substack-platform-id (:id (get-item/get-item-by-title db {:title "Substack"}))
         substacks-id (:id (get-item/get-item-by-title db {:title "Substacks"}))
         articles-id (:id (get-item/get-item-by-title db {:title "Articles"}))]

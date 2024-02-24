@@ -1,6 +1,5 @@
-(ns repository.insertion.homefolder
-  (:require [cambium.core :as log]
-            [clojure.string :as str]
+(ns repository.insertion.file
+  (:require [clojure.string :as str]
             [clojure.set :as set]
             datastore
             [datastore.get-item :as get-item]
@@ -33,7 +32,10 @@
   (when (:id (get-item/get-item-by-path db "data->'resource-links'->>'image'" file-name))
     (throw (Exception. "image already exists!"))))
 
-(defn save-file [db file-name context-ids-set]
+(defn match? [title]
+  (home/supported-file-type? title))
+
+(defn ingest [db file-name context-ids-set _]
   (validate-not-exists db file-name) 
   (let [classification (classify file-name)
         files-context-id (common/get-item-or-throw-error db "Files") 
@@ -49,18 +51,3 @@
                         "" 
                         context-ids-set 
                         resource-links)))
-
-(defn batch-insertion [db]
-  (log/info "Startin batch insertion ...")
-  (let [import-id (common/get-item-or-throw-error db "Imports")]
-    (log/info (str "1 " (home/list-files)))
-    (log/info (str "2 " (doall (home/list-files))))
-    (doall 
-     (for [file-name (home/list-files)]
-       (when (home/supported-file-type? file-name)
-         (log/info (str "Importing " file-name " ... "))
-         (try
-           (save-file db file-name #{import-id})
-           (home/move-file file-name)
-           (catch Exception e 
-             (log/error (.getMessage e)))))))))

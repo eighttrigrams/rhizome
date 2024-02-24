@@ -34,10 +34,14 @@
                          (:id (datastore/upgrade-issue-to-context! db channel))))]
     channel-id))
 
-(defn save-video
+(defn match? [title]
+  (re-matches #"https://www.youtube.com/watch\?v=[.[^&]]*" title))
+
+(defn ingest
   [db 
    url 
-   context-ids-set]
+   context-ids-set
+   _]
   (let [{:keys [title 
                 author_name
                 author_url] :as _response} (query url)
