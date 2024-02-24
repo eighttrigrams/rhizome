@@ -1,13 +1,9 @@
 (ns datastore
   (:require [next.jdbc :as jdbc]
             [honey.sql :as sql]
-            [cambium.core :as log]
-            [cheshire.core :as json]
             [datastore.issues :as issues]
             [datastore.contexts :as contexts]
-            [datastore.get-item :as get-item]
-            [datastore.helpers
-             :refer [un-namespace-keys]]))
+            [datastore.get-item :as get-item]))
 
 ;; entity types
 ;; - issues
@@ -83,23 +79,21 @@
 
 (def remove-stored-context contexts/remove-stored-context)
 
+(defn get-contained-items-count [db id]
+  (count (jdbc/execute! db
+                        (sql/format {:select :*
+                                     :from   [:collections]
+                                     :where  [:= :container_id id]})
+                        {:return-keys true})))
+
 (defn delete-item
   [db {:keys [id]}]
-  (log/info (str "Prepare deleting item with id '" id "'"))
-  (let [contained-items-count
-        (count (jdbc/execute! db
-                              (sql/format {:select :*
-                                           :from   [:collections]
-                                           :where  [:= :container_id id]})
-                              {:return-keys true}))]
-    (if (> contained-items-count 0)
-      (log/info (str "Doing nothing. Item to be deleted still contains items."))
-      (do (issues/delete-date db id)
-          (jdbc/execute! db (sql/format {:delete-from [:collections]
-                                         :where [:= :item_id [:inline id]]}))
-          (jdbc/execute! db (sql/format {:delete-from [:issue_issue]
-                                         :where [:or
-                                                 [:= :left_id [:inline id]]
-                                                 [:= :right_id [:inline id]]]}))
-          (jdbc/execute! db (sql/format {:delete-from [:issues]
-                                         :where [:= :id [:inline id]]}))))))
+  (issues/delete-date db id)
+  (jdbc/execute! db (sql/format {:delete-from [:collections]
+                                 :where [:= :item_id [:inline id]]}))
+  (jdbc/execute! db (sql/format {:delete-from [:issue_issue]
+                                 :where [:or
+                                         [:= :left_id [:inline id]]
+                                         [:= :right_id [:inline id]]]}))
+  (jdbc/execute! db (sql/format {:delete-from [:issues]
+                                 :where [:= :id [:inline id]]})))

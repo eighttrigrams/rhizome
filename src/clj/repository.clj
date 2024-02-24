@@ -6,7 +6,8 @@
             [datastore.search :as search]
             [datastore.get-item :as get-item]
             [cambium.core :as log]
-            [repository.insertion :as insertion]))
+            [repository.insertion :as insertion]
+            [repository.deletion :as deletion]))
 
 (mount/defstate repository
   :start (do
@@ -186,25 +187,33 @@
 
 (defn delete-selected-issue [{:keys [db]}]
   (fn [{:keys [selected-issue] :as opts}]
-    (datastore/delete-item db selected-issue)
-    {:issues         (search/search-issues db opts)
-     :selected-issue nil}))
+    (try
+      (deletion/delete-item db selected-issue)
+      {:issues         (search/search-issues db opts)
+       :selected-issue nil}
+      (catch Exception e
+        (log/error (str "Caught an exception in repository/delete-selected-issue " e))
+        {}))))
 
 (defn delete-issue [{:keys [db]}]
   (fn [opts issue]
-    (datastore/delete-item db issue)
-    {:issues         (search/search-issues db opts)
-     :selected-issue nil}))
+    (try
+      (deletion/delete-item db issue)
+      {:issues         (search/search-issues db opts)
+       :selected-issue nil}
+      (catch Exception e
+        (log/error (str "Caught an exception in repository/delete-issue" e))
+        {}))))
 
 (defn delete-context [{:keys [db]}]
   (fn [opts arg]
     (try 
-      (datastore/delete-item db arg)
+      (deletion/delete-item db arg)
       {:issues           (search/search-issues db opts)
        :contexts         (search/search-contexts db "")
        :selected-context nil}
       (catch Exception e
-        (log/error (str "Caught an exception in repository/delete-item " e))
+        (log/error (str "Caught an exception in repository/delete-context " e))
         {}))))
 
 (defn- get-selected-secondary-contexts-set 

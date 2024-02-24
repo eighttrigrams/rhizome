@@ -141,3 +141,8 @@
       (prn "get-issue-----" (.getMessage e))
       (throw e))))
 
+(defn get-items-by-path [db path url]
+  (-> (basic-find-query [:raw path] url)
+      sql/format
+      (#(jdbc/execute! db % {:return-keys true}))))
+
