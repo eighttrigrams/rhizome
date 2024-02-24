@@ -227,13 +227,13 @@
   (fn [{:keys [selected-context]
         :as state} 
        {:keys [title]}
-       split-short-title?]
+       alternative-behaviour?]
     (try
       (let [_ (insertion/insert-issue db 
                                       title
                                       selected-context 
                                       (get-selected-secondary-contexts-set state)
-                                      split-short-title?)]
+                                      alternative-behaviour?)]
         {:selected-issue nil
          :issues         (search/search-issues
                           db

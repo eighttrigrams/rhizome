@@ -30,7 +30,7 @@
    title 
    selected-context 
    selected-secondary-contexts-set
-   split-short-title?]
+   alternative-behaviour?]
   (let [selected-context-id (:id selected-context)]
     (cond (re-matches #"https://www.youtube.com/watch\?v=[.[^&]]*" title) 
           (youtube/save-video db title selected-context-id) 
@@ -45,4 +45,5 @@
               )
           (homefolder/save-file db title selected-context-id)
           :else 
-          (normal-issue-insertion db title selected-context-id selected-secondary-contexts-set split-short-title?))))
+          (normal-issue-insertion db title selected-context-id selected-secondary-contexts-set 
+                                  alternative-behaviour?))))
