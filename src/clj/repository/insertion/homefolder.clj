@@ -46,12 +46,12 @@
   (let [import-id (common/get-item-or-throw-error db "Imports")]
     (log/info (str "1 " (home/list-files)))
     (log/info (str "2 " (doall (home/list-files))))
-    (for [file-name (home/list-files)]
-      (do
-        (log/info (str "Importing " file-name " ... "))
-        (try
-          (home/validate-not-exists file-name)
-          (save-file db file-name #{import-id})
-          (home/move-file file-name)
-          (catch Exception e 
-            (log/error (.getMessage e))))))))
+    (doall (for [file-name (home/list-files)]
+             (do
+               (log/info (str "Importing " file-name " ... "))
+               (try
+                 (home/validate-not-exists file-name)
+                 (save-file db file-name #{import-id})
+                 (home/move-file file-name)
+                 (catch Exception e 
+                   (log/error (.getMessage e)))))))))
