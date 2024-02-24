@@ -75,8 +75,8 @@
     (when-not articles-id (throw (Exception. "no articles-id")))
     (let [identifiers (convert url)
           title       (get-post-title url)
+          _           (when-not (seq title) (throw (Exception. "no post title")))
           substack-id (create-or-take-substack-id db identifiers substack-platform-id substacks-id)
-          _           (when-not title (throw (Exception. "no post title")))
           _ (when (:id (get-item/get-item-by-path db 
                                                   "data->'resource-links'->>'substack-article'" 
                                                   url))

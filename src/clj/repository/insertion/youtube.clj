@@ -1,5 +1,6 @@
 (ns repository.insertion.youtube
   (:require [clojure.string :as str] 
+            [cambium.core :as log]
             [cheshire.core :as json]
             [clj-http.client :as http]
             [ring.util.codec :refer [url-encode]]
@@ -15,9 +16,9 @@
 
 (defn query [url]
   (json/parse-string (:body (http/get (str "https://www.youtube.com/oembed?" 
-                                        (make-query-string {"format" "json" 
-                                                            "url" url}))))
-                  true))
+                                           (make-query-string {"format" "json" 
+                                                               "url" url}))))
+                     true))
 
 (defn- create-channel-or-take-existing 
   [db author_name author_url youtube-channels-id]
@@ -44,20 +45,23 @@
   (let [{:keys [title 
                 author_name
                 author_url] :as _response} (query url)
+        _ (when-not (and (seq title)
+                         (seq author_name)
+                         (seq author_url))
+            (log/error (str title " " author_name " " author_url))
+            (throw (Exception. 
+                    "at least one of title author_name or author_url is unexpectedly nil")))
         youtube-channels-id (common/get-item-or-throw-error db "YouTube Channels")
         youtube-videos-id (common/get-item-or-throw-error db "YouTube Videos")
-        video-id (common/get-item-or-throw-error db "Video")]
-    
-    (let [channel-id (create-channel-or-take-existing db 
-                                                      author_name
-                                                      author_url
-                                                      youtube-channels-id)
-          _ (when (:id (get-item/get-item-by-path db 
-                                                  "data->'resource-links'->>'youtube-video'" 
-                                                  url))
-              (throw (Exception. "youtube video already exists!")))]
-      (common/insert-item db 
-                          title
-                          selected-context-id 
-                          #{channel-id youtube-videos-id video-id} 
-                          {:youtube-video url}))))
+        video-id (common/get-item-or-throw-error db "Video")
+        channel-id (create-channel-or-take-existing db 
+                                                    author_name
+                                                    author_url
+                                                    youtube-channels-id)]
+    (when (:id (get-item/get-item-by-path db "data->'resource-links'->>'youtube-video'" url))
+      (throw (Exception. "youtube video already exists!")))
+    (common/insert-item db 
+                        title
+                        selected-context-id 
+                        #{channel-id youtube-videos-id video-id} 
+                        {:youtube-video url})))
