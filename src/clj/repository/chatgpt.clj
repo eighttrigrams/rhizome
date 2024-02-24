@@ -14,6 +14,7 @@
                :content content}]})
 
 (defn get-summary [content]
+  (log/info (str "Using ChatGPT configuration: " configuration))
   (when-let [token (:token configuration)]
     (try
       (let [parsed-response-body
