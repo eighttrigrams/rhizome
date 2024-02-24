@@ -42,6 +42,7 @@
                         resource-links)))
 
 (defn batch-insertion [db]
+  (log/info "Startin batch insertion ...")
   (let [import-id (common/get-item-or-throw-error db "Imports")]
     (for [file-name (home/list-files)]
       (do
