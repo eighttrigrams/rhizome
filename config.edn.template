@@ -1,4 +1,5 @@
 {:port 3006
+ :chat-gpt-token "abc"
  :db 
  {:dbtype   "postgresql"
   :dbname   ""

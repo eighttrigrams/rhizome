@@ -5,7 +5,8 @@
             [hickory.core :as html]
             [hickory.select :as select]
             [datastore.get-item :as get-item]
-            [repository.insertion.common :as common]))
+            [repository.insertion.common :as common]
+            [repository.chatgpt :as chatgpt]))
 
 (defn extract-text [content]
   (str/join (doall (reduce (fn [acc val]
@@ -91,16 +92,21 @@
     (let [identifiers (convert url)
           [title content] (get-post url)
           _           (when-not (seq title) (throw (Exception. "no post title")))
-          _ (tap> [:content content])
+          summary (chatgpt/get-summary content)
           substack-id (create-or-take-substack-id db identifiers substack-platform-id substacks-id)
           _ (when (:id (get-item/get-item-by-path db 
                                                   "data->'resource-links'->>'substack-article'" 
                                                   url))
-              (throw (Exception. "substack article already exists!")))]
-      (insert-article db 
-                      url 
-                      title
-                      context-ids-set
-                      substack-platform-id
-                      substack-id
-                      articles-id))))
+              (throw (Exception. "substack article already exists!")))
+          issue (insert-article db 
+                                  url 
+                                  title
+                                  context-ids-set
+                                  substack-platform-id
+                                  substack-id
+                                  articles-id)]
+      (when (and issue summary)
+        (datastore/update-issue-description db (assoc issue :description 
+                                                      (str "--- ChatGPT 3.5 BEGIN ---\n\n" 
+                                                           summary
+                                                           "\n\n--- ChatGPT 3.5 END ---")))))))
