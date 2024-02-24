@@ -6,9 +6,10 @@
 (defn- resolve-it [file-id]
   (let [suffix-id (str/last-index-of file-id ".")
         suffix (subs file-id (inc suffix-id))]
-    (case suffix
-      ("mp3" "mp4" "MP3" "MP4") "Music" 
-      ("pdf" "PDF") "Documents"
+    (case (str/lower-case suffix)
+      ("mp3" "mp4") "Music" 
+      "pdf" "Documents"
+      ("png" "jpeg" "jpg") "Pictures"
       nil)))
 
 (defn open [file-id]
