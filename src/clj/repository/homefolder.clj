@@ -16,6 +16,16 @@
       (str/ends-with? (str/lower-case file-name) ".jpg")
       (str/ends-with? (str/lower-case file-name) ".png")))
 
+(defn validate-not-exists [file-name]
+  (when (.exists (io/file (str "/Users/daniel/Music/Tracked/" file-name)))
+    (throw (Exception. (str "File already exists" file-name))))
+  (when (.exists (io/file (str "/Users/daniel/Pictures/Tracked/" file-name)))
+    (throw (Exception. (str "File already exists" file-name))))
+  (when (.exists (io/file (str "/Users/daniel/Documents/Tracked/" file-name)))
+    (throw (Exception. (str "File already exists" file-name))))
+  (when (.exists (io/file (str "/Users/daniel/Movies/Tracked/" file-name)))
+    (throw (Exception. (str "File already exists" file-name)))))
+
 (defn- get-target [file-name]
   (str "/Users/daniel/"
        (case (get-suffix file-name)
@@ -23,11 +33,6 @@
          ("pdf") "Documents"
          ("jpeg" "jpg" "png") "Pictures")
        "/Tracked/" file-name))
-
-(defn validate-not-exists [file-name]
-  (let [target (get-target file-name)]
-    (when (.exists (io/file target))
-      (throw (Exception. (str "File already exists" target))))))
 
 (defn move-file [file-name]
   (let [target (get-target file-name)]

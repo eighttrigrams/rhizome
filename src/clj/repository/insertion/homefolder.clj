@@ -26,6 +26,7 @@
   (subs title 0 (str/last-index-of title ".")))
 
 (defn save-file [db file-name context-ids-set]
+  (home/validate-not-exists file-name)
   (let [classification (classify file-name)
         files-context-id (common/get-item-or-throw-error db "Files") 
         additional-context-ids (get-additional-context-ids db classification)
@@ -51,7 +52,6 @@
        (do
          (log/info (str "Importing " file-name " ... "))
          (try
-           (home/validate-not-exists file-name)
            (save-file db file-name #{import-id})
            (home/move-file file-name)
            (catch Exception e 
