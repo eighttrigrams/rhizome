@@ -1,9 +1,11 @@
 (ns repository.insertion.homefolder
-  (:require [clojure.string :as str]
+  (:require [cambium.core :as log]
+            [clojure.string :as str]
             [clojure.set :as set]
             datastore
             [utils :refer [condx]]
-            [repository.insertion.common :as common]))
+            [repository.insertion.common :as common]
+            [repository.homefolder :as home]))
 
 ;; TODO make condx work to match multiple cases, like case
 (defn- classify [title]
@@ -23,15 +25,28 @@
 (defn strip-suffix [title]
   (subs title 0 (str/last-index-of title ".")))
 
-(defn save-file [db title context-ids-set]
-  (let [classification (classify title)
+(defn save-file [db file-name context-ids-set]
+  (let [classification (classify file-name)
         files-context-id (common/get-item-or-throw-error db "Files") 
         additional-context-ids (get-additional-context-ids db classification)
         context-ids-set (conj (set/union context-ids-set 
                                          (into #{} additional-context-ids))
                               files-context-id)
-        title (strip-suffix title)
-        resource-links (merge {:file title}
+        resource-links (merge {:file file-name}
                                (when (some #{"Image"} classification)
-                                 {:image title}))] 
-    (common/insert-item db title "" context-ids-set resource-links)))
+                                 {:image file-name}))] 
+    (common/insert-item db 
+                        (strip-suffix file-name)
+                        "" 
+                        context-ids-set 
+                        resource-links)))
+
+(defn batch-insertion [db]
+  (let [import-id (common/get-item-or-throw-error db "Imports")]
+    (for [file-name (home/list-files)]
+      (try
+        (home/validate-not-exists file-name)
+        (save-file db file-name #{import-id})
+        (home/move-file file-name)
+        (catch Exception e 
+          (log/error (.getMessage e)))))))

@@ -27,11 +27,13 @@
 (defn insert-issue 
   [db 
    title 
-   selected-context 
+   selected-context
    selected-secondary-contexts-set
    alternative-behaviour?]
   (let [context-ids-set (into #{} (conj selected-secondary-contexts-set (:id selected-context)))]
-    (cond (re-matches #"https://www.youtube.com/watch\?v=[.[^&]]*" title) 
+    (cond (= "IMPORT" title)
+          (homefolder/batch-insertion db)
+          (re-matches #"https://www.youtube.com/watch\?v=[.[^&]]*" title) 
           (youtube/save-video db 
                               title 
                               context-ids-set) 
