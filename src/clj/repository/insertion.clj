@@ -38,7 +38,11 @@
           (substack/save-article db title selected-context-id) 
           (or (str/ends-with? (str/lower-case title) ".mp4")
               (str/ends-with? (str/lower-case title) ".mp3")
-              (str/ends-with? (str/lower-case title) ".pdf"))
+              (str/ends-with? (str/lower-case title) ".pdf")
+              (str/ends-with? (str/lower-case title) ".jpeg")
+              (str/ends-with? (str/lower-case title) ".jpg")
+              (str/ends-with? (str/lower-case title) ".png")
+              )
           (homefolder/save-file db title selected-context-id)
           :else 
           (normal-issue-insertion db title selected-context-id selected-secondary-contexts-set split-short-title?))))
