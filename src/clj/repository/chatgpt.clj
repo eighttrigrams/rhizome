@@ -4,18 +4,18 @@
             [clj-http.client :as http]
             [cheshire.core :as json]))
 
-(def configuration (:chat-gpt config/config))
+(defn configuration [] (:chat-gpt config/config))
 
 (defn form-params [content]
-  {:model    (:model configuration),
+  {:model    (:model (configuration)),
    :messages [{:role    "system",
-               :content (:prompt configuration)}
+               :content (:prompt (configuration))}
               {:role    "user",
                :content content}]})
 
 (defn get-summary [content]
-  (log/info (str "Using ChatGPT configuration: " configuration))
-  (when-let [token (:token configuration)]
+  (log/info (str "Using ChatGPT configuration: " (configuration)))
+  (when-let [token (:token (configuration))]
     (try
       (let [parsed-response-body
               (json/parse-string 
