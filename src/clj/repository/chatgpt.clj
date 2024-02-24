@@ -4,15 +4,17 @@
             [clj-http.client :as http]
             [cheshire.core :as json]))
 
+(def configuration (:chat-gpt config/config))
+
 (defn form-params [content]
-  {:model    "gpt-3.5-turbo-0125",
+  {:model    (:model configuration),
    :messages [{:role    "system",
-               :content "You are a professional summary writer who delivers executive summaries of essays to CEOs. Every input will be an essay. Please summarize in 2 paragraphs."}
+               :content (:prompt configuration)}
               {:role    "user",
                :content content}]})
 
 (defn get-summary [content]
-  (when-let [token (:chat-gpt-token config/config)]
+  (when-let [token (:token configuration)]
     (try
       (let [parsed-response-body
               (json/parse-string 
