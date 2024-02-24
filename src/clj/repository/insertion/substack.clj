@@ -4,7 +4,8 @@
             [clj-http.client :as http]
             [hickory.core :as html]
             [hickory.select :as select]
-            [datastore.get-item :as get-item]))
+            [datastore.get-item :as get-item]
+            [repository.insertion.common :as common]))
 
 (defn- get-post-title [url]
   (let [tree (html/as-hickory (html/parse (:body (http/get url))))
@@ -19,15 +20,11 @@
     subdomain-full-url] 
    substack-platform-id
    substacks-id]
-  (let [substack (datastore/new-issue db 
-                                      subdomain-url
-                                      subdomain-handle
-                                      substacks-id
-                                      #{substack-platform-id})
-        substack (datastore/update-issue db
-                                         {:issue              (update substack :data
-                                                                      (fn [data] (assoc data :resource-links {:substack subdomain-full-url})))
-                                          :related-issues-ids '()})]
+  (let [substack (common/insert-item db 
+                                     subdomain-url
+                                     subdomain-handle 
+                                     #{substack-platform-id substacks-id}
+                                     {:substack subdomain-full-url})]
     (:id (datastore/upgrade-issue-to-context! db substack))))
 
 (defn-  convert [url]
@@ -44,17 +41,15 @@
 (defn- insert-article 
   [db 
    url 
-   selected-context-id 
+   context-ids-set 
    substack-platform-id 
    substack-id 
    articles-id]
-  (let [issue (datastore/new-issue db (get-post-title url)
-                                           ""
-                                           selected-context-id
-                                           #{substack-id articles-id substack-platform-id})]
-    (datastore/update-issue db {:issue              (update issue :data 
-                                                              (fn [data] (assoc data :resource-links {:substack-article url})))
-                                  :related-issues-ids '()})))
+  (common/insert-item db 
+                      (get-post-title url) 
+                      "" 
+                      (conj context-ids-set substack-id articles-id substack-platform-id) 
+                      {:substack-article url}))
 
 (defn- create-or-take-substack-id [db identifiers substack-platform-id substacks-id]
   (let [substack-id (:id (get-item/get-item-by-path db 
@@ -66,7 +61,7 @@
                                                      substacks-id))]
     substack-id))
 
-(defn save-article [db url selected-context-id]
+(defn save-article [db url context-ids-set]
   (let [substack-platform-id (:id (get-item/get-item-by-title db {:title "Substack"}))
         substacks-id (:id (get-item/get-item-by-title db {:title "Substacks"}))
         articles-id (:id (get-item/get-item-by-title db {:title "Articles"}))]
@@ -83,7 +78,7 @@
               (throw (Exception. "substack article already exists!")))]
       (insert-article db 
                       url 
-                      selected-context-id
+                      context-ids-set
                       substack-platform-id
                       substack-id
                       articles-id))))

@@ -15,10 +15,12 @@
   (str "/Users/daniel/" folder "/Tracked/" file))
 
 (defn- found-files [file]
-  (filter 
-   (fn [folder] 
-     (.exists (io/file (file-path folder file))))
-   ["Pictures" "Music" "Documents"]))
+  (if-not file
+    []
+    (filter 
+     (fn [folder] 
+       (.exists (io/file (file-path folder file))))
+     ["Pictures" "Music" "Documents"])))
 
 (defn- delete-file [found-files file]
   (when file
@@ -41,7 +43,7 @@
           (> files-count 1)
           (log/warn (str "Doing nothing. Files count for file is greater than one. (" files-count ")"))
           (> (count found-files) 1)
-          (log/warn (str "Doing nothing. Too many files found. (" (count found-files) ")"))
+          (log/warn (str "Doing nothing. Too many files found. (" (count found-files) ") "))
           :else
           (do (delete-file found-files file)
               (datastore/delete-item db {:id id})))))

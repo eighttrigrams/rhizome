@@ -1,5 +1,6 @@
 (ns repository.insertion.homefolder
   (:require [clojure.string :as str]
+            [clojure.set :as set]
             datastore
             [utils :refer [condx]]
             [repository.insertion.common :as common]))
@@ -22,14 +23,15 @@
 (defn strip-suffix [title]
   (subs title 0 (str/last-index-of title ".")))
 
-(defn save-file [db title selected-context-id]
+(defn save-file [db title context-ids-set]
   (let [classification (classify title)
         files-context-id (common/get-item-or-throw-error db "Files") 
-        additional-context-ids (get-additional-context-ids db classification)] 
-    (common/insert-item db 
-                        (strip-suffix title) 
-                        selected-context-id 
-                        (conj additional-context-ids files-context-id)
-                        (merge {:file title}
+        additional-context-ids (get-additional-context-ids db classification)
+        context-ids-set (conj (set/union context-ids-set 
+                                         (into #{} additional-context-ids))
+                              files-context-id)
+        title (strip-suffix title)
+        resource-links (merge {:file title}
                                (when (some #{"Image"} classification)
-                                 {:image title})))))
+                                 {:image title}))] 
+    (common/insert-item db title "" context-ids-set resource-links)))

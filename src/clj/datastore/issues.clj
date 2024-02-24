@@ -92,17 +92,19 @@
                               :columns     [:container_id :item_id]
                               :values      values})))
 
-(defn new-issue [db 
-                 title
-                 short-title
-                 context-id 
-                 selected-secondary-contexts-set]
-  (let [issue-id    (create-new-issue! db title short-title)
-        values      (vec (doall
-                          (map (fn [ctx-id]
-                                 [[:inline ctx-id]
-                                  [:inline issue-id]])
-                               (conj selected-secondary-contexts-set context-id))))]
+(defn new-issue 
+  [db 
+   title
+   short-title
+   context-ids-set]
+  (when-not (seq context-ids-set) 
+    (throw (Exception. "won't create a new-issue when no contexts")))
+  (let [issue-id (create-new-issue! db title short-title)
+        values   (vec (doall
+                       (map (fn [ctx-id]
+                              [[:inline ctx-id]
+                               [:inline issue-id]])
+                            context-ids-set)))]
     (insert-issue-relations! db values)
     (get-issue db {:id issue-id})))
 

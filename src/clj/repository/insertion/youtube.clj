@@ -26,22 +26,18 @@
         channel-handle (str "YT" channel-handle-simple)
         channel-id (:id (get-item/get-item-by-path db "data->'resource-links'->>'youtube-channel'" author_url))
         channel-id (or channel-id
-                       (let [channel (datastore/new-issue db 
-                                                          author_name
-                                                          channel-handle
-                                                          youtube-channels-id
-                                                          #{})
-                             channel (datastore/update-issue db
-                                                             {:issue              (update channel :data
-                                                                                          (fn [data] (assoc data :resource-links {:youtube-channel author_url})))
-                                                              :related-issues-ids '()})]
+                       (let [channel (common/insert-item db 
+                                                         author_name 
+                                                         channel-handle
+                                                         #{youtube-channels-id}
+                                                         {:youtube-channel author_url})]
                          (:id (datastore/upgrade-issue-to-context! db channel))))]
     channel-id))
 
 (defn save-video
   [db 
    url 
-   selected-context-id]
+   context-ids-set]
   (let [{:keys [title 
                 author_name
                 author_url] :as _response} (query url)
@@ -62,6 +58,6 @@
       (throw (Exception. "youtube video already exists!")))
     (common/insert-item db 
                         title
-                        selected-context-id 
-                        #{channel-id youtube-videos-id video-id} 
+                        ""
+                        (conj context-ids-set channel-id youtube-videos-id video-id) 
                         {:youtube-video url})))
