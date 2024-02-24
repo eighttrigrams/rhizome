@@ -3,6 +3,7 @@
             [clojure.string :as str]
             [clojure.set :as set]
             datastore
+            [datastore.get-item :as get-item]
             [utils :refer [condx]]
             [repository.insertion.common :as common]
             [repository.homefolder :as home]))
@@ -25,8 +26,15 @@
 (defn strip-suffix [title]
   (subs title 0 (str/last-index-of title ".")))
 
-(defn save-file [db file-name context-ids-set]
+(defn- validate-not-exists [db file-name]
   (home/validate-not-exists file-name)
+  (when (:id (get-item/get-item-by-path db "data->'resource-links'->>'file'" file-name))
+    (throw (Exception. "file already exists!")))
+  (when (:id (get-item/get-item-by-path db "data->'resource-links'->>'image'" file-name))
+    (throw (Exception. "image already exists!"))))
+
+(defn save-file [db file-name context-ids-set]
+  (validate-not-exists db file-name) 
   (let [classification (classify file-name)
         files-context-id (common/get-item-or-throw-error db "Files") 
         additional-context-ids (get-additional-context-ids db classification)
@@ -34,8 +42,8 @@
                                          (into #{} additional-context-ids))
                               files-context-id)
         resource-links (merge {:file file-name}
-                               (when (some #{"Image"} classification)
-                                 {:image file-name}))] 
+                              (when (some #{"Image"} classification)
+                                {:image file-name}))]
     (common/insert-item db 
                         (strip-suffix file-name)
                         "" 
