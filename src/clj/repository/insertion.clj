@@ -37,7 +37,7 @@
           (youtube/match? title) 
           (youtube/ingest db title context-ids-set nil) 
           (substack/match? title)
-          (substack/save-article db title context-ids-set nil) 
+          (substack/save-article db title context-ids-set alternative-behaviour?) 
           (file/match? title)
           (file/ingest db title context-ids-set nil)
           :else 
