@@ -107,6 +107,6 @@
                                   articles-id)]
       (when (and issue summary)
         (datastore/update-issue-description db (assoc issue :description 
-                                                      (str "--- ChatGPT 3.5 BEGIN ---\n\n" 
+                                                      (str "--- ChatGPT BEGIN ---\n\n" 
                                                            summary
-                                                           "\n\n--- ChatGPT 3.5 END ---")))))))
+                                                           "\n\n--- ChatGPT END ---")))))))
