@@ -15,7 +15,7 @@
        (when (home/supported-file-type? file-name)
          (log/info (str "Importing " file-name " ... "))
          (try
-           (file/ingest db file-name #{import-id})
+           (file/ingest db file-name #{import-id} nil)
            (home/move-file file-name)
            (catch Exception e 
              (log/error (.getMessage e)))))))))
