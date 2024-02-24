@@ -44,9 +44,11 @@
 (defn batch-insertion [db]
   (let [import-id (common/get-item-or-throw-error db "Imports")]
     (for [file-name (home/list-files)]
-      (try
-        (home/validate-not-exists file-name)
-        (save-file db file-name #{import-id})
-        (home/move-file file-name)
-        (catch Exception e 
-          (log/error (.getMessage e)))))))
+      (do
+        (log/info (str "Importing " file-name " ... "))
+        (try
+          (home/validate-not-exists file-name)
+          (save-file db file-name #{import-id})
+          (home/move-file file-name)
+          (catch Exception e 
+            (log/error (.getMessage e))))))))
