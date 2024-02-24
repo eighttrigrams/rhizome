@@ -92,7 +92,8 @@
     (let [identifiers (convert url)
           [title content] (get-post url)
           _           (when-not (seq title) (throw (Exception. "no post title")))
-          summary (chatgpt/get-summary content)
+          summary (and should-capture-summary?
+                       (chatgpt/get-summary content))
           substack-id (create-or-take-substack-id db identifiers substack-platform-id substacks-id)
           _ (when (:id (get-item/get-item-by-path db 
                                                   "data->'resource-links'->>'substack-article'" 
@@ -105,7 +106,7 @@
                                   substack-platform-id
                                   substack-id
                                   articles-id)]
-      (when (and issue should-capture-summary? summary)
+      (when (and issue summary)
         (datastore/update-issue-description db (assoc issue :description 
                                                       (str "--- ChatGPT | " 
                                                            (:model (chatgpt/configuration))
