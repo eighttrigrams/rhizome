@@ -3,6 +3,7 @@
             [datastore.config :as config]))
 
 (defn match? [title]
+  ;; or use (some identity values)
   (reduce #(or %1 %2) false
           (map (fn [url]
                  (re-matches (re-pattern 
