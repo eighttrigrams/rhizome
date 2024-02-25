@@ -1,10 +1,16 @@
 (ns repository.insertion.substack-external
-  (:require [repository.insertion.substack :as substack]))
+  (:require [repository.insertion.substack :as substack]
+            [datastore.config :as config]))
 
 (defn match? [title]
-  (or (re-matches #"https://www.arktosjournal.com\/p\/.*" title)
-      (re-matches #"https://www.eugyppius.com\/p\/.*" title)
-      (re-matches #"https://www.alexkaschuta.com\/p\/.*" title)))
+  (reduce #(or %1 %2) false
+          (map (fn [url]
+                 (re-matches (re-pattern 
+                              (str "https://" url "\\/p\\/.*")) 
+                             title))
+               (-> config/config
+                   :substack
+                   :external-substacks))))
 
 (defn save-article [db url context-ids-set should-capture-summary?]
   ((substack/make:save-article true) db url context-ids-set should-capture-summary?))
