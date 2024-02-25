@@ -53,11 +53,25 @@
           subdomain-handle (str subdomain ".substack")
           subdomain-url (str subdomain-handle ".com")
           subdomain-full-url (str "https://" subdomain-url)]
-    [subdomain-handle
+    [;; short-title
+     subdomain-handle
+     ;; title
      subdomain-url
+     ;; link
      subdomain-full-url]))
 
-(defn- create-or-take-substack-id [db identifiers substack-platform-id substacks-id]
+(defn- convert-external [url]
+  (let [without-protocol (str/replace url "https://" "")
+        only-domain (subs without-protocol 0 
+                          (str/index-of without-protocol "/"))]
+    [only-domain
+     only-domain
+     (str "https://" only-domain)]))
+
+(defn- create-or-take-substack-id [db 
+                                   identifiers 
+                                   substack-platform-id 
+                                   substacks-id]
   (let [substack-id (:id (get-item/get-item-by-path db 
                                                     "data->'resource-links'->>'substack'" 
                                                     (last identifiers)))
@@ -95,8 +109,13 @@
           _                    (validate-preconditions db url title)
           summary              (and should-capture-summary?
                                     (chatgpt/get-summary content))
-          substack-id          (when external?
-                                 (create-or-take-substack-id db (convert url) substack-platform-id substacks-id))
+          substack-id          (create-or-take-substack-id 
+                                db 
+                                (if external?
+                                  (convert-external url)
+                                  (convert url))
+                                substack-platform-id
+                                substacks-id)
           issue                (common/insert-item db 
                                                    title 
                                                    "" 
