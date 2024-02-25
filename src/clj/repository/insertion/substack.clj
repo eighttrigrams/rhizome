@@ -76,9 +76,6 @@
        (:model (chatgpt/configuration))
        " | END ---"))
 
-(defn match? [title]
-  (re-matches #"https://.*\.substack.com\/p\/.*" title))
-
 (defn- validate-preconditions [db url title]
   (let [_ (when-not (seq title) (throw (Exception. "no post title")))
         _ (when (:id (get-item/get-item-by-path db 
@@ -86,21 +83,28 @@
                                                 url))
             (throw (Exception. "substack article already exists!")))]))
 
-(defn save-article [db url context-ids-set should-capture-summary?]
-  (let [substack-platform-id (common/get-item-or-throw-error db "Substack")
-        substacks-id (common/get-item-or-throw-error db "Substacks")
-        articles-id (common/get-item-or-throw-error db "Articles")
-        identifiers (convert url)
-        [title content] (get-post url)
-        _ (validate-preconditions db url title)
-        summary (and should-capture-summary?
-                     (chatgpt/get-summary content))
-        substack-id (create-or-take-substack-id db identifiers substack-platform-id substacks-id)
-        issue (common/insert-item db 
-                                  title 
-                                  "" 
-                                  (conj context-ids-set substack-id articles-id substack-platform-id) 
-                                  {:substack-article url})]
-    (when (and issue summary)
-      (datastore/update-issue-description db (assoc issue :description 
-                                                    (wrap-summary summary))))))
+(defn match? [title]
+  (re-matches #"https://.*\.substack.com\/p\/.*" title))
+
+(defn make:save-article [external?]
+  (fn save-article [db url context-ids-set should-capture-summary?]
+    (let [substack-platform-id (common/get-item-or-throw-error db "Substack")
+          substacks-id         (common/get-item-or-throw-error db "Substacks")
+          articles-id          (common/get-item-or-throw-error db "Articles")
+          [title content]      (get-post url)
+          _                    (validate-preconditions db url title)
+          summary              (and should-capture-summary?
+                                    (chatgpt/get-summary content))
+          substack-id          (when external?
+                                 (create-or-take-substack-id db (convert url) substack-platform-id substacks-id))
+          issue                (common/insert-item db 
+                                                   title 
+                                                   "" 
+                                                   (conj context-ids-set 
+                                                         (or substack-id articles-id) ;; hack 
+                                                         articles-id 
+                                                         substack-platform-id) 
+                                                   {:substack-article url})]
+      (when (and issue summary)
+        (datastore/update-issue-description db (assoc issue :description 
+                                                      (wrap-summary summary)))))))

@@ -1,7 +1,7 @@
 {:port 3006
  :chat-gpt { 
     :token "abc"
-    :prompt "You are a professional summary writer who delivers executive summaries of essays to CEOs. Every input will be an essay. Please summarize in 2 paragraphs."
+    :prompt "You are a professional summary writer who delivers executive summaries of essays to CEOs. Every input will be an essay. Please summarize in 3 paragraphs. Mach das auf Deutsch, bitte!"
     :model "gpt-3.5-turbo-0125"
  }
  :db 
