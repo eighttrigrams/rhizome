@@ -77,20 +77,23 @@
 (defn match? [title]
   (re-matches #"https://.*\.substack.com\/p\/.*" title))
 
+(defn- validate-preconditions [db url title]
+  (let [_ (when-not (seq title) (throw (Exception. "no post title")))
+        _ (when (:id (get-item/get-item-by-path db 
+                                                "data->'resource-links'->>'substack-article'" 
+                                                url))
+            (throw (Exception. "substack article already exists!")))]))
+
 (defn save-article [db url context-ids-set should-capture-summary?]
   (let [substack-platform-id (common/get-item-or-throw-error db "Substack")
         substacks-id (common/get-item-or-throw-error db "Substacks")
         articles-id (common/get-item-or-throw-error db "Articles")
         identifiers (convert url)
         [title content] (get-post url)
-        _           (when-not (seq title) (throw (Exception. "no post title")))
+        _ (validate-preconditions db url title)
         summary (and should-capture-summary?
                      (chatgpt/get-summary content))
         substack-id (create-or-take-substack-id db identifiers substack-platform-id substacks-id)
-        _ (when (:id (get-item/get-item-by-path db 
-                                                "data->'resource-links'->>'substack-article'" 
-                                                url))
-            (throw (Exception. "substack article already exists!")))
         issue (common/insert-item db 
                                   title 
                                   "" 
