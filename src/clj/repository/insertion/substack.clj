@@ -21,9 +21,11 @@
 
 (defn- get-post [url]
   (let [tree (html/as-hickory (html/parse (:body (http/get url))))
-        title (first (:content (first (select/select (select/and (select/tag "h1")
-                                                   (select/class "post-title"))
-                                                     tree))))
+        title (first (:content 
+                      (first 
+                       (select/select
+                        (select/tag "title")
+                        tree))))
         content (:content (first (:content (first (select/select
                                                           (select/and 
                                                            (select/tag "div")
