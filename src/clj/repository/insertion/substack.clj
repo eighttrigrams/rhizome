@@ -55,20 +55,6 @@
      subdomain-url
      subdomain-full-url]))
 
-(defn- insert-article 
-  [db 
-   url 
-   title
-   context-ids-set 
-   substack-platform-id 
-   substack-id 
-   articles-id]
-  (common/insert-item db 
-                      title 
-                      "" 
-                      (conj context-ids-set substack-id articles-id substack-platform-id) 
-                      {:substack-article url}))
-
 (defn- create-or-take-substack-id [db identifiers substack-platform-id substacks-id]
   (let [substack-id (:id (get-item/get-item-by-path db 
                                                     "data->'resource-links'->>'substack'" 
@@ -79,39 +65,37 @@
                                                      substacks-id))]
     substack-id))
 
+(defn wrap-summary [summary]
+  (str "--- ChatGPT | " 
+       (:model (chatgpt/configuration))
+       " | BEGIN ---\n\n" 
+       summary
+       "\n\n--- ChatGPT | "
+       (:model (chatgpt/configuration))
+       " | END ---"))
+
 (defn match? [title]
   (re-matches #"https://.*\.substack.com\/p\/.*" title))
 
 (defn save-article [db url context-ids-set should-capture-summary?]
-  (let [substack-platform-id (:id (get-item/get-item-by-title db {:title "Substack"}))
-        substacks-id (:id (get-item/get-item-by-title db {:title "Substacks"}))
-        articles-id (:id (get-item/get-item-by-title db {:title "Articles"}))]
-    (when-not substacks-id (throw (Exception. "no substack-platform-id")))
-    (when-not substacks-id (throw (Exception. "no substacks-id")))
-    (when-not articles-id (throw (Exception. "no articles-id")))
-    (let [identifiers (convert url)
-          [title content] (get-post url)
-          _           (when-not (seq title) (throw (Exception. "no post title")))
-          summary (and should-capture-summary?
-                       (chatgpt/get-summary content))
-          substack-id (create-or-take-substack-id db identifiers substack-platform-id substacks-id)
-          _ (when (:id (get-item/get-item-by-path db 
-                                                  "data->'resource-links'->>'substack-article'" 
-                                                  url))
-              (throw (Exception. "substack article already exists!")))
-          issue (insert-article db 
-                                  url 
-                                  title
-                                  context-ids-set
-                                  substack-platform-id
-                                  substack-id
-                                  articles-id)]
-      (when (and issue summary)
-        (datastore/update-issue-description db (assoc issue :description 
-                                                      (str "--- ChatGPT | " 
-                                                           (:model (chatgpt/configuration))
-                                                           " | BEGIN ---\n\n" 
-                                                           summary
-                                                           "\n\n--- ChatGPT | "
-                                                           (:model (chatgpt/configuration))
-                                                           " | END ---")))))))
+  (let [substack-platform-id (common/get-item-or-throw-error db "Substack")
+        substacks-id (common/get-item-or-throw-error db "Substacks")
+        articles-id (common/get-item-or-throw-error db "Articles")
+        identifiers (convert url)
+        [title content] (get-post url)
+        _           (when-not (seq title) (throw (Exception. "no post title")))
+        summary (and should-capture-summary?
+                     (chatgpt/get-summary content))
+        substack-id (create-or-take-substack-id db identifiers substack-platform-id substacks-id)
+        _ (when (:id (get-item/get-item-by-path db 
+                                                "data->'resource-links'->>'substack-article'" 
+                                                url))
+            (throw (Exception. "substack article already exists!")))
+        issue (common/insert-item db 
+                                  title 
+                                  "" 
+                                  (conj context-ids-set substack-id articles-id substack-platform-id) 
+                                  {:substack-article url})]
+    (when (and issue summary)
+      (datastore/update-issue-description db (assoc issue :description 
+                                                    (wrap-summary summary))))))
