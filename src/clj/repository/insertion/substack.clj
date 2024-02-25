@@ -104,7 +104,8 @@
 
 (defn make:save-article [external?]
   (fn save-article [db url context-ids-set should-capture-summary?]
-    (let [substack-platform-id (common/get-item-or-throw-error db "Substack")
+    (let [url                  (first (clojure.string/split url #"\?"))
+          substack-platform-id (common/get-item-or-throw-error db "Substack")
           substacks-id         (common/get-item-or-throw-error db "Substacks")
           articles-id          (common/get-item-or-throw-error db "Articles")
           [title content]      (get-post url)
