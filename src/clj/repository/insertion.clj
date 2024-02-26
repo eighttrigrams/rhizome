@@ -35,13 +35,14 @@
   (let [context-ids-set (into #{} (conj selected-secondary-contexts-set (:id selected-context)))]
     (cond (batch/match? title)
           (batch/ingest db nil nil nil)
+          ;; not supporting that any longer, since that doesn't guarantee the file is imported properly
+          #_(file/match? title)
+          #_(file/ingest db title context-ids-set nil)
           (youtube/match? title) 
           (youtube/ingest db title context-ids-set nil) 
           (substack/match? title)
           ((substack/make:save-article false) db title context-ids-set alternative-behaviour?)
           (substack-external/match? title)
           (substack-external/save-article db title context-ids-set alternative-behaviour?)
-          (file/match? title)
-          (file/ingest db title context-ids-set nil)
           :else 
           (normal-issue-insertion db title context-ids-set alternative-behaviour?))))
