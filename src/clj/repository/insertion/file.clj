@@ -37,6 +37,8 @@
 
 (defn ingest [db file-name context-ids-set _]
   (validate-not-exists db file-name) 
+  (when (re-find #"," file-name)
+    (throw (Exception. (str "file name shouldn't contain commas: " file-name))))
   (let [classification (classify file-name)
         files-context-id (common/get-item-or-throw-error db "Files") 
         additional-context-ids (get-additional-context-ids db classification)

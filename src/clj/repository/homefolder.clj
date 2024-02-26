@@ -5,8 +5,7 @@
 
 (defn- get-suffix [file-name]
   (let [idx (str/last-index-of file-name ".")]
-    (str/lower-case
-     (subs file-name (inc idx) (count file-name)))))
+    (str/lower-case (subs file-name (inc idx)))))
 
 (defn supported-file-type? [file-name]
   (or (str/ends-with? (str/lower-case file-name) ".mp4")
@@ -26,12 +25,14 @@
   (when (.exists (io/file (str "/Users/daniel/Movies/Tracked/" file-name)))
     (throw (Exception. (str "File already exists: " file-name)))))
 
-(defn- get-target [file-name]
+(defn get-target [file-name]
   (str "/Users/daniel/"
        (case (get-suffix file-name)
-         ("mp3" "mp4") "Music"
+         "mp3" "Music"
+         "mp4" "Movies"
          ("pdf") "Documents"
-         ("jpeg" "jpg" "png") "Pictures")
+         ("jpeg" "jpg" "png") "Pictures"
+         nil)
        "/Tracked/" file-name))
 
 (defn move-file [file-name]
