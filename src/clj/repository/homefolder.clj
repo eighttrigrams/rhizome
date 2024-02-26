@@ -37,7 +37,7 @@
 
 (defn move-file [file-name]
   (let [target (get-target file-name)]
-    (log/info (str "Will move " file-name " to " target))
+    (log/info (str "Will move " file-name " to " (str/replace target file-name "")))
     (.renameTo (io/file (str "/Users/daniel/Downloads/Tracked/" file-name))
                (io/file target))))
 
