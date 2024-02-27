@@ -7,6 +7,7 @@
             [repository.insertion.youtube :as youtube]
             #_[repository.insertion.file :as file]
             [repository.insertion.unz :as unz]
+            [repository.insertion.takimag :as takimag]
             [repository.insertion.batch :as batch]))
 
 (defn- normal-issue-insertion 
@@ -47,5 +48,7 @@
           (substack-external/save-article db title context-ids-set alternative-behaviour?)
           (unz/match? title) 
           (unz/ingest db title context-ids-set alternative-behaviour?) 
+          (takimag/match? title) 
+          (takimag/ingest db title context-ids-set alternative-behaviour?) 
           :else 
           (normal-issue-insertion db title context-ids-set alternative-behaviour?))))

@@ -29,6 +29,8 @@
                    (str "[" title "]( " substack-link ")"))
                  (str (when-let [article-link (:substack-article (:resource-links data))]
                         (str "[substack]( " article-link ")"))
+                      (when-let [article-link (:web-article (:resource-links data))]
+                        (str "[link]( " article-link ")"))
                       (when-let [youtube-link (:youtube-video (:resource-links data))]
                         (str "[youtube]( " youtube-link ")")) 
                       (when-let [youtube-link (:youtube-channel (:resource-links data))]

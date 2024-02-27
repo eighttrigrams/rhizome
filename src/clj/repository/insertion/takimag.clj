@@ -1,4 +1,4 @@
-(ns repository.insertion.unz
+(ns repository.insertion.takimag 
   (:require datastore
             [hickory.select :as select]
             [repository.insertion.common :as common]
@@ -6,14 +6,15 @@
             utils))
 
 (defn- extract-content [hickory-tree]
-  (:content (first (drop 2 (:content (first (select/select
-                                             (select/and 
-                                              (select/tag "div")
-                                              (select/id "contents-holder")) 
-                                             hickory-tree)))))))
+  (let [content (:content (first (select/select
+                                  (select/and 
+                                   (select/tag "div")
+                                   (select/id "post")) 
+                                  hickory-tree)))]
+    content))
 
 (defn match? [title]
-  (re-matches #"https://www.unz.com.*" title))
+  (re-matches #"https://www.takimag.com.*" title))
 
 (defn ingest [db url context-ids-set should-capture-summary?]
   (let [articles-id     (common/get-item-or-throw-error db "Articles")

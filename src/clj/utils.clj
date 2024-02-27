@@ -25,7 +25,7 @@
   (let [tree (html/as-hickory (html/parse (:body (http/get url))))
         title (first (:content 
                       (first 
-                        (select/select
+                       (select/select
                         (select/tag "title")
                         tree))))]
     [title (-> tree 
