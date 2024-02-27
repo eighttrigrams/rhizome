@@ -6,7 +6,8 @@
             [hickory.select :as select]
             [datastore.get-item :as get-item]
             [repository.insertion.common :as common]
-            [repository.chatgpt :as chatgpt]))
+            [repository.chatgpt :as chatgpt]
+            [utils.url :as url]))
 
 (defn extract-text [content]
   (str/join (doall (reduce (fn [acc val]
@@ -49,12 +50,10 @@
     (:id (datastore/upgrade-issue-to-context! db substack))))
 
 (defn-  convert [url]
-  (let [idx (str/index-of url ".substack")
-          su (subs url 0 idx)
-          subdomain (str/replace su "https://" "")
-          subdomain-handle (str subdomain ".substack")
-          subdomain-url (str subdomain-handle ".com")
-          subdomain-full-url (str "https://" subdomain-url)]
+  (let [subdomain (url/get-subdomain url)
+        subdomain-handle (str subdomain ".substack")
+        subdomain-url (str subdomain-handle ".com")
+        subdomain-full-url (str "https://" subdomain-url)]
     [;; short-title
      subdomain-handle
      ;; title
@@ -104,7 +103,7 @@
 
 (defn make:save-article [external?]
   (fn save-article [db url context-ids-set should-capture-summary?]
-    (let [url                  (first (clojure.string/split url #"\?"))
+    (let [url                  (url/url-without-query-params url)
           substack-platform-id (common/get-item-or-throw-error db "Substack")
           substacks-id         (common/get-item-or-throw-error db "Substacks")
           articles-id          (common/get-item-or-throw-error db "Articles")

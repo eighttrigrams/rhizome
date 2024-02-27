@@ -3,20 +3,14 @@
             [cambium.core :as log]
             [cheshire.core :as json]
             [clj-http.client :as http]
-            [ring.util.codec :refer [url-encode]]
             datastore
             [datastore.get-item :as get-item]
-            [repository.insertion.common :as common]))
-
-(defn make-query-string [m]
-  (->> (for [[k v] m]
-         (str (url-encode k) "=" (url-encode v)))
-       (interpose "&")
-       (apply str)))
+            [repository.insertion.common :as common]
+            [utils.url :as url]))
 
 (defn query [url]
   (json/parse-string (:body (http/get (str "https://www.youtube.com/oembed?" 
-                                           (make-query-string {"format" "json" 
+                                           (url/make-query-string {"format" "json" 
                                                                "url" url}))))
                      true))
 
@@ -35,14 +29,15 @@
     channel-id))
 
 (defn match? [title]
-  (re-matches #"https://www.youtube.com/watch\?v=[.[^&]]*" title))
+  (re-matches #"https://www.youtube.com/watch\?.*v=.*" title))
 
 (defn ingest
   [db 
    url 
    context-ids-set
    _]
-  (let [{:keys [title 
+  (let [url (url/pick-query-params url ["v"])
+        {:keys [title 
                 author_name
                 author_url] :as _response} (query url)
         _ (when-not (and (seq title)
