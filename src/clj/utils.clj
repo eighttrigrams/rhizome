@@ -1,6 +1,42 @@
-(ns utils)
+(ns utils
+  (:require [clojure.string :as str]
+            [hickory.select :as select]
+            [clj-http.client :as http]
+            [hickory.core :as html]
+            [repository.chatgpt :as chatgpt]))
 
 (defn condx [p & pairs]
   (first (keep (fn [[v f]]
                  (when (p v) f))
                (partition 2 pairs))))
+
+(defn extract-text [content]
+  (str/join (doall (reduce (fn [acc val]
+                             (cond (string? val)
+                                   (concat acc [val])
+                                   (and (= :element (:type val)) 
+                                        (:content val))
+                                   (concat acc (extract-text (:content val)))
+                                   :else acc))
+                           [] 
+                           content))))
+
+(defn get-post [url extract-content]
+  (let [tree (html/as-hickory (html/parse (:body (http/get url))))
+        title (first (:content 
+                      (first 
+                        (select/select
+                        (select/tag "title")
+                        tree))))]
+    [title (-> tree 
+               extract-content  
+               extract-text)]))
+
+(defn wrap-summary [summary]
+  (str "--- ChatGPT | " 
+       (:model (chatgpt/configuration))
+       " | BEGIN ---\n\n" 
+       summary
+       "\n\n--- ChatGPT | "
+       (:model (chatgpt/configuration))
+       " | END ---"))

@@ -1,37 +1,12 @@
 (ns repository.insertion.substack
   (:require [clojure.string :as str]
             datastore
-            [clj-http.client :as http]
-            [hickory.core :as html]
             [hickory.select :as select]
             [datastore.get-item :as get-item]
             [repository.insertion.common :as common]
             [repository.chatgpt :as chatgpt]
+            utils
             [utils.url :as url]))
-
-(defn extract-text [content]
-  (str/join (doall (reduce (fn [acc val]
-                             (cond (string? val)
-                                   (concat acc [val])
-                                   (and (= :element (:type val)) 
-                                        (:content val))
-                                   (concat acc (extract-text (:content val)))
-                                   :else acc))
-                           [] 
-                           content))))
-
-(defn- get-post [url]
-  (let [tree (html/as-hickory (html/parse (:body (http/get url))))
-        title (first (:content 
-                      (first 
-                       (select/select
-                        (select/tag "title")
-                        tree))))
-        content (:content (first (:content (first (select/select
-                                                          (select/and 
-                                                           (select/tag "div")
-                                                           (select/class "available-content")) tree)))))]
-    [title (extract-text content)]))
 
 (defn- get-substack-id 
   [db 
@@ -82,14 +57,7 @@
                                                      substacks-id))]
     substack-id))
 
-(defn wrap-summary [summary]
-  (str "--- ChatGPT | " 
-       (:model (chatgpt/configuration))
-       " | BEGIN ---\n\n" 
-       summary
-       "\n\n--- ChatGPT | "
-       (:model (chatgpt/configuration))
-       " | END ---"))
+
 
 (defn- validate-preconditions [db url title]
   (let [_ (when-not (seq title) (throw (Exception. "no post title")))
@@ -101,13 +69,18 @@
 (defn match? [title]
   (re-matches #"https://.*\.substack.com\/p\/.*" title))
 
+(defn- extract-content [hickory-tree]
+  (:content (first (:content (first (select/select
+     (select/and (select/tag "div")
+                 (select/class "available-content")) hickory-tree))))))
+
 (defn make:save-article [external?]
   (fn save-article [db url context-ids-set should-capture-summary?]
     (let [url                  (url/url-without-query-params url)
           substack-platform-id (common/get-item-or-throw-error db "Substack")
           substacks-id         (common/get-item-or-throw-error db "Substacks")
           articles-id          (common/get-item-or-throw-error db "Articles")
-          [title content]      (get-post url)
+          [title content]      (utils/get-post url extract-content)
           _                    (validate-preconditions db url title)
           summary              (and should-capture-summary?
                                     (chatgpt/get-summary content))
@@ -128,4 +101,4 @@
                                                    {:substack-article url})]
       (when (and issue summary)
         (datastore/update-issue-description db (assoc issue :description 
-                                                      (wrap-summary summary)))))))
+                                                      (utils/wrap-summary summary)))))))

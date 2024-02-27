@@ -5,7 +5,8 @@
             [repository.insertion.substack :as substack]
             [repository.insertion.substack-external :as substack-external]
             [repository.insertion.youtube :as youtube]
-            [repository.insertion.file :as file]
+            #_[repository.insertion.file :as file]
+            [repository.insertion.unz :as unz]
             [repository.insertion.batch :as batch]))
 
 (defn- normal-issue-insertion 
@@ -39,10 +40,12 @@
           #_(file/match? title)
           #_(file/ingest db title context-ids-set nil)
           (youtube/match? title) 
-          (youtube/ingest db title context-ids-set nil) 
+          (youtube/ingest db title context-ids-set nil)
           (substack/match? title)
           ((substack/make:save-article false) db title context-ids-set alternative-behaviour?)
           (substack-external/match? title)
           (substack-external/save-article db title context-ids-set alternative-behaviour?)
+          (unz/match? title) 
+          (unz/ingest db title context-ids-set alternative-behaviour?) 
           :else 
           (normal-issue-insertion db title context-ids-set alternative-behaviour?))))
