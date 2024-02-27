@@ -18,7 +18,6 @@
 (defn ingest [db url context-ids-set should-capture-summary?]
   (let [articles-id     (common/get-item-or-throw-error db "Articles")
         [title content] (utils/get-post url extract-content)
-        _ (tap> [:content content should-capture-summary?])
         summary              (and should-capture-summary?
                                   (chatgpt/get-summary content))
         issue                (common/insert-item db 
