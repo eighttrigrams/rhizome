@@ -45,6 +45,7 @@
      [image-itself image-link])
    (when (and
           (string? title)
+          ;; TODO use condx
           (or (str/ends-with? title ".png")
               (str/ends-with? title ".jpg")
               (str/ends-with? title ".PNG")
