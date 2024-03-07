@@ -26,7 +26,7 @@
    [:> ReactMarkdown
     {:children (if (:substack (:resource-links data)) 
                  (let [substack-link (:substack (:resource-links data))]
-                   (str "[" title "]( " substack-link ")"))
+                   (str "[Substack]( " substack-link ") " title))
                  (str (when-let [article-link (:substack-article (:resource-links data))]
                         (str "[substack]( " article-link ")"))
                       (when-let [article-link (:web-article (:resource-links data))]
