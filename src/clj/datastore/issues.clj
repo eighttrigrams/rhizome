@@ -1,5 +1,6 @@
 (ns datastore.issues
-  (:require [cheshire.core :as json]
+  (:require [cambium.core :as log]
+            [cheshire.core :as json]
             [next.jdbc :as jdbc]
             [honey.sql :as sql]
             [datastore.get-item :refer [get-item] :rename {get-item get-issue}]))
@@ -82,7 +83,11 @@
                                            [:raw "NOW()"]
                                            [:raw "NOW()"]
                                            title
-                                           short_title]]})
+                                           (if (boolean (re-find #"\d" short_title))
+                                             (do 
+                                               (log/error (str "Can't insert short_title due to it containing digit: " short_title))
+                                               "")
+                                             short_title)]]})
 
                {:return-keys true})))
 

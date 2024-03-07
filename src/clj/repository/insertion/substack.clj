@@ -17,9 +17,7 @@
    substacks-id]
   (let [substack (common/insert-item db 
                                      subdomain-url
-                                     (if (boolean (re-find #"\d" subdomain-handle))
-                                       ""
-                                       subdomain-handle) 
+                                     subdomain-handle 
                                      #{substack-platform-id substacks-id}
                                      {:substack subdomain-full-url})]
     (:id (datastore/upgrade-issue-to-context! db substack))))
