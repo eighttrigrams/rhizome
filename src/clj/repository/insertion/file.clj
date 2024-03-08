@@ -8,6 +8,7 @@
             [repository.homefolder :as home]))
 
 ;; TODO make condx work to match multiple cases, like case
+;; when adding files, also see homefolder.clj (this here is 1 of 3 places)
 (defn- classify [title]
   (condx #(str/ends-with? (str/lower-case title) %) 
          "mp3" ["MP3s" "Audio"] 

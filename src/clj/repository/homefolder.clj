@@ -7,6 +7,7 @@
   (let [idx (str/last-index-of file-name ".")]
     (str/lower-case (subs file-name (inc idx)))))
 
+;; when adding files, also see file.clj (this here is 1 of 3 places)
 (defn supported-file-type? [file-name]
   (or (str/ends-with? (str/lower-case file-name) ".mp4")
       (str/ends-with? (str/lower-case file-name) ".flv")
@@ -28,6 +29,7 @@
   (when (.exists (io/file (str "/Users/daniel/Movies/Tracked/" file-name)))
     (throw (Exception. (str "File already exists: " file-name)))))
 
+;; when adding files, also see file.clj (this here is 1 of 3 places)
 (defn get-target [file-name]
   (str "/Users/daniel/"
        (case (get-suffix file-name)
