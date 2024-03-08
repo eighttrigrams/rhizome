@@ -114,7 +114,7 @@
   (let [data (-> (get-context db context)
                  :data
                  (update-in [:views :current :search-mode]
-                            #(mod (inc (or % 0)) 3)))]
+                            #(mod (inc (or % 0)) 4)))]
     (jdbc/execute-one! db (sql/format {:update [:issues]
                                        :set    {:data [:inline (json/generate-string data)]}
                                        :where  [:= :id [:inline id]]}))

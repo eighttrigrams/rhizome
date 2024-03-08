@@ -157,7 +157,7 @@
                                #_(remove #(contains? (set urgent-issues-ids) %) issues-ids))]
     all-issues-ids))
 
-(defn- issues-query [ids]
+(defn- issues-query [search-mode ids]
   {:select   [:issues.title
               :issues.short_title
               :issues.short_title_ints
@@ -179,10 +179,12 @@
               [:issues :issues_o] [:= :collections.container_id :issues_o.id]]
    :where    [:in :issues.id [:inline ids]]
    :group-by [:issues.id]
-   :order-by [[:issues.updated_at :desc]]})
+   :order-by [[:issues.updated_at (if (= 1 search-mode)
+                                    :asc 
+                                    :desc)]]})
 
 (defn- re-order [search-mode issues]
-  (if (= 1 search-mode)
+  (if (= 2 search-mode)
     (let [top (sort-by #(:short_title %) 
                        (filter #(and (some? (:short_title %))
                                      (= 0 (:short_title_ints %))) issues))
@@ -281,10 +283,10 @@
    {{{{{:keys [search-mode]} :current} :views} :data} :selected-context
     :keys [link-issue]}]
   (cond->> issues
-    (#{1 2} search-mode)
+    (#{2 3} search-mode)
     (re-order search-mode)
     (and (not link-issue)
-         (not (#{1 2} search-mode))) 
+         (not (#{2 3} search-mode))) 
     pin-events))
 
 (defn- sort-issues [state 
@@ -299,11 +301,12 @@
   [db {:keys                                                                                                                                [link-issue]
        {{{{:keys [selected-secondary-contexts
                   secondary-contexts-inverted
-                  secondary-contexts-unassigned-selected]} :current} :views} :data} :selected-context
+                  secondary-contexts-unassigned-selected
+                  search-mode]} :current} :views} :data} :selected-context
        :as                                                                                                                                  opts}]
   (if-let [ids (do-fetch-ids db opts)]
     (->> ids
-         issues-query
+         (issues-query search-mode)
          sql/format
          (jdbc/execute! db)
          (map common/post-process)

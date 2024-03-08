@@ -123,8 +123,9 @@
        [:h4 "Search mode: "
         (case (:search-mode (:current (:views (:data (:selected-context @*state)))))
           0 "Normal"
-          1 "A->Z,0->9"
-          2 "9->0,Z->A"
+          1 "Reverse"
+          2 "A->Z,0->9"
+          3 "9->0,Z->A"
           nil "Normal")]
        [:h4 "Events View: "
         (case (:events-view (:current (:views (:data (:selected-context @*state)))))
