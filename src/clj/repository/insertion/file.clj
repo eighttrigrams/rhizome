@@ -13,6 +13,7 @@
          "mp3" ["MP3s" "Audio"] 
          "mp4" ["MP4s" "Video"]
          "flv" ["FLVs" "Video"]
+         "mov" ["MOVs" "Video"]
          "pdf" ["PDFs"]
          "jpg" ["JPEGs" "Image"]
          "jpeg" ["JPEGs" "Image"]

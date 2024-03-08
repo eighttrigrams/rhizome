@@ -10,6 +10,7 @@
 (defn supported-file-type? [file-name]
   (or (str/ends-with? (str/lower-case file-name) ".mp4")
       (str/ends-with? (str/lower-case file-name) ".flv")
+      (str/ends-with? (str/lower-case file-name) ".mov")
       (str/ends-with? (str/lower-case file-name) ".mp3")
       (str/ends-with? (str/lower-case file-name) ".pdf")
       (str/ends-with? (str/lower-case file-name) ".jpeg")
@@ -30,7 +31,7 @@
   (str "/Users/daniel/"
        (case (get-suffix file-name)
          "mp3" "Music"
-         ("mp4" "flv") "Movies"
+         ("mp4" "flv" "mov") "Movies"
          ("pdf") "Documents"
          ("jpeg" "jpg" "png") "Pictures"
          nil)
