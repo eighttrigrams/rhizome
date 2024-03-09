@@ -1,15 +1,12 @@
 (ns repository.insertion.apple-pods
   (:require [clojure.string :as str]
             datastore
-            [cheshire.core :as json]
             [hickory.core :as html]
             [clj-http.client :as http]
             [hickory.select :as select]
             [datastore.get-item :as get-item]
             [repository.insertion.common :as common]
-            [repository.chatgpt :as chatgpt]
-            utils
-            [utils.url :as url]))
+            utils))
 
 (defn match? [title]
   (re-matches #"https:\/\/podcasts.apple.com\/.*\/podcast\/.*\/id.*\?i=.*" title))
