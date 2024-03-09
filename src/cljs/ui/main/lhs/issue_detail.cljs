@@ -70,8 +70,8 @@
                         (str "[YT" (str/replace youtube-link "https://www.youtube.com/" "") "](" 
                              youtube-link ")"))
                      " " title)}]] 
-   (display-youtube-video description data)
    [image-component title data]
+   (display-youtube-video description data)
    [:div.description
     [:> ReactMarkdown
      {:children description}]]])
