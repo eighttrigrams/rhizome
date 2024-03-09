@@ -15,11 +15,9 @@
   (re-matches #"https:\/\/podcasts.apple.com\/.*\/podcast\/.*\/id.*\?i=.*" title))
 
 (defn get-podcast-url [url]
-  (let [idx (+ (str/last-index-of url "/id") 3)
-        rest (subs url idx)
-        idx (str/index-of rest "?")
-        rest (subs rest 0 idx)]
-    (str "https://podcasts.apple.com/de/podcast/some-podcast-name/id" rest)))
+  (let [idx (str/last-index-of url "?")
+        rest (subs url 0 idx)]
+    rest))
 
 (defn extract-title [url]
   (let [tree (html/as-hickory (html/parse (:body (http/get url))))
