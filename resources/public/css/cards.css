@@ -7,6 +7,15 @@ li.card {
     padding: 10px;
 }
 
+li.card.tall {
+    height: 300px;
+}
+
+li.card.tall img {
+    position: absolute;
+    top: 120px;
+}
+
 .scrollable.search-active li.card {
     z-index: 1005;
 }

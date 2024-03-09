@@ -71,8 +71,11 @@
     [:li.issue-card
      {:class          (str (if simple-card? 
                              "simple-card"
-                             "card") (when (= (:id (:selected-issue @*state))
-                                              (:id issue)) " selected"))
+                             "card")
+                           (when (= (:id (:selected-issue @*state))
+                                    (:id issue)) " selected")
+                           (when (:preview-image (:data issue))
+                             " tall"))
       :id             (str "issue-card-" idx)
       :on-click       #(let [skip-select? (and (deref modifiers/*alt-pressed?)
                                                (not= :issues (:active-search @*state)))]
@@ -109,4 +112,18 @@
                                                     {0 "⭕"})
                                                   (when-let [file (:file (:resource-links (:data issue)))]
                                                     {:file file})
-                                                  (:contexts issue)))]])]]))
+                                                  (:contexts issue)))]
+         (if-let [preview-image (:preview-image (:data issue))]
+           [:img {:src     (str "/imgs/Preview/" preview-image)
+                  :style   {:visibility :hidden
+                            :height "0px"}
+                  :on-load (fn [t]
+                             (set! (-> (.-target t) .-style .-height) "180px")
+                             (set! (.. t -target -style -visibility) "visible"))}]
+           (when-let [regular-image (:image (:resource-links (:data issue)))]
+             [:img {:src     (str "/imgs/" regular-image)
+                  :style   {:visibility :hidden
+                            :height "0px"}
+                  :on-load (fn [t]
+                             (set! (-> (.-target t) .-style .-height) "180px")
+                             (set! (.. t -target -style -visibility) "visible"))}]))])]]))
