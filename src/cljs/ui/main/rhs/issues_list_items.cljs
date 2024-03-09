@@ -43,8 +43,6 @@
                       " " title))}]])
 
 (defn related-issues-list-item-component [*state {:keys [id title] :as issue}]
-  (prn "related-issues-list-item-component"
-       issue)
   [:li.card.issue-card
    {:on-click #(do (swap! *state (fn [state] ;; TODO review and dedup with issues-list-item/component
                                    (-> state

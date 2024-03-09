@@ -4,7 +4,6 @@
   [:span.contexts
    (doall
     (map (fn [[idx title]]
-           (prn title (js/encodeURI title))
            (if (= :file idx)
              [:span.badge 
               {:key idx
