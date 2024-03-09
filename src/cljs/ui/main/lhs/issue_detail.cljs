@@ -40,20 +40,23 @@
                        (set! (-> (.-target t) .-style .-width) "540px")
                        (set! (.. t -target -style -visibility) "visible"))}])
 
-(defn- image-component [title resource-links]
-  [:<>
-   (when-let [image-link (:image resource-links)]
-     [image-itself image-link])
-   (when (and
-          (string? title)
+(defn- image-component [title data]
+  (let [resource-links (:resource-links data)]
+    [:<>
+     (when-let [preview-image-link (:preview-image data)]
+       [image-itself (str "Preview/" preview-image-link)])
+     (when-let [image-link (:image resource-links)]
+       [image-itself image-link])
+     (when (and
+            (string? title)
           ;; TODO use condx
-          (or (str/ends-with? title ".png")
-              (str/ends-with? title ".jpg")
-              (str/ends-with? title ".PNG")
-              (str/ends-with? title ".JPG")
-              (str/ends-with? title ".JPEG")
-              (str/ends-with? title ".jpeg")))
-     [image-itself title])])
+            (or (str/ends-with? title ".png")
+                (str/ends-with? title ".jpg")
+                (str/ends-with? title ".PNG")
+                (str/ends-with? title ".JPG")
+                (str/ends-with? title ".JPEG")
+                (str/ends-with? title ".jpeg")))
+       [image-itself title])]))
 
 (defn- the-issue-itself-component [{:keys [title description date data]}]
   [:<>
@@ -68,27 +71,31 @@
                              youtube-link ")"))
                      " " title)}]] 
    (display-youtube-video description data)
-   [image-component title (:resource-links data)]
+   [image-component title data]
    [:div.description
     [:> ReactMarkdown
      {:children description}]]])
 
-(defn send-file-to-backend [file]
+(defn send-file-to-backend [file id]
   (let [form-data (js/FormData.)]
-    (.append form-data "file" file)
-    (ajax/POST "/upload"
-      {:body            form-data
-       :response-format (ajax.core/raw-response-format)
-       :headers         {"Accept" "application/json"}
-       :handler         (fn [response] (println "Success:" response))
-       :error-handler   (fn [error] (println "Error:" error))})))
+    (if-not (str/ends-with? (.-name file) ".png")
+      (prn "file should be a png")
+      (do
+        (.append form-data "file" file)
+        (.append form-data "id" id)
+        (ajax/POST "/upload"
+          {:body            form-data
+           :response-format (ajax.core/raw-response-format)
+           :headers         {"Accept" "application/json"}
+           :handler         (fn [response] (println "Success:" response))
+           :error-handler   (fn [error] (println "Error:" error))})))))
 
-(defn drop-target []
+(defn drop-target [id]
   (let [drop (fn [e]
                ;; Prevent the default action to accept the drop
                (.preventDefault e)
                (let [files (.-files (.. e -dataTransfer))]
-                 (send-file-to-backend (aget files 0))))
+                 (send-file-to-backend (aget files 0) id)))
         drag-over (fn [e]
                     ;; Necessary to allow the drop
                     (.preventDefault e))]
@@ -114,7 +121,7 @@
        [:<>
         [context-links-component *state contexts]
         [:hr]])
-     #_[drop-target]
+     [drop-target (:id selected-issue)]
      [the-issue-itself-component (or selected-issue
                                      selected-context)]]))
 

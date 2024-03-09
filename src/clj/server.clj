@@ -1,9 +1,9 @@
 (ns server
   (:require [ring.adapter.jetty :as j]
             privacy
+            upload
             [compojure.core :refer [defroutes context GET POST]]
             [ring.util.response :as response]
-            [clojure.java.io :as io]
             [ring.middleware.json :as json]
             [env :refer [wrap-env-defaults]]
             [mount.core :as mount]
@@ -54,9 +54,9 @@
        req))))
 
 (defn upload-handler [request]
-  (let [uploaded-file (get (-> request :multipart-params) "file")]
-    (prn "uploaded-file" uploaded-file)
-    (io/copy (:tempfile uploaded-file) (io/file "/Users/daniel/Downloads/abc.png"))
+  (let [uploaded-file (get (-> request :multipart-params) "file")
+        id (get (-> request :multipart-params) "id")]
+    (upload/upload-preview-file (:db config/config) uploaded-file id)
     ;; Process the uploaded file here. For example, save it to a directory.
     (response/response "File uploaded successfully!")))
 

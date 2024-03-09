@@ -57,6 +57,10 @@
       (insert-date db id date event_archived?))
     (get-issue db issue)))
 
+(defn update-issue-simple [db issue]
+  (update-issue* db issue) 
+  (get-issue db issue))
+
 (defn update-issue-description [db {:keys [id description] :as issue}]
   (jdbc/execute-one! db
                      (sql/format {:update [:issues]

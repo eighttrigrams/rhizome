@@ -28,6 +28,8 @@
 
 (def update-issue issues/update-issue)
 
+(def update-issue-simple issues/update-issue-simple)
+
 (def new-issue issues/new-issue)
 
 (defn set-containers-of-item!
