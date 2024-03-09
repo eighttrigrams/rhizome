@@ -3,6 +3,7 @@
             [clojure.string :as str]
             datastore
             [repository.insertion.substack :as substack]
+            [repository.insertion.apple-pods :as apple-pods]
             [repository.insertion.substack-external :as substack-external]
             [repository.insertion.youtube :as youtube]
             #_[repository.insertion.file :as file]
@@ -42,6 +43,8 @@
           #_(file/ingest db title context-ids-set nil)
           (youtube/match? title) 
           (youtube/ingest db title context-ids-set nil)
+          (apple-pods/match? title) 
+          (apple-pods/ingest db title context-ids-set nil)
           (substack/match? title)
           ((substack/make:save-article false) db title context-ids-set alternative-behaviour?)
           (substack-external/match? title)

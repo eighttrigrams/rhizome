@@ -31,6 +31,10 @@
                         (str "[substack]( " article-link ")"))
                       (when-let [article-link (:web-article (:resource-links data))]
                         (str "[link]( " article-link ")"))
+                      (when-let [apple-podcast-link (:apple-podcast (:resource-links data))]
+                        (str "[apple podcasts]( " apple-podcast-link ")")) 
+                      (when-let [apple-pod-ep-link (:apple-podcast-episode (:resource-links data))]
+                        (str "[apple podcasts]( " apple-pod-ep-link ")")) 
                       (when-let [youtube-link (:youtube-video (:resource-links data))]
                         (str "[youtube]( " youtube-link ")")) 
                       (when-let [youtube-link (:youtube-channel (:resource-links data))]
