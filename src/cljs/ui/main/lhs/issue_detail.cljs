@@ -1,7 +1,8 @@
 (ns ui.main.lhs.issue-detail
   (:require ["react-markdown$default" :as ReactMarkdown]
             [ui.actions :as actions]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [ajax.core :as ajax]))
 
 (defn- context-links-component [*state related-contexts]
   (when (seq related-contexts)
@@ -72,6 +73,32 @@
     [:> ReactMarkdown
      {:children description}]]])
 
+(defn send-file-to-backend [file]
+  (let [form-data (js/FormData.)]
+    (.append form-data "file" file)
+    (ajax/POST "/upload"
+      {:body            form-data
+       :response-format (ajax.core/raw-response-format)
+       :headers         {"Accept" "application/json"}
+       :handler         (fn [response] (println "Success:" response))
+       :error-handler   (fn [error] (println "Error:" error))})))
+
+(defn drop-target []
+  (let [drop (fn [e]
+               ;; Prevent the default action to accept the drop
+               (.preventDefault e)
+               (let [files (.-files (.. e -dataTransfer))]
+                 (send-file-to-backend (aget files 0))))
+        drag-over (fn [e]
+                    ;; Necessary to allow the drop
+                    (.preventDefault e))]
+    [:div {:onDrop drop
+           :onDragOver drag-over
+           :style {:border "2px dashed #ccc"
+                   :padding "20px"
+                   :margin-top "20px"}}
+     "Drop here"]))
+
 (defn component [*state suppress-switcher?]
   (let [{:keys [selected-issue selected-context]} @*state
         {:keys [contexts]} selected-issue]
@@ -87,6 +114,7 @@
        [:<>
         [context-links-component *state contexts]
         [:hr]])
+     #_[drop-target]
      [the-issue-itself-component (or selected-issue
                                      selected-context)]]))
 

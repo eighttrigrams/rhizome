@@ -3,6 +3,7 @@
             privacy
             [compojure.core :refer [defroutes context GET POST]]
             [ring.util.response :as response]
+            [clojure.java.io :as io]
             [ring.middleware.json :as json]
             [env :refer [wrap-env-defaults]]
             [mount.core :as mount]
@@ -12,7 +13,8 @@
             dispatch
             [cambium.core :as log]
             [ring.middleware.resource :refer [wrap-resource]]
-            [ring.middleware.file :refer [wrap-file]]))
+            [ring.middleware.file :refer [wrap-file]]
+            [ring.middleware.multipart-params :refer [wrap-multipart-params]]))
 
 (defn api-handler [{{msg :msg} :body}]
   (tap> [:resources (r/list-resources)])
@@ -51,6 +53,13 @@
           (json/wrap-json-body {:keywords? true})))
        req))))
 
+(defn upload-handler [request]
+  (let [uploaded-file (get (-> request :multipart-params) "file")]
+    (prn "uploaded-file" uploaded-file)
+    (io/copy (:tempfile uploaded-file) (io/file "/Users/daniel/Downloads/abc.png"))
+    ;; Process the uploaded file here. For example, save it to a directory.
+    (response/response "File uploaded successfully!")))
+
 (defn- routes [mode]
   (fn [req]
     (
@@ -58,6 +67,7 @@
        (context "/api" []
          (POST "/" [] (api mode)))
        (GET "/open/:file-id" [] open)
+       (POST "/upload" req (upload-handler req))
        (GET "/" [] (response/resource-response "public/index.html")))
      req))) ;; TODO use route/resources (see cljsc-webstacks)
 
@@ -66,7 +76,8 @@
     ((-> (routes mode)
           wrap-env-defaults
           (wrap-resource "public")
-          (wrap-file "./public" {:allow-symlinks? true}))
+          (wrap-file "./public" {:allow-symlinks? true})
+         wrap-multipart-params)
      req)))
 
 (mount/defstate ^{:on-reload :noop} http-server
