@@ -29,6 +29,10 @@
                    (str "[Substack]( " substack-link ") " title))
                  (str (when-let [article-link (:substack-article (:resource-links data))]
                         (str "[substack]( " article-link ")"))
+                      (when-let [substack-author-link (:substack-author (:resource-links data))]
+                        (str "[substack]( " substack-author-link ")"))
+                      (when-let [substack-note-link (:substack-note (:resource-links data))]
+                        (str "[substack]( " substack-note-link ")"))
                       (when-let [article-link (:web-article (:resource-links data))]
                         (str "[link]( " article-link ")"))
                       (when-let [apple-podcast-link (:apple-podcast (:resource-links data))]
