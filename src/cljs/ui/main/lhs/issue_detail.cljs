@@ -2,7 +2,8 @@
   (:require ["react-markdown$default" :as ReactMarkdown]
             [ui.actions :as actions]
             [clojure.string :as str]
-            [ajax.core :as ajax]))
+            [ajax.core :as ajax]
+            [ui.main.rhs.modifiers :as modifiers]))
 
 (defn- context-links-component [*state related-contexts]
   (when (seq related-contexts)
@@ -84,6 +85,7 @@
       (do
         (.append form-data "file" file)
         (.append form-data "id" id)
+        (.append form-data "high-res" (boolean @modifiers/*alt-pressed?))
         (ajax/POST "/upload"
           {:body            form-data
            :response-format (ajax.core/raw-response-format)

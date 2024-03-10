@@ -76,7 +76,8 @@
                              "card")
                            (when (= (:id (:selected-issue @*state))
                                     (:id issue)) " selected")
-                           (when (or (:preview-image (:data issue))
+                           (when (or (:preview-image-lowres (:data issue))
+                                     (:preview-image (:data issue))
                                      (:image (:resource-links (:data issue))))
                              " tall"))
       :id             (str "issue-card-" idx)
@@ -116,17 +117,24 @@
                                                   (when-let [file (:file (:resource-links (:data issue)))]
                                                     {:file file})
                                                   (:contexts issue)))]
-         (if-let [preview-image (:preview-image (:data issue))]
-           [:img {:src     (str "/imgs/Preview/" preview-image)
-                  :style   {:visibility :hidden
-                            :height "0px"}
-                  :on-load (fn [t]
-                             (set! (-> (.-target t) .-style .-height) "180px")
-                             (set! (.. t -target -style -visibility) "visible"))}]
-           (when-let [regular-image (:image (:resource-links (:data issue)))]
-             [:img {:src     (str "/imgs/" regular-image)
-                  :style   {:visibility :hidden
-                            :height "0px"}
-                  :on-load (fn [t]
-                             (set! (-> (.-target t) .-style .-height) "180px")
-                             (set! (.. t -target -style -visibility) "visible"))}]))])]]))
+         (cond (:preview-image-lowres (:data issue))
+               [:img {:src     (str "/imgs/Preview/Lowres/" (:preview-image-lowres (:data issue)))
+                      :style   {:visibility :hidden
+                                :height "0px"}
+                      :on-load (fn [t]
+                                 (set! (-> (.-target t) .-style .-height) "180px")
+                                 (set! (.. t -target -style -visibility) "visible"))}]
+               (:preview-image (:data issue))
+               [:img {:src     (str "/imgs/Preview/" (:preview-image (:data issue)))
+                      :style   {:visibility :hidden
+                                :height "0px"}
+                      :on-load (fn [t]
+                                 (set! (-> (.-target t) .-style .-height) "180px")
+                                 (set! (.. t -target -style -visibility) "visible"))}]
+               (:image (:resource-links (:data issue)))
+               [:img {:src     (str "/imgs/" (:image (:resource-links (:data issue))))
+                      :style   {:visibility :hidden
+                                :height "0px"}
+                      :on-load (fn [t]
+                                 (set! (-> (.-target t) .-style .-height) "180px")
+                                 (set! (.. t -target -style -visibility) "visible"))}])])]]))
