@@ -77,14 +77,14 @@
     [:> ReactMarkdown
      {:children description}]]])
 
-(defn send-file-to-backend [file id]
+(defn send-file-to-backend [file id mode]
   (let [form-data (js/FormData.)]
     (if-not (str/ends-with? (.-name file) ".png")
       (prn "file should be a png")
       (do
         (.append form-data "file" file)
         (.append form-data "id" id)
-        (.append form-data "alternative-behaviour" (str (boolean @modifiers/*alt-pressed?)))
+        (.append form-data "alternative-behaviour" (str (= :high mode)))
         (ajax/POST "/upload"
           {:body            form-data
            :response-format (ajax.core/raw-response-format)
@@ -93,20 +93,31 @@
            :error-handler   (fn [error] (println "Error:" error))})))))
 
 (defn drop-target [id]
-  (let [drop (fn [e]
-               ;; Prevent the default action to accept the drop
-               (.preventDefault e)
-               (let [files (.-files (.. e -dataTransfer))]
-                 (send-file-to-backend (aget files 0) id)))
+  (let [drop (fn [mode]
+               (fn [e]
+                 ;; Prevent the default action to accept the drop
+                 (.preventDefault e)
+                 (let [files (.-files (.. e -dataTransfer))]
+                   (send-file-to-backend (aget files 0) id mode))))
         drag-over (fn [e]
                     ;; Necessary to allow the drop
                     (.preventDefault e))]
-    [:div {:onDrop drop
-           :onDragOver drag-over
-           :style {:border "2px dashed #ccc"
-                   :padding "20px"
-                   :margin-top "20px"}}
-     "Drop here"]))
+    [:div
+     {:style {:display :flex}}
+     [:div {:onDrop     (drop :high)
+            :onDragOver drag-over
+            :style      {:border     "2px dashed #ccc"
+                         :padding    "20px"
+                         :flex 1
+                         :margin-top "20px"}}
+      "Highres here"]
+     [:div {:onDrop     (drop :low)
+            :onDragOver drag-over
+            :style      {:border     "2px dashed #ccc"
+                         :padding    "20px"
+                         :flex 1
+                         :margin-top "20px"}}
+      "Lowres here"]]))
 
 (defn component [*state suppress-switcher?]
   (let [{:keys [selected-issue selected-context]} @*state
