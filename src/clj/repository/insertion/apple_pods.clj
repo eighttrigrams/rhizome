@@ -24,9 +24,11 @@
                         (select/tag "title")
                         tree))))]
     (-> title
-        (str/replace 
-         "‎" "")
-        (str/trim))))
+        (str/replace "‎" "")
+        (str/replace #"auf.Apple.Podcasts" "")
+        (str/trim)
+        (str/replace #"^„" "")
+        (str/replace #"“$" ""))))
 
 (defn- create-podcast-or-take-existing 
   [db url apple-podcasts-platform-id]
@@ -41,15 +43,18 @@
                                                          #{podcasts-id apple-podcasts-platform-id}
                                                          {:apple-podcast podcast-url})]
                          (:id (datastore/upgrade-issue-to-context! db channel))))]
-    channel-id))
+    [channel-id podcast-title]))
 
 (defn ingest [db url context-ids-set _should-capture-summary?]
   (let [apple-podcasts-platform-id (common/get-item-or-throw-error db "Apple Podcasts")
-        podcast-id (create-podcast-or-take-existing db url apple-podcasts-platform-id)
+        [podcast-id podcast-title] (create-podcast-or-take-existing db url apple-podcasts-platform-id)
         podcast-episodes-id (common/get-item-or-throw-error db "Podcast Episodes")]
     (when (:id (get-item/get-item-by-path db "data->'resource-links'->>'apple-podcast-episode'" url))
       (throw (Exception. "apple podcast episode already exists!")))
-    (let [title (extract-title url)]
+    (let [title (-> url 
+                    extract-title
+                    (str/replace (str podcast-title ":") "")
+                    str/trim)]
       (common/insert-item db 
                           title
                           ""
