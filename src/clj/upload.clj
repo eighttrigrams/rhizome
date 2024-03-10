@@ -4,13 +4,13 @@
             datastore
             [clojure.java.shell :refer [sh]]))
 
-(defn upload-preview-file [db uploaded-file id low-res?]
+(defn upload-preview-file [db uploaded-file id alternative-behaviour?]
   (let [_ 1]
     (try
       (log/info (str "Uploading preview file: " id))
       (let [item (datastore/get-issue db {:id id})
             youtube-video? (-> item :data :resource-links :youtube-video)
-            downscale-image? (or (= "true" low-res?)
+            downscale-image? (or (= "false" alternative-behaviour?)
                                  youtube-video?)
             data (or (:data item) {})
             data (if downscale-image?  
