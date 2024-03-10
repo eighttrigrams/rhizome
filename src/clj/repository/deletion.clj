@@ -30,6 +30,16 @@
         (log/info (str "Will delete file " file-path))
         (io/delete-file (io/file file-path))))))
 
+(defn- delete-preview-images [id]
+  (let [highres-path (str "/Users/daniel/Pictures/Tracked/Preview/" id ".png")
+        lowres-path (str "/Users/daniel/Pictures/Tracked/Preview/Lowres/" id ".png")]
+    (when (.exists (io/file highres-path))
+      (log/info (str "Will remove " highres-path))
+      (.delete (io/file highres-path)))
+    (when (.exists (io/file lowres-path))
+      (log/info (str "Will remove " lowres-path))
+      (.delete (io/file lowres-path)))))
+
 (defn delete-item
   [db {:keys [id]
        {{:keys [file]} :resource-links} :data}]
@@ -46,4 +56,5 @@
           (log/warn (str "Doing nothing. Too many files found. (" (count found-files) ") "))
           :else
           (do (delete-file found-files file)
-              (datastore/delete-item db {:id id})))))
+              (datastore/delete-item db {:id id})
+              (delete-preview-images id)))))
