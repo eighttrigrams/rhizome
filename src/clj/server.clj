@@ -56,8 +56,8 @@
 (defn upload-handler [request]
   (let [uploaded-file (get (-> request :multipart-params) "file")
         id (get (-> request :multipart-params) "id")
-        high-res? (get (-> request :multipart-params) "high-res")]
-    (upload/upload-preview-file (:db config/config) uploaded-file id high-res?)
+        low-res? (get (-> request :multipart-params) "low-res")]
+    (upload/upload-preview-file (:db config/config) uploaded-file id low-res?)
     ;; Process the uploaded file here. For example, save it to a directory.
     (response/response "File uploaded successfully!")))
 

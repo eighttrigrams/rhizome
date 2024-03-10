@@ -85,7 +85,7 @@
       (do
         (.append form-data "file" file)
         (.append form-data "id" id)
-        (.append form-data "high-res" (boolean @modifiers/*alt-pressed?))
+        (.append form-data "low-res" (boolean @modifiers/*alt-pressed?))
         (ajax/POST "/upload"
           {:body            form-data
            :response-format (ajax.core/raw-response-format)

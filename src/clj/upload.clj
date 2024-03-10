@@ -4,13 +4,13 @@
             datastore
             [clojure.java.shell :refer [sh]]))
 
-(defn upload-preview-file [db uploaded-file id high-res?]
+(defn upload-preview-file [db uploaded-file id low-res?]
   (let [_ 1]
     (try
       (log/info (str "Uploading preview file: " id))
       (let [item (datastore/get-issue db {:id id})
             data (or (:data item) {})
-            data (if (= "true" high-res?) 
+            data (if (= "false" low-res?) 
                    (-> data 
                        (assoc :preview-image (str id ".png"))
                        (dissoc :preview-image-lowres))
@@ -25,7 +25,7 @@
                       ".png")]
         (datastore/update-issue-simple db (assoc item :data data)) 
         (io/copy (:tempfile uploaded-file) (io/file path))
-        (when-not (= "true" high-res?)
+        (when-not (= "false" low-res?)
           (log/info "Will downscale image now")
           (sh "convert" path "-resize" "x200" lowres-path)
           (io/delete-file (io/file path))))
