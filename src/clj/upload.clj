@@ -9,10 +9,7 @@
     (try
       (log/info (str "Uploading preview file: " id))
       (let [item (datastore/get-issue db {:id id})
-            youtube-video? (-> item :data :resource-links :youtube-video)
-            downscale-image? (or (= "false" alternative-behaviour?)
-                                 youtube-video?)
-            _ (log/info (str "downscale-image? " downscale-image?))
+            downscale-image? (= "false" alternative-behaviour?)
             data (or (:data item) {})
             data (if downscale-image?  
                    (-> data 
