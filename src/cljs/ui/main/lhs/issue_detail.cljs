@@ -43,8 +43,8 @@
 (defn- image-component [title data]
   (let [resource-links (:resource-links data)]
     [:<>
-     (when-let [preview-image-link (and (:preview-image data)
-                                        (not (:youtube-video (:resource-links data))))]
+     (when-let [preview-image-link (and (not (:youtube-video (:resource-links data)))
+                                        (:preview-image data))]
        [image-itself (str "Preview/" preview-image-link)])
      (when-let [image-link (:image resource-links)]
        [image-itself image-link])
