@@ -12,6 +12,7 @@
             youtube-video? (-> item :data :resource-links :youtube-video)
             downscale-image? (or (= "false" alternative-behaviour?)
                                  youtube-video?)
+            _ (log/info (str "downscale-image? " downscale-image?))
             data (or (:data item) {})
             data (if downscale-image?  
                    (-> data 
