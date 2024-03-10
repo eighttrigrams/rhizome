@@ -9,23 +9,26 @@
     (try
       (log/info (str "Uploading preview file: " id))
       (let [item (datastore/get-issue db {:id id})
+            youtube-video? (-> item :data :resource-links :youtube-video)
+            downscale-image? (or (= "true" low-res?)
+                                 youtube-video?)
             data (or (:data item) {})
-            data (if (= "false" low-res?) 
-                   (-> data 
-                       (assoc :preview-image (str id ".png"))
-                       (dissoc :preview-image-lowres))
+            data (if downscale-image?  
                    (-> data 
                        (assoc :preview-image-lowres (str id ".png"))
-                       (dissoc :preview-image)))
+                       (dissoc :preview-image))
+                   (-> data 
+                       (assoc :preview-image (str id ".png"))
+                       (dissoc :preview-image-lowres)))
             path (str "/Users/daniel/Pictures/Tracked/Preview/" 
                       id 
                       ".png")
             lowres-path (str "/Users/daniel/Pictures/Tracked/Preview/Lowres/" 
-                      id 
-                      ".png")]
+                             id 
+                             ".png")]
         (datastore/update-issue-simple db (assoc item :data data)) 
         (io/copy (:tempfile uploaded-file) (io/file path))
-        (when-not (= "false" low-res?)
+        (when downscale-image?
           (log/info "Will downscale image now")
           (sh "convert" path "-resize" "x200" lowres-path)
           (io/delete-file (io/file path))))
