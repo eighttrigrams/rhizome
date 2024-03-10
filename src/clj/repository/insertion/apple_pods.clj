@@ -24,12 +24,12 @@
                         (select/tag "title")
                         tree))))]
     (-> title
-    (str/replace 
-     "‎" "")
-    (str/trim))))
+        (str/replace 
+         "‎" "")
+        (str/trim))))
 
 (defn- create-podcast-or-take-existing 
-  [db url]
+  [db url apple-podcasts-platform-id]
   (let [podcasts-id (common/get-item-or-throw-error db "Podcasts")
         podcast-url (get-podcast-url url)
         podcast-title (extract-title podcast-url)
@@ -38,13 +38,14 @@
                        (let [channel (common/insert-item db 
                                                          podcast-title 
                                                          ""
-                                                         #{podcasts-id}
+                                                         #{podcasts-id apple-podcasts-platform-id}
                                                          {:apple-podcast podcast-url})]
                          (:id (datastore/upgrade-issue-to-context! db channel))))]
     channel-id))
 
 (defn ingest [db url context-ids-set _should-capture-summary?]
-  (let [podcast-id (create-podcast-or-take-existing db url)
+  (let [apple-podcasts-platform-id (common/get-item-or-throw-error db "Apple Podcasts")
+        podcast-id (create-podcast-or-take-existing db url apple-podcasts-platform-id)
         podcast-episodes-id (common/get-item-or-throw-error db "Podcast Episodes")]
     (when (:id (get-item/get-item-by-path db "data->'resource-links'->>'apple-podcast-episode'" url))
       (throw (Exception. "apple podcast episode already exists!")))
@@ -52,5 +53,8 @@
       (common/insert-item db 
                           title
                           ""
-                          (conj context-ids-set podcast-id podcast-episodes-id) 
+                          (conj context-ids-set 
+                                podcast-id 
+                                podcast-episodes-id
+                                apple-podcasts-platform-id) 
                           {:apple-podcast-episode url}))))
