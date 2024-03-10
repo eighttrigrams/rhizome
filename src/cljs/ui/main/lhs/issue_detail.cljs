@@ -124,7 +124,8 @@
        [:<>
         [context-links-component *state contexts]
         [:hr]])
-     [drop-target (:id selected-issue)]
+     (when-not (-> selected-issue :data :resource-links :image)
+       [drop-target (:id selected-issue)])
      [the-issue-itself-component (or selected-issue
                                      selected-context)]]))
 
