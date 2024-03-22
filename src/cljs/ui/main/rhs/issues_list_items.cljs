@@ -87,7 +87,7 @@
   (when (or (:preview-image-lowres data)
                                      (:preview-image data)
                                      (:image (:resource-links data)))
-                             "tall"))
+                             " tall"))
 
 (defn related-issues-list-item-component [*state {:keys [id title] :as issue}]
   [:li.card.issue-card
