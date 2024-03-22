@@ -77,18 +77,21 @@
                         (swap! *state dissoc :preview-issue)))
                     300)))
 
-(defn on-mouse-enter [*state issue]
+(defn- on-mouse-enter [*state issue]
   #(when-not (:loading @*state)
                        (swap! *state assoc
                               :preview-issue issue
                               :mouse :enter)))
 
+(defn- tall [data]
+  (when (or (:preview-image-lowres data)
+                                     (:preview-image data)
+                                     (:image (:resource-links data)))
+                             "tall"))
+
 (defn related-issues-list-item-component [*state {:keys [id title] :as issue}]
   [:li.card.issue-card
-   {:class (when (or (:preview-image-lowres (:data issue))
-                                     (:preview-image (:data issue))
-                                     (:image (:resource-links (:data issue))))
-                             "tall") 
+   {:class (tall (:data issue)) 
     :on-click #(do (swap! *state (fn [state] ;; TODO review and dedup with issues-list-item/component
                                           (-> state
                                               (dissoc :preview-issue))))
@@ -110,10 +113,7 @@
                              "card")
                            (when (= (:id (:selected-issue @*state))
                                     (:id issue)) " selected")
-                           (when (or (:preview-image-lowres (:data issue))
-                                     (:preview-image (:data issue))
-                                     (:image (:resource-links (:data issue))))
-                             " tall"))
+                           (tall (:data issue)))
       :id             (str "issue-card-" idx)
       :on-click       #(let [skip-select? (and (deref modifiers/*alt-pressed?)
                                                (not= :issues (:active-search @*state)))]
