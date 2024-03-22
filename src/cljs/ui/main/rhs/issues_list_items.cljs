@@ -46,26 +46,56 @@
                              youtube-link ")"))
                       " " title))}]])
 
+(defn- image-preview-component [data]
+  (cond (:preview-image-lowres data)
+               [:img {:src     (str "/imgs/Preview/Lowres/" (:preview-image-lowres data))
+                      :style   {:visibility :hidden
+                                :height "0px"}
+                      :on-load (fn [t]
+                                 (set! (-> (.-target t) .-style .-height) "180px")
+                                 (set! (.. t -target -style -visibility) "visible"))}]
+               (:preview-image data)
+               [:img {:src     (str "/imgs/Preview/" (:preview-image data))
+                      :style   {:visibility :hidden
+                                :height "0px"}
+                      :on-load (fn [t]
+                                 (set! (-> (.-target t) .-style .-height) "180px")
+                                 (set! (.. t -target -style -visibility) "visible"))}]
+               (:image (:resource-links data))
+               [:img {:src     (str "/imgs/" (:image (:resource-links data)))
+                      :style   {:visibility :hidden
+                                :height "0px"}
+                      :on-load (fn [t]
+                                 (set! (-> (.-target t) .-style .-height) "180px")
+                                 (set! (.. t -target -style -visibility) "visible"))}]))
+
+(defn- on-mouse-leave [*state]
+  #(do
+     (swap! *state assoc :mouse :leave)
+     (js/setTimeout (fn [_]
+                      (when (= :leave (:mouse @*state))
+                        (swap! *state dissoc :preview-issue)))
+                    300)))
+
+(defn on-mouse-enter [*state issue]
+  #(when-not (:loading @*state)
+                       (swap! *state assoc
+                              :preview-issue issue
+                              :mouse :enter)))
+
 (defn related-issues-list-item-component [*state {:keys [id title] :as issue}]
   [:li.card.issue-card
    {:on-click #(do (swap! *state (fn [state] ;; TODO review and dedup with issues-list-item/component
                                    (-> state
                                        (dissoc :preview-issue))))
                    (actions/select-issue! *state {:id id}))
-    :on-mouse-enter #(when-not (:loading @*state)
-                       (swap! *state assoc
-                              :preview-issue issue
-                              :mouse :enter))
-    :on-mouse-leave #(do
-                       (swap! *state assoc :mouse :leave)
-                       (js/setTimeout (fn [_]
-                                        (when (= :leave (:mouse @*state))
-                                          (swap! *state dissoc :preview-issue)))
-                                      300))}
+    :on-mouse-enter (on-mouse-enter *state issue)
+    :on-mouse-leave (on-mouse-leave *state)}
    [:div
     [title-component title]
     [info-component @*state issue]
-    [context-badges/component (:contexts issue)]]])
+    [context-badges/component (:contexts issue)]
+    [image-preview-component (:data issue)]]])
 
 (defn regular-issues-list-item-component [*state issue idx select-fn]
   (let [simple-card? (and (:notes-mode (:current (:views (:data (:selected-context @*state)))))
@@ -89,22 +119,13 @@
                                                 skip-select?)
                          (when skip-select?
                            (select-fn idx)))
-      :on-mouse-enter #(when-not (or (:loading @*state)
-                                     simple-card?)
-                         (swap! *state assoc 
-                                :preview-issue issue
-                                :mouse :enter))
+      :on-mouse-enter (on-mouse-enter *state issue)
       :on-context-menu (fn [e]
                          (.preventDefault e)
                          (if (:is_context issue)
                            (actions/select-context! *state issue)
                            (actions/delete-issue! *state issue)))
-      :on-mouse-leave #(do
-                         (swap! *state assoc :mouse :leave)
-                         (js/setTimeout (fn [_]
-                                          (when (= :leave (:mouse @*state))
-                                            (swap! *state dissoc :preview-issue)))
-                                        300))}
+      :on-mouse-leave (on-mouse-leave *state)}
      [:div
       [title-component (:title issue) (:data issue)]
       (when-not simple-card?
@@ -117,24 +138,4 @@
                                                   (when-let [file (:file (:resource-links (:data issue)))]
                                                     {:file file})
                                                   (:contexts issue)))]
-         (cond (:preview-image-lowres (:data issue))
-               [:img {:src     (str "/imgs/Preview/Lowres/" (:preview-image-lowres (:data issue)))
-                      :style   {:visibility :hidden
-                                :height "0px"}
-                      :on-load (fn [t]
-                                 (set! (-> (.-target t) .-style .-height) "180px")
-                                 (set! (.. t -target -style -visibility) "visible"))}]
-               (:preview-image (:data issue))
-               [:img {:src     (str "/imgs/Preview/" (:preview-image (:data issue)))
-                      :style   {:visibility :hidden
-                                :height "0px"}
-                      :on-load (fn [t]
-                                 (set! (-> (.-target t) .-style .-height) "180px")
-                                 (set! (.. t -target -style -visibility) "visible"))}]
-               (:image (:resource-links (:data issue)))
-               [:img {:src     (str "/imgs/" (:image (:resource-links (:data issue))))
-                      :style   {:visibility :hidden
-                                :height "0px"}
-                      :on-load (fn [t]
-                                 (set! (-> (.-target t) .-style .-height) "180px")
-                                 (set! (.. t -target -style -visibility) "visible"))}])])]]))
+         [image-preview-component (:data issue)]])]]))
