@@ -85,10 +85,14 @@
 
 (defn related-issues-list-item-component [*state {:keys [id title] :as issue}]
   [:li.card.issue-card
-   {:on-click #(do (swap! *state (fn [state] ;; TODO review and dedup with issues-list-item/component
-                                   (-> state
-                                       (dissoc :preview-issue))))
-                   (actions/select-issue! *state {:id id}))
+   {:class (when (or (:preview-image-lowres (:data issue))
+                                     (:preview-image (:data issue))
+                                     (:image (:resource-links (:data issue))))
+                             "tall") 
+    :on-click #(do (swap! *state (fn [state] ;; TODO review and dedup with issues-list-item/component
+                                          (-> state
+                                              (dissoc :preview-issue))))
+                          (actions/select-issue! *state {:id id}))
     :on-mouse-enter (on-mouse-enter *state issue)
     :on-mouse-leave (on-mouse-leave *state)}
    [:div
