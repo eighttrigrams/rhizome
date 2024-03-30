@@ -279,7 +279,7 @@
                         {(:id arg) (:title arg)})]
     (log/info (str "repository/link-selected-item-to-context " selected-issue))
     (try
-      (datastore/reprioritize-context db selected-context)
+      (datastore/reprioritize-context db arg)
       (datastore/set-containers-of-item! db selected-issue (vec (set (keys contexts))))
       {:link-context   nil
        :selected-issue (datastore/get-issue db selected-issue)
