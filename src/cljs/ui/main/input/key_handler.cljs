@@ -65,6 +65,22 @@
            (= :issues active-search)
            (actions/select-first-issue! *state)))
        (when (and alt-pressed?
+                  (= "Digit2" code)
+                  (= :contexts active-search))
+         (actions/select-second-context! *state false))
+       (when (and alt-pressed?
+                  (= "Digit3" code)
+                  (= :contexts active-search))
+         (actions/select-third-context! *state false))
+       (when (and alt-pressed?
+                  (= "Digit4" code)
+                  (= :contexts active-search))
+         (actions/select-fourth-context! *state false))
+       (when (and alt-pressed?
+                  (= "Digit5" code)
+                  (= :contexts active-search))
+         (actions/select-fifth-context! *state false))
+       (when (and alt-pressed?
                   selected-issue
                   (= "KeyA" code))
          (.preventDefault e)

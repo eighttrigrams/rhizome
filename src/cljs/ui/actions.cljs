@@ -87,6 +87,25 @@
                      (first (:contexts @*state)) 
                      suppress-reset-issue)))
 
+(defn- select-nth-context! [*state suppress-reset-issue n]
+  (when (and (seq (:contexts @*state))
+             (> (count (:contexts @*state)) n))
+    (select-context! *state 
+                     (nth (:contexts @*state) n) 
+                     suppress-reset-issue)))
+
+(defn select-second-context! [*state suppress-reset-issue]
+  (select-nth-context! *state suppress-reset-issue 1))
+
+(defn select-third-context! [*state suppress-reset-issue]
+  (select-nth-context! *state suppress-reset-issue 2))
+
+(defn select-fourth-context! [*state suppress-reset-issue]
+  (select-nth-context! *state suppress-reset-issue 3))
+
+(defn select-fifth-context! [*state suppress-reset-issue]
+  (select-nth-context! *state suppress-reset-issue 4))
+
 (defn select-issue! 
   ([*state issue] (select-issue! *state issue false))
   ([*state issue skip-select?]
