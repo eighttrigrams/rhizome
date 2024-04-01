@@ -244,11 +244,12 @@
 
 (defn- link-issue-to-selected-context 
   "when context selected add an issue"
-  [db {:keys [selected-context] :as opts} arg]
+  [db {:keys [selected-context] :as opts} issue-id]
   (try
-    (let [selected-issue (datastore/get-issue db {:id arg})
+    (datastore/reprioritize-issue db {:id issue-id})
+    (let [selected-issue (datastore/get-issue db {:id issue-id})
           context-ids   (keys (:contexts selected-issue))] 
-      (datastore/set-containers-of-item! db {:id arg} (vec (set (conj context-ids (:id selected-context)))))
+      (datastore/set-containers-of-item! db {:id issue-id} (vec (set (conj context-ids (:id selected-context)))))
       {:selected-issue   nil
        :issues           (search/search-issues db 
                                                (-> opts
