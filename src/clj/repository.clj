@@ -290,9 +290,10 @@
         (log/error (str "Caught an exception in link-selected-item-to-context " (.getMessage e)))
         (throw e)))))
 
-(defn- link-issue-to-selected-issue [db {:keys [selected-issue] :as opts} arg]
+(defn- link-issue-to-selected-issue [db {:keys [selected-issue] :as opts} related-issue-id]
   (try
-    (datastore/link-issue db (:id selected-issue) arg)
+    (datastore/reprioritize-issue db {:id related-issue-id})
+    (datastore/link-issue db (:id selected-issue) related-issue-id)
     {:selected-issue   (datastore/get-issue db selected-issue)
      :issues           (search/search-issues db (-> opts
                                                     (dissoc :search-globally?)
