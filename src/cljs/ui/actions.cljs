@@ -130,6 +130,23 @@
   (when (seq (:issues @*state))
     (select-issue! *state (first (:issues @*state)))))
 
+(defn- select-nth-issue! [*state n]
+  (when (and (seq (:issues @*state))
+             (> (count (:issues @*state)) n))
+    (select-issue! *state (nth (:issues @*state) n))))
+
+(defn select-second-issue! [*state]
+  (select-nth-issue! *state 1))
+
+(defn select-third-issue! [*state]
+  (select-nth-issue! *state 2))
+
+(defn select-fourth-issue! [*state]
+  (select-nth-issue! *state 3))
+
+(defn select-fifth-issue! [*state]
+  (select-nth-issue! *state 4))
+
 (defn start-context-search [*state]
   (fetch-and-reset! *state 
                     (assoc @*state
