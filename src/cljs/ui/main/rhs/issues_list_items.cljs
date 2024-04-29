@@ -131,7 +131,11 @@
                            (actions/select-context! *state issue)
                            (actions/delete-issue! *state issue)))
       :on-mouse-leave (on-mouse-leave *state)}
-     [:div.issue-card-inner
+     [:div
+      {:class (when (or (:preview-image-lowres (:data issue))
+                        (:preview-image (:data issue))
+                        (:image (:resource-links (:data issue))))
+                "issue-card-inner")}
       [title-component (:title issue) (:data issue)]
       (when-not simple-card?
         [:<>
