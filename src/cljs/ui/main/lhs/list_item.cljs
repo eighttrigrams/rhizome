@@ -8,6 +8,6 @@
    {:class    (when (= (:id (:selected-context @*state)) ;; TODO review on :id
                        (:id context)) :selected)
     :on-click #(actions/select-context! *state context)}
-   [:div
+   [:div.issue-card-inner-as-of-yet-unused
     [ili/title-component (:title context) (:data context)]
     [context-badges/component (:contexts context)]]])

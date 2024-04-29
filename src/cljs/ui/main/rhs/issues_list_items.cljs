@@ -83,6 +83,7 @@
                               :preview-issue issue
                               :mouse :enter)))
 
+;; TODO this isn't used any longer
 (defn- tall [data]
   (when (or (:preview-image-lowres data)
                                      (:preview-image data)
@@ -98,7 +99,7 @@
                           (actions/select-issue! *state {:id id}))
     :on-mouse-enter (on-mouse-enter *state issue)
     :on-mouse-leave (on-mouse-leave *state)}
-   [:div
+   [:div.issue-card-inner
     [title-component title]
     [info-component @*state issue]
     [context-badges/component (:contexts issue)]
@@ -130,7 +131,7 @@
                            (actions/select-context! *state issue)
                            (actions/delete-issue! *state issue)))
       :on-mouse-leave (on-mouse-leave *state)}
-     [:div
+     [:div.issue-card-inner
       [title-component (:title issue) (:data issue)]
       (when-not simple-card?
         [:<>

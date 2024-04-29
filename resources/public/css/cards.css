@@ -7,13 +7,14 @@ li.card {
     padding: 10px;
 }
 
-li.card.tall {
-    height: 300px;
-}
-
-li.card.tall img {
+li.card img {
     position: absolute;
-    top: 120px;
+    top: 9px;
+    left: -220px;
+    max-width: 200px;
+    max-height: 100px;
+    width: auto;
+    height: auto !important;
 }
 
 .scrollable.search-active li.card {
@@ -75,4 +76,11 @@ span.badge {
     border-radius: 3px;
     padding: 3px;
     margin-right: 3px;
+}
+
+.issue-card-inner {
+    position: relative;
+    left: 220px;
+    width: 470px;
+    top: -10px;
 }
