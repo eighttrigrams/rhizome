@@ -1,7 +1,7 @@
 li.card {
     position: relative;
     background-color: rgb(102, 15, 69);
-    height: 100px;
+    height: 115px;
     margin-bottom: 10px;
     border-radius: 4px;
     padding: 15px;
@@ -9,9 +9,9 @@ li.card {
 }
 
 li.card img {
-    max-width: 165px;
+    max-width: 203px;
     background-color: rgb(28, 16, 23);
-    max-height: 114px;
+    max-height: 132px;
     width: auto;
     height: auto !important;
     display: inline-block;
@@ -69,7 +69,7 @@ li.simple-card span.title p {
 
 li.card.issue-card span.contexts {
     position: absolute;
-    top: 95px;
+    top: 117px;
     font-size: 12px;
 }
 
