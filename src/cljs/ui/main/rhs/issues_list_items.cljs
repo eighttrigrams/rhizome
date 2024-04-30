@@ -100,10 +100,14 @@
     :on-mouse-enter (on-mouse-enter *state issue)
     :on-mouse-leave (on-mouse-leave *state)}
    [:div.issue-card-inner
-    [title-component title]
-    [info-component @*state issue]
-    [context-badges/component (:contexts issue)]
-    [image-preview-component (:data issue)]]])
+    (when (or (:preview-image-lowres (:data issue))
+              (:preview-image (:data issue))
+              (:image (:resource-links (:data issue)))) 
+      [image-preview-component (:data issue)])
+    [:div.issue-card-inner-right.issue-card-inner-child
+     [title-component title]
+     [info-component @*state issue]
+     [context-badges/component (:contexts issue)]]]])
 
 (defn regular-issues-list-item-component [*state issue idx select-fn]
   (let [simple-card? (and (:notes-mode (:current (:views (:data (:selected-context @*state)))))
@@ -131,20 +135,20 @@
                            (actions/select-context! *state issue)
                            (actions/delete-issue! *state issue)))
       :on-mouse-leave (on-mouse-leave *state)}
-     [:div
-      {:class (when (or (:preview-image-lowres (:data issue))
-                        (:preview-image (:data issue))
-                        (:image (:resource-links (:data issue))))
-                "issue-card-inner")}
-      [title-component (:title issue) (:data issue)]
-      (when-not simple-card?
-        [:<>
-         [info-component @*state issue]
-         [context-badges/component (remove #(= (:id (:selected-context @*state))
-                                               (first %)) 
-                                           (merge (when (:is_context issue) 
-                                                    {0 "⭕"})
-                                                  (when-let [file (:file (:resource-links (:data issue)))]
-                                                    {:file file})
-                                                  (:contexts issue)))]
-         [image-preview-component (:data issue)]])]]))
+     [:div.issue-card-inner
+      (when (or (:preview-image-lowres (:data issue))
+                (:preview-image (:data issue))
+                (:image (:resource-links (:data issue)))) 
+        [image-preview-component (:data issue)])
+      [:div.issue-card-inner-right.issue-card-inner-child
+       [title-component (:title issue) (:data issue)]
+       (when-not simple-card?
+         [:<>
+          [info-component @*state issue]
+          [context-badges/component (remove #(= (:id (:selected-context @*state))
+                                                (first %)) 
+                                            (merge (when (:is_context issue) 
+                                                     {0 "⭕"})
+                                                   (when-let [file (:file (:resource-links (:data issue)))]
+                                                     {:file file})
+                                                   (:contexts issue)))]])]]]))

@@ -9,20 +9,20 @@ li.card {
 }
 
 li.card img {
-    position: absolute;
-    top: 9px;
-    left: -175px;
     max-width: 165px;
-    max-height: 100px;
+    background-color: rgb(28, 16, 23);
+    max-height: 114px;
     width: auto;
     height: auto !important;
+    display: inline-block;
+    margin-right: 10px;
+    position: relative;
+    left: -5px;
+    top: -10px;
 }
 
-.issue-card-inner {
-    position: relative;
-    left: 175px;
-    width: 645px;
-    top: -10px;
+.issue-card-inner-right {
+    display: inline-block;
 }
 
 .scrollable.search-active li.card {
