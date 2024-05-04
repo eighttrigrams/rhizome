@@ -150,25 +150,29 @@
       (#(jdbc/execute! db % {:return-keys true}))))
 
 (defn update-collection-title-in-collection-items
-  [db item-id id short_title title]
-  (let [data (:issues/data (jdbc/execute-one! db
-                                                         (sql/format {:select [:data]
-                                                                      :from   [:issues]
-                                                                      :where  [:= :id [:inline item-id]]})
-                                                         {:return-keys true}))
-                   data (cond (nil? data) {}
-                              :else (json/parse-string (.getValue data)))
-                   data (if (get data "context-labels")
-                          data
-                          (assoc data "context-labels" {}))
-                   data (update data "context-labels" (fn [contexts]
-                                                        (assoc contexts (str id)  
-                                                               (or short_title title))))]
-               (jdbc/execute-one! db
-                                  (sql/format {:update [:issues]
-                                               :where  [:= :id [:inline item-id]]
-                                               :set    {:data [:inline (json/generate-string data)]}})
-                                  {:return-keys true})))
+  ([db item-id id short_title title] 
+   (update-collection-title-in-collection-items db item-id id short_title title false))
+  ([db item-id id short_title title delete?]
+   (let [data (:issues/data (jdbc/execute-one! db
+                                               (sql/format {:select [:data]
+                                                            :from   [:issues]
+                                                            :where  [:= :id [:inline item-id]]})
+                                               {:return-keys true}))
+         data (cond (nil? data) {}
+                    :else (json/parse-string (.getValue data)))
+         data (if (get data "context-labels")
+                data
+                (assoc data "context-labels" {}))
+         data (update data "context-labels" (fn [contexts]
+                                              (if delete?
+                                                (dissoc contexts (str id))
+                                                (assoc contexts (str id)  
+                                                       (or short_title title)))))]
+     (jdbc/execute-one! db
+                        (sql/format {:update [:issues]
+                                     :where  [:= :id [:inline item-id]]
+                                     :set    {:data [:inline (json/generate-string data)]}})
+                        {:return-keys true}))))
 
 (defn- update-collection-title-in-collection-items-for-children 
   [db id title short_title]

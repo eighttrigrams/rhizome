@@ -451,13 +451,16 @@
 (defn unlink-selected-item-from-container [{:keys [db]}]
   (fn [{:keys [selected-issue selected-context] :as state}]
     (try 
-      (log/info (str "repository/unlink-selected-item-from-container" (:id selected-issue)))
+      (log/info (str "repository/unlink-selected-item-from-container " (:id selected-issue)))
       (let [selected-context-id (:id selected-context)
             selected-issue (update selected-issue :contexts #(dissoc % selected-context-id))
             issue-contexts-ids (keys (:contexts selected-issue))]
         (datastore/set-containers-of-item! db
                                            selected-issue
                                            issue-contexts-ids)
+        (get-item/update-collection-title-in-collection-items db
+                                                              (:id selected-issue)
+                                                              (:id selected-context) nil nil true)
         {:selected-issue nil
          :issues (search/search-issues db state)})
       (catch Exception e
