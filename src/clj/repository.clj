@@ -229,11 +229,16 @@
        {:keys [title]}
        alternative-behaviour?]
     (try
-      (let [_ (insertion/insert-issue db 
-                                      title
-                                      selected-context 
-                                      (get-selected-secondary-contexts-set state)
-                                      alternative-behaviour?)]
+      (let [issue (insertion/insert-issue db 
+                                          title
+                                          selected-context 
+                                          (get-selected-secondary-contexts-set state)
+                                          alternative-behaviour?)]
+        (get-item/update-collection-title-in-collection-items db 
+                                                              (:id issue) 
+                                                              (:id selected-context)
+                                                              (:short_title selected-context)
+                                                              (:title selected-context))
         {:selected-issue nil
          :issues         (search/search-issues
                           db
@@ -287,6 +292,11 @@
     (try
       (datastore/reprioritize-context db arg)
       (datastore/set-containers-of-item! db selected-issue (vec (set (keys contexts))))
+      (get-item/update-collection-title-in-collection-items db 
+                                                            (:id selected-issue) 
+                                                            (:id arg)
+                                                            (:short_title arg)
+                                                            (:title arg))
       {:link-context   nil
        :selected-issue (datastore/get-issue db selected-issue)
        :active-search  nil
