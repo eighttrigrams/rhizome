@@ -250,6 +250,11 @@
     (let [selected-issue (datastore/get-issue db {:id issue-id})
           context-ids   (keys (:contexts selected-issue))] 
       (datastore/set-containers-of-item! db {:id issue-id} (vec (set (conj context-ids (:id selected-context)))))
+      (get-item/update-collection-title-in-collection-items db 
+                                                            issue-id 
+                                                            (:id selected-context)
+                                                            (:short_title selected-context)
+                                                            (:title selected-context))
       {:selected-issue   nil
        :issues           (search/search-issues db 
                                                (-> opts

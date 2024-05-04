@@ -149,15 +149,9 @@
       sql/format
       (#(jdbc/execute! db % {:return-keys true}))))
 
-(defn- update-collection-title-in-collection-items [db id title short_title]
-  (let [item-ids (doall (map :collections/item_id
-                             (jdbc/execute! db
-                                            (sql/format {:select [:item_id]
-                                                         :from   [:collections]
-                                                         :where  [:= :container_id [:inline id]]})
-                                            {:return-keys true})))]
-    (doall (for [item-id item-ids]
-             (let [data (:issues/data (jdbc/execute-one! db
+(defn update-collection-title-in-collection-items
+  [db item-id id short_title title]
+  (let [data (:issues/data (jdbc/execute-one! db
                                                          (sql/format {:select [:data]
                                                                       :from   [:issues]
                                                                       :where  [:= :id [:inline item-id]]})
@@ -174,11 +168,22 @@
                                   (sql/format {:update [:issues]
                                                :where  [:= :id [:inline item-id]]
                                                :set    {:data [:inline (json/generate-string data)]}})
-                                  {:return-keys true}))))))
+                                  {:return-keys true})))
+
+(defn- update-collection-title-in-collection-items-for-children 
+  [db id title short_title]
+  (let [item-ids (doall (map :collections/item_id
+                             (jdbc/execute! db
+                                            (sql/format {:select [:item_id]
+                                                         :from   [:collections]
+                                                         :where  [:= :container_id [:inline id]]})
+                                            {:return-keys true})))]
+    (doall (for [item-id item-ids]
+             (update-collection-title-in-collection-items db item-id id short_title title)))))
 
 (defn update-item [db {:keys [id title short_title tags data] :as item} mode]
   (try
-    (update-collection-title-in-collection-items db id title short_title)
+    (update-collection-title-in-collection-items-for-children db id title short_title)
     (catch Exception e
       (prn (.getMessage e))))
   (let [old-data (:data (get-item db item))
