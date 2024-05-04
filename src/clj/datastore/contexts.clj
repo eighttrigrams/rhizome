@@ -4,7 +4,7 @@
             [honey.sql :as sql]
             [datastore.helpers
              :refer [un-namespace-keys]]
-            [datastore.get-item :refer [get-item] :rename {get-item get-context}]))
+            [datastore.get-item :refer [get-item update-item] :rename {get-item get-context}]))
 
 (defn new-context [db {title :title}]
   (-> (jdbc/execute-one!
@@ -24,22 +24,8 @@
       un-namespace-keys
       (dissoc :searchable)))
 
-(defn- update-context' [db {:keys [id title short_title tags data] :as item}]
-  (let [old-data (:data (get-context db item))]
-    (jdbc/execute-one! db
-                       (sql/format {:update [:issues]
-                                    :where  [:= :id [:inline id]]
-                                    :set    {:title          [:inline title]
-                                             :short_title    [:inline short_title]
-                                             :tags           [:inline tags]
-                                             :updated_at_ctx [:raw "NOW()"]
-                                             :data           [:inline (json/generate-string
-                                                                       (merge old-data
-                                                                              data))]}})
-                       {:return-keys true})))
-
 (defn update-context [db {:keys [context]}]
-  (update-context' db context)
+  (update-item db context :context)
   (get-context db context))
 
 (defn update-context-description [db {:keys [id description]}]

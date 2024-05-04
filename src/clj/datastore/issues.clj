@@ -1,9 +1,8 @@
 (ns datastore.issues
   (:require [cambium.core :as log]
-            [cheshire.core :as json]
             [next.jdbc :as jdbc]
             [honey.sql :as sql]
-            [datastore.get-item :refer [get-item] :rename {get-item get-issue}]))
+            [datastore.get-item :refer [get-item update-item] :rename {get-item get-issue}]))
 
 (defn delete-date [db issue-id]
   (jdbc/execute! db
@@ -19,19 +18,6 @@
                                              [:raw "NOW()"]
                                              [:raw "NOW()"]
                                              [:inline event_archived?]]]})))
-
-(defn- update-issue* [db {:keys [id title short_title tags data]}]
-  (jdbc/execute-one! db
-                     (sql/format {:update [:issues]
-                                  :where  [:= :id [:inline id]]
-                                  :set    {:title       [:inline title]
-                                           :short_title [:inline short_title]
-                                           :tags        [:inline tags]
-                                           :data        [:inline (json/generate-string
-                                                                  ;; TODO review
-                                                                  (or data {}))]
-                                           :updated_at  [:raw "NOW()"]}})
-                     {:return-keys true}))
 
 (defn- delete-related-issues [db id]
   (jdbc/execute! db (sql/format {:delete-from [:issue_issue]
@@ -52,13 +38,13 @@
     (delete-date db id)
     (delete-related-issues db id)
     (relate-issues db id related-issues-ids)
-    (update-issue* db issue)
+    (update-item db issue :issue)
     (when date
       (insert-date db id date event_archived?))
     (get-issue db issue)))
 
 (defn update-issue-simple [db issue]
-  (update-issue* db issue) 
+  (update-item db issue :issue) 
   (get-issue db issue))
 
 (defn update-issue-description [db {:keys [id description] :as issue}]

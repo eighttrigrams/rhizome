@@ -1,7 +1,10 @@
 (ns datastore.get-item
   (:require [next.jdbc :as jdbc]
             [honey.sql :as sql]
-            [datastore.issues.common :as common]))
+            [cheshire.core :as json]
+            [cambium.core :as log]
+            [datastore.issues.common :as common]
+            [clojure.string :as str]))
 
 (declare get-item)
 
@@ -146,3 +149,54 @@
       sql/format
       (#(jdbc/execute! db % {:return-keys true}))))
 
+(defn- update-collection-title-in-collection-items [db id title short_title]
+  (let [item-ids (doall (map :collections/item_id
+                             (jdbc/execute! db
+                                            (sql/format {:select [:item_id]
+                                                         :from   [:collections]
+                                                         :where  [:= :container_id [:inline id]]})
+                                            {:return-keys true})))]
+    (doall (for [item-id item-ids]
+             (let [data (:issues/data (jdbc/execute-one! db
+                                                         (sql/format {:select [:data]
+                                                                      :from   [:issues]
+                                                                      :where  [:= :id [:inline item-id]]})
+                                                         {:return-keys true}))
+                   data (cond (nil? data) {}
+                              :else (json/parse-string (.getValue data)))
+                   data (if (get data "context-labels")
+                          data
+                          (assoc data "context-labels" {}))
+                   data (update data "context-labels" (fn [contexts]
+                                                        (assoc contexts (str id)  
+                                                               (or short_title title))))]
+               (jdbc/execute-one! db
+                                  (sql/format {:update [:issues]
+                                               :where  [:= :id [:inline item-id]]
+                                               :set    {:data [:inline (json/generate-string data)]}})
+                                  {:return-keys true}))))))
+
+(defn update-item [db {:keys [id title short_title tags data] :as item} mode]
+  (try
+    (update-collection-title-in-collection-items db id title short_title)
+    (catch Exception e
+      (prn (.getMessage e))))
+  (let [old-data (:data (get-item db item))
+        set (merge {:title       [:inline title]
+                    :short_title [:inline short_title]
+                    :tags        [:inline tags]}
+                   (if (= :context mode)
+                     {:updated_at_ctx [:raw "NOW()"]
+                      :data           [:inline (json/generate-string
+                                                (merge old-data
+                                                       data))]}
+                     {:data       [:inline (json/generate-string
+                                            ;; TODO review
+                                            (or data {}))]
+                      :updated_at [:raw "NOW()"]}))
+        formatted-sql (sql/format {:update [:issues]
+                                   :where  [:= :id [:inline id]]
+                                   :set    set})]
+    (jdbc/execute-one! db
+                       formatted-sql
+                       {:return-keys true})))
