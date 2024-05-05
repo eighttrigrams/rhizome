@@ -58,8 +58,8 @@
 (defn- filter-contexts [{:keys [link-context selected-context selected-issue]} contexts]
   (if-not link-context
     (remove #(= (:id selected-context) (:id %)) contexts)
-    (let [ids-of-contexts-to-remove (conj (set (keys (or (:contexts selected-issue)
-                                                         (:contexts selected-context))))
+    (let [ids-of-contexts-to-remove (conj (set (keys (or (:contexts (:data selected-issue))
+                                                         (:contexts (:data selected-context)))))
                                           (:id (or selected-issue selected-context)))]
       (remove #(ids-of-contexts-to-remove (:id %)) contexts))))
 
@@ -214,14 +214,14 @@
      (fn [issue]
        (or 
         (and secondary-contexts-unassigned-selected
-             (= 1 (count (:contexts issue))))
+             (= 1 (count (:contexts (:data issue)))))
         
         (if-not secondary-contexts-inverted
           (and (not secondary-contexts-unassigned-selected)
-               (every? identity (map #(contains? (set (keys (:contexts issue))) %) 
+               (every? identity (map #(contains? (set (keys (:contexts (:data issue)))) %) 
                                      selected-secondary-contexts-set)))
           (seq (set/intersection 
-                (set (keys (:contexts issue)))
+                (set (keys (:contexts (:data issue))))
                 selected-secondary-contexts-set)))))
      issues)
     issues))
@@ -256,7 +256,7 @@
                                        (:id selected-issue))]
         (remove #(issue-ids-to-exclude (:id %)) 
                 issues))
-      (remove #(or ((set (keys (:contexts %))) (:id selected-context))
+      (remove #(or ((set (keys (:contexts (:data %)))) (:id selected-context))
                    (= (:id %) (:id selected-context))) issues))))
 
 (defn- sort-for-events-view 
@@ -357,7 +357,7 @@
                               (assoc-in [:selected-context :data :views :current :selected-secondary-contexts] [])
                               (assoc-in [:selected-context :data :views :current :secondary-contexts-inverted] false)
                               (assoc-in [:selected-context :data :views :current :secondary-contexts-unassigned-selected] false)))
-       (map :contexts)
+       (map #(get-in % [:data :contexts]))
        (map seq)
        (apply concat)
        (group-by first)
