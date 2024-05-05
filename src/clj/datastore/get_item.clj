@@ -171,7 +171,9 @@
                                                 (select-keys contexts (map str constraints))
                                                 :else
                                                 (assoc contexts (str id)  
-                                                       (or short_title title)))))]
+                                                       (if (seq short_title)
+                                                         short_title
+                                                         title)))))]
      (jdbc/execute-one! db
                         (sql/format {:update [:issues]
                                      :where  [:= :id [:inline item-id]]
