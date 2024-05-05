@@ -33,6 +33,16 @@
       parse-data
       (dissoc :searchable)))
 
+(defn post-process-simple [query-result]
+  (-> query-result
+      un-namespace-keys
+      simplify-date
+      parse-data
+      (#(update-in % [:data :contexts] (fn [contexts] (into {} 
+                                                 (map (fn [[k v]] [(Integer/parseInt (name k)) v]) contexts)))))
+      (#(assoc % :contexts (:contexts (:data %))))
+      (dissoc :searchable)))
+
 ;; TODO dedup with fn above
 (defn post-process-without-join-contexts [query-result]
   (-> query-result

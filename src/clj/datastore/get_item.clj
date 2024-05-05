@@ -160,10 +160,10 @@
                                                {:return-keys true}))
          data (cond (nil? data) {}
                     :else (json/parse-string (.getValue data)))
-         data (if (get data "context-labels")
+         data (if (get data "contexts")
                 data
-                (assoc data "context-labels" {}))
-         data (update data "context-labels" (fn [contexts]
+                (assoc data "contexts" {}))
+         data (update data "contexts" (fn [contexts]
                                               (cond 
                                                 (true? constraints)
                                                 (dissoc contexts (str id))

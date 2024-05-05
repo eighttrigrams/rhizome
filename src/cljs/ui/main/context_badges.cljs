@@ -4,6 +4,7 @@
   [:span.contexts
    (doall
     (map (fn [[idx title]]
+           (prn "----" idx "---" title)
            (if (= :file idx)
              [:span.badge 
               {:key idx

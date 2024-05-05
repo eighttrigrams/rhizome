@@ -49,14 +49,9 @@
 
 (defn- context-ids-query [ids]
   (sql/format
-   {:select    [:issues.*
-                [[:array_agg :issues_o.id] :context_ids]
-                [[:array_agg :issues_o.title] :context_titles]
-                [[:array_agg :issues_o.short_title] :context_short_titles]]
+   {:select    [:issues.*]
     :from      [:issues]
     :where     [:in :issues.id [:inline ids]]
-    :left-join [:collections [:= :issues.id :collections.item_id]
-                [:issues :issues_o] [:= :collections.container_id :issues_o.id]]
     :group-by [:issues.id]
     :order-by  [[:updated_at_ctx :desc]]}))
 
@@ -84,7 +79,7 @@
           (->> ids
                (context-ids-query)
                (jdbc/execute! db)
-               (map common/post-process)
+               (map common/post-process-simple)
                (filter-contexts opts))
           '()))
       (catch Exception e
@@ -170,13 +165,8 @@
                :where  [:= :events.issue_id :issues.id]}
               {:select :archived
                :from   [:events]
-               :where  [:= :events.issue_id :issues.id]}
-              [[:array_agg :issues_o.id] :context_ids]
-              [[:array_agg :issues_o.title] :context_titles]
-              [[:array_agg :issues_o.short_title] :context_short_titles]]
+               :where  [:= :events.issue_id :issues.id]}]
    :from     [:issues]
-   :join     [:collections [:= :issues.id :collections.item_id]
-              [:issues :issues_o] [:= :collections.container_id :issues_o.id]]
    :where    [:in :issues.id [:inline ids]]
    :group-by [:issues.id]
    :order-by [[:issues.updated_at (if (= 1 search-mode)
@@ -309,7 +299,7 @@
          (issues-query search-mode)
          sql/format
          (jdbc/execute! db)
-         (map common/post-process)
+         (map common/post-process-simple)
          (sort-issues opts)
          (filter-by-selected-secondary-contexts 
           (into #{} selected-secondary-contexts)
