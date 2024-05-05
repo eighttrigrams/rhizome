@@ -151,8 +151,8 @@
 
 (defn update-collection-title-in-collection-items
   ([db item-id id short_title title] 
-   (update-collection-title-in-collection-items db item-id id short_title title false))
-  ([db item-id id short_title title delete?]
+   (update-collection-title-in-collection-items db item-id id short_title title nil))
+  ([db item-id id short_title title constraints]
    (let [data (:issues/data (jdbc/execute-one! db
                                                (sql/format {:select [:data]
                                                             :from   [:issues]
@@ -164,8 +164,12 @@
                 data
                 (assoc data "context-labels" {}))
          data (update data "context-labels" (fn [contexts]
-                                              (if delete?
+                                              (cond 
+                                                (true? constraints)
                                                 (dissoc contexts (str id))
+                                                (seq constraints)
+                                                (select-keys contexts (map str constraints))
+                                                :else
                                                 (assoc contexts (str id)  
                                                        (or short_title title)))))]
      (jdbc/execute-one! db

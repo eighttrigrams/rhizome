@@ -474,6 +474,11 @@
                                      (or (:issue (:issue arg))
                                          (:issue arg))
                                      (:issue-contexts arg))
+      (get-item/update-collection-title-in-collection-items db
+                                                            (:id (or (:issue (:issue arg))
+                                                                     (:issue arg)))
+                                                            nil nil nil 
+                                                            (:issue-contexts arg))
       (let [{:keys [data]} (get-item/get-item db (:issue (:issue arg)))]
         {:selected-issue (datastore/update-issue db 
                                                  (assoc-in (:issue arg) 
