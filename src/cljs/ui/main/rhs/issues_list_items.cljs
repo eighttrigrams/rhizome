@@ -107,7 +107,7 @@
     [:div.issue-card-inner-right.issue-card-inner-child
      [title-component title]
      [info-component @*state issue]
-     [context-badges/component (:contexts issue)]]]])
+     [context-badges/component (:contexts (:data issue))]]]])
 
 (defn regular-issues-list-item-component [*state issue idx select-fn]
   (let [simple-card? (and (:notes-mode (:current (:views (:data (:selected-context @*state)))))
@@ -151,4 +151,4 @@
                                                      {0 "⭕"})
                                                    (when-let [file (:file (:resource-links (:data issue)))]
                                                      {:file file})
-                                                   (:contexts issue)))]])]]]))
+                                                   (:contexts (:data issue))))]])]]]))

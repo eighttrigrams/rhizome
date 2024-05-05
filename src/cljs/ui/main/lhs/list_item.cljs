@@ -10,4 +10,4 @@
     :on-click #(actions/select-context! *state context)}
    [:div.issue-card-inner-as-of-yet-unused
     [ili/title-component (:title context) (:data context)]
-    [context-badges/component (:contexts context)]]])
+    [context-badges/component (:contexts (:data context))]]])

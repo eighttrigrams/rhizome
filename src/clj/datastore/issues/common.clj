@@ -40,7 +40,7 @@
       parse-data
       (#(update-in % [:data :contexts] (fn [contexts] (into {} 
                                                  (map (fn [[k v]] [(Integer/parseInt (name k)) v]) contexts)))))
-      (#(assoc % :contexts (:contexts (:data %))))
+      #_(#(assoc % :contexts (:contexts (:data %))))
       (dissoc :searchable)))
 
 ;; TODO dedup with fn above
