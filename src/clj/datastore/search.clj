@@ -41,7 +41,7 @@
                         :issues.id
                         :issues.data
                         :issues.is_context
-                        :issues.updated_at]
+                        :issues.updated_at_ctx]
                :where [:and
                        (when-not (= "" (or q ""))
                          [:raw (format "searchable @@ to_tsquery('simple', '%s')"
