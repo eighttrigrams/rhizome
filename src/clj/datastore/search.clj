@@ -53,6 +53,7 @@
 
 (defn- filter-contexts [{:keys [link-context selected-context selected-issue]} contexts]
   (try
+    (log/info (str "contexts" contexts))
     (if-not link-context
       (remove #(= (:id selected-context) (:id %)) contexts)
       (let [ids-of-contexts-to-remove (conj (set (map #(Integer/parseInt (if (keyword? %) 
