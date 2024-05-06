@@ -27,7 +27,8 @@
     (datastore/new-issue db 
                          title
                          short-title
-                         context-ids-set)))
+                         context-ids-set
+                         {:suppress-digit-check? true})))
 
 (defn insert-issue 
   [db 

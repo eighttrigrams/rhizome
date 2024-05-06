@@ -60,7 +60,7 @@
                                  :set {:updated_at [:raw "NOW()"]}
                                  :where [:= :id [:inline id]]})))
 
-(defn- create-new-issue! [db title short_title]
+(defn- create-new-issue! [db title short_title suppress-digit-check?]
   (:issues/id (jdbc/execute-one!
                db
                (sql/format {:insert-into [:issues]
@@ -73,7 +73,8 @@
                                            [:raw "NOW()"]
                                            [:raw "NOW()"]
                                            title
-                                           (if (boolean (re-find #"\d" short_title))
+                                           (if (and (not suppress-digit-check?)
+                                                    (boolean (re-find #"\d" short_title)))
                                              (do 
                                                (log/error (str "Can't insert short_title due to it containing digit: " short_title))
                                                "")
@@ -88,20 +89,22 @@
                               :values      values})))
 
 (defn new-issue 
-  [db 
-   title
-   short-title
-   context-ids-set]
-  (when-not (seq context-ids-set) 
-    (throw (Exception. "won't create a new-issue when no contexts")))
-  (let [issue-id (create-new-issue! db title short-title)
-        values   (vec (doall
-                       (map (fn [ctx-id]
-                              [[:inline ctx-id]
-                               [:inline issue-id]])
-                            context-ids-set)))]
-    (insert-issue-relations! db values)
-    (get-issue db {:id issue-id})))
+  ([db title short-title context-ids-set] (new-issue db title short-title context-ids-set {}))
+  ([db 
+    title
+    short-title
+    context-ids-set
+    {:keys [suppress-digit-check?]}]
+   (when-not (seq context-ids-set) 
+     (throw (Exception. "won't create a new-issue when no contexts")))
+   (let [issue-id (create-new-issue! db title short-title suppress-digit-check?)
+         values   (vec (doall
+                        (map (fn [ctx-id]
+                               [[:inline ctx-id]
+                                [:inline issue-id]])
+                             context-ids-set)))]
+     (insert-issue-relations! db values)
+     (get-issue db {:id issue-id}))))
 
 (defn link-issue [db issue-id related-issue-id]
   (let [issue (get-issue db {:id issue-id})
