@@ -81,13 +81,21 @@
         (throw e)))))
 
 (defn- fetch-issue-ids [ds q selected-context events-view link-issue search-mode]
-  (let [select [:issues.title
+  (let [select-simple [:issues.title
+                       :issues.short_title
+                       :issues.short_title_ints
+                       :issues.id
+                       :issues.data
+                       :issues.is_context
+                       :issues.updated_at]
+        select [:issues.title
                 :issues.short_title
                 :issues.short_title_ints
                 :issues.id
                 :issues.data
                 :issues.is_context
                 :issues.updated_at
+                ;; TODO simply concat those to select-simple
                 {:select :date
                  :from   [:events]
                  :where  [:= :events.issue_id :issues.id]}
@@ -137,7 +145,9 @@
                                                  [:not= :events.archived [:inline (= 1 events-view)]]]}]
                               [:=])
         formatted-query (sql/format (merge
-                                     {:select   select
+                                     {:select   (if (not= 0 events-view)
+                                                  select
+                                                  select-simple)
                                       :from     [:issues]
                                       :order-by [[:issues.updated_at (if (= 1 search-mode)
                                                                        :asc 
