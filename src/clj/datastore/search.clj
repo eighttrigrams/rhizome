@@ -370,19 +370,21 @@
 (defn search-issues [db {{{:keys [highlighted-secondary-contexts]} :data  
                           :as selected-context} :selected-context
                          :as opts}]
-  (try
-    (let [opts (
+  (sectime
+   "search-issues"
+   (try
+             (let [opts (
                 ;; TODO instead of doing this, make sure q is always at least ""
-                if (:q opts) 
-                 (update opts :q remove-some-chars)
+                         if (:q opts) 
+                          (update opts :q remove-some-chars)
                  ;; for destructuring in searcj-issues' to work properly when :q is present but has nil value
-                 (dissoc opts :q))]
-      (if-not selected-context
-        [(search-issues' db opts) {}]
-        [(search-issues' db opts) 
-         (get-aggregated-contexts db 
-                                  opts 
-                                  highlighted-secondary-contexts)]))
-    (catch Exception e
-      (log/error (str "error in search-issues: " (.getMessage e) " - params were: " (with-out-str (pp/pprint opts))))
-      (throw e))))
+                          (dissoc opts :q))]
+               (if-not selected-context
+                 [(search-issues' db opts) {}]
+                 [(search-issues' db opts) 
+                  (get-aggregated-contexts db 
+                                           opts 
+                                           highlighted-secondary-contexts)]))
+             (catch Exception e
+               (log/error (str "error in search-issues: " (.getMessage e) " - params were: " (with-out-str (pp/pprint opts))))
+               (throw e)))))
