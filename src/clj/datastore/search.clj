@@ -8,6 +8,13 @@
             [datastore.issues.common :as common]
             [datastore.get-item :as get-item]))
 
+(defmacro sectime
+  [what expr]
+  `(let [start# (. System (currentTimeMillis))
+         ret# ~expr]
+     (log/info (str "Elapsed time - " ~what ": " (/ (double (- (. System (currentTimeMillis)) start#)) 1000.0) " secs"))
+     ret#))
+
 (defn- remove-some-chars [q]
   (-> q
       (str/replace "(" " ")
@@ -123,9 +130,11 @@
                 selected-context
                 (and (string? q) (not= "" q)))
           '()
-          (jdbc/execute! 
-           ds 
-           urgent-events-query))
+          (sectime
+           "urgent-issues query"
+           (jdbc/execute! 
+            ds 
+            urgent-events-query)))
         selected-context (when (:id selected-context) selected-context)
         search-clause       (if (not= "" q)
                               [:raw (format "searchable @@ to_tsquery('simple', '%s')" 
@@ -233,12 +242,13 @@
        :or   {q ""}
        :as state} search-mode]
        
-  (seq (fetch-issue-ids db 
-                        q 
-                        (if search-globally? nil selected-context) 
-                        (get-events-view state)
-                        link-issue
-                        search-mode)))
+  (sectime "do-fetch-ids"
+   (seq (fetch-issue-ids db 
+                         q 
+                         (if search-globally? nil selected-context) 
+                         (get-events-view state)
+                         link-issue
+                         search-mode))))
 
 (defn- filter-issues
   [{:keys [link-issue 
