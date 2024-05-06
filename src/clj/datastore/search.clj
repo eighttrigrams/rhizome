@@ -58,6 +58,7 @@
                                                     (keys (or (:contexts (:data selected-issue))
                                                               (:contexts (:data selected-context))))))
                                           (:id (or selected-issue selected-context)))]
+      (log/info (str "ids-of-contexts-to-remove" ids-of-contexts-to-remove))
       (remove #(ids-of-contexts-to-remove (:id %)) contexts))))
 
 (defn search-contexts
