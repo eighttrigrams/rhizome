@@ -86,10 +86,23 @@
         (log/error (str "error in search/search-contexts: " e " - param was: " q))
         (throw e)))))
 
-(defn- fetch-issue-ids [ds q selected-context events-view link-issue]
-  (let [urgent-events-query
+(defn- fetch-issue-ids [ds q selected-context events-view link-issue search-mode]
+  (let [select [:issues.title
+                :issues.short_title
+                :issues.short_title_ints
+                :issues.id
+                :issues.data
+                :issues.is_context
+                :issues.updated_at
+                {:select :date
+                 :from   [:events]
+                 :where  [:= :events.issue_id :issues.id]}
+                {:select :archived
+                 :from   [:events]
+                 :where  [:= :events.issue_id :issues.id]}]
+        urgent-events-query
         (sql/format
-         {:select   [:issues.id]
+         {:select   select
           :from     [:issues]
           :order-by [[:updated_at :desc]]
           :where    [:exists {:select [:events.id]
@@ -102,7 +115,7 @@
                                         ;; we sort later
                                         #_[:+ :events.date [:raw "interval '6 hours'"]] 
                                         [:raw "NOW()"]]]}]})
-        urgent-issues-ids 
+        urgent-issues 
         (if (or link-issue 
                 (not= 0 events-view)
                 selected-context
@@ -111,7 +124,6 @@
           (jdbc/execute! 
            ds 
            urgent-events-query))
-        urgent-issues-ids (map #(:issues/id %) urgent-issues-ids)
         selected-context (when (:id selected-context) selected-context)
         search-clause       (if (not= "" q)
                               [:raw (format "searchable @@ to_tsquery('simple', '%s')" 
@@ -131,47 +143,25 @@
                                                  [:not= :events.archived [:inline (= 1 events-view)]]]}]
                               [:=])
         formatted-query (sql/format (merge
-                                     {:select   [:issues.id]
+                                     {:select   select
                                       :from     [:issues]
-                                      :order-by [[:updated_at :desc]]
+                                      :order-by [[:issues.updated_at (if (= 1 search-mode)
+                                                                       :asc 
+                                                                       :desc)]]
                                       :join     join-clause
-                                      :where    [:or
-                                                 [:and
-                                                  exists-clause
-                                                  join-where-clause
-                                                  search-clause]]}
+                                      :where    [:and [:or
+                                                       [:and
+                                                        exists-clause
+                                                        join-where-clause
+                                                        search-clause]]
+                                                 (when (seq urgent-issues)
+                                                   [:not [:in :issues.id [:inline (map :issues/id urgent-issues)]]])]}
                                      (when (and (= "" q)
                                                 (not selected-context)
                                                 (= 0 events-view))
                                        {:limit 500})))
-        issues-ids (jdbc/execute! ds formatted-query)
-        issues-ids (map #(:issues/id %) issues-ids)
-        all-issues-ids (concat urgent-issues-ids 
-                               issues-ids 
-                               ;; duplicates don't matter
-                               #_(remove #(contains? (set urgent-issues-ids) %) issues-ids))]
-    all-issues-ids))
-
-(defn- issues-query [search-mode ids]
-  {:select   [:issues.title
-              :issues.short_title
-              :issues.short_title_ints
-              :issues.id
-              :issues.data
-              :issues.is_context
-              :issues.updated_at
-              {:select :date
-               :from   [:events]
-               :where  [:= :events.issue_id :issues.id]}
-              {:select :archived
-               :from   [:events]
-               :where  [:= :events.issue_id :issues.id]}]
-   :from     [:issues]
-   :where    [:in :issues.id [:inline ids]]
-   :group-by [:issues.id]
-   :order-by [[:issues.updated_at (if (= 1 search-mode)
-                                    :asc 
-                                    :desc)]]})
+        issues (jdbc/execute! ds formatted-query)]
+    (concat urgent-issues issues)))
 
 (defn- re-order [search-mode issues]
   (if (= 2 search-mode)
@@ -237,13 +227,14 @@
 (defn- do-fetch-ids 
   [db {:keys [q search-globally? selected-context link-issue]
        :or   {q ""}
-       :as state}]
+       :as state} search-mode]
        
   (seq (fetch-issue-ids db 
                         q 
                         (if search-globally? nil selected-context) 
                         (get-events-view state)
-                        link-issue)))
+                        link-issue
+                        search-mode)))
 
 (defn- filter-issues
   [{:keys [link-issue 
@@ -294,20 +285,15 @@
                   secondary-contexts-unassigned-selected
                   search-mode]} :current} :views} :data} :selected-context
        :as                                                                                                                                  opts}]
-  (if-let [ids (do-fetch-ids db opts)]
-    (->> ids
-         (issues-query search-mode)
-         sql/format
-         (jdbc/execute! db)
-         (map common/post-process-simple)
-         (sort-issues opts)
-         (filter-by-selected-secondary-contexts 
-          (into #{} selected-secondary-contexts)
-          secondary-contexts-unassigned-selected
-          secondary-contexts-inverted
-          (= :issue link-issue))
-         (filter-issues opts))
-    '()))
+  (->> (do-fetch-ids db opts search-mode)
+       (map common/post-process-simple)
+       (sort-issues opts)
+       (filter-by-selected-secondary-contexts 
+        (into #{} selected-secondary-contexts)
+        secondary-contexts-unassigned-selected
+        secondary-contexts-inverted
+        (= :issue link-issue))
+       (filter-issues opts)))
 
 (defn- try-parse [item]
   (try (Integer/parseInt item)
