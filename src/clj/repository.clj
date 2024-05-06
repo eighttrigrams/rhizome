@@ -453,7 +453,7 @@
     (try 
       (log/info (str "repository/unlink-selected-item-from-container " (:id selected-issue)))
       (let [selected-context-id (:id selected-context)
-            selected-issue (update selected-issue :contexts #(dissoc % selected-context-id))
+            selected-issue (update-in selected-issue [:data :contexts] #(dissoc % selected-context-id))
             issue-contexts-ids (keys (:contexts (:data selected-issue)))]
         (datastore/set-containers-of-item! db
                                            selected-issue
