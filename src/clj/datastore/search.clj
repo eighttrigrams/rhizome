@@ -32,16 +32,16 @@
       "*"
       qs)))
 
-(defn- query-string-contexts-query [q]
-  (log/info (str "query-string-contexts:q:" q))
-  (sql/format {:select :*
-               :from   [:issues.title
+(defn- query-string-contexts-query [q selected-context]
+  (log/info (str "query-string-contexts:q:" q selected-context))
+  (sql/format {:select [:issues.title
                         :issues.short_title
                         :issues.short_title_ints
                         :issues.id
                         :issues.data
                         :issues.is_context
                         :issues.updated_at_ctx]
+               :from  [:issues]
                :where [:and
                        (when-not (= "" (or q ""))
                          [:raw (format "searchable @@ to_tsquery('simple', '%s')"
@@ -66,7 +66,7 @@
         {:keys [q]} opts]
     (try
       (->>
-       (query-string-contexts-query q)
+       (query-string-contexts-query q (:selected-context opts))
        (jdbc/execute! db)
        (map common/post-process-simple)
        (filter-contexts opts))
