@@ -32,7 +32,7 @@
       "*"
       qs)))
 
-(defn- query-string-contexts-query [q selected-context]
+(defn- query-string-contexts-query [q _selected-context]
   (sql/format (merge {:select [:issues.title
                                :issues.short_title
                                :issues.short_title_ints
@@ -47,7 +47,7 @@
                                               (convert-q-to-query-string q))])
                               [:= :issues.is_context true]]
                       :order-by [[:updated_at_ctx :desc]]}
-                     (when (and (not selected-context)
+                     (when true #_(and (not selected-context)
                                 (= "" (or q "")))
                        {:limit 500}))))
 
