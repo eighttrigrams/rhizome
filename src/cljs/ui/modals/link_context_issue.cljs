@@ -16,7 +16,7 @@
                                        (into {} new-vals)
                                        vals)))))] 
     
-    (reset! *selectable-contexts (:contexts issue))
+    (reset! *selectable-contexts (:contexts (:data issue)))
     
     (r/create-class
      {:component-did-mount #(.focus (get-component-el))

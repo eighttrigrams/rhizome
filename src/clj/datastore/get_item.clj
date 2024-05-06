@@ -1,6 +1,7 @@
 (ns datastore.get-item
   (:require [next.jdbc :as jdbc]
             [honey.sql :as sql]
+            [cambium.core :as log]
             [cheshire.core :as json]
             [datastore.issues.common :as common]))
 
@@ -91,7 +92,7 @@
                        (:related_issues (get-issue-with-related-issues db id recursion-depth))
                        nil)]
        (-> (get-issue-without-related-issues db id)
-           common/post-process-without-join-contexts
+           common/post-process-simple
            (assoc :contexts (or collections {}))
            (assoc :related_issues (or relations #{}))))
      (catch java.lang.Exception e
@@ -114,7 +115,7 @@
   [db {:keys [title]}]
   (try
     (-> (get-issue-without-related-issues-by-title db title)
-        common/post-process-without-join-contexts
+        common/post-process-simple
         (assoc :contexts {})
         (assoc :related_issues {}))
     (catch java.lang.Exception e
@@ -135,7 +136,7 @@
   [db path url]
   (try
     (-> (get-issue-without-related-issues-by-path db path url)
-        common/post-process-without-join-contexts
+        common/post-process-simple
         (assoc :contexts {})
         (assoc :related_issues {}))
     (catch java.lang.Exception e
@@ -190,23 +191,22 @@
              (update-collection-title-in-collection-items db item-id id short_title title)))))
 
 (defn update-item [db {:keys [id title short_title tags data] :as item} mode]
-  (try
-    (update-collection-title-in-collection-items-for-children db id title short_title)
-    (catch Exception e
-      (prn (.getMessage e))))
+  (when (= :context mode)
+    (try
+      (update-collection-title-in-collection-items-for-children db id title short_title)
+      (catch Exception e
+        (prn (.getMessage e)))))
   (let [old-data (:data (get-item db item))
         set (merge {:title       [:inline title]
                     :short_title [:inline short_title]
                     :tags        [:inline tags]}
+                   (merge {:data       [:inline (json/generate-string
+                                                 (if data
+                                                   (merge old-data data)
+                                                   {}))]})
                    (if (= :context mode)
-                     {:updated_at_ctx [:raw "NOW()"]
-                      :data           [:inline (json/generate-string
-                                                (merge old-data
-                                                       data))]}
-                     {:data       [:inline (json/generate-string
-                                            ;; TODO review
-                                            (or data {}))]
-                      :updated_at [:raw "NOW()"]}))
+                     {:updated_at_ctx [:raw "NOW()"]}
+                     {:updated_at [:raw "NOW()"]}))
         formatted-sql (sql/format {:update [:issues]
                                    :where  [:= :id [:inline id]]
                                    :set    set})]

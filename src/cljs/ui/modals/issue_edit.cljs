@@ -2,6 +2,7 @@
   (:require [reagent.core :as r]
             [net.eighttrigrams.cljs-text-editor.editor :as editor]
             [ui.modals.link-context-issue :as link-context-issue]
+            [clojure.string :as str]
             api))
 
 (defn- get-title-el []
@@ -12,6 +13,9 @@
 
 (defn- get-tags-el []
   (.getElementById js/document "issue-tags"))
+
+(defn- get-highlighted-secondary-contexts-el []
+  (.getElementById js/document "issue-highlighted-secondary-contexts"))
 
 (defn- get-event-el []
   (.getElementById js/document "has-date"))
@@ -42,7 +46,12 @@
                       [:div
                        [:input#issue-tags.line
                         {:autoComplete :off
-                         :defaultValue (:tags issue)}]]])}))
+                         :defaultValue (:tags issue)}]]
+                      [:div
+                       [:input#issue-highlighted-secondary-contexts.line
+                        {:autoComplete :off
+                         :defaultValue (str/join " " (:highlighted-secondary-contexts
+                                                      (:data issue)))}]]])}))
 
 (defn event-component [issue *date-visible?]
   [:<>
@@ -96,5 +105,6 @@
                         :has-event?      (.-checked (get-event-el))
                         :event_archived? (when (get-event-archived-el) 
                                            (.-checked (get-event-archived-el)))
-                        :date            (when (get-date-el) (.-value (get-date-el)))}
+                        :date            (when (get-date-el) (.-value (get-date-el)))
+                        :data            {:highlighted-secondary-contexts (str/split (.-value (get-highlighted-secondary-contexts-el)) #" ")}}
    :related-issues-ids (keys @*related-issues)})

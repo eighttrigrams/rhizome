@@ -33,6 +33,7 @@
       qs)))
 
 (defn- query-string-contexts-query [q]
+  (log/info (str "query-string-contexts:q:" q))
   (sql/format {:select :*
                :from   [:issues]
                :where [:and
@@ -282,6 +283,7 @@
 
 (defn- pre-process-highlighted-secondary-contexts
   [highlighted-secondary-contexts]
+  (log/info (str "yoyoyo" highlighted-secondary-contexts))
   (->> highlighted-secondary-contexts
        (map try-parse)
        (remove nil?)))
@@ -337,6 +339,7 @@
 (defn search-issues [db {{{:keys [highlighted-secondary-contexts]} :data  
                           :as selected-context} :selected-context
                          :as opts}]
+  (log/info (str "ops:" (:data (:selected-context opts))) )
   (try
     (let [opts (
                 ;; TODO instead of doing this, make sure q is always at least ""
