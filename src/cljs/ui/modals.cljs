@@ -3,7 +3,6 @@
             [net.eighttrigrams.cljs-text-editor.editor :as editor]
             [ui.modals.key-handler :as key-handler]
             [ui.modals.issue-edit :as issue-edit]
-            [ui.modals.context-edit :as context-edit]
             [ui.modals.link-context-issue :as link-context-issue]))
 
 (defn- get-description-el []
@@ -24,10 +23,8 @@
   (case (:modal @*state)
     (:edit-context :edit-issue)
     (key-handler/handle-edit-keys *state
-                                  #((if (:selected-issue @*state)
-                                      issue-edit/get-values
-                                      context-edit/get-values)
-                                    (:id item))
+                                  #(issue-edit/get-values (:id item) 
+                                                          (:selected-issue @*state))
                                   (if (= :edit-issue (:modal @*state))
                                     #(link-context-issue/get-values)
                                     nil))
@@ -49,7 +46,7 @@
          :description
          [textarea-component item]
          :edit-issue
-         [:div#modal-component [issue-edit/component item]]
+         [:div#modal-component [issue-edit/component item :issue]]
          :edit-context
-         [:div#modal-component [context-edit/component item]]
+         [:div#modal-component [issue-edit/component item :context]]
          nil)])))

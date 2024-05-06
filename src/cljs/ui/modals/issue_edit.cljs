@@ -80,7 +80,7 @@
                         :on-click #(swap! *related-issues dissoc idx)}
                        title]) @*related-issues))]])
 
-(defn component [issue]
+(defn component [issue mode]
   (let [*date-visible?  (r/atom (boolean (:date issue)))]
     (reset! *related-issues (into {} (map (fn [{:keys [id title]}] [id title]) (:related_issues issue))))
     (r/create-class
@@ -89,22 +89,34 @@
       (fn [_item]
         [:<>
          [basic-elements-component issue]
-         [:hr]
-         [:h4 "Event"]
-         [event-component issue *date-visible?]
-         [:hr]
-         [:h4 "Related issues"]
-         [related-issues-component *related-issues]
-         [link-context-issue/component issue]])})))
+         (when (= :issue mode)
+           [:<>
+            [:hr]
+            [:h4 "Event"]
+            [event-component issue *date-visible?]
+            [:hr]
+            [:h4 "Related issues"]
+            [related-issues-component *related-issues]
+            [link-context-issue/component issue]])])})))
 
-(defn get-values [id]
-  {:issue              {:id              id
-                        :title           (.-value (get-title-el))
-                        :short_title     (.-value (get-short-title-el))
-                        :tags            (.-value (get-tags-el))
-                        :has-event?      (.-checked (get-event-el))
-                        :event_archived? (when (get-event-archived-el) 
-                                           (.-checked (get-event-archived-el)))
-                        :date            (when (get-date-el) (.-value (get-date-el)))
-                        :data            {:highlighted-secondary-contexts (str/split (.-value (get-highlighted-secondary-contexts-el)) #" ")}}
-   :related-issues-ids (keys @*related-issues)})
+(defn get-values [id issue?]
+  {(if issue? :issue :context) {:id              id
+                                :title           (.-value (get-title-el))
+                                :short_title     (.-value (get-short-title-el))
+                                :tags            (.-value (get-tags-el))
+                                :has-event?      (.-checked (get-event-el))
+                                :event_archived? (when (get-event-archived-el) 
+                                                   (.-checked (get-event-archived-el)))
+                                :date            (when (get-date-el) (.-value (get-date-el)))
+                                :data            {:highlighted-secondary-contexts (str/split (.-value (get-highlighted-secondary-contexts-el)) #" ")}}
+   :related-issues-ids         (keys @*related-issues)})
+
+#_(defn get-context-values [id]
+  {:context
+   {:id          id
+    :title       (.-value (get-title-el))
+    :short_title (.-value (get-short-title-el))
+    :tags        (.-value (get-tags-el))
+    :data        {:highlighted-secondary-contexts
+                  (str/split (.-value (get-highlighted-secondary-contexts-el)) #" ")}}
+   :secondary-contexts-ids '()})
