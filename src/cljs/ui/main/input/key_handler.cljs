@@ -67,34 +67,42 @@
        (when (and alt-pressed?
                   (= "Digit2" code)
                   (= :contexts active-search))
+         (.preventDefault e)
          (actions/select-second-context! *state false))
        (when (and alt-pressed?
                   (= "Digit3" code)
                   (= :contexts active-search))
+         (.preventDefault e)
          (actions/select-third-context! *state false))
        (when (and alt-pressed?
                   (= "Digit4" code)
                   (= :contexts active-search))
+         (.preventDefault e)
          (actions/select-fourth-context! *state false))
        (when (and alt-pressed?
                   (= "Digit5" code)
                   (= :contexts active-search))
+         (.preventDefault e)
          (actions/select-fifth-context! *state false))
        (when (and alt-pressed?
                   (= "Digit2" code)
                   (= :issues active-search))
+         (.preventDefault e)
          (actions/select-second-issue! *state))
        (when (and alt-pressed?
                   (= "Digit3" code)
                   (= :issues active-search))
+         (.preventDefault e)
          (actions/select-third-issue! *state))
        (when (and alt-pressed?
                   (= "Digit4" code)
                   (= :issues active-search))
+         (.preventDefault e)
          (actions/select-fourth-issue! *state))
        (when (and alt-pressed?
                   (= "Digit5" code)
                   (= :issues active-search))
+         (.preventDefault e)
          (actions/select-fifth-issue! *state))
        (when (and alt-pressed?
                   selected-issue
