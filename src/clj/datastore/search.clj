@@ -52,15 +52,18 @@
                        {:limit 500}))))
 
 (defn- filter-contexts [{:keys [link-context selected-context selected-issue]} contexts]
-  (if-not link-context
-    (remove #(= (:id selected-context) (:id %)) contexts)
-    (let [ids-of-contexts-to-remove (conj (set (map #(Integer/parseInt (if (keyword? %) 
-                                                                         (name %) 
-                                                                         %)) 
-                                                    (keys (or (:contexts (:data selected-issue))
-                                                              (:contexts (:data selected-context))))))
-                                          (:id (or selected-issue selected-context)))]
-      (remove #(ids-of-contexts-to-remove (:id %)) contexts))))
+  (try
+    (if-not link-context
+      (remove #(= (:id selected-context) (:id %)) contexts)
+      (let [ids-of-contexts-to-remove (conj (set (map #(Integer/parseInt (if (keyword? %) 
+                                                                           (name %) 
+                                                                           %)) 
+                                                      (keys (or (:contexts (:data selected-issue))
+                                                                (:contexts (:data selected-context))))))
+                                            (:id (or selected-issue selected-context)))]
+        (remove #(ids-of-contexts-to-remove (:id %)) contexts)))
+    (catch Exception e
+      (log/error (str "eee" (.getMessage e))))))
 
 (defn search-contexts
   [db opts]
