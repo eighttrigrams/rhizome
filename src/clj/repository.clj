@@ -253,7 +253,7 @@
   (try
     (datastore/reprioritize-issue db {:id issue-id})
     (let [selected-issue (datastore/get-issue db {:id issue-id})
-          context-ids   (keys (:contexts selected-issue))] 
+          context-ids   (keys (:contexts (:data selected-issue)))] 
       (datastore/set-containers-of-item! db {:id issue-id} (vec (set (conj context-ids (:id selected-context)))))
       (get-item/update-collection-title-in-collection-items db 
                                                             issue-id 
@@ -286,7 +286,7 @@
   [db {:keys [selected-issue selected-context] :as opts} arg]
   (let [selected-issue (or selected-issue
                            (get-item/get-item db selected-context))
-        contexts (merge (:contexts selected-issue)
+        contexts (merge (:contexts (:data selected-issue))
                         {(:id arg) (:title arg)})]
     (log/info (str "repository/link-selected-item-to-context " selected-issue))
     (try
@@ -454,7 +454,7 @@
       (log/info (str "repository/unlink-selected-item-from-container " (:id selected-issue)))
       (let [selected-context-id (:id selected-context)
             selected-issue (update selected-issue :contexts #(dissoc % selected-context-id))
-            issue-contexts-ids (keys (:contexts selected-issue))]
+            issue-contexts-ids (keys (:contexts (:data selected-issue)))]
         (datastore/set-containers-of-item! db
                                            selected-issue
                                            issue-contexts-ids)
