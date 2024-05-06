@@ -49,7 +49,7 @@
                       :order-by [[:updated_at_ctx :desc]]}
                      (when true #_(and (not selected-context)
                                 (= "" (or q "")))
-                       {:limit 500}))))
+                       {:limit 100}))))
 
 (defn- filter-contexts [{:keys [link-context selected-context selected-issue]} contexts]
   (if-not link-context
