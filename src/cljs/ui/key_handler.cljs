@@ -47,7 +47,7 @@
                     (= "KeyT" code)
                     selected-context
                     selected-issue
-                    (or (> (count (:contexts selected-issue)) 1)
+                    (or (> (count (:contexts (:data selected-issue))) 1)
                         (:is_context selected-issue)))
                (actions/unlink-selected-issue-from-selected-context *state)
                (= "KeyI" code)
