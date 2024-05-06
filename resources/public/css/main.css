@@ -63,6 +63,7 @@ ul.cards {
     height: 100vh;
     position: relative;
     margin: auto;
+    left: 187px;
 }
 
 #modals-component textarea {
