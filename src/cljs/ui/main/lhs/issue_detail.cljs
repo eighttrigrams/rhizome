@@ -121,7 +121,7 @@
 
 (defn component [*state suppress-switcher?]
   (let [{:keys [selected-issue selected-context]} @*state
-        {:keys [contexts]} selected-issue]
+        {{:keys [contexts]} :data} selected-issue]
     [:<>
      [:h4 (when-not suppress-switcher?
             (if selected-context
