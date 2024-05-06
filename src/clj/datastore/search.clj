@@ -54,11 +54,12 @@
 (defn- filter-contexts [{:keys [link-context selected-context selected-issue]} contexts]
   (if-not link-context
     (remove #(= (:id selected-context) (:id %)) contexts)
-    (let [ids-of-contexts-to-remove (conj (set (map #(Integer/parseInt (if (keyword? %) (name %) %)) 
+    (let [ids-of-contexts-to-remove (conj (set (map #(Integer/parseInt (if (keyword? %) 
+                                                                         (name %) 
+                                                                         %)) 
                                                     (keys (or (:contexts (:data selected-issue))
                                                               (:contexts (:data selected-context))))))
                                           (:id (or selected-issue selected-context)))]
-      (log/info (str "ids-of-contexts-to-remove" ids-of-contexts-to-remove))
       (remove #(ids-of-contexts-to-remove (:id %)) contexts))))
 
 (defn search-contexts
@@ -292,7 +293,6 @@
 
 (defn- pre-process-highlighted-secondary-contexts
   [highlighted-secondary-contexts]
-  (log/info (str "yoyoyo" highlighted-secondary-contexts))
   (->> highlighted-secondary-contexts
        (map try-parse)
        (remove nil?)))
@@ -348,7 +348,6 @@
 (defn search-issues [db {{{:keys [highlighted-secondary-contexts]} :data  
                           :as selected-context} :selected-context
                          :as opts}]
-  (log/info (str "ops:" (:data (:selected-context opts))) )
   (try
     (let [opts (
                 ;; TODO instead of doing this, make sure q is always at least ""

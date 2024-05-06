@@ -1,5 +1,6 @@
 (ns datastore.issues.common
-  (:require [cheshire.core :as json]
+  (:require [cheshire.core :as json] 
+            [cambium.core :as log]
             [datastore.helpers
              :refer [un-namespace-keys simplify-date]]))
 
@@ -13,7 +14,9 @@
       un-namespace-keys
       simplify-date
       parse-data
-      (#(update-in % [:data :contexts] (fn [contexts] 
-                                         (into {} 
-                                               (map (fn [[k v]] [(Integer/parseInt (name k)) v]) contexts)))))
+      (#(update-in % [:data :contexts] 
+                   (fn [contexts] 
+                     (log/info (str "contexts: " contexts))
+                     (into {} 
+                           (map (fn [[k v]] [(Integer/parseInt (name k)) v]) contexts)))))
       (dissoc :searchable)))
