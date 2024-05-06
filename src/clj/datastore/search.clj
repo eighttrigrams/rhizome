@@ -54,8 +54,13 @@
 (defn- filter-contexts [{:keys [link-context selected-context selected-issue]} contexts]
   (if-not link-context
     (remove #(= (:id selected-context) (:id %)) contexts)
-    (let [ids-of-contexts-to-remove (conj (set (keys (or (:contexts (:data selected-issue)) 
-                                                         (:contexts (:data selected-context)))))
+    (let [ids-of-contexts-to-remove (conj (set (map #(if (number? %)
+                                                       %
+                                                       (Integer/parseInt (if (keyword? %) 
+                                                                           (name %) 
+                                                                           %))) 
+                                                    (keys (or (:contexts (:data selected-issue))
+                                                              (:contexts (:data selected-context))))))
                                           (:id (or selected-issue selected-context)))]
       (remove #(ids-of-contexts-to-remove (:id %)) contexts))))
 
