@@ -2,9 +2,7 @@
   (:require [next.jdbc :as jdbc]
             [honey.sql :as sql]
             [cheshire.core :as json]
-            [cambium.core :as log]
-            [datastore.issues.common :as common]
-            [clojure.string :as str]))
+            [datastore.issues.common :as common]))
 
 (declare get-item)
 
@@ -68,7 +66,7 @@
                         (add-in-collections)
                         sql/format
                         (#(jdbc/execute-one! db % {:return-keys true})))]
-    (-> result common/post-process)))
+    (-> result common/post-process-simple)))
 
 (defn get-item
   "Gets an issue, including related issues.

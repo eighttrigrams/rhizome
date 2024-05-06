@@ -32,34 +32,22 @@
       "*"
       qs)))
 
-(def all-contexts-query (sql/format {:select :issues.id
-                                     :from [:issues]
-                                     :where [:= :issues.is_context true]
-                                     :order-by [[:updated_at_ctx :desc]]
-                                     :limit 500}))
-
 (defn- query-string-contexts-query [q]
-  (sql/format {:select :issues.id
+  (sql/format {:select :*
                :from   [:issues]
                :where [:and
-                       [:raw (format "searchable @@ to_tsquery('simple', '%s')"
-                                     (convert-q-to-query-string q))]
+                       (when-not (= "" (or q ""))
+                         [:raw (format "searchable @@ to_tsquery('simple', '%s')"
+                                       (convert-q-to-query-string q))])
                        [:= :issues.is_context true]]
                :order-by [[:updated_at_ctx :desc]]}))
-
-(defn- context-ids-query [ids]
-  (sql/format
-   {:select    [:issues.*]
-    :from      [:issues]
-    :where     [:in :issues.id [:inline ids]]
-    :group-by [:issues.id]
-    :order-by  [[:updated_at_ctx :desc]]}))
 
 (defn- filter-contexts [{:keys [link-context selected-context selected-issue]} contexts]
   (if-not link-context
     (remove #(= (:id selected-context) (:id %)) contexts)
-    (let [ids-of-contexts-to-remove (conj (set (keys (or (:contexts (:data selected-issue))
-                                                         (:contexts (:data selected-context)))))
+    (let [ids-of-contexts-to-remove (conj (set (map #(Integer/parseInt (if (keyword? %) (name %) %)) 
+                                                    (keys (or (:contexts (:data selected-issue))
+                                                              (:contexts (:data selected-context))))))
                                           (:id (or selected-issue selected-context)))]
       (remove #(ids-of-contexts-to-remove (:id %)) contexts))))
 
@@ -70,18 +58,11 @@
                opts)
         {:keys [q]} opts]
     (try
-      (let [ids (->> (if (= "" (or q ""))
-                       all-contexts-query
-                       (query-string-contexts-query q))
-                     (jdbc/execute! db)
-                     (map :issues/id))]
-        (if (> (count ids) 0)
-          (->> ids
-               (context-ids-query)
-               (jdbc/execute! db)
-               (map common/post-process-simple)
-               (filter-contexts opts))
-          '()))
+      (->>
+       (query-string-contexts-query q)
+       (jdbc/execute! db)
+       (map common/post-process-simple)
+       (filter-contexts opts))
       (catch Exception e
         (log/error (str "error in search/search-contexts: " e " - param was: " q))
         (throw e)))))
