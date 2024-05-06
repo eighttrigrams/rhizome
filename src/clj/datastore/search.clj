@@ -33,21 +33,23 @@
       qs)))
 
 (defn- query-string-contexts-query [q selected-context]
-  (log/info (str "query-string-contexts:q:" q selected-context))
-  (sql/format {:select [:issues.title
-                        :issues.short_title
-                        :issues.short_title_ints
-                        :issues.id
-                        :issues.data
-                        :issues.is_context
-                        :issues.updated_at_ctx]
-               :from  [:issues]
-               :where [:and
-                       (when-not (= "" (or q ""))
-                         [:raw (format "searchable @@ to_tsquery('simple', '%s')"
-                                       (convert-q-to-query-string q))])
-                       [:= :issues.is_context true]]
-               :order-by [[:updated_at_ctx :desc]]}))
+  (sql/format (merge {:select [:issues.title
+                               :issues.short_title
+                               :issues.short_title_ints
+                               :issues.id
+                               :issues.data
+                               :issues.is_context
+                               :issues.updated_at_ctx]
+                      :from  [:issues]
+                      :where [:and
+                              (when-not (= "" (or q ""))
+                                [:raw (format "searchable @@ to_tsquery('simple', '%s')"
+                                              (convert-q-to-query-string q))])
+                              [:= :issues.is_context true]]
+                      :order-by [[:updated_at_ctx :desc]]}
+                     (when (and (not selected-context)
+                                (= "" (or q "")))
+                       {:limit 500}))))
 
 (defn- filter-contexts [{:keys [link-context selected-context selected-issue]} contexts]
   (if-not link-context
