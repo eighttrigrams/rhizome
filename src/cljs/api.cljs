@@ -51,6 +51,8 @@
 
 (defn-over-http update-issue :return-value {})
 
+(defn-over-http update-context :return-value {})
+
 (defn-over-http upgrade-issue-to-context :return-value {})
 
 (defn-over-http unlink-selected-item-from-container :return-value {})

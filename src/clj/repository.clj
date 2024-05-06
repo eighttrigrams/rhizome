@@ -326,14 +326,6 @@
       (log/error (str "Caught an exception in link-issue-to-selected-issue " (.getMessage e)))
       (throw e))))
 
-(defn update-context [db opts arg]
-  (let [selected-context (datastore/update-context db arg)]
-    {:selected-context selected-context
-     :issues           (search/search-issues db (-> opts
-                                                    (dissoc :q)
-                                                    (assoc :selected-context selected-context)))
-     :q                nil}))
-
 (defn search-contexts [db opts]
   {:contexts (search/search-contexts db opts)})
 
@@ -472,9 +464,9 @@
     (log/info (str "repository/update-issue " arg))
     (try
       (datastore/set-containers-of-item! db
-                                     (or (:issue (:issue arg))
-                                         (:issue arg))
-                                     (:issue-contexts arg))
+                                         (or (:issue (:issue arg))
+                                             (:issue arg))
+                                         (:issue-contexts arg))
       (get-item/update-collection-title-in-collection-items db
                                                             (:id (or (:issue (:issue arg))
                                                                      (:issue arg)))
@@ -490,7 +482,17 @@
          :issues         (search/search-issues db (dissoc opts :q))
          :q              nil})
       (catch Exception e
-        (log/error (str "Caught an update-issue " (.getMessage e)))))))[]
+        (log/error (str "Caught an update-issue " (.getMessage e)))))))
+
+(defn update-context [{:keys [db]}]
+  (fn [opts arg]
+    (log/info (str "repository/update-context " arg))
+    (let [selected-context (datastore/update-context db (:context arg))]
+      {:selected-context selected-context
+       :issues           (search/search-issues db (-> opts
+                                                      (dissoc :q)
+                                                      (assoc :selected-context selected-context)))
+       :q                nil})))
 
 (defn start-global-search [{:keys [db]}]
   (fn [state]
@@ -550,7 +552,6 @@
           :q              nil}
          :update-context-description
          {:selected-context (datastore/update-context-description db arg)}
-         :update-context (update-context db opts arg)
          :deselect-context
          {:issues           (search/search-issues db (dissoc opts :selected-context :q))
           :contexts         (search/search-contexts db "")
