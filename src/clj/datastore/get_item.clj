@@ -190,26 +190,31 @@
     (doall (for [item-id item-ids]
              (update-collection-title-in-collection-items db item-id id short_title title)))))
 
-(defn update-item [db {:keys [id title short_title tags data] :as item} mode]
-  (when (= :context mode)
-    (try
-      (update-collection-title-in-collection-items-for-children db id title short_title)
-      (catch Exception e
-        (prn (.getMessage e)))))
-  (let [old-data (:data (get-item db item))
-        set (merge {:title       [:inline title]
-                    :short_title [:inline short_title]
-                    :tags        [:inline tags]}
-                   (merge {:data       [:inline (json/generate-string
-                                                 (if data
-                                                   (merge old-data data)
-                                                   {}))]})
-                   (if (= :context mode)
-                     {:updated_at_ctx [:raw "NOW()"]}
-                     {:updated_at [:raw "NOW()"]}))
-        formatted-sql (sql/format {:update [:issues]
-                                   :where  [:= :id [:inline id]]
-                                   :set    set})]
-    (jdbc/execute-one! db
-                       formatted-sql
-                       {:return-keys true})))
+(defn update-item [db 
+                   {:keys [id title short_title tags data] :as item} 
+                   mode]
+  (let [old-item (get-item db item)]
+    (when (and (= :context mode)
+               (or (not= (:title old-item) title)
+                   (not= (:short_title old-item) short_title)))
+      (try
+        (update-collection-title-in-collection-items-for-children db id title short_title)
+        (catch Exception e
+          (prn (.getMessage e)))))
+    (let [old-data (:data old-item)
+          set (merge {:title       [:inline title]
+                      :short_title [:inline short_title]
+                      :tags        [:inline tags]}
+                     (merge {:data       [:inline (json/generate-string
+                                                   (if data
+                                                     (merge old-data data)
+                                                     {}))]})
+                     (if (= :context mode)
+                       {:updated_at_ctx [:raw "NOW()"]}
+                       {:updated_at [:raw "NOW()"]}))
+          formatted-sql (sql/format {:update [:issues]
+                                     :where  [:= :id [:inline id]]
+                                     :set    set})]
+      (jdbc/execute-one! db
+                         formatted-sql
+                         {:return-keys true}))))
