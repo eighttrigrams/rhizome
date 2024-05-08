@@ -291,15 +291,17 @@
                   secondary-contexts-unassigned-selected
                   search-mode]} :current} :views} :data} :selected-context
        :as                                                                                                                                  opts}]
-  (->> (do-fetch-ids db opts search-mode)
-       (map common/post-process-simple)
-       (sort-issues opts)
-       (filter-by-selected-secondary-contexts 
-        (into #{} selected-secondary-contexts)
-        secondary-contexts-unassigned-selected
-        secondary-contexts-inverted
-        (= :issue link-issue))
-       (filter-issues opts)))
+       (let [issues (do-fetch-ids db opts search-mode)]
+         (sectime "search-issues'#after-do-fetch-ids"
+                  (->> issues
+                       (map common/post-process-simple)
+                       (sort-issues opts)
+                       (filter-by-selected-secondary-contexts 
+                        (into #{} selected-secondary-contexts)
+                        secondary-contexts-unassigned-selected
+                        secondary-contexts-inverted
+                        (= :issue link-issue))
+                       (filter-issues opts)))))
 
 (defn- try-parse [item]
   (try (Integer/parseInt item)
@@ -340,24 +342,27 @@
   [db 
    opts 
    highlighted-secondary-contexts]
-  (->> (search-issues' db (-> opts
-                              (assoc :q "")
-                              (dissoc :selected-issue)
-                              (assoc :events-view 0)
-                              (assoc-in [:selected-context :data :views :current :events-view] 0)
-                              (assoc-in [:selected-context :data :views :current :search-mode] 0)
-                              (assoc-in [:selected-context :data :views :current :selected-secondary-contexts] [])
-                              (assoc-in [:selected-context :data :views :current :secondary-contexts-inverted] false)
-                              (assoc-in [:selected-context :data :views :current :secondary-contexts-unassigned-selected] false)))
-       (map #(get-in % [:data :contexts]))
-       (map seq)
-       (apply concat)
-       (group-by first)
-       (map #(do [(count (second %)) (first (second %))]))
-       (sort-by first)
-       reverse
-       (map (fn [[count [id title]]] [id [title count]]))
-       (sort-secondary-contexts db highlighted-secondary-contexts)))
+  (let [issues (search-issues' db (-> opts
+                                      (assoc :q "")
+                                      (dissoc :selected-issue)
+                                      (assoc :events-view 0)
+                                      (assoc-in [:selected-context :data :views :current :events-view] 0)
+                                      (assoc-in [:selected-context :data :views :current :search-mode] 0)
+                                      (assoc-in [:selected-context :data :views :current :selected-secondary-contexts] [])
+                                      (assoc-in [:selected-context :data :views :current :secondary-contexts-inverted] false)
+                                      (assoc-in [:selected-context :data :views :current :secondary-contexts-unassigned-selected] false)))]
+    (sectime
+     "get-aggregated-contexts#after-search-issues'"
+     (->> issues
+                  (map #(get-in % [:data :contexts]))
+                  (map seq)
+                  (apply concat)
+                  (group-by first)
+                  (map #(do [(count (second %)) (first (second %))]))
+                  (sort-by first)
+                  reverse
+                  (map (fn [[count [id title]]] [id [title count]]))
+                  (sort-secondary-contexts db highlighted-secondary-contexts)))))
 
 (defn search-issues [db {{{:keys [highlighted-secondary-contexts]} :data  
                           :as selected-context} :selected-context
