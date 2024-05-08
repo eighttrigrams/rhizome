@@ -1,6 +1,7 @@
 (ns ui.actions
   (:require [ui.actions.common :refer [fetch-and-reset! 
-                                       fetch-and-reset-with-method!]]
+                                       fetch-and-reset-with-method!
+                                       fetch-and-reset-with-method-2!]]
             api
             [goog.async.Debouncer]))
 
@@ -76,17 +77,18 @@
        ;; For a snappy response in the UI; see below
        (swap! *state assoc :selected-context context)
 
-       (fetch-and-reset-with-method! 
-        *state 
-        @*state
-        api/fetch-context
-        [context suppress-reset-issue])
-       
-       (when (:selected-context @*state)
+       (if-not (:selected-context @*state)
          (fetch-and-reset-with-method! 
           *state 
           @*state
-          api/fetch-aggregated-contexts))))))
+          api/fetch-context
+          [context suppress-reset-issue])
+         (fetch-and-reset-with-method-2! 
+          *state 
+          @*state
+          api/fetch-context
+          api/fetch-aggregated-contexts
+          [context suppress-reset-issue]))))))
 
 (defn select-first-context! [*state suppress-reset-issue]
   (when (seq (:contexts @*state))

@@ -63,3 +63,13 @@
             <!
             (reset-state! *state)
             (dissoc-loading *state)))))
+
+(defn fetch-and-reset-with-method-2!
+  [*state state method method-2 & args]
+  (let [state (assoc state :loading true :preview-issue nil)]
+    (reset! *state state)
+    (go (-> (apply fetch-resources-with-method state method args)
+            <!
+            (reset-state! *state))
+        (<! (fetch-resources-with-method @*state method-2))
+        (dissoc-loading nil *state))))
