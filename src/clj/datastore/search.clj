@@ -362,6 +362,7 @@
 
 (defn search-issues [db {{{:keys [highlighted-secondary-contexts]} :data  
                           :as selected-context} :selected-context
+                         :keys [skip-context-aggregation?]
                          :as opts}]
   (sectime
    "search-issues"
@@ -375,14 +376,15 @@
            f1 (when selected-context 
                 (future (sectime "search-issues/issues" 
                                  (search-issues' db opts))))
-           f2 (when selected-context 
+           f2 (when (and selected-context (not skip-context-aggregation?)) 
                 (future (sectime "search-issues/aggregates"
                                  (get-aggregated-contexts db 
                                                           opts 
                                                           highlighted-secondary-contexts))))]
        (if-not selected-context
          [(search-issues' db opts) {}]
-         [@f1 @f2]))
+         [@f1 (when (and selected-context (not skip-context-aggregation?))
+                @f2)]))
      (catch Exception e
        (log/error (str "error in search-issues: " (.getMessage e) " - params were: " (with-out-str (pp/pprint opts))))
        (throw e)))))

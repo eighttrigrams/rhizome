@@ -63,7 +63,7 @@
   (fn [opts]
     (let [_context (future (datastore/update-context db {:context (:selected-context opts)}))]
       {;;:selected-context context
-       :issues (search/search-issues db opts)})))
+       :issues (search/search-issues db (assoc opts :skip-context-aggregation? true))})))
 
 (defn change-secondary-contexts-selection [{:keys [db]}]
   (change-secondary-contexts-operation db))

@@ -21,7 +21,7 @@
    {:issues (if issues 
               (first issues)
               (:issues state))
-    :aggregated-contexts (if issues
+    :aggregated-contexts (if (and issues (second issues))
                            (second issues)
                            (:aggregated-contexts state))
     :contexts (or contexts (:contexts state))}))
