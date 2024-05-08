@@ -524,7 +524,9 @@
        (case cmd
          nil
          (cond (= :issues active-search)
-               {:issues (search/search-issues db (make-search-issues opts))}
+               {:issues (search/search-issues db 
+                                              (assoc (make-search-issues opts)
+                                                     :skip-context-aggregation? true))}
                (= :contexts active-search) (search-contexts db opts)
                :else
                (merge {:issues   (search/search-issues db opts)
