@@ -516,9 +516,9 @@
 (defn fetch-aggregated-contexts [{:keys [db]}]
   (fn [state]
     (log/info "fetch-aggregated-contexts")
-    (second (search/search-issues 
-             db (assoc (make-search-issues state) 
-                       :only-context-aggregation? true)))))
+    (search/fetch-aggregated-contexts 
+     db (assoc (make-search-issues state) 
+               :only-context-aggregation? true))))
 
 (defn list-resources [{:keys [db privacy-mode]}]
   (fn [{:keys                                                             [cmd
