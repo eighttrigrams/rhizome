@@ -82,12 +82,11 @@
         api/fetch-context
         [context suppress-reset-issue])
        
-       (fetch-and-reset-with-method! 
-        *state 
-        @*state
-        api/fetch-aggregated-contexts)
-       
-       ))))
+       (when (:selected-context @*state)
+         (fetch-and-reset-with-method! 
+          *state 
+          @*state
+          api/fetch-aggregated-contexts))))))
 
 (defn select-first-context! [*state suppress-reset-issue]
   (when (seq (:contexts @*state))
