@@ -21,13 +21,7 @@
                   set))))
 
 (defn- basic-issues-query [id]
-  {:select   [:issues.*
-              {:select :date
-               :from   [:events]
-               :where  [:= :events.issue_id :issues.id]}
-              {:select [[:archived :event_archived?]]
-               :from   [:events]
-               :where  [:= :events.issue_id :issues.id]}]
+  {:select   [:issues.*]
    :from     [:issues]
    :where    [:= :issues.id [:inline id]]
    :group-by [:issues.id] ;; TODO remove

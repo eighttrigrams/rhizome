@@ -94,7 +94,9 @@
                        :issues.id
                        :issues.data
                        :issues.is_context
-                       :issues.updated_at]
+                       :issues.updated_at
+                       :issues.date
+                       :issues.archived]
         select [:issues.title
                 :issues.short_title
                 :issues.short_title_ints
@@ -102,28 +104,21 @@
                 :issues.data
                 :issues.is_context
                 :issues.updated_at
-                ;; TODO simply concat those to select-simple
-                {:select :date
-                 :from   [:events]
-                 :where  [:= :events.issue_id :issues.id]}
-                {:select :archived
-                 :from   [:events]
-                 :where  [:= :events.issue_id :issues.id]}]
+                :issues.date
+                :issues.archived]
         urgent-events-query
         (sql/format
          {:select   select
           :from     [:issues]
           :order-by [[:updated_at :desc]]
-          :where    [:exists {:select [:events.id]
-                              :from   [:events]
-                              :where  [:and
-                                       [:= :events.issue_id :issues.id]
-                                       [:not= :events.archived true]
-                                       [:< 
-                                        :events.date
+          :where    [:and
+                     [:<> :issues.date nil]
+                     [:not= :issues.archived true]
+                     [:< 
+                      :date
                                         ;; we sort later
-                                        #_[:+ :events.date [:raw "interval '6 hours'"]] 
-                                        [:raw "NOW()"]]]}]})
+                      #_[:+ :events.date [:raw "interval '6 hours'"]] 
+                      [:raw "NOW()"]]]})
         urgent-issues 
         (if (or link-issue 
                 (not= 0 events-view)
@@ -147,11 +142,9 @@
                               [:= :collections.container_id (:id selected-context)]
                               [:=])
         exists-clause       (if (not= 0 events-view)
-                              [:exists {:select [:events.id]
-                                        :from   [:events]
-                                        :where  [:and
-                                                 [:= :events.issue_id :issues.id]
-                                                 [:not= :events.archived [:inline (= 1 events-view)]]]}]
+                              [:and
+                               [:<> :issues.date nil]
+                               [:not= :issues.archived [:inline (= 1 events-view)]]]
                               [:=])
         formatted-query (sql/format (merge
                                      {:select   (if (not= 0 events-view)
@@ -162,11 +155,10 @@
                                                                        :asc 
                                                                        :desc)]]
                                       :join     join-clause
-                                      :where    [:and [:or
-                                                       [:and
-                                                        exists-clause
-                                                        join-where-clause
-                                                        search-clause]]
+                                      :where    [:and [:and
+                                                       exists-clause
+                                                       join-where-clause
+                                                       search-clause]
                                                  (when (seq urgent-issues)
                                                    [:not [:in :issues.id [:inline (map :issues/id urgent-issues)]]])]}
                                      (when (and (= "" q)

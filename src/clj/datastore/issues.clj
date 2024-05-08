@@ -6,18 +6,16 @@
 
 (defn delete-date [db issue-id]
   (jdbc/execute! db
-                 (sql/format {:delete-from [:events]
-                              :where [:= :issue_id [:inline issue-id]]})))
+                 (sql/format {:update [:issues]
+                       :set    {:date nil
+                                :archived nil}
+                       :where [:= :id [:inline issue-id]]})))
 
-(defn- insert-date [db issue-id date event_archived?]
-  (jdbc/execute! db
-                 (sql/format {:insert-into [:events]
-                              :columns     [:issue_id :date :inserted_at :updated_at :archived]
-                              :values      [[[:inline issue-id]
-                                             [:inline date]
-                                             [:raw "NOW()"]
-                                             [:raw "NOW()"]
-                                             [:inline event_archived?]]]})))
+(defn- insert-date [db issue-id date archived]
+  (jdbc/execute! db (sql/format {:update [:issues]
+                                 :set    {:date [:inline date]
+                                          :archived [:inline archived]}
+                                 :where [:= :id [:inline issue-id]]})))
 
 (defn- delete-related-issues [db id]
   (jdbc/execute! db (sql/format {:delete-from [:issue_issue]
@@ -34,13 +32,13 @@
                                                   [[:inline related-issue-id] [:inline id]]]})))))
 
 (defn update-issue [db {:keys [issue related-issues-ids]}]
-  (let [{:keys [date id event_archived?]} issue]
+  (let [{:keys [date id archived]} issue]
     (delete-date db id)
     (delete-related-issues db id)
     (relate-issues db id related-issues-ids)
     (update-item db issue :issue)
     (when date
-      (insert-date db id date event_archived?))
+      (insert-date db id date archived))
     (get-issue db issue)))
 
 (defn update-issue-simple [db issue]

@@ -29,6 +29,7 @@
 (def *related-issues (r/atom {}))
 
 (defn basic-elements-component [issue]
+  (prn "issue" issue)
   (r/create-class {:component-did-mount #(do (editor/create (get-title-el) {:input-field-mode? true})
                                              (editor/create (get-short-title-el) {:input-field-mode? true})
                                              (editor/create (get-tags-el) {:input-field-mode? true}))
@@ -70,7 +71,7 @@
       [:p "Event archived?"]
       [:input#event-archived
        {:type           :checkbox
-        :defaultChecked (:event_archived? issue)}]])])
+        :defaultChecked (:archived issue)}]])])
 
 (defn- related-issues-component [*related-issues]
   [:<>
@@ -112,7 +113,7 @@
                           :short_title     (.-value (get-short-title-el))
                           :tags            (.-value (get-tags-el))
                           :has-event?      (.-checked (get-event-el))
-                          :event_archived? (when (get-event-archived-el) 
+                          :archived        (when (get-event-archived-el) 
                                              (.-checked (get-event-archived-el)))
                           :date            (when (get-date-el) (.-value (get-date-el)))
                           :data            {:highlighted-secondary-contexts (str/split (.-value (get-highlighted-secondary-contexts-el)) #" ")}}
