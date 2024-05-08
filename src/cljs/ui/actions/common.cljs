@@ -18,13 +18,11 @@
   (merge 
    state
    i
-   {:issues (if (and issues (first issues)) 
-              (first issues)
-              (:issues state))
-    :aggregated-contexts (if (and issues (second issues))
-                           (second issues)
-                           (:aggregated-contexts state))
-    :contexts (or contexts (:contexts state))}))
+   {:contexts (or contexts (:contexts state))}
+   (when (and issues (second issues))
+     {:aggregated-contexts (second issues)})
+   (when (and issues (first issues))
+     {:issues (first issues)})))
 
 (defn- list-resources [state]
   (api/list-resources (dissoc state :issues :contexts)))
@@ -63,13 +61,3 @@
             <!
             (reset-state! *state)
             (dissoc-loading *state)))))
-
-(defn fetch-and-reset-with-method-2!
-  [*state state method method-2 & args]
-  (let [state (assoc state :loading true :preview-issue nil)]
-    (reset! *state state)
-    (go (-> (apply fetch-resources-with-method state method args)
-            <!
-            (reset-state! *state))
-        (<! (fetch-resources-with-method state method-2))
-        (dissoc-loading nil *state))))
