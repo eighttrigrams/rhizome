@@ -350,7 +350,7 @@
      "get-aggregated-contexts#after-search-issues'"
      (->> issues
 
-          (reduce (fn [acc {{:keys [contexts]} :data}]
+          #_(reduce (fn [acc {{:keys [contexts]} :data}]
 
                     (into {} (reduce (fn [contexts [id title]]
 
@@ -360,14 +360,14 @@
                                      acc
                                      contexts)))
                   {})
-          ;; (map #(get-in % [:data :contexts]))
-          ;; (map seq)
-          ;; (apply concat)
-          ;; (group-by first)
-          ;; (map #(do [(count (second %)) (first (second %))]))
-          ;; (sort-by first)
-          ;; reverse
-          ;; (map (fn [[count [id title]]] [id [title count]]))
+          (map #(get-in % [:data :contexts]))
+          (map seq)
+          (apply concat)
+          (group-by first)
+          (map #(do [(count (second %)) (first (second %))]))
+          (sort-by first)
+          reverse
+          (map (fn [[count [id title]]] [id [title count]]))
 
           (sort-secondary-contexts db highlighted-secondary-contexts)))))
 
