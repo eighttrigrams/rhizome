@@ -202,25 +202,24 @@
    secondary-contexts-inverted
    link-issue?
    issues]
-  (sectime "filter-by-selected-secondary-contexts"
-           (if (and (not link-issue?)
-                    (or secondary-contexts-unassigned-selected
-                        (seq selected-secondary-contexts-set)))
-             ((if-not secondary-contexts-inverted filter remove)
-              (fn [issue]
-                (or 
-                 (and secondary-contexts-unassigned-selected
-                      (= 1 (count (:contexts (:data issue)))))
-                 
-                 (if-not secondary-contexts-inverted
-                   (and (not secondary-contexts-unassigned-selected)
-                        (every? identity (map #(contains? (set (keys (:contexts (:data issue)))) %) 
-                                              selected-secondary-contexts-set)))
-                   (seq (set/intersection 
-                         (set (keys (:contexts (:data issue))))
-                         selected-secondary-contexts-set)))))
-              issues)
-             issues)))
+  (if (and (not link-issue?)
+           (or secondary-contexts-unassigned-selected
+               (seq selected-secondary-contexts-set)))
+    ((if-not secondary-contexts-inverted filter remove)
+     (fn [issue]
+       (or 
+        (and secondary-contexts-unassigned-selected
+             (= 1 (count (:contexts (:data issue)))))
+        
+        (if-not secondary-contexts-inverted
+          (and (not secondary-contexts-unassigned-selected)
+               (every? identity (map #(contains? (set (keys (:contexts (:data issue)))) %) 
+                                     selected-secondary-contexts-set)))
+          (seq (set/intersection 
+                (set (keys (:contexts (:data issue))))
+                selected-secondary-contexts-set)))))
+     issues)
+    issues))
 
 (defn- get-events-view 
   [{{{{{:keys [events-view]} :current} :views} :data
