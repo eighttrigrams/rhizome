@@ -292,16 +292,15 @@
                   search-mode]} :current} :views} :data} :selected-context
        :as                                                                                                                                  opts}]
        (let [issues (do-fetch-ids db opts search-mode)]
-         (sectime "search-issues'#after-do-fetch-ids"
-                  (->> issues
-                       (map common/post-process-simple)
-                       (sort-issues opts)
-                       (filter-by-selected-secondary-contexts 
-                        (into #{} selected-secondary-contexts)
-                        secondary-contexts-unassigned-selected
-                        secondary-contexts-inverted
-                        (= :issue link-issue))
-                       (filter-issues opts)))))
+         (->> issues
+              (map common/post-process-simple)
+              (sort-issues opts)
+              (filter-by-selected-secondary-contexts 
+               (into #{} selected-secondary-contexts)
+               secondary-contexts-unassigned-selected
+               secondary-contexts-inverted
+               (= :issue link-issue))
+              (filter-issues opts))))
 
 (defn- try-parse [item]
   (try (Integer/parseInt item)
