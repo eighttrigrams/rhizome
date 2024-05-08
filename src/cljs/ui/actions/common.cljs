@@ -18,7 +18,7 @@
   (merge 
    state
    i
-   {:issues (if issues 
+   {:issues (if (and issues (first issues)) 
               (first issues)
               (:issues state))
     :aggregated-contexts (if (and issues (second issues))

@@ -362,8 +362,10 @@
 
 (defn search-issues [db {{{:keys [highlighted-secondary-contexts]} :data  
                           :as selected-context} :selected-context
-                         :keys [skip-context-aggregation?]
+                         :keys [skip-context-aggregation?
+                                only-context-aggregation?]
                          :as opts}]
+  (log/info (str "search-issues:" skip-context-aggregation? ":" only-context-aggregation?))
   (sectime
    "search-issues"
    (try
@@ -373,18 +375,20 @@
                   (update opts :q remove-some-chars)
                  ;; for destructuring in searcj-issues' to work properly when :q is present but has nil value
                   (dissoc opts :q))
-           f1 (when selected-context 
+           f1 (when (and selected-context (not only-context-aggregation?)) 
                 (future (sectime "search-issues/issues" 
                                  (search-issues' db opts))))
-           f2 (when (and selected-context (not skip-context-aggregation?)) 
+           f2 (when (or (and selected-context 
+                             (not skip-context-aggregation?))
+                        only-context-aggregation?) 
                 (future (sectime "search-issues/aggregates"
                                  (get-aggregated-contexts db 
                                                           opts 
                                                           highlighted-secondary-contexts))))]
        (if-not selected-context
          [(search-issues' db opts) {}]
-         [@f1 (when (and selected-context (not skip-context-aggregation?))
-                @f2)]))
+         [(when f1 @f1) 
+          (when f2 @f2)]))
      (catch Exception e
        (log/error (str "error in search-issues: " (.getMessage e) " - params were: " (with-out-str (pp/pprint opts))))
        (throw e)))))

@@ -24,6 +24,7 @@
                                 upgrade-issue-to-context
                                 unlink-selected-item-from-container
                                 fetch-context
+                                fetch-aggregated-contexts
                                 delete-context
                                 flip-privacy]]))
 
@@ -48,6 +49,7 @@
   delete-issue 
   update-issue
   update-context
+  fetch-aggregated-contexts
   unlink-selected-item-from-container
   upgrade-issue-to-context
   fetch-context

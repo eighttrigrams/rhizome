@@ -40,6 +40,7 @@
 
 (defn fetch-context [{:keys [db]}]
   (fn [_opts [arg suppress-reset-issue?]]
+    (log/info "fetch-context")
     (try
       (let [selected-context      (datastore/get-context db arg)
             opts                  {:search-globally? false
@@ -47,7 +48,10 @@
         (datastore/reprioritize-context db arg)
         (merge opts
                {:selected-context                        selected-context
-                :issues                                  (search/search-issues db (dissoc opts :q))
+                :issues                                  (search/search-issues db 
+                                                                               (-> opts
+                                                                                   (dissoc :q)
+                                                                                   (assoc :only-context-aggregation? true)))
                 :active-search                           (when-not suppress-reset-issue?
                                                            :issues)
                 :context-to-fetch                        nil
@@ -508,6 +512,14 @@
      :link-context     false
      :link-issue       nil
      :q                ""}))
+
+(defn fetch-aggregated-contexts [{:keys [db]}]
+  (fn [state]
+    (log/info "fetch-aggregated-contexts")
+    (if-not (:selected-context state)
+      {}
+      {:issues (search/search-issues db (assoc (make-search-issues state) 
+                                               :only-context-aggregation? true))})))
 
 (defn list-resources [{:keys [db privacy-mode]}]
   (fn [{:keys                                                             [cmd
