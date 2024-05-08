@@ -349,15 +349,27 @@
     (sectime
      "get-aggregated-contexts#after-search-issues'"
      (->> issues
-                  (map #(get-in % [:data :contexts]))
-                  (map seq)
-                  (apply concat)
-                  (group-by first)
-                  (map #(do [(count (second %)) (first (second %))]))
-                  (sort-by first)
-                  reverse
-                  (map (fn [[count [id title]]] [id [title count]]))
-                  (sort-secondary-contexts db highlighted-secondary-contexts)))))
+
+          (reduce (fn [acc {{:keys [contexts]} :data}]
+
+                    (into {} (reduce (fn [contexts [id title]]
+
+                                       (if (get contexts id)
+                                         (update-in contexts [id 1] inc)
+                                         (assoc contexts id [title 1])))
+                                     acc
+                                     contexts)))
+                  {})
+          ;; (map #(get-in % [:data :contexts]))
+          ;; (map seq)
+          ;; (apply concat)
+          ;; (group-by first)
+          ;; (map #(do [(count (second %)) (first (second %))]))
+          ;; (sort-by first)
+          ;; reverse
+          ;; (map (fn [[count [id title]]] [id [title count]]))
+
+          (sort-secondary-contexts db highlighted-secondary-contexts)))))
 
 (defn search-issues [db {{{:keys [highlighted-secondary-contexts]} :data  
                           :as selected-context} :selected-context
