@@ -233,14 +233,12 @@
   [db {:keys [q search-globally? selected-context link-issue]
        :or   {q ""}
        :as state} search-mode]
-       
-  (sectime "do-fetch-ids"
-   (seq (fetch-issue-ids db 
-                         q 
-                         (if search-globally? nil selected-context) 
-                         (get-events-view state)
-                         link-issue
-                         search-mode))))
+  (seq (fetch-issue-ids db 
+                        q 
+                        (if search-globally? nil selected-context) 
+                        (get-events-view state)
+                        link-issue
+                        search-mode)))
 
 (defn- filter-issues
   [{:keys [link-issue 
@@ -376,11 +374,13 @@
                  ;; for destructuring in searcj-issues' to work properly when :q is present but has nil value
                   (dissoc opts :q))
            f1 (when selected-context 
-                (future (search-issues' db opts)))
+                (future (sectime "search-issues/issues" 
+                                 (search-issues' db opts))))
            f2 (when selected-context 
-                (future (get-aggregated-contexts db 
-                                                 opts 
-                                                 highlighted-secondary-contexts)))]
+                (future (sectime "search-issues/aggregates"
+                                 (get-aggregated-contexts db 
+                                                          opts 
+                                                          highlighted-secondary-contexts))))]
        (if-not selected-context
          [(search-issues' db opts) {}]
          [@f1 @f2]))
