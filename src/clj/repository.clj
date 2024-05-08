@@ -555,6 +555,7 @@
          :insert-context
          {:selected-context                        (datastore/new-context db arg)
           :selected-issue                          nil
+          :aggregated-contexts                     '()
           :issues                                  []
           :q                                       nil
           :active-search                           :issues

@@ -130,10 +130,8 @@
                            (select-fn idx)))
       :on-mouse-enter (on-mouse-enter *state issue)
       :on-context-menu (fn [e]
-                         (.preventDefault e)
-                         (if (:is_context issue)
-                           (actions/select-context! *state issue)
-                           (actions/delete-issue! *state issue)))
+                         (.preventDefault e) 
+                         (actions/delete-issue! *state issue))
       :on-mouse-leave (on-mouse-leave *state)}
      [:div.issue-card-inner
       (when (or (:preview-image-lowres (:data issue))
@@ -148,7 +146,7 @@
           [context-badges/component (remove #(= (:id (:selected-context @*state))
                                                 (first %)) 
                                             (merge (when (:is_context issue) 
-                                                     {0 "⭕"})
+                                                     {0 #(actions/select-context! *state issue)})
                                                    (when-let [file (:file (:resource-links (:data issue)))]
                                                      {:file file})
                                                    (:contexts (:data issue))))]])]]]))
