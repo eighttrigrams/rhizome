@@ -378,16 +378,13 @@
                  if (:q opts) 
                   (update opts :q remove-some-chars)
                  ;; for destructuring in searcj-issues' to work properly when :q is present but has nil value
-                  (dissoc opts :q))
-           f1 (when selected-context 
-                (future (search-issues' db opts)))
-           f2 (when selected-context 
-                (future (get-aggregated-contexts db 
-                                                 opts 
-                                                 highlighted-secondary-contexts)))]
+                  (dissoc opts :q))]
        (if-not selected-context
          [(search-issues' db opts) {}]
-         [@f1 @f2]))
+         [@(future (search-issues' db opts)) 
+          @(future (get-aggregated-contexts db 
+                                            opts 
+                                            highlighted-secondary-contexts))]))
      (catch Exception e
        (log/error (str "error in search-issues: " (.getMessage e) " - params were: " (with-out-str (pp/pprint opts))))
        (throw e)))))
