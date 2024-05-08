@@ -51,7 +51,7 @@
                 :issues                                  (search/search-issues db 
                                                                                (-> opts
                                                                                    (dissoc :q)
-                                                                                   (assoc :only-context-aggregation? true)))
+                                                                                   (assoc :skip-context-aggregation? true)))
                 :active-search                           (when-not suppress-reset-issue?
                                                            :issues)
                 :context-to-fetch                        nil

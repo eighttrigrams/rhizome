@@ -71,5 +71,7 @@
     (go (-> (apply fetch-resources-with-method state method args)
             <!
             (reset-state! *state))
-        (<! (fetch-resources-with-method @*state method-2))
+        (-> (fetch-resources-with-method @*state method-2) 
+            <!
+            (reset-state! *state))
         (dissoc-loading nil *state))))
