@@ -18,11 +18,13 @@
   (merge 
    state
    i
-   {:contexts (or contexts (:contexts state))}
-   (when (and issues (second issues))
-     {:aggregated-contexts (second issues)})
-   (when (and issues (first issues))
-     {:issues (first issues)})))
+   {:issues (if (and issues (first issues)) 
+              (first issues)
+              (:issues state))
+    :aggregated-contexts (if (and issues (second issues))
+                           (second issues)
+                           (:aggregated-contexts state))
+    :contexts (or contexts (:contexts state))}))
 
 (defn- list-resources [state]
   (api/list-resources (dissoc state :issues :contexts)))
