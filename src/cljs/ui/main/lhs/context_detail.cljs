@@ -57,6 +57,7 @@
         secondary-contexts (remove (fn [[idx _v]]
                                      (= idx (:id selected-context))) 
                                    aggregated-contexts)]
+    (prn "render anew" aggregated-contexts)
     [:ul
      [:li [unassigned-secondary-contexts-component *state]]
      (map-indexed

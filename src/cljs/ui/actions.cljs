@@ -76,19 +76,15 @@
      (do
        ;; For a snappy response in the UI; see below
        (swap! *state assoc :selected-context context)
-
-       (if-not (:selected-context @*state)
-         (fetch-and-reset-with-method! 
-          *state 
-          @*state
-          api/fetch-context
-          [context suppress-reset-issue])
-         (fetch-and-reset-with-method-2! 
-          *state 
-          @*state
-          api/fetch-context
-          api/fetch-aggregated-contexts
-          [context suppress-reset-issue]))))))
+       
+       (fetch-and-reset-with-method! 
+        *state 
+        *state
+        api/fetch-context
+        [context suppress-reset-issue])
+       
+       (when (:selected-context @*state)
+         (fetch-and-reset-with-method-2! *state))))))
 
 (defn select-first-context! [*state suppress-reset-issue]
   (when (seq (:contexts @*state))

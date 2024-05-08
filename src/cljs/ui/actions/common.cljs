@@ -16,14 +16,14 @@
 (defn- update-state [{:keys [issues contexts] :as i} 
                      state]
   (merge 
-   state
+   (if (map? state) state @state)
    i
    {:issues (if (and issues (first issues)) 
               (first issues)
               (:issues state))
-    :aggregated-contexts (if (and issues (second issues))
-                           (second issues)
-                           (:aggregated-contexts state))
+    ;; :aggregated-contexts (if (and issues (second issues))
+                          ;;  (second issues)
+                          ;;  (:aggregated-contexts state))
     :contexts (or contexts (:contexts state))}))
 
 (defn- list-resources [state]
@@ -51,27 +51,28 @@
 
 (defn- fetch-resources-with-method
   [state method & args]
-  (go (-> (apply method state args)
+  (go (-> (apply method (if (map? state) state @state) args)
           <p!
           (update-state state))))
 
 (defn fetch-and-reset-with-method!
   [*state state method & args]
-  (let [state (assoc state :loading true :preview-issue nil)]
-    (reset! *state state)
-    (go (-> (apply fetch-resources-with-method state method args)
+  (let [state' (assoc (if (map? state) 
+                        state
+                        @state)
+                      :loading true :preview-issue nil)]
+    (reset! *state state')
+    (go (-> (apply fetch-resources-with-method (if (map? state) 
+                                                 state'
+                                                 state)
+                   method 
+                   args)
             <!
             (reset-state! *state)
             (dissoc-loading *state)))))
 
 (defn fetch-and-reset-with-method-2!
-  [*state state method method-2 & args]
-  (let [state (assoc state :loading true :preview-issue nil)]
-    (reset! *state state)
-    (go (-> (apply fetch-resources-with-method state method args)
-            <!
-            (reset-state! *state))
-        (-> (fetch-resources-with-method @*state method-2) 
-            <!
-            (reset-state! *state))
-        (dissoc-loading nil *state))))
+  [*state]
+  (go (-> (api/fetch-aggregated-contexts @*state)
+          <p!
+          (#(swap! *state assoc :aggregated-contexts %)))))
