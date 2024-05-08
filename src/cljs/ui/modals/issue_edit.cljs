@@ -29,7 +29,6 @@
 (def *related-issues (r/atom {}))
 
 (defn basic-elements-component [issue]
-  (prn "issue" issue)
   (r/create-class {:component-did-mount #(do (editor/create (get-title-el) {:input-field-mode? true})
                                              (editor/create (get-short-title-el) {:input-field-mode? true})
                                              (editor/create (get-tags-el) {:input-field-mode? true}))
