@@ -349,17 +349,6 @@
     (sectime
      "get-aggregated-contexts#after-search-issues'"
      (->> issues
-
-          #_(reduce (fn [acc {{:keys [contexts]} :data}]
-
-                    (into {} (reduce (fn [contexts [id title]]
-
-                                       (if (get contexts id)
-                                         (update-in contexts [id 1] inc)
-                                         (assoc contexts id [title 1])))
-                                     acc
-                                     contexts)))
-                  {})
           (map #(get-in % [:data :contexts]))
           (map seq)
           (apply concat)
