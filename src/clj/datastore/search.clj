@@ -125,11 +125,9 @@
                 selected-context
                 (and (string? q) (not= "" q)))
           '()
-          (sectime
-           "urgent-issues query"
-           (jdbc/execute! 
-            ds 
-            urgent-events-query)))
+          (jdbc/execute! 
+           ds 
+           urgent-events-query))
         selected-context (when (:id selected-context) selected-context)
         search-clause       (if (not= "" q)
                               [:raw (format "searchable @@ to_tsquery('simple', '%s')" 
