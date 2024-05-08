@@ -370,8 +370,7 @@
                  if (:q opts) 
                   (update opts :q remove-some-chars)
                  ;; for destructuring in searcj-issues' to work properly when :q is present but has nil value
-                  (dissoc opts :q))
-           ]
+                  (dissoc opts :q))]
        (sectime "get-aggregated-contexts"
                     (get-aggregated-contexts db 
                                              opts 
