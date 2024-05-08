@@ -27,16 +27,6 @@
    :group-by [:issues.id] ;; TODO remove
    :order-by [[:issues.updated_at :desc]]})
 
-(defn- add-in-collections [query]
-  (-> (if (:join query) query (assoc query :join []))
-      (update :select conj
-              [[:array_agg :issues_o.id] :context_ids]
-              [[:array_agg :issues_o.title] :context_titles]
-              [[:array_agg :issues_o.short_title] :context_short_titles])
-      (update :join conj
-              :collections [:= :issues.id :collections.item_id]
-              [:issues :issues_o] [:= :collections.container_id :issues_o.id])))
-
 (defn- add-in-relations [query]
   (-> (if (:join query) query (assoc query :join []))
       (update :select conj [[:array_agg :related_issues.id] :related_issues_ids])
@@ -58,7 +48,6 @@
 
 (defn- get-collections [db id]
   (when-let [result (-> (basic-issues-query id)
-                        (add-in-collections)
                         sql/format
                         (#(jdbc/execute-one! db % {:return-keys true})))]
     (-> result common/post-process-simple)))
