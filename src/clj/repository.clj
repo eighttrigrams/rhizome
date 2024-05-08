@@ -70,11 +70,11 @@
   (fn [opts]
     (sectime
      "change-secondary-contexts-operation"
-     (let [context (datastore/update-context db {:context (:selected-context opts)})]
+     (let [_context (future (datastore/update-context db {:context (:selected-context opts)}))]
        (sectime 
         "change-secondary-contexts-operation#search-issues"
-        {:selected-context context
-         :issues (search/search-issues db (assoc opts :selected-context context))})))))
+        {;;:selected-context context
+         :issues (search/search-issues db opts)})))))
 
 (defn change-secondary-contexts-selection [{:keys [db]}]
   (change-secondary-contexts-operation db))
