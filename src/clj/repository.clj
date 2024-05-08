@@ -23,13 +23,6 @@
           (tap> [:resources :down])
           nil))
 
-(defmacro sectime
-  [what expr]
-  `(let [start# (. System (currentTimeMillis))
-         ret# ~expr]
-     (log/info (str "Elapsed time - " ~what ": " (/ (double (- (. System (currentTimeMillis)) start#)) 1000.0) " secs"))
-     ret#))
-
 #_{:clj-kondo/ignore [:unresolved-var]}
 (defn get-contexts [q]
   (let [db (:db config/config)]
@@ -68,13 +61,9 @@
 
 (defn- change-secondary-contexts-operation [db]
   (fn [opts]
-    (sectime
-     "change-secondary-contexts-operation"
-     (let [_context (future (datastore/update-context db {:context (:selected-context opts)}))]
-       (sectime 
-        "change-secondary-contexts-operation#search-issues"
-        {;;:selected-context context
-         :issues (search/search-issues db opts)})))))
+    (let [_context (future (datastore/update-context db {:context (:selected-context opts)}))]
+      {;;:selected-context context
+       :issues (search/search-issues db opts)})))
 
 (defn change-secondary-contexts-selection [{:keys [db]}]
   (change-secondary-contexts-operation db))
