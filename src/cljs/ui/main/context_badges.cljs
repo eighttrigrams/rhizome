@@ -1,5 +1,4 @@
-(ns ui.main.context-badges
-  (:require [ui.actions :as actions]))
+(ns ui.main.context-badges)
 
 (defn component [contexts]
   [:span.contexts
@@ -9,13 +8,17 @@
              :file
                  [:span.badge 
                   {:key idx
-                   :on-click (fn [_]
+                   :on-click (fn [e]
+                               (.preventDefault e)
                                (js/fetch (str "/open/" (js/encodeURI title))))}
                   "🟢"]
                  0
                  [:span.badge 
                   {:key idx
-                   :on-click (fn [_] (title))}
+                   :on-click (fn [e] 
+                               (.preventDefault e)
+                               (let [callback-fn title]
+                                 (callback-fn)))}
                   "⭕"]
                  [:span.badge {:key idx} title])) 
          contexts))])
