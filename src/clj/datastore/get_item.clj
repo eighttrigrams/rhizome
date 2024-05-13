@@ -205,28 +205,30 @@
 (defn update-item [db 
                    {:keys [id title short_title tags data] :as item} 
                    mode]
-  (let [old-item (get-item db item)]
+  (let [old-item (get-item db item)
+        old-data (:data old-item)
+        set (merge {:title       [:inline title]
+                    :short_title [:inline short_title]
+                    :tags        [:inline tags]}
+                   (merge {:data       [:inline (json/generate-string
+                                                 (if data
+                                                   (merge old-data data)
+                                                   {}))]})
+                   (if (= :context mode)
+                     {:updated_at_ctx [:raw "NOW()"]}
+                     {:updated_at [:raw "NOW()"]}))
+        formatted-sql (sql/format {:update [:issues]
+                                   :where  [:= :id [:inline id]]
+                                   :set    set})
+        result (jdbc/execute-one! db
+                                  formatted-sql
+                                  {:return-keys true})]
     (when (and (= :context mode)
                (or (not= (:title old-item) title)
                    (not= (:short_title old-item) short_title)))
-      (try
-        (update-collection-title-in-collection-items-for-children db id title short_title)
-        (catch Exception e
-          (prn (.getMessage e)))))
-    (let [old-data (:data old-item)
-          set (merge {:title       [:inline title]
-                      :short_title [:inline short_title]
-                      :tags        [:inline tags]}
-                     (merge {:data       [:inline (json/generate-string
-                                                   (if data
-                                                     (merge old-data data)
-                                                     {}))]})
-                     (if (= :context mode)
-                       {:updated_at_ctx [:raw "NOW()"]}
-                       {:updated_at [:raw "NOW()"]}))
-          formatted-sql (sql/format {:update [:issues]
-                                     :where  [:= :id [:inline id]]
-                                     :set    set})]
-      (jdbc/execute-one! db
-                         formatted-sql
-                         {:return-keys true}))))
+      (future 
+        (try
+          (update-collection-title-in-collection-items-for-children db id title short_title)
+          (catch Exception e
+            (log/error (.getMessage e))))))
+    result))
