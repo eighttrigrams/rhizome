@@ -238,11 +238,7 @@
                                           selected-context 
                                           (get-selected-secondary-contexts-set state)
                                           alternative-behaviour?)]
-        (get-item/update-collection-title-in-collection-items db 
-                                                              (:id issue) 
-                                                              (:id selected-context)
-                                                              (:short_title selected-context)
-                                                              (:title selected-context))
+        (get-item/set-contexts-of-new-issue db (:id issue))
         {:selected-issue nil
          :issues         (search/search-issues
                           db

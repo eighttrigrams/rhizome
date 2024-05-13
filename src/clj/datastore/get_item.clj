@@ -131,6 +131,35 @@
       sql/format
       (#(jdbc/execute! db % {:return-keys true}))))
 
+(defn set-contexts-of-new-issue [db item-id]
+  (let [data (:issues/data (jdbc/execute-one! db
+                                              (sql/format {:select [:data]
+                                                           :from   [:issues]
+                                                           :where  [:= :id [:inline item-id]]})
+                                              {:return-keys true}))
+        data (cond (nil? data) {}
+                   :else (json/parse-string (.getValue data)))
+        data (if (get data "contexts")
+               data
+               (assoc data "contexts" {}))
+        contexts (dissoc (into {}
+                               (map (fn [{:issues/keys [id title short_title]}]
+                                      [id (if (seq short_title)
+                                            short_title
+                                            title)]
+                                      )(jdbc/execute! db
+                                                      (sql/format {:select [:issues.id :title :short_title]
+                                                                   :from   [:collections]
+                                                                   :join   [:issues [:= :collections.container_id :issues.id]]
+                                                                   :where  [:= :collections.item_id [:inline item-id]]})
+                                                      {:return-keys true})))
+                         item-id)]
+    (jdbc/execute-one! db
+                       (sql/format {:update [:issues]
+                                    :where  [:= :id [:inline item-id]]
+                                    :set    {:data [:inline (json/generate-string (assoc data :contexts contexts))]}})
+                       {:return-keys true})))
+
 (defn update-collection-title-in-collection-items
   ([db item-id id short_title title] 
    (update-collection-title-in-collection-items db item-id id short_title title nil))
