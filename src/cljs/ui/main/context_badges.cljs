@@ -9,14 +9,14 @@
                  [:span.badge 
                   {:key idx
                    :on-click (fn [e]
-                               (.preventDefault e)
+                               (.stopPropagation e)
                                (js/fetch (str "/open/" (js/encodeURI title))))}
                   "🟢"]
                  0
                  [:span.badge 
                   {:key idx
                    :on-click (fn [e] 
-                               (.preventDefault e)
+                               (.stopPropagation e)
                                (let [callback-fn title]
                                  (callback-fn)))}
                   "⭕"]
