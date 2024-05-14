@@ -256,7 +256,7 @@
 
 (defn fetch-aggregated-contexts [{:keys [db]}]
   (fn [state]
-    (log/info "fetch-aggregated-contexts")
+    (when-not (:selected-context state) (throw (Exception. "fetch-aggregated-contexts called without selected-context")))
     (search/fetch-aggregated-contexts 
      db (assoc (make-search-issues state) 
                :only-context-aggregation? true))))
@@ -264,7 +264,7 @@
 (defn insert-issue [{:keys [db]}]
   (fn [{:keys [selected-context]
         :as state} 
-       {:keys [title] :as opts}
+       {:keys [title]}
        alternative-behaviour?]
     (try
       (let [issue (insertion/insert-issue db 
@@ -278,7 +278,7 @@
                           db
                           (dissoc state :q :selected-issue))
          :q              nil
-         :aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)})
+         :aggregated-contexts ((fetch-aggregated-contexts {:db db}) state)})
       (catch Exception e
         (log/error (str "Caught an exception in insert-issue " (.getMessage e)))))))
 
