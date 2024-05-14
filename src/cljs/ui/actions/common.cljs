@@ -13,7 +13,7 @@
 (defn reset-state! [new-state *state]
   (reset! *state (dissoc new-state :enter-pressed?)))
 
-(defn- update-state [{:keys [issues contexts] :as i} 
+(defn- update-state [{:keys [issues contexts aggregated-contexts] :as i} 
                      state]
   (merge 
    (if (map? state) state @state)
@@ -21,10 +21,9 @@
    {:issues (if (and issues (first issues)) 
               (first issues)
               (:issues state))
-    ;; :aggregated-contexts (if (and issues (second issues))
-                          ;;  (second issues)
-                          ;;  (:aggregated-contexts state))
-    :contexts (or contexts (:contexts state))}))
+    :contexts (or contexts (:contexts state))}
+   (when aggregated-contexts
+     {:aggregated-contexts aggregated-contexts})))
 
 (defn- list-resources [state]
   (api/list-resources (dissoc state :issues :contexts)))
@@ -72,7 +71,9 @@
             (dissoc-loading *state)))))
 
 (defn fetch-and-reset-with-method-2!
-  [*state]
-  (go (-> (api/fetch-aggregated-contexts @*state)
+  [*state state method & args]
+  (apply fetch-and-reset-with-method! *state state method args)
+  (when (:selected-context @*state)
+    (go (-> (api/fetch-aggregated-contexts @*state)
           <p!
-          (#(swap! *state assoc :aggregated-contexts %)))))
+          (#(swap! *state assoc :aggregated-contexts %))))))

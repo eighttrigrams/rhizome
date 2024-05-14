@@ -131,6 +131,43 @@
        :contexts                        (search/search-contexts db "")
        :selected-context context})))
 
+(defn make-search-issues
+  [{:keys [link-issue
+           search-globally?]
+    :as   opts}]
+  (if (or (= :issue link-issue)
+          search-globally?)
+    (-> opts
+        (cond-> :selected-context
+          (update :selected-context (fn [a] (dissoc a :search_mode))))
+        (assoc :events-view 0)
+        (assoc-in [:selected-context 
+                   :data 
+                   :views
+                   :current
+                   :selected-secondary-contexts] [])
+        (assoc-in [:selected-context
+                   :data
+                   :views
+                   :current
+                   :secondary-contexts-inverted] false)
+        (assoc-in [:selected-context
+                   :data
+                   :views
+                   :current
+                   :secondary-contexts-unassigned-selected] false)
+        (assoc-in [:selected-context
+                   :data
+                   :views
+                   :current
+                   :events-view] 0)
+        (assoc-in [:selected-context
+                   :data
+                   :views
+                   :current
+                   :search-mode] 0))
+    opts))
+
 (defn- make-events-fn [db mode-number db-fn]
   (fn [{:keys [selected-context] :as opts}]
     (if selected-context
@@ -189,16 +226,6 @@
     (let [selected-context (datastore/cycle-notes-mode db selected-context)]
       {:selected-context selected-context})))
 
-(defn delete-selected-issue [{:keys [db]}]
-  (fn [{:keys [selected-issue] :as opts}]
-    (try
-      (deletion/delete-item db selected-issue)
-      {:issues         (search/search-issues db opts)
-       :selected-issue nil}
-      (catch Exception e
-        (log/error (str "Caught an exception in repository/delete-selected-issue " e))
-        {}))))
-
 (defn delete-issue [{:keys [db]}]
   (fn [opts issue]
     (try
@@ -227,10 +254,17 @@
                secondary-contexts-inverted
                selected-secondary-contexts)))
 
+(defn fetch-aggregated-contexts [{:keys [db]}]
+  (fn [state]
+    (log/info "fetch-aggregated-contexts")
+    (search/fetch-aggregated-contexts 
+     db (assoc (make-search-issues state) 
+               :only-context-aggregation? true))))
+
 (defn insert-issue [{:keys [db]}]
   (fn [{:keys [selected-context]
         :as state} 
-       {:keys [title]}
+       {:keys [title] :as opts}
        alternative-behaviour?]
     (try
       (let [issue (insertion/insert-issue db 
@@ -243,7 +277,8 @@
          :issues         (search/search-issues
                           db
                           (dissoc state :q :selected-issue))
-         :q              nil})
+         :q              nil
+         :aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)})
       (catch Exception e
         (log/error (str "Caught an exception in insert-issue " (.getMessage e)))))))
 
@@ -301,7 +336,8 @@
        :selected-issue (datastore/get-issue db selected-issue)
        :active-search  nil
        :issues         (search/search-issues db (dissoc opts :q))
-       :q              nil}
+       :q              nil
+       :aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)}
       (catch Exception e 
         (log/error (str "Caught an exception in link-selected-item-to-context " (.getMessage e)))
         (throw e)))))
@@ -328,43 +364,6 @@
 
 (defn search-contexts [db opts]
   {:contexts (search/search-contexts db opts)})
-
-(defn make-search-issues
-  [{:keys [link-issue
-           search-globally?]
-    :as   opts}]
-  (if (or (= :issue link-issue)
-          search-globally?)
-    (-> opts
-        (cond-> :selected-context
-          (update :selected-context (fn [a] (dissoc a :search_mode))))
-        (assoc :events-view 0)
-        (assoc-in [:selected-context 
-                   :data 
-                   :views
-                   :current
-                   :selected-secondary-contexts] [])
-        (assoc-in [:selected-context
-                   :data
-                   :views
-                   :current
-                   :secondary-contexts-inverted] false)
-        (assoc-in [:selected-context
-                   :data
-                   :views
-                   :current
-                   :secondary-contexts-unassigned-selected] false)
-        (assoc-in [:selected-context
-                   :data
-                   :views
-                   :current
-                   :events-view] 0)
-        (assoc-in [:selected-context
-                   :data
-                   :views
-                   :current
-                   :search-mode] 0))
-    opts))
 
 (defn start-linking-selected-issue-to-issue-with-local-search [db opts]
   {:issues           (search/search-issues db (make-search-issues
@@ -494,6 +493,17 @@
                                                       (assoc :selected-context selected-context)))
        :q                nil})))
 
+(defn delete-selected-issue [{:keys [db]}]
+  (fn [{:keys [selected-issue] :as opts}]
+    (try
+      (deletion/delete-item db selected-issue)
+      {:issues         (search/search-issues db opts)
+       :selected-issue nil
+       :aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)}
+      (catch Exception e
+        (log/error (str "Caught an exception in repository/delete-selected-issue " e))
+        {}))))
+
 (defn start-global-search [{:keys [db]}]
   (fn [state]
     {:issues           (search/search-issues
@@ -508,13 +518,6 @@
      :link-context     false
      :link-issue       nil
      :q                ""}))
-
-(defn fetch-aggregated-contexts [{:keys [db]}]
-  (fn [state]
-    (log/info "fetch-aggregated-contexts")
-    (search/fetch-aggregated-contexts 
-     db (assoc (make-search-issues state) 
-               :only-context-aggregation? true))))
 
 (defn list-resources [{:keys [db privacy-mode]}]
   (fn [{:keys                                                             [cmd
