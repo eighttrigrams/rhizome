@@ -295,23 +295,26 @@
                                                             (:id selected-context)
                                                             (:short_title selected-context)
                                                             (:title selected-context))
-      {:selected-issue   nil
-       :issues           (search/search-issues db 
-                                               (-> opts
-                                                   (dissoc :search-globally? 
-                                                           :q
-                                                           :link-issue
-                                                           :link-context)
-                                                   (assoc-in [:selected-context 
-                                                              :data 
-                                                              :views 
-                                                              :current 
-                                                              :selected-secondary-contexts] [])))
-       :active-search    nil
-       :link-issue       nil
-       :link-context     nil
-       :search-globally? false
-       :q                nil})
+      (let [opts (-> opts
+                                             (dissoc :search-globally? 
+                                                     :q
+                                                     :link-issue
+                                                     :link-context)
+                                             (assoc-in [:selected-context 
+                                                        :data 
+                                                        :views 
+                                                        :current 
+                                                        :selected-secondary-contexts] []))
+            issues (search/search-issues db opts)
+            aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)]
+        {:selected-issue   nil
+         :issues           issues
+         :active-search    nil
+         :link-issue       nil
+         :link-context     nil
+         :search-globally? false
+         :q                nil
+         :aggregated-contexts aggregated-contexts}))
     (catch Exception e
       (log/error (str "Caught an exception in link-issue-to-selected-context " (.getMessage e)))
       (throw e))))
@@ -454,7 +457,8 @@
                                                               (:id selected-issue)
                                                               (:id selected-context) nil nil true)
         {:selected-issue nil
-         :issues (search/search-issues db state)})
+         :issues (search/search-issues db state)
+         :aggregated-contexts ((fetch-aggregated-contexts {:db db}) state)})
       (catch Exception e
         (log/error (str "Caught an repository/unlink-selected-item-from-container " (.getMessage e)))))))
 
