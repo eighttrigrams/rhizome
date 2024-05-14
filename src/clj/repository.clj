@@ -335,12 +335,13 @@
                                                             (:id arg)
                                                             (:short_title arg)
                                                             (:title arg))
-      {:link-context   nil
-       :selected-issue (datastore/get-issue db selected-issue)
-       :active-search  nil
-       :issues         (search/search-issues db (dissoc opts :q))
-       :q              nil
-       :aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)}
+      (merge {:link-context   nil
+              :selected-issue (datastore/get-issue db selected-issue)
+              :active-search  nil
+              :issues         (search/search-issues db (dissoc opts :q))
+              :q              nil}
+             (when selected-context
+               {:aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)}))
       (catch Exception e 
         (log/error (str "Caught an exception in link-selected-item-to-context " (.getMessage e)))
         (throw e)))))
