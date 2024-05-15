@@ -153,6 +153,13 @@
                                                 (first %)) 
                                             (merge (when (:is_context issue) 
                                                      {0 #(actions/select-context! *state issue)})
+                                                   (when (:date issue)
+                                                     {:date (:date issue)})
+                                                   (when (and (:selected-context @*state)
+                                                              (or (nil? (:events-view (:current (:views (:data (:selected-context @*state))))))
+                                                                  (= 0 (:events-view (:current (:views (:data (:selected-context @*state)))))))
+                                                              (> (:short_title_ints issue) 0))
+                                                     {:number (:short_title_ints issue)})
                                                    (when-let [file (:file (:resource-links (:data issue)))]
                                                      {:file file})
                                                    (:contexts (:data issue))))]])]]]))

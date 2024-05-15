@@ -85,3 +85,7 @@ span.badge {
     padding: 3px;
     margin-right: 3px;
 }
+
+span.badge.light {
+    background-color: #d4f6b9;
+}
