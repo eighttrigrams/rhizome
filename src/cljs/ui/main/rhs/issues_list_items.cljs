@@ -90,7 +90,8 @@
                                      (:image (:resource-links data)))
                              " tall"))
 
-(defn related-issues-list-item-component [*state {:keys [id title] :as issue}]
+;; TODO remove
+#_(defn related-issues-list-item-component [*state {:keys [id title] :as issue}]
   [:li.card.issue-card
    {:class (tall (:data issue)) 
     :on-click #(do (swap! *state (fn [state] ;; TODO review and dedup with issues-list-item/component
@@ -113,26 +114,31 @@
   (let [simple-card? (and (:notes-mode (:current (:views (:data (:selected-context @*state)))))
                           (not (-> *state deref :search-globally?)))]
     [:li.issue-card
-     {:class          (str (if simple-card? 
-                             "simple-card"
-                             "card")
-                           (when (= (:id (:selected-issue @*state))
-                                    (:id issue)) " selected")
-                           (tall (:data issue)))
-      :id             (str "issue-card-" idx)
-      :on-click       #(let [skip-select? (and (deref modifiers/*alt-pressed?)
-                                               (not= :issues (:active-search @*state)))]
-                         (swap! *state (fn [state] (dissoc state :preview-issue))) 
-                         (actions/select-issue! *state 
-                                                issue
-                                                skip-select?)
-                         (when skip-select?
-                           (select-fn idx)))
-      :on-mouse-enter (on-mouse-enter *state issue)
-      :on-context-menu (fn [e]
-                         (.preventDefault e) 
-                         (actions/delete-issue! *state issue))
-      :on-mouse-leave (on-mouse-leave *state)}
+     (merge {:class          (str (if simple-card? 
+                                    "simple-card"
+                                    "card")
+                                  (when (= (:id (:selected-issue @*state))
+                                           (:id issue)) " selected")
+                                  (tall (:data issue)))
+             :on-click       #(if idx 
+                                (let [skip-select? (and (deref modifiers/*alt-pressed?)
+                                                        (not= :issues (:active-search @*state)))]
+                                  (swap! *state (fn [state] (dissoc state :preview-issue))) 
+                                  (actions/select-issue! *state 
+                                                         issue
+                                                         skip-select?)
+                                  (when skip-select?
+                                    (select-fn idx)))
+                                (swap! *state (fn [state] ;; TODO review and dedup with issues-list-item/component
+                                          (-> state
+                                              (dissoc :preview-issue)))))
+             :on-mouse-enter (on-mouse-enter *state issue)
+             :on-mouse-leave (on-mouse-leave *state)}
+            (when idx 
+              {:id             (str "issue-card-" idx)
+               :on-context-menu (fn [e]
+                                (.preventDefault e) 
+                                (actions/delete-issue! *state issue))}))
      [:div.issue-card-inner
       (when (or (:preview-image-lowres (:data issue))
                 (:preview-image (:data issue))

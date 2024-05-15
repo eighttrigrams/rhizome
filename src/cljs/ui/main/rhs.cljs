@@ -34,7 +34,7 @@
    (for [related-issue (:related_issues (or (:selected-issue @*state)
                                             (:selected-context @*state)))]
      ^{:key (:id related-issue)}
-     [issues-list-items/related-issues-list-item-component *state related-issue])])
+     [issues-list-items/regular-issues-list-item-component *state related-issue nil nil])])
 
 (defn component [_*state]
   (fn [*state]
