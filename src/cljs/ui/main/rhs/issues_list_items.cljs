@@ -99,9 +99,11 @@
   (let [simple-card? (and (:notes-mode (:current (:views (:data (:selected-context @*state)))))
                           (not (-> *state deref :search-globally?)))]
     [:li.issue-card
-     (merge {:class          (str (if simple-card? 
-                                    "simple-card"
-                                    "card")
+     (merge {:class          (str "card"
+                                  (when (not (or (:preview-image-lowres (:data issue))
+                                                 (:preview-image (:data issue))
+                                                 (:image (:resource-links (:data issue)))))
+                                    " simple-card")
                                   (when (= (:id (:selected-issue @*state))
                                            (:id issue)) " selected")
                                   (tall (:data issue)))
@@ -131,18 +133,17 @@
         [image-preview-component (:data issue)])
       [:div.issue-card-inner-right.issue-card-inner-child
        [title-component (:title issue) (:data issue)]
-       (when-not simple-card?
-         [context-badges/component (remove #(= (:id (:selected-context @*state))
-                                               (first %)) 
-                                           (merge (when (:is_context issue) 
-                                                    {0 #(actions/select-context! *state issue)})
-                                                  (when (:date issue)
-                                                    {:date (:date issue)})
-                                                  (when (and (:selected-context @*state)
-                                                             (or (nil? (:events-view (:current (:views (:data (:selected-context @*state))))))
-                                                                 (= 0 (:events-view (:current (:views (:data (:selected-context @*state)))))))
-                                                             (> (:short_title_ints issue) 0))
-                                                    {:number (:short_title_ints issue)})
-                                                  (when-let [file (:file (:resource-links (:data issue)))]
-                                                    {:file file})
-                                                  (:contexts (:data issue))))])]]]))
+       [context-badges/component (remove #(= (:id (:selected-context @*state))
+                                             (first %)) 
+                                         (merge (when (:is_context issue) 
+                                                  {0 #(actions/select-context! *state issue)})
+                                                (when (:date issue)
+                                                  {:date (:date issue)})
+                                                (when (and (:selected-context @*state)
+                                                           (or (nil? (:events-view (:current (:views (:data (:selected-context @*state))))))
+                                                               (= 0 (:events-view (:current (:views (:data (:selected-context @*state)))))))
+                                                           (> (:short_title_ints issue) 0))
+                                                  {:number (:short_title_ints issue)})
+                                                (when-let [file (:file (:resource-links (:data issue)))]
+                                                  {:file file})
+                                                (:contexts (:data issue))))]]]]))

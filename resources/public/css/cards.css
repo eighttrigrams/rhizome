@@ -8,6 +8,10 @@ li.card {
     padding-left: 10px;
 }
 
+li.card.simple-card {
+    height: 56px;
+}
+
 li.card img {
     max-width: 203px;
     background-color: rgb(28, 16, 23);
@@ -62,15 +66,14 @@ li.card.issue-card span.title1 {
     top: 5px;
 }
 
-li.simple-card span.title p {
-    margin-bottom: 10px;
-    margin-top: 19px;
-}
-
 li.card.issue-card span.contexts {
     position: absolute;
     top: 117px;
     font-size: 12px;
+}
+
+li.card.issue-card.simple-card span.contexts {
+    top: 62px;
 }
 
 li.card.issue-card span.info {
