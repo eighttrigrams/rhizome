@@ -218,9 +218,6 @@
 (defn cycle-search-mode! [*state]
   (fetch-and-reset-with-method! *state @*state api/cycle-search-mode))
 
-(defn cycle-notes-mode! [*state]
-  (fetch-and-reset-with-method! *state @*state api/cycle-notes-mode))
-
 (defn show-context-as-issue! [*state]
   (fetch-and-reset-with-method! *state
                                 @*state
