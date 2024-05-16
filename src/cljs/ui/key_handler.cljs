@@ -87,12 +87,4 @@
                (and selected-issue
                     (:is_context selected-issue)
                     (= "KeyF" code))
-               (actions/show-context-as-context-again! *state)
-               (and selected-context
-                    (not selected-issue)
-                    (= "KeyB" code)
-                    (or (nil? (-> selected-context :data :views :current :events-view))
-                        (= 0 (-> selected-context :data :views :current :events-view)))
-                    (or (nil? (-> selected-context :data :views :current :search-mode))
-                        (= 0 (-> selected-context :data :views :current :search-mode))))
-               (actions/cycle-notes-mode! *state)))))))
+               (actions/show-context-as-context-again! *state)))))))

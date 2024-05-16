@@ -13,7 +13,6 @@
                                 show-events
                                 show-past-events
                                 deselect-events
-                                cycle-notes-mode
                                 store-current-view
                                 load-stored-context
                                 remove-stored-context
@@ -41,7 +40,6 @@
   show-events
   show-past-events
   deselect-events
-  cycle-notes-mode
   store-current-view
   load-stored-context
   remove-stored-context

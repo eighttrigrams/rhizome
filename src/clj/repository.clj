@@ -221,11 +221,6 @@
       {:selected-context selected-context
        :issues           (search/search-issues db (assoc opts :selected-context selected-context))})))
 
-(defn cycle-notes-mode [{:keys [db]}]
-  (fn [{:keys [selected-context] :as _opts}]
-    (let [selected-context (datastore/cycle-notes-mode db selected-context)]
-      {:selected-context selected-context})))
-
 (defn delete-issue [{:keys [db]}]
   (fn [opts issue]
     (try
