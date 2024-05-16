@@ -6,14 +6,14 @@
     (map (fn [[idx title]]
            (case idx 
              :file
-             [:span.badge 
+             [:span.badge.light 
               {:key      idx
                :on-click (fn [e]
                            (.stopPropagation e)
                            (js/fetch (str "/open/" (js/encodeURI title))))}
               "🟢"]
              0
-             [:span.badge 
+             [:span.badge.light
               {:key      idx
                :on-click (fn [e] 
                            (.stopPropagation e)
