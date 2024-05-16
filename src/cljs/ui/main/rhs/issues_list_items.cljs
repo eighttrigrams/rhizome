@@ -116,9 +116,10 @@
                                                          skip-select?)
                                   (when skip-select?
                                     (select-fn idx)))
-                                (swap! *state (fn [state] ;; TODO review and dedup with issues-list-item/component
-                                          (-> state
-                                              (dissoc :preview-issue)))))
+                                (do (swap! *state (fn [state] ;; TODO review and dedup with issues-list-item/component
+                                                    (-> state
+                                                        (dissoc :preview-issue))))
+                                    (actions/select-issue! *state issue)))
              :on-mouse-enter (on-mouse-enter *state issue)
              :on-mouse-leave (on-mouse-leave *state)}
             (when idx 
