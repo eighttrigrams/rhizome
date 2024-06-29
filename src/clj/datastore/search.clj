@@ -87,7 +87,7 @@
         (log/error (str "error in search/search-contexts: " e " - param was: " q))
         (throw e)))))
 
-(defn- fetch-issue-ids [ds q selected-context events-view link-issue search-mode selected-issue]
+(defn- fetch-issue-ids [ds q selected-context events-view link-issue search-mode _selected-issue]
   (let [select [:issues.title
                 :issues.short_title
                 :issues.short_title_ints
@@ -128,8 +128,8 @@
                               [:collections [:= :issues.id :collections.item_id]]
                               [])
         join-where-clause   (if selected-context
-                              #_[:= :collections.container_id (:id selected-context)]
-                              (if (= :issue link-issue)
+                              [:= :collections.container_id (:id selected-context)]
+                              #_(if (= :issue link-issue)
                                 [:in :collections.container_id [:inline (keys (:contexts (:data selected-issue)))]]
                                 [:= :collections.container_id (:id selected-context)])
                               [:=])
@@ -144,7 +144,7 @@
                                        {:select select})
                                      {
                                       :from     [:issues]
-                                      :order-by (if (and selected-context (= :issue link-issue))
+                                      :order-by (if false #_(and selected-context (= :issue link-issue))
                                                   [:issues.id [:issues.updated_at (if (= 1 search-mode)
                                                                                     :asc 
                                                                                     :desc)]]
@@ -158,11 +158,11 @@
                                                        search-clause]
                                                  (when (seq urgent-issues)
                                                    [:not [:in :issues.id [:inline (map :issues/id urgent-issues)]]])]}
-                                     (when #_(and (= "" q)
+                                     (when (and (= "" q)
                                                   (not selected-context)
                                                   (= 0 events-view)
                                                   )
-                                      (and (= "" q)
+                                      #_(and (= "" q)
                                            (if selected-context
                                              (= :issue link-issue)
                                              (= 0 events-view))) 
