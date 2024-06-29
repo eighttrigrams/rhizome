@@ -155,6 +155,7 @@
                                                   (= :issue link-issue)
                                                   (= 0 events-view)))
                                        {:limit 500})))
+        _ (log/info (str "query" formatted-query))
         issues (jdbc/execute! ds formatted-query)]
     (concat urgent-issues issues)))
 
