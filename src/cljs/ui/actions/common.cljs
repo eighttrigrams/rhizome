@@ -15,6 +15,7 @@
 
 (defn- update-state [{:keys [issues contexts aggregated-contexts] :as i} 
                      state]
+  (prn "count" (count issues))
   (merge 
    (if (map? state) state @state)
    i
