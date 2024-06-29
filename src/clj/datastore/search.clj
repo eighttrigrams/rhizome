@@ -87,8 +87,17 @@
         (log/error (str "error in search/search-contexts: " e " - param was: " q))
         (throw e)))))
 
-(defn- fetch-issue-ids [ds q selected-context events-view link-issue search-mode selected-issue]
-  (let [select [:issues.title
+(defn- fetch-issue-ids [ds q selected-context events-view link-issue search-mode]
+  (let [select-simple [:issues.title
+                       :issues.short_title
+                       :issues.short_title_ints
+                       :issues.id
+                       :issues.data
+                       :issues.is_context
+                       :issues.updated_at
+                       :issues.date
+                       :issues.archived]
+        select [:issues.title
                 :issues.short_title
                 :issues.short_title_ints
                 :issues.id
@@ -128,9 +137,7 @@
                               [:collections [:= :issues.id :collections.item_id]]
                               [])
         join-where-clause   (if selected-context
-                              (if (= :issue link-issue)
-                                [:in :collections.container_id [:inline (keys (:contexts (:data selected-issue)))]]
-                                [:= :collections.container_id (:id selected-context)])
+                              [:= :collections.container_id (:id selected-context)]
                               [:=])
         exists-clause       (if (not= 0 events-view)
                               [:and
@@ -138,7 +145,9 @@
                                [:not= :issues.archived [:inline (= 1 events-view)]]]
                               [:=])
         formatted-query (sql/format (merge
-                                     {:select   select
+                                     {:select   (if (not= 0 events-view)
+                                                  select
+                                                  select-simple)
                                       :from     [:issues]
                                       :order-by [[:issues.updated_at (if (= 1 search-mode)
                                                                        :asc 
@@ -151,13 +160,10 @@
                                                  (when (seq urgent-issues)
                                                    [:not [:in :issues.id [:inline (map :issues/id urgent-issues)]]])]}
                                      (when (and (= "" q)
-                                                (if selected-context
-                                                  (= :issue link-issue)
-                                                  (= 0 events-view)))
+                                                (not selected-context)
+                                                (= 0 events-view))
                                        {:limit 500})))
-        _ (log/info (str "query" formatted-query))
         issues (jdbc/execute! ds formatted-query)]
-    (log/info (str "results:" (count issues) "urgent-results:" (count urgent-issues)))
     (concat urgent-issues issues)))
 
 (defn- re-order [search-mode issues]
@@ -224,7 +230,7 @@
         global-events-view) 0))
 
 (defn- do-fetch-ids 
-  [db {:keys [q search-globally? selected-context link-issue selected-issue]
+  [db {:keys [q search-globally? selected-context link-issue]
        :or   {q ""}
        :as state} search-mode]
   (seq (fetch-issue-ids db 
@@ -232,8 +238,7 @@
                         (if search-globally? nil selected-context) 
                         (get-events-view state)
                         link-issue
-                        search-mode
-                        selected-issue)))
+                        search-mode)))
 
 (defn- filter-issues
   [{:keys [link-issue 
