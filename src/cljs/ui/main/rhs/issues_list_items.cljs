@@ -96,55 +96,53 @@
      [context-badges/component (:contexts (:data issue))]]]])
 
 (defn regular-issues-list-item-component [*state issue idx select-fn]
-  (let [simple-card? (and (:notes-mode (:current (:views (:data (:selected-context @*state)))))
-                          (not (-> *state deref :search-globally?)))]
-    [:li.issue-card
-     (merge {:class          (str "card"
-                                  (when (not (or (:preview-image-lowres (:data issue))
-                                                 (:preview-image (:data issue))
-                                                 (:image (:resource-links (:data issue)))))
-                                    " simple-card")
-                                  (when (= (:id (:selected-issue @*state))
-                                           (:id issue)) " selected")
-                                  (tall (:data issue)))
-             :on-click       #(if idx 
-                                (let [skip-select? (and (deref modifiers/*alt-pressed?)
-                                                        (not= :issues (:active-search @*state)))]
-                                  (swap! *state (fn [state] (dissoc state :preview-issue))) 
-                                  (actions/select-issue! *state 
-                                                         issue
-                                                         skip-select?)
-                                  (when skip-select?
-                                    (select-fn idx)))
-                                (do (swap! *state (fn [state] ;; TODO review and dedup with issues-list-item/component
-                                                    (-> state
-                                                        (dissoc :preview-issue))))
-                                    (actions/select-issue! *state issue)))
-             :on-mouse-enter (on-mouse-enter *state issue)
-             :on-mouse-leave (on-mouse-leave *state)}
-            (when idx 
-              {:id             (str "issue-card-" idx)
-               :on-context-menu (fn [e]
+  [:li.issue-card
+   (merge {:class          (str "card"
+                                (when (not (or (:preview-image-lowres (:data issue))
+                                               (:preview-image (:data issue))
+                                               (:image (:resource-links (:data issue)))))
+                                  " simple-card")
+                                (when (= (:id (:selected-issue @*state))
+                                         (:id issue)) " selected")
+                                (tall (:data issue)))
+           :on-click       #(if idx 
+                              (let [skip-select? (and (deref modifiers/*alt-pressed?)
+                                                      (not= :issues (:active-search @*state)))]
+                                (swap! *state (fn [state] (dissoc state :preview-issue))) 
+                                (actions/select-issue! *state 
+                                                       issue
+                                                       skip-select?)
+                                (when skip-select?
+                                  (select-fn idx)))
+                              (do (swap! *state (fn [state] ;; TODO review and dedup with issues-list-item/component
+                                                  (-> state
+                                                      (dissoc :preview-issue))))
+                                  (actions/select-issue! *state issue)))
+           :on-mouse-enter (on-mouse-enter *state issue)
+           :on-mouse-leave (on-mouse-leave *state)}
+          (when idx 
+            {:id             (str "issue-card-" idx)
+             :on-context-menu (fn [e]
                                 (.preventDefault e) 
                                 (actions/delete-issue! *state issue))}))
-     [:div.issue-card-inner
-      (when (or (:preview-image-lowres (:data issue))
-                (:preview-image (:data issue))
-                (:image (:resource-links (:data issue)))) 
-        [image-preview-component (:data issue)])
-      [:div.issue-card-inner-right.issue-card-inner-child
-       [title-component (:title issue) (:data issue)]
-       [context-badges/component (remove #(= (:id (:selected-context @*state))
-                                             (first %)) 
-                                         (merge (when (:is_context issue) 
-                                                  {0 #(actions/select-context! *state issue)})
-                                                (when (:date issue)
-                                                  {:date (:date issue)})
-                                                (when (and (:selected-context @*state)
-                                                           (or (nil? (:events-view (:current (:views (:data (:selected-context @*state))))))
-                                                               (= 0 (:events-view (:current (:views (:data (:selected-context @*state)))))))
-                                                           (> (:short_title_ints issue) 0))
-                                                  {:number (:short_title_ints issue)})
-                                                (when-let [file (:file (:resource-links (:data issue)))]
-                                                  {:file file})
-                                                (:contexts (:data issue))))]]]]))
+   [:div.issue-card-inner
+    (when (or (:preview-image-lowres (:data issue))
+              (:preview-image (:data issue))
+              (:image (:resource-links (:data issue)))) 
+      [image-preview-component (:data issue)])
+    [:div.issue-card-inner-right.issue-card-inner-child
+     [title-component (:title issue) (:data issue)]
+     [context-badges/component (remove #(= (:id (:selected-context @*state))
+                                           (first %)) 
+                                       (merge (when (:is_context issue) 
+                                                {0 #(actions/select-context! *state issue)})
+                                              (when (:date issue)
+                                                {:date (:date issue)})
+                                              (when (and (:selected-context @*state)
+                                                         (or (nil? (:events-view (:current (:views (:data (:selected-context @*state))))))
+                                                             (= 0 (:events-view (:current (:views (:data (:selected-context @*state)))))))
+                                                         (> (:short_title_ints issue) 0))
+                                                {:number (:short_title_ints issue)})
+                                              (when-let [file (:file (:resource-links (:data issue)))]
+                                                {:file file})
+                                              (:contexts (:data issue))))]]]])
