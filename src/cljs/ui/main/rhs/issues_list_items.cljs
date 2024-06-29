@@ -68,33 +68,6 @@
                               :preview-issue issue
                               :mouse :enter)))
 
-;; TODO this isn't used any longer
-(defn- tall [data]
-  (when (or (:preview-image-lowres data)
-                                     (:preview-image data)
-                                     (:image (:resource-links data)))
-                             " tall"))
-
-;; TODO remove
-#_(defn related-issues-list-item-component [*state {:keys [id title] :as issue}]
-  [:li.card.issue-card
-   {:class (tall (:data issue)) 
-    :on-click #(do (swap! *state (fn [state] ;; TODO review and dedup with issues-list-item/component
-                                          (-> state
-                                              (dissoc :preview-issue))))
-                          (actions/select-issue! *state {:id id}))
-    :on-mouse-enter (on-mouse-enter *state issue)
-    :on-mouse-leave (on-mouse-leave *state)}
-   [:div.issue-card-inner
-    (when (or (:preview-image-lowres (:data issue))
-              (:preview-image (:data issue))
-              (:image (:resource-links (:data issue)))) 
-      [image-preview-component (:data issue)])
-    [:div.issue-card-inner-right.issue-card-inner-child
-     [title-component title]
-     [info-component @*state issue]
-     [context-badges/component (:contexts (:data issue))]]]])
-
 (defn regular-issues-list-item-component [*state issue idx select-fn]
   [:li.issue-card
    (merge {:class          (str "card"
@@ -103,8 +76,7 @@
                                                (:image (:resource-links (:data issue)))))
                                   " simple-card")
                                 (when (= (:id (:selected-issue @*state))
-                                         (:id issue)) " selected")
-                                (tall (:data issue)))
+                                         (:id issue)) " selected"))
            :on-click       #(if idx 
                               (let [skip-select? (and (deref modifiers/*alt-pressed?)
                                                       (not= :issues (:active-search @*state)))]
