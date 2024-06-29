@@ -157,7 +157,7 @@
                                        {:limit 500})))
         _ (log/info (str "query" formatted-query))
         issues (jdbc/execute! ds formatted-query)]
-    (log/info (str "results:" (count issues)))
+    (log/info (str "results:" (count issues)) (str "urgent-results:" (count urgent-issues)))
     (concat urgent-issues issues)))
 
 (defn- re-order [search-mode issues]
