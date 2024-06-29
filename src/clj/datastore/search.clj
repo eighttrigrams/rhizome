@@ -138,14 +138,19 @@
                                [:<> :issues.date nil]
                                [:not= :issues.archived [:inline (= 1 events-view)]]]
                               [:=])
-        selects (vec (concat [[:issues.id]] select))
-        _ (log/info (str "..." selects))
         formatted-query (sql/format (merge
-                                     {:select-distinct-on selects
+                                     (if (and selected-context (= :issue link-issue))
+                                       {:select-distinct-on (vec (concat [[:issues.id]] select))}
+                                       {:select select})
+                                     {
                                       :from     [:issues]
-                                      :order-by [:issues.id [:issues.updated_at (if (= 1 search-mode)
-                                                                                  :asc 
-                                                                                  :desc)]]
+                                      :order-by (if (and selected-context (= :issue link-issue))
+                                                  [:issues.id [:issues.updated_at (if (= 1 search-mode)
+                                                                                    :asc 
+                                                                                    :desc)]]
+                                                  [:issues.updated_at (if (= 1 search-mode)
+                                                                                    :asc 
+                                                                                    :desc)])
                                       :join     join-clause
                                       :where    [:and [:and
                                                        exists-clause
