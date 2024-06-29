@@ -244,6 +244,7 @@
     (if (= :issue link-issue)
       (let [issue-ids-to-exclude (conj (set (map :id (:related_issues selected-issue)))
                                        (:id selected-issue))]
+        (log/info (str "///count" (count issues)))
         (remove #(issue-ids-to-exclude (:id %)) 
                 issues))
       (remove #(or ((set (keys (:contexts (:data %)))) (:id selected-context))
