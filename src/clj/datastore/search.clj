@@ -162,20 +162,18 @@
 
 (defn- re-order [search-mode issues]
   (if (= 2 search-mode)
-    (let [_top (sort-by #(:short_title %) 
+    (let [top (sort-by #(:short_title %) 
                        (filter #(and (some? (:short_title %))
                                      (= 0 (:short_title_ints %))) issues))
           bottom (sort-by #(:short_title_ints %)
                           (filter #(> (:short_title_ints %) 0) issues))]
-      #_(concat top bottom)
-      bottom)
+      (concat top bottom))
     (let [top (reverse (sort-by #(:short_title_ints %)
                                 (filter #(> (:short_title_ints %) 0) issues)))
-          _bottom (reverse (sort-by #(:short_title %)
+          bottom (reverse (sort-by #(:short_title %)
                                    (filter #(and (= (:short_title_ints %) 0)
                                                  (some? (:short_title %))) issues)))]
-      #_(concat top bottom)
-      top)))
+      (concat top bottom))))
 
 (defn- expired-filter [issue]
   (and
