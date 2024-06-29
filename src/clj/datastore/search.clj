@@ -139,7 +139,7 @@
                                [:not= :issues.archived [:inline (= 1 events-view)]]]
                               [:=])
         formatted-query (sql/format (merge
-                                     (if (and selected-context (= :issue link-issue))
+                                     (if false #_(and selected-context (= :issue link-issue))
                                        {:select-distinct-on (vec (concat [[:issues.id]] select))}
                                        {:select select})
                                      {
