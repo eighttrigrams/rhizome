@@ -148,9 +148,9 @@
                                                   [:issues.id [:issues.updated_at (if (= 1 search-mode)
                                                                                     :asc 
                                                                                     :desc)]]
-                                                  [:issues.updated_at (if (= 1 search-mode)
+                                                  [[:issues.updated_at (if (= 1 search-mode)
                                                                                     :asc 
-                                                                                    :desc)])
+                                                                                    :desc)]])
                                       :join     join-clause
                                       :where    [:and [:and
                                                        exists-clause
