@@ -16,7 +16,7 @@
 (defn- update-state [{:keys [issues contexts aggregated-contexts] :as i} 
                      state]
   (prn "count" (count (first issues))
-       "?" (and issues (first issues)))
+       "?" (true? (and issues (first issues))))
   (merge 
    (if (map? state) state @state)
    i
