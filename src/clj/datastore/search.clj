@@ -151,8 +151,9 @@
                                                  (when (seq urgent-issues)
                                                    [:not [:in :issues.id [:inline (map :issues/id urgent-issues)]]])]}
                                      (when (and (= "" q)
-                                                (not selected-context)
-                                                (= 0 events-view))
+                                                (if selected-context
+                                                  (= :issues link-issue)
+                                                  (= 0 events-view)))
                                        {:limit 500})))
         issues (jdbc/execute! ds formatted-query)]
     (concat urgent-issues issues)))
