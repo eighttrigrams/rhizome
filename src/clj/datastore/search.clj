@@ -159,20 +159,12 @@
                                      (when (and (= "" q)
                                                   (not selected-context)
                                                   (= 0 events-view))
-                                      #_(and (= "" q)
-                                           (if selected-context
-                                             (= :issue link-issue)
-                                             (= 0 events-view))) 
                                        {:limit 500})))
         formatted-query (if (and selected-context (= :issue link-issue)) 
                           (let [[q :as original-query] formatted-query
                                 formatted-query 
                                   (str "SELECT * FROM (" q ") AS issues ORDER BY issues.updated_at DESC"
-                                       (when (and 
-                                              (= "" q)
-                                              selected-context
-                                              (= :issue link-issue))
-                                         " LIMIT 500"))]
+                                       (when (= "" q) " LIMIT 500"))]
                             (assoc original-query 0 formatted-query))
                           formatted-query)
         issues (jdbc/execute! ds formatted-query)]
