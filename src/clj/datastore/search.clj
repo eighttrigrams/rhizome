@@ -175,7 +175,6 @@
                                          " LIMIT 500"))]
                             (assoc original-query 0 formatted-query))
                           formatted-query)
-        _ (log/info (str "--->" formatted-query))
         issues (jdbc/execute! ds formatted-query)]
     (concat urgent-issues issues)))
 
