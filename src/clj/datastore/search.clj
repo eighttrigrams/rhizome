@@ -147,8 +147,8 @@
                                       :order-by (if (and selected-context (= :issue link-issue))
                                                   [:issues.id]
                                                   [[:issues.updated_at (if (= 1 search-mode)
-                                                                                    :asc 
-                                                                                    :desc)]])
+                                                                         :asc 
+                                                                         :desc)]])
                                       :join     join-clause
                                       :where    [:and [:and
                                                        exists-clause
@@ -156,20 +156,26 @@
                                                        search-clause]
                                                  (when (seq urgent-issues)
                                                    [:not [:in :issues.id [:inline (map :issues/id urgent-issues)]]])]}
-                                     (when #_(and (= "" q)
+                                     (when (and (= "" q)
                                                   (not selected-context)
-                                                  (= 0 events-view)
-                                                  )
-                                      (and (= "" q)
+                                                  (= 0 events-view))
+                                      #_(and (= "" q)
                                            (if selected-context
                                              (= :issue link-issue)
                                              (= 0 events-view))) 
                                        {:limit 500})))
         formatted-query (if (and selected-context (= :issue link-issue)) 
-                                   (let [[q :as original-query] formatted-query
-                                         formatted-query (str "SELECT * FROM (" q ") AS issues ORDER BY issues.updated_at DESC")]
-                                     (assoc original-query 0 formatted-query))
-                                   formatted-query)
+                          (let [[q :as original-query] formatted-query
+                                formatted-query 
+                                  (str "SELECT * FROM (" q ") AS issues ORDER BY issues.updated_at DESC"
+                                       (when (and 
+                                              (= "" q)
+                                              selected-context
+                                              (= :issue link-issue))
+                                         " LIMIT 500"))]
+                            (assoc original-query 0 formatted-query))
+                          formatted-query)
+        _ (log/info (str "--->" formatted-query))
         issues (jdbc/execute! ds formatted-query)]
     (concat urgent-issues issues)))
 
