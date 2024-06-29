@@ -87,7 +87,7 @@
         (log/error (str "error in search/search-contexts: " e " - param was: " q))
         (throw e)))))
 
-(defn- fetch-issue-ids [ds q selected-context events-view link-issue search-mode _selected-issue]
+(defn- fetch-issue-ids [ds q selected-context events-view link-issue search-mode selected-issue]
   (let [select [:issues.title
                 :issues.short_title
                 :issues.short_title_ints
@@ -128,19 +128,24 @@
                               [:collections [:= :issues.id :collections.item_id]]
                               [])
         join-where-clause   (if selected-context
-                              [:= :collections.container_id (:id selected-context)]
+                              #_[:= :collections.container_id (:id selected-context)]
+                              (if (= :issue link-issue)
+                                [:in :collections.container_id [:inline (keys (:contexts (:data selected-issue)))]]
+                                [:= :collections.container_id (:id selected-context)])
                               [:=])
         exists-clause       (if (not= 0 events-view)
                               [:and
                                [:<> :issues.date nil]
                                [:not= :issues.archived [:inline (= 1 events-view)]]]
                               [:=])
+        selects (vec (concat [[:issues.id]] select))
+        _ (log/info (str "..." selects))
         formatted-query (sql/format (merge
-                                     {:select   select
+                                     {:select-distinct-on selects
                                       :from     [:issues]
-                                      :order-by [[:issues.updated_at (if (= 1 search-mode)
-                                                                       :asc 
-                                                                       :desc)]]
+                                      :order-by [:issues.id [:issues.updated_at (if (= 1 search-mode)
+                                                                                  :asc 
+                                                                                  :desc)]]
                                       :join     join-clause
                                       :where    [:and [:and
                                                        exists-clause
@@ -148,9 +153,14 @@
                                                        search-clause]
                                                  (when (seq urgent-issues)
                                                    [:not [:in :issues.id [:inline (map :issues/id urgent-issues)]]])]}
-                                     (when (and (= "" q)
-                                                (not selected-context)
-                                                (= 0 events-view))
+                                     (when #_(and (= "" q)
+                                                  (not selected-context)
+                                                  (= 0 events-view)
+                                                  )
+                                      (and (= "" q)
+                                           (if selected-context
+                                             (= :issue link-issue)
+                                             (= 0 events-view))) 
                                        {:limit 500})))
         issues (jdbc/execute! ds formatted-query)]
     (concat urgent-issues issues)))
