@@ -152,7 +152,7 @@
                                                    [:not [:in :issues.id [:inline (map :issues/id urgent-issues)]]])]}
                                      (when (and (= "" q)
                                                 (if selected-context
-                                                  (= :issues link-issue)
+                                                  (= :issue link-issue)
                                                   (= 0 events-view)))
                                        {:limit 500})))
         issues (jdbc/execute! ds formatted-query)]
