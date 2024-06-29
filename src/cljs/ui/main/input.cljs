@@ -10,6 +10,7 @@
   (when-not (and (-> *state deref :selected-context :data :views :current :notes-mode)
                  (not (-> *state deref :search-globally?))
                  (not (= :contexts (:active-search @*state))))
+    (prn "---search")
     (actions/search! *state)))
 
 (def save-input-debounced!
