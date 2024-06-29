@@ -20,7 +20,6 @@
    1000))
 
 (defn- issues-list-component [*state]
-  (prn "issues" (map :id (:issues @*state)))
   [:ul.cards
    (map-indexed
     (fn [idx issue]
