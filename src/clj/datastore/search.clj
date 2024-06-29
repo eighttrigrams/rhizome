@@ -87,17 +87,8 @@
         (log/error (str "error in search/search-contexts: " e " - param was: " q))
         (throw e)))))
 
-(defn- fetch-issue-ids [ds q selected-context events-view link-issue search-mode]
-  (let [select-simple [:issues.title
-                       :issues.short_title
-                       :issues.short_title_ints
-                       :issues.id
-                       :issues.data
-                       :issues.is_context
-                       :issues.updated_at
-                       :issues.date
-                       :issues.archived]
-        select [:issues.title
+(defn- fetch-issue-ids [ds q selected-context events-view link-issue search-mode _selected-issue]
+  (let [select [:issues.title
                 :issues.short_title
                 :issues.short_title_ints
                 :issues.id
@@ -145,9 +136,7 @@
                                [:not= :issues.archived [:inline (= 1 events-view)]]]
                               [:=])
         formatted-query (sql/format (merge
-                                     {:select   (if (not= 0 events-view)
-                                                  select
-                                                  select-simple)
+                                     {:select   select
                                       :from     [:issues]
                                       :order-by [[:issues.updated_at (if (= 1 search-mode)
                                                                        :asc 
@@ -230,7 +219,7 @@
         global-events-view) 0))
 
 (defn- do-fetch-ids 
-  [db {:keys [q search-globally? selected-context link-issue]
+  [db {:keys [q search-globally? selected-context link-issue selected-issue]
        :or   {q ""}
        :as state} search-mode]
   (seq (fetch-issue-ids db 
@@ -238,7 +227,8 @@
                         (if search-globally? nil selected-context) 
                         (get-events-view state)
                         link-issue
-                        search-mode)))
+                        search-mode
+                        selected-issue)))
 
 (defn- filter-issues
   [{:keys [link-issue 
