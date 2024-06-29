@@ -168,8 +168,11 @@
         formatted-query (if (and selected-context (= :issue link-issue)) 
                                    (let [[q i] formatted-query
                                          q (str "SELECT * FROM (" q ") AS issues ORDER BY issues.updated_at DESC")]
-                                     [q i])
+                                     (if (nil? i)
+                                       [q]
+                                       [q i]))
                                    formatted-query)
+        _ (log/info (str "--->" formatted-query))
         issues (jdbc/execute! ds formatted-query)]
     (concat urgent-issues issues)))
 
