@@ -114,7 +114,7 @@
               secondary-contexts-inverted]} :current} :views} :data}
    issues]
   (let [selected-secondary-contexts-set (into #{} selected-secondary-contexts)
-        link-issue? (= :issue link-issue)]
+        link-issue? link-issue]
     (if (and (not link-issue?)
              (or secondary-contexts-unassigned-selected
                  (seq selected-secondary-contexts-set)))
@@ -177,8 +177,12 @@
   [db {:keys [q search-globally? selected-context link-issue selected-issue]
        :or   {q ""}
        :as state} search-mode]
-  (let [selected-context (if search-globally? nil selected-context)
-        events-view (get-events-view state)
+  (let [events-view (get-events-view state)
+        selected-context (if (and search-globally?
+                                  (not 
+                                   (and (= :context link-issue)
+                                        (seq (:selected-secondary-contexts (:current (:views (:data selected-context)))))))) 
+                           nil selected-context)
         selected-context (when (:id selected-context) selected-context)
         search-clause       (if (not= "" q)
                               [:raw (format "searchable @@ to_tsquery('simple', '%s')" 
@@ -187,11 +191,13 @@
         join-clause         (if selected-context
                               [:collections [:= :issues.id :collections.item_id]]
                               [])
-        _context-ids-to-join-on-link-issue-context(:selected-secondary-contexts (:current (:views (:data selected-context))))
+        context-ids-to-join-on-link-issue-context (:selected-secondary-contexts (:current (:views (:data selected-context))))
         context-ids-to-join-on-link-issue-issue (keys (:contexts (:data selected-issue)))
         join-where-clause   (if selected-context
-                              (if (= :issue link-issue)
-                                [:in :collections.container_id [:inline context-ids-to-join-on-link-issue-issue]]
+                              (if link-issue
+                                [:in :collections.container_id [:inline (if (= :issue link-issue)
+                                                                          context-ids-to-join-on-link-issue-issue
+                                                                          context-ids-to-join-on-link-issue-context)]]
                                 [:= :collections.container_id (:id selected-context)])
                               [:=])
         exists-clause       (if (not= 0 events-view)
@@ -201,12 +207,12 @@
                               [:=])
         urgent-issues (do-fetch-urgent-issues-ids db link-issue events-view selected-context q)
         formatted-query (sql/format (merge
-                                     (if (and selected-context (= :issue link-issue))
+                                     (if (and selected-context link-issue)
                                        {:select-distinct-on (vec (concat [[:issues.id]] select))}
                                        {:select select})
                                      {
                                       :from     [:issues]
-                                      :order-by (if (and selected-context (= :issue link-issue))
+                                      :order-by (if (and selected-context link-issue)
                                                   [:issues.id]
                                                   [[:issues.updated_at (if (= 1 search-mode)
                                                                          :asc 
@@ -219,16 +225,16 @@
                                                  (when (seq urgent-issues)
                                                    [:not [:in :issues.id [:inline (map :issues/id urgent-issues)]]])]}
                                      (when (and (= "" q)
-                                                  (not selected-context)
-                                                  (= 0 events-view))
+                                                (not selected-context)
+                                                (= 0 events-view))
                                        {:limit 500})))
-        formatted-query (if (and selected-context (= :issue link-issue)) 
+        formatted-query (if (and selected-context link-issue) 
                           (let [[q :as original-query] formatted-query
                                 formatted-query 
-                                  (str "SELECT * FROM (" q ") AS issues ORDER BY issues.updated_at DESC"
-                                       (when #_(= "" q) 
-                                         true ;; it's good to limit this in general now, since it still can be many
-                                         " LIMIT 500"))]
+                                (str "SELECT * FROM (" q ") AS issues ORDER BY issues.updated_at DESC"
+                                     (when #_(= "" q) 
+                                      true ;; it's good to limit this in general now, since it still can be many
+                                       " LIMIT 500"))]
                             (assoc original-query 0 formatted-query))
                           formatted-query)
         issues (jdbc/execute! db formatted-query)]
