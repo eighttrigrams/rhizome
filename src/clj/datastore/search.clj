@@ -193,29 +193,31 @@
     (concat top bottom)))
 
 (defn- filter-by-selected-secondary-contexts 
-  [selected-secondary-contexts-set 
-   secondary-contexts-unassigned-selected
-   secondary-contexts-inverted
-   link-issue?
+  [{:keys [link-issue]
+    {{{:keys [selected-secondary-contexts
+              secondary-contexts-unassigned-selected
+              secondary-contexts-inverted]} :current} :views} :data}
    issues]
-  (if (and (not link-issue?)
-           (or secondary-contexts-unassigned-selected
-               (seq selected-secondary-contexts-set)))
-    ((if-not secondary-contexts-inverted filter remove)
-     (fn [issue]
-       (or 
-        (and secondary-contexts-unassigned-selected
-             (= 1 (count (:contexts (:data issue)))))
-        
-        (if-not secondary-contexts-inverted
-          (and (not secondary-contexts-unassigned-selected)
-               (every? identity (map #(contains? (set (keys (:contexts (:data issue)))) %) 
-                                     selected-secondary-contexts-set)))
-          (seq (set/intersection 
-                (set (keys (:contexts (:data issue))))
-                selected-secondary-contexts-set)))))
-     issues)
-    issues))
+  (let [selected-secondary-contexts-set (into #{} selected-secondary-contexts)
+        link-issue? (= :issue link-issue)]
+    (if (and (not link-issue?)
+             (or secondary-contexts-unassigned-selected
+                 (seq selected-secondary-contexts-set)))
+      ((if-not secondary-contexts-inverted filter remove)
+       (fn [issue]
+         (or 
+          (and secondary-contexts-unassigned-selected
+               (= 1 (count (:contexts (:data issue)))))
+          
+          (if-not secondary-contexts-inverted
+            (and (not secondary-contexts-unassigned-selected)
+                 (every? identity (map #(contains? (set (keys (:contexts (:data issue)))) %) 
+                                       selected-secondary-contexts-set)))
+            (seq (set/intersection 
+                  (set (keys (:contexts (:data issue))))
+                  selected-secondary-contexts-set)))))
+       issues)
+      issues)))
 
 (defn- get-events-view 
   [{{{{{:keys [events-view]} :current} :views} :data
@@ -280,21 +282,13 @@
       (sort-for-regular-view issues state))))
 
 (defn- search-issues'
-  [db {:keys                                                                                                                                [link-issue]
-       {{{{:keys [selected-secondary-contexts
-                  secondary-contexts-inverted
-                  secondary-contexts-unassigned-selected
-                  search-mode]} :current} :views} :data} :selected-context
+  [db {{{{{:keys [search-mode]} :current} :views} :data} :selected-context
        :as                                                                                                                                  opts}]
        (let [issues (do-fetch-ids db opts search-mode)]
          (->> issues
               (map common/post-process-simple)
               (sort-issues opts)
-              (filter-by-selected-secondary-contexts 
-               (into #{} selected-secondary-contexts)
-               secondary-contexts-unassigned-selected
-               secondary-contexts-inverted
-               (= :issue link-issue))
+              (filter-by-selected-secondary-contexts opts)
               (filter-issues opts))))
 
 (defn- try-parse [item]
