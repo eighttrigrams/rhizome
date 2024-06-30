@@ -109,9 +109,9 @@
 
 (defn- filter-by-selected-secondary-contexts 
   [{:keys [link-issue]
-    {{{:keys [selected-secondary-contexts
+    {{{{:keys [selected-secondary-contexts
               secondary-contexts-unassigned-selected
-              secondary-contexts-inverted]} :current} :views} :data}
+              secondary-contexts-inverted]} :current} :views} :data} :selected-context}
    issues]
   (let [selected-secondary-contexts-set (into #{} selected-secondary-contexts)
         link-issue? (= :issue link-issue)]
@@ -197,6 +197,7 @@
                               (if link-issue
                                 [:in :collections.container_id [:inline (if (= :issue link-issue)
                                                                           context-ids-to-join-on-link-issue-issue
+                                                                          ;; TODO this should not be an in query, but an composed and query (intersection); then, later on, in filter-by-selected-secondary-contexts , we don't do any filtering any more 
                                                                           context-ids-to-join-on-link-issue-context)]]
                                 [:= :collections.container_id (:id selected-context)])
                               [:=])
@@ -237,7 +238,9 @@
                                        " LIMIT 500"))]
                             (assoc original-query 0 formatted-query))
                           formatted-query)
+        _ (log/info (str "formatted-query: " formatted-query))
         issues (jdbc/execute! db formatted-query)]
+    (log/info (str "count: " (count issues)))
     (seq (concat urgent-issues issues))))
 
 (defn- filter-issues
