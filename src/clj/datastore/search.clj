@@ -234,7 +234,9 @@
                                 formatted-query 
                                 (str "SELECT * FROM (" q ") AS issues ORDER BY issues.updated_at DESC"
                                      (when #_(= "" q) 
-                                      true ;; it's good to limit this in general now, since it still can be many
+                                        ;; it's good to limit this in general now, since it still can be many
+                                        ;; however, when link-issue to context, we shouldn't filter, since we filter later (see TODO above)
+                                       (= :issue link-issue)
                                        " LIMIT 500"))]
                             (assoc original-query 0 formatted-query))
                           formatted-query)
