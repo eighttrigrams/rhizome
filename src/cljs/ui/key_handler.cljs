@@ -56,7 +56,11 @@
                (actions/link-with-global-search! *state)
                (and (not alt-pressed?) selected-issue (= "KeyA" code))
                (actions/link-with-local-search! *state)
-               (and selected-context (not selected-issue) (not in-notes-mode?) (= "KeyA" code))
+               (and selected-context 
+                    (not selected-issue)
+                    (= "KeyA" code)
+                    (and (not (-> @*state :selected-context :data :views :current :secondary-contexts-inverted)) 
+                       (not (-> @*state :selected-context :data :views :current :secondary-contexts-unassigned-selected))))
                (actions/link-issue-to-selected-context! *state)
                (and (= "KeyC" code)
                     (not meta-pressed?)
