@@ -114,7 +114,7 @@
               secondary-contexts-inverted]} :current} :views} :data}
    issues]
   (let [selected-secondary-contexts-set (into #{} selected-secondary-contexts)
-        link-issue? link-issue]
+        link-issue? (= :issue link-issue)]
     (if (and (not link-issue?)
              (or secondary-contexts-unassigned-selected
                  (seq selected-secondary-contexts-set)))
