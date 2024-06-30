@@ -142,22 +142,18 @@
         events-view
         global-events-view) 0))
 
-(defn- do-fetch-ids 
-  [db {:keys [q search-globally? selected-context link-issue selected-issue]
-       :or   {q ""}
-       :as state} search-mode]
-  (let [selected-context (if search-globally? nil selected-context)
-        events-view (get-events-view state)
-        select [:issues.title
-                :issues.short_title
-                :issues.short_title_ints
-                :issues.id
-                :issues.data
-                :issues.is_context
-                :issues.updated_at
-                :issues.date
-                :issues.archived]
-        urgent-events-query
+(def select [:issues.title
+             :issues.short_title
+             :issues.short_title_ints
+             :issues.id
+             :issues.data
+             :issues.is_context
+             :issues.updated_at
+             :issues.date
+             :issues.archived])
+
+(defn- do-fetch-urgent-issues-ids [db link-issue events-view selected-context q]
+  (let [urgent-events-query
         (sql/format
          {:select   select
           :from     [:issues]
@@ -167,30 +163,35 @@
                      [:not= :issues.archived true]
                      [:< 
                       :date
-                                        ;; we sort later
-                      #_[:+ :events.date [:raw "interval '6 hours'"]] 
-                      [:raw "NOW()"]]]})
-        urgent-issues 
-        (if (or link-issue 
-                (not= 0 events-view)
-                selected-context
-                (and (string? q) (not= "" q)))
+                      [:raw "NOW()"]]]})]
+    (if (or link-issue 
+            (not= 0 events-view)
+            selected-context
+            (and (string? q) (not= "" q)))
           '()
           (jdbc/execute! 
            db 
-           urgent-events-query))
+           urgent-events-query))))
+
+(defn- do-fetch-ids 
+  [db {:keys [q search-globally? selected-context link-issue selected-issue]
+       :or   {q ""}
+       :as state} search-mode]
+  (let [selected-context (if search-globally? nil selected-context)
+        events-view (get-events-view state)
         selected-context (when (:id selected-context) selected-context)
         search-clause       (if (not= "" q)
                               [:raw (format "searchable @@ to_tsquery('simple', '%s')" 
                                             (convert-q-to-query-string q))] 
-                              [:=])
+                              [:=]) ;; TODO can i write [] ?
         join-clause         (if selected-context
                               [:collections [:= :issues.id :collections.item_id]]
                               [])
+        _context-ids-to-join-on-link-issue-context(:selected-secondary-contexts (:current (:views (:data selected-context))))
+        context-ids-to-join-on-link-issue-issue (keys (:contexts (:data selected-issue)))
         join-where-clause   (if selected-context
-                              #_[:= :collections.container_id (:id selected-context)]
                               (if (= :issue link-issue)
-                                [:in :collections.container_id [:inline (keys (:contexts (:data selected-issue)))]]
+                                [:in :collections.container_id [:inline context-ids-to-join-on-link-issue-issue]]
                                 [:= :collections.container_id (:id selected-context)])
                               [:=])
         exists-clause       (if (not= 0 events-view)
@@ -198,6 +199,7 @@
                                [:<> :issues.date nil]
                                [:not= :issues.archived [:inline (= 1 events-view)]]]
                               [:=])
+        urgent-issues (do-fetch-urgent-issues-ids db link-issue events-view selected-context q)
         formatted-query (sql/format (merge
                                      (if (and selected-context (= :issue link-issue))
                                        {:select-distinct-on (vec (concat [[:issues.id]] select))}
