@@ -243,6 +243,7 @@
         _ (log/info (str "formatted-query: " formatted-query))
         issues (jdbc/execute! db formatted-query)]
     (log/info (str "count: " (count issues)))
+    ;; TODO this concatenation, and the querying for urgent-issues, should be one level higher, the fn here should not know about it since it already has a well-defined responsibility
     (seq (concat urgent-issues issues))))
 
 (defn- filter-issues
