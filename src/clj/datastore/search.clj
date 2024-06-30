@@ -87,67 +87,8 @@
         (log/error (str "error in search/search-contexts: " e " - param was: " q))
         (throw e)))))
 
-(defn- re-order [search-mode issues]
-  (if (= 2 search-mode)
-    (sort-by #(:short_title_ints %)
-                          (filter #(> (:short_title_ints %) 0) issues))
-    (reverse (sort-by #(:short_title_ints %)
-                      (filter #(> (:short_title_ints %) 0) issues)))))
-
-(defn- expired-filter [issue]
-  (and
-   (not (:archived issue))
-   (:date issue)
-   (= 1 (.compareTo (java.time.Instant/now)
-                    (java.time.Instant/parse (str (:date issue) "T05:45:00Z"))))))
-
-;; TODO extract common pattern (top,bottom) with #re-order
-(defn- pin-events [issues]
-  (let [top (filter expired-filter issues)
-        bottom (remove  expired-filter issues)]
-    (concat top bottom)))
-
-(defn- filter-by-selected-secondary-contexts 
-  [issues
-   {:keys                                                                                                                                            [link-issue]
-    {{{{:keys [selected-secondary-contexts
-               secondary-contexts-inverted
-               secondary-contexts-unassigned-selected]} :current} :views} :data} :selected-context}]
-  (let [selected-secondary-contexts-set (into #{} selected-secondary-contexts)]
-    (if (and (not (= :issue link-issue))
-             (or secondary-contexts-unassigned-selected
-                 (seq selected-secondary-contexts-set)))
-      ((if-not secondary-contexts-inverted filter remove)
-       (fn [issue]
-         (or 
-          (and secondary-contexts-unassigned-selected
-               (= 1 (count (:contexts (:data issue)))))
-          
-          (if-not secondary-contexts-inverted
-            (and (not secondary-contexts-unassigned-selected)
-                 (every? identity (map #(contains? (set (keys (:contexts (:data issue)))) %) 
-                                       selected-secondary-contexts-set)))
-            (seq (set/intersection 
-                  (set (keys (:contexts (:data issue))))
-                  selected-secondary-contexts-set)))))
-       issues)
-      issues)))
-
-(defn- get-events-view 
-  [{{{{{:keys [events-view]} :current} :views} :data
-     :as                                       selected-context} :selected-context
-    global-events-view :events-view}]
-  (or (if selected-context
-        events-view
-        global-events-view) 0))
-
-(defn- do-fetch-ids 
-  [db {:keys [q search-globally? selected-context link-issue selected-issue]
-       :or   {q ""}
-       :as state} search-mode]
-  (let [events-view (get-events-view state)
-        selected-context (if search-globally? nil selected-context) 
-        select [:issues.title
+(defn- fetch-issue-ids [ds q selected-context events-view link-issue search-mode selected-issue]
+  (let [select [:issues.title
                 :issues.short_title
                 :issues.short_title_ints
                 :issues.id
@@ -166,7 +107,7 @@
                      [:not= :issues.archived true]
                      [:< 
                       :date
-                      ;; we sort later
+                                        ;; we sort later
                       #_[:+ :events.date [:raw "interval '6 hours'"]] 
                       [:raw "NOW()"]]]})
         urgent-issues 
@@ -176,7 +117,7 @@
                 (and (string? q) (not= "" q)))
           '()
           (jdbc/execute! 
-           db
+           ds 
            urgent-events-query))
         selected-context (when (:id selected-context) selected-context)
         search-clause       (if (not= "" q)
@@ -228,8 +169,83 @@
                                          " LIMIT 500"))]
                             (assoc original-query 0 formatted-query))
                           formatted-query)
-        issues (jdbc/execute! db formatted-query)]
-    (seq (concat urgent-issues issues))))
+        issues (jdbc/execute! ds formatted-query)]
+    (concat urgent-issues issues)))
+
+(defn- re-order [search-mode issues]
+  (if (= 2 search-mode)
+    (let [_top (sort-by #(:short_title %) 
+                       (filter #(and (some? (:short_title %))
+                                     (= 0 (:short_title_ints %))) issues))
+          bottom (sort-by #(:short_title_ints %)
+                          (filter #(> (:short_title_ints %) 0) issues))]
+      #_(concat top bottom)
+      bottom)
+    (let [top (reverse (sort-by #(:short_title_ints %)
+                                (filter #(> (:short_title_ints %) 0) issues)))
+          _bottom (reverse (sort-by #(:short_title %)
+                                   (filter #(and (= (:short_title_ints %) 0)
+                                                 (some? (:short_title %))) issues)))]
+      #_(concat top bottom)
+      top)))
+
+(defn- expired-filter [issue]
+  (and
+   (not (:archived issue))
+   (:date issue)
+   (= 1 (.compareTo (java.time.Instant/now)
+                    (java.time.Instant/parse (str (:date issue) "T05:45:00Z"))))))
+
+;; TODO extract common pattern (top,bottom) with #re-order
+(defn- pin-events [issues]
+  (let [top (filter expired-filter issues)
+        bottom (remove  expired-filter issues)]
+    (concat top bottom)))
+
+(defn- filter-by-selected-secondary-contexts 
+  [selected-secondary-contexts-set 
+   secondary-contexts-unassigned-selected
+   secondary-contexts-inverted
+   link-issue?
+   issues]
+  (if (and (not link-issue?)
+           (or secondary-contexts-unassigned-selected
+               (seq selected-secondary-contexts-set)))
+    ((if-not secondary-contexts-inverted filter remove)
+     (fn [issue]
+       (or 
+        (and secondary-contexts-unassigned-selected
+             (= 1 (count (:contexts (:data issue)))))
+        
+        (if-not secondary-contexts-inverted
+          (and (not secondary-contexts-unassigned-selected)
+               (every? identity (map #(contains? (set (keys (:contexts (:data issue)))) %) 
+                                     selected-secondary-contexts-set)))
+          (seq (set/intersection 
+                (set (keys (:contexts (:data issue))))
+                selected-secondary-contexts-set)))))
+     issues)
+    issues))
+
+(defn- get-events-view 
+  [{{{{{:keys [events-view]} :current} :views} :data
+     :as                                       selected-context} :selected-context
+    global-events-view :events-view}]
+  (or (if selected-context
+        events-view
+        global-events-view) 0))
+
+(defn- do-fetch-ids 
+  [db {:keys [q search-globally? selected-context link-issue selected-issue]
+       :or   {q ""}
+       :as state} search-mode]
+  (seq (fetch-issue-ids db 
+                        q 
+                        (if search-globally? nil selected-context) 
+                        (get-events-view state)
+                        link-issue
+                        search-mode
+                        selected-issue)))
 
 (defn- filter-issues
   [{:keys [link-issue 
@@ -274,13 +290,21 @@
       (sort-for-regular-view issues state))))
 
 (defn- search-issues'
-  [db {{{{{:keys [search-mode]} :current} :views} :data} :selected-context
-       :as opts}]
+  [db {:keys                                                                                                                                [link-issue]
+       {{{{:keys [selected-secondary-contexts
+                  secondary-contexts-inverted
+                  secondary-contexts-unassigned-selected
+                  search-mode]} :current} :views} :data} :selected-context
+       :as                                                                                                                                  opts}]
        (let [issues (do-fetch-ids db opts search-mode)]
          (->> issues
               (map common/post-process-simple)
               (sort-issues opts)
-              (filter-by-selected-secondary-contexts opts)
+              (filter-by-selected-secondary-contexts 
+               (into #{} selected-secondary-contexts)
+               secondary-contexts-unassigned-selected
+               secondary-contexts-inverted
+               (= :issue link-issue))
               (filter-issues opts))))
 
 (defn- try-parse [item]
