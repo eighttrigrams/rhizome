@@ -141,7 +141,7 @@
         (cond-> :selected-context
           (update :selected-context (fn [a] (dissoc a :search_mode))))
         (assoc :events-view 0)
-        (assoc-in [:selected-context 
+        #_(assoc-in [:selected-context 
                    :data 
                    :views
                    :current
