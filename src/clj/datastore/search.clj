@@ -192,8 +192,7 @@
    search-mode
    events-view
    urgent-issues-ids]
-  (let [selected-context (when (:id selected-context) selected-context)
-        search-clause       (when (not= "" q)
+  (let [search-clause       (when (not= "" q)
                               [:raw (format "searchable @@ to_tsquery('simple', '%s')" 
                                             (convert-q-to-query-string q))])
         join-clause         (if selected-context
@@ -250,6 +249,7 @@
                                    (and (= :context link-issue)
                                         (seq (:selected-secondary-contexts (:current (:views (:data selected-context)))))))) 
                            nil selected-context)
+        selected-context (when (:id selected-context) selected-context)
         events-view (get-events-view state)
         urgent-issues (do-fetch-urgent-issues-ids db link-issue events-view selected-context q)
         urgent-issues-ids (when (seq urgent-issues) (map :issues/id urgent-issues))]
