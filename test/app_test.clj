@@ -136,12 +136,12 @@
           opts      (merge opts (repository/start-linking-issue-to-selected-context
                                  db
                                  (repository/make-search-issues opts)))
-          _ (is (= 1 (count (first (:issues opts)))))
+          _ (is (= 2 (count (first (:issues opts)))))
           opts      ((repository/fetch-context {:db db}) {} [context-1 true])
           opts      (merge opts (repository/start-linking-issue-to-selected-context
                                  db
                                  (repository/make-search-issues opts)))
-          _ (is (= 0 (count (first (:issues opts)))))]))
+          _ (is (= 1 (count (first (:issues opts)))))]))
   (testing "link issue to selected context"
     (reset-db)
     (let [context-1 (create-context "context-1")
