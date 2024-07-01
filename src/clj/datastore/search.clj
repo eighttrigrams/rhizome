@@ -114,7 +114,7 @@
               secondary-contexts-inverted]} :current} :views} :data} :selected-context}
    issues]
   (let [selected-secondary-contexts-set (into #{} selected-secondary-contexts)
-        link-issue? (= :issue link-issue)]
+        link-issue? link-issue]
     (if (and (not link-issue?)
              (or secondary-contexts-unassigned-selected
                  (seq selected-secondary-contexts-set)))
@@ -209,11 +209,13 @@
                               [:=])
         urgent-issues (do-fetch-urgent-issues-ids db link-issue events-view selected-context q)
         formatted-query (sql/format (merge
-                                     (if (and selected-context link-issue)
+                                     (when (and selected-context (= :context link-issue))
+                                       {:group-by [:issues.id]
+                                        :having [:raw (str "COUNT(issues.id) = " (count context-ids-to-join-on-link-issue-context))]})
+                                     (if (and selected-context (= :issue link-issue))
                                        {:select-distinct-on (vec (concat [[:issues.id]] select))}
                                        {:select select})
-                                     {
-                                      :from     [:issues]
+                                     {:from     [:issues]
                                       :order-by (if (and selected-context link-issue)
                                                   [:issues.id]
                                                   [[:issues.updated_at (if (= 1 search-mode)
@@ -233,12 +235,7 @@
         formatted-query (if (and selected-context link-issue) 
                           (let [[q :as original-query] formatted-query
                                 formatted-query 
-                                (str "SELECT * FROM (" q ") AS issues ORDER BY issues.updated_at DESC"
-                                     (when #_(= "" q) 
-                                        ;; it's good to limit this in general now, since it still can be many
-                                        ;; however, when link-issue to context, we shouldn't filter, since we filter later (see TODO above)
-                                       (= :issue link-issue)
-                                       " LIMIT 500"))]
+                                (str "SELECT * FROM (" q ") AS issues ORDER BY issues.updated_at DESC LIMIT 500")]
                             (assoc original-query 0 formatted-query))
                           formatted-query)
         _ (log/info (str "formatted-query: " formatted-query))
