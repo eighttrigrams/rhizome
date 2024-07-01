@@ -25,6 +25,7 @@
 (defn- update-context [context]
   ((repository/update-context {:db db})
    {}
+   ;; TODO review
    {:context {:context context}}))
 
 (defn- create-issue [title 
