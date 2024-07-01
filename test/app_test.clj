@@ -183,6 +183,7 @@
                             (assoc-in opts
                                       [:selected-context :context :context]
                                       context-1)))
+                                ;; TODO review: here we should to identity instead future, but the test works nevertheless as is, so something is probably wrong
           opts      (merge opts (repository/start-linking-issue-to-selected-context
                                  db
                                  (repository/make-search-issues opts)))
