@@ -188,7 +188,7 @@
         search-clause       (if (not= "" q)
                               [:raw (format "searchable @@ to_tsquery('simple', '%s')" 
                                             (convert-q-to-query-string q))] 
-                              [:=]) ;; TODO can i write [] ?
+                              [:=]) ;; TODO i think i can write nil
         join-clause         (if selected-context
                               [:collections [:= :issues.id :collections.item_id]]
                               [])
