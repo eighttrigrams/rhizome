@@ -173,6 +173,7 @@
            db 
            urgent-events-query))))
 
+;; TODO get rid of search-globally?
 (defn- do-fetch-ids 
   [db {:keys [q search-globally? selected-context link-issue selected-issue]
        :or   {q ""}
