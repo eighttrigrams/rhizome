@@ -105,9 +105,22 @@
       (is (= 1 (count (first (:issues opts)))))
       (is (= "issue-2" (:title (ffirst (:issues opts)))))))
   
-  ;; TODO add test for display the correct issues - when issue is connected to other issues; and global (2 more tests)
+  ;; TODO add test for display the correct issues - when issue is connected to other issues
 
-  
+  (testing "connect globally"
+    (reset-db)
+    (let [context-1 (create-context "context-1")
+          context-2 (create-context "context-2")
+          issue-1   (create-issue "issue-1" (:id context-1) [])
+          _issue-2   (create-issue "issue-2" (:id context-1) [])
+          _issue-3   (create-issue "issue-3" (:id context-2) [])
+          opts      ((repository/fetch-context {:db db}) {} [context-1 true]) 
+          opts      (merge opts ((repository/select-issue {:db db}) opts issue-1 false))
+          
+          opts      (merge opts (repository/start-linking-selected-issue-to-issue-with-global-search 
+                                 db
+                                 (repository/make-search-issues opts)))]
+      (is (= 4 (count (first (:issues opts)))))))
 
   (testing "with local search"
     (reset-db)
