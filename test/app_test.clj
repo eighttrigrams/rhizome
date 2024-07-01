@@ -158,7 +158,7 @@
             _issue-2  (create-issue "issue-2" (:id context-2) [(:id context-3)])
             _issue-2  (create-issue "issue-3" (:id context-2) [])
             opts      ((repository/fetch-context {:db db}) {} [context-1 true])
-            _opts ;; we have to overwrite the future thing
+            _opts
             ((repository/change-secondary-contexts-selection {:db db})
              (->
               opts
