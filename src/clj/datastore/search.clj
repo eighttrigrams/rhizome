@@ -173,6 +173,15 @@
            db 
            urgent-events-query))))
 
+(defn- get-formatted-query [formatted-query selected-context link-issue]
+  (let [formatted-query (if (and selected-context link-issue) 
+                          (let [[q :as original-query] formatted-query
+                                formatted-query        (str "SELECT * FROM (" q ") AS issues ORDER BY issues.updated_at DESC LIMIT 500")]
+                            (assoc original-query 0 formatted-query))
+                          formatted-query)]
+    (log/info (str "formatted-query: " formatted-query))
+    formatted-query))
+
 ;; TODO get rid of search-globally?
 (defn- do-fetch-ids 
   [db {:keys [q search-globally? selected-context link-issue selected-issue]
@@ -185,28 +194,25 @@
                                         (seq (:selected-secondary-contexts (:current (:views (:data selected-context)))))))) 
                            nil selected-context)
         selected-context (when (:id selected-context) selected-context)
-        search-clause       (if (not= "" q)
+        search-clause       (when (not= "" q)
                               [:raw (format "searchable @@ to_tsquery('simple', '%s')" 
-                                            (convert-q-to-query-string q))] 
-                              [:=]) ;; TODO i think i can write nil
+                                            (convert-q-to-query-string q))])
         join-clause         (if selected-context
                               [:collections [:= :issues.id :collections.item_id]]
                               [])
         context-ids-to-join-on-link-issue-context (:selected-secondary-contexts (:current (:views (:data selected-context))))
         context-ids-to-join-on-link-issue-issue (keys (:contexts (:data selected-issue)))
-        join-where-clause   (if selected-context
+        join-where-clause   (when selected-context
                               (if link-issue
                                 [:in :collections.container_id [:inline (if (= :issue link-issue)
                                                                           context-ids-to-join-on-link-issue-issue
                                                                           ;; TODO this should not be an in query, but an composed and query (intersection); then, later on, in filter-by-selected-secondary-contexts , we don't do any filtering any more 
                                                                           context-ids-to-join-on-link-issue-context)]]
-                                [:= :collections.container_id (:id selected-context)])
-                              [:=])
-        exists-clause       (if (not= 0 events-view)
+                                [:= :collections.container_id (:id selected-context)]))
+        exists-clause       (when (not= 0 events-view)
                               [:and
                                [:<> :issues.date nil]
-                               [:not= :issues.archived [:inline (= 1 events-view)]]]
-                              [:=])
+                               [:not= :issues.archived [:inline (= 1 events-view)]]])
         urgent-issues (do-fetch-urgent-issues-ids db link-issue events-view selected-context q)
         formatted-query (sql/format (merge
                                      (when (and selected-context (= :context link-issue))
@@ -232,13 +238,7 @@
                                                 (not selected-context)
                                                 (= 0 events-view))
                                        {:limit 500})))
-        formatted-query (if (and selected-context link-issue) 
-                          (let [[q :as original-query] formatted-query
-                                formatted-query 
-                                (str "SELECT * FROM (" q ") AS issues ORDER BY issues.updated_at DESC LIMIT 500")]
-                            (assoc original-query 0 formatted-query))
-                          formatted-query)
-        _ (log/info (str "formatted-query: " formatted-query))
+        formatted-query (get-formatted-query formatted-query selected-context link-issue)
         issues (jdbc/execute! db formatted-query)]
     (log/info (str "count: " (count issues)))
     ;; TODO this concatenation, and the querying for urgent-issues, should be one level higher, the fn here should not know about it since it already has a well-defined responsibility
