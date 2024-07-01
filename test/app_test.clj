@@ -178,12 +178,6 @@
           context-2 (create-context "context-2")
           issue-1   (create-issue "issue-1" (:id context-1) [])
           opts      ((repository/fetch-context {:db db}) {} [context-2 true])
-          opts      (merge opts
-                           ((repository/change-secondary-contexts-selection {:db db})
-                            (assoc-in opts
-                                      [:selected-context :context :context]
-                                      context-1)))
-                                ;; TODO review: here we should to identity instead future, but the test works nevertheless as is, so something is probably wrong
           opts      (merge opts (repository/start-linking-issue-to-selected-context
                                  db
                                  (repository/make-search-issues opts)))
