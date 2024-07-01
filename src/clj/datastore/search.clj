@@ -215,6 +215,7 @@
                                        {:group-by [:issues.id]
                                         :having [:raw (str "COUNT(issues.id) = " (count context-ids-to-join-on-link-issue-context))]})
                                      (if (and selected-context (= :issue link-issue))
+                                       ;; TODO maybe we don't need a distinction here and can simply resort to use group by
                                        {:select-distinct-on (vec (concat [[:issues.id]] select))}
                                        {:select select})
                                      {:from     [:issues]
