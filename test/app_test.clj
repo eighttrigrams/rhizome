@@ -110,7 +110,10 @@
                      :issues
                      first)]
       (is (= 1 (count issues)))
-      (is (= "issue-3" (:title (first issues)))))))
+      (is (= "issue-3" (:title (first issues))))))
+      
+      ;; TODO add test for display the correct issues - when issue is connected to other issues; when not; and global (3 tests)
+      )
 
 (deftest link-selected-issue-to-context 
   (testing "base case"
