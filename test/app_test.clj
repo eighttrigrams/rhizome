@@ -151,12 +151,12 @@
           opts      (merge opts
                            ((repository/change-secondary-contexts-selection {:db db})
                             (assoc-in opts
-                                      [:selected-context :data :views :current :selected-secondary-contexts]
-                                      [(:id context-1)])))
+                                      [:selected-context :context :context]
+                                      context-1)))
           opts      (merge opts (repository/start-linking-issue-to-selected-context
                                  db
                                  (repository/make-search-issues opts)))
           opts      (merge opts ((repository/finish-linking-issue {:db db}) 
                                  opts (:id issue-1)))
-          _         (is (= #{"context-1" "context-2"} 
-                           (set (vals (:contexts (ffirst (:issues opts)))))))])))
+          _         (is (= '("context-1" "context-2")
+                           (vals (:contexts (:data (ffirst (:issues opts)))))))])))
