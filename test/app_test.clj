@@ -85,7 +85,10 @@
                    [context-2-id ["context-2" 1 false]]) 
              (second (:issues ((repository/fetch-context {:db db})
                                                         {}
-                                                        [context-1 false]))))))))
+                                                        [context-1 false])))))))
+  ;; TODO add case to demo global and local search
+  ;; TODO demo different filtering options, secondary-contexts, invert, no secondary contexts etc.
+  )
 
 (deftest link-issue-to-issue 
   
@@ -94,8 +97,8 @@
     (let [context-1 (create-context "context-1")
           context-2 (create-context "context-2")
           issue-1   (create-issue "issue-1" (:id context-1) [])
-          _issue-2   (create-issue "issue-2" (:id context-1) [])
-          _issue-3   (create-issue "issue-3" (:id context-2) [])
+          _issue-2  (create-issue "issue-2" (:id context-1) [])
+          _issue-3  (create-issue "issue-3" (:id context-2) [])
           opts      ((repository/fetch-context {:db db}) {} [context-1 true]) 
           opts      (merge opts ((repository/select-issue {:db db}) opts issue-1 false))
           
@@ -105,15 +108,30 @@
       (is (= 1 (count (first (:issues opts)))))
       (is (= "issue-2" (:title (ffirst (:issues opts)))))))
   
-  ;; TODO add test for display the correct issues - when issue is connected to other issues
-
+  (testing "connect locally, but outside context because connected issues"
+    (reset-db)
+    (let [context-1 (create-context "context-1")
+          context-2 (create-context "context-2")
+          context-3 (create-context "context-3")
+          issue-1   (create-issue "issue-1" (:id context-1) [(:id context-2)])
+          _issue-2  (create-issue "issue-2" (:id context-2) [])
+          _issue-3  (create-issue "issue-3" (:id context-3) [])
+          opts      ((repository/fetch-context {:db db}) {} [context-1 true]) 
+          opts      (merge opts ((repository/select-issue {:db db}) opts issue-1 false))
+          
+          opts      (merge opts (repository/start-linking-selected-issue-to-issue-with-local-search 
+                                 db
+                                 (repository/make-search-issues opts)))]
+      (is (= 1 (count (first (:issues opts)))))
+      (is (= "issue-2" (:title (ffirst (:issues opts)))))))
+  
   (testing "connect globally"
     (reset-db)
     (let [context-1 (create-context "context-1")
           context-2 (create-context "context-2")
           issue-1   (create-issue "issue-1" (:id context-1) [])
-          _issue-2   (create-issue "issue-2" (:id context-1) [])
-          _issue-3   (create-issue "issue-3" (:id context-2) [])
+          _issue-2  (create-issue "issue-2" (:id context-1) [])
+          _issue-3  (create-issue "issue-3" (:id context-2) [])
           opts      ((repository/fetch-context {:db db}) {} [context-1 true]) 
           opts      (merge opts ((repository/select-issue {:db db}) opts issue-1 false))
           
@@ -127,7 +145,7 @@
     (let [context-1 (create-context "context-1")
           issue-1   (create-issue "issue-1" (:id context-1) [])
           issue-2   (create-issue "issue-2" (:id context-1) [])
-          _issue-3   (create-issue "issue-3" (:id context-1) [])
+          _issue-3  (create-issue "issue-3" (:id context-1) [])
           opts      ((repository/fetch-context {:db db}) {} [context-1 true]) 
           opts      (merge opts ((repository/select-issue {:db db}) opts issue-1 false))
           opts      (merge opts (repository/start-linking-selected-issue-to-issue-with-local-search 
@@ -139,15 +157,12 @@
           opts      (merge opts (repository/start-linking-selected-issue-to-issue-with-local-search
                                  db
                                  (repository/make-search-issues opts)))
-          issues (-> (merge opts {:q ""})
-                     ((repository/list-resources {:db db}))
-                     :issues
-                     first)]
+          issues    (-> (merge opts {:q ""})
+                        ((repository/list-resources {:db db}))
+                        :issues
+                        first)]
       (is (= 1 (count issues)))
-      (is (= "issue-3" (:title (first issues))))))
-      
-      
-      )
+      (is (= "issue-3" (:title (first issues)))))))
 
 (deftest link-selected-issue-to-context 
   (testing "base case"
