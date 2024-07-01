@@ -107,6 +107,7 @@
         bottom (remove  expired-filter issues)]
     (concat top bottom)))
 
+;; TODO most of this, when not inverted and not unassigned selected, can be done as part of the query in do-fetch-ids' 
 (defn- filter-by-selected-secondary-contexts 
   [{:keys [link-issue]
     {{{{:keys [selected-secondary-contexts
