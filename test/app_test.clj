@@ -128,7 +128,7 @@
       (is (= 1 (count contexts))))))
 
 (deftest link-issue-to-selected-context
-  (testing "display the correct issues"
+  (testing "display the correct issues - when NO secondary contexts selected"
     (reset-db)
     (let [context-1 (create-context "context-1")
           context-2 (create-context "context-2")
@@ -144,7 +144,7 @@
                                  (repository/make-search-issues opts)))
           _ (is (= 1 (count (first (:issues opts)))))]))
   
-  (testing "display the correct issues 2"
+  (testing "display the correct issues - when secondary contexts selected"
     (reset-db)
     (with-redefs [repository/the-future identity]
       (let [context-1 (create-context "context-1")
