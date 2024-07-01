@@ -144,7 +144,6 @@
                                  (repository/make-search-issues opts)))
           _ (is (= 1 (count (first (:issues opts)))))]))
   
-  ;; TODO working on this
   (testing "display the correct issues 2"
     (reset-db)
     (let [context-1 (create-context "context-1")
