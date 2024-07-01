@@ -146,30 +146,31 @@
   
   (testing "display the correct issues 2"
     (reset-db)
-    (let [context-1 (create-context "context-1")
-          context-2 (create-context "context-2")
-          context-3 (create-context "context-3")
-          _context-4 (create-context "context-4")
-          _issue-1  (create-issue "issue-1" (:id context-1) [(:id context-2) (:id context-3)])
-          _issue-2  (create-issue "issue-2" (:id context-2) [(:id context-3)])
-          _issue-2  (create-issue "issue-3" (:id context-2) [])
-          opts      ((repository/fetch-context {:db db}) {} [context-1 true])
-          _opts ;; we have to overwrite the future thing
-          ((repository/change-secondary-contexts-selection {:db db})
-           (->
-            opts
-            (assoc :test/indentity-instead-future true)
-            (assoc-in
-                      [:selected-context :data :views :current :selected-secondary-contexts]
-                      [(:id context-2) (:id context-3)])))
-          opts      ((repository/fetch-context {:db db}) {} [context-1 true])
-          opts      (merge opts (repository/start-linking-issue-to-selected-context
-                                 db
-                                 (repository/make-search-issues opts)))
-          _         (is (= 1 (count (first (:issues opts)))))
-          _         (is (= "issue-2" (:title (ffirst (:issues opts)))))
-          
-          ]))
+    (with-redefs [repository/the-future identity]
+      (let [context-1 (create-context "context-1")
+            context-2 (create-context "context-2")
+            context-3 (create-context "context-3")
+            _context-4 (create-context "context-4")
+            _issue-1  (create-issue "issue-1" (:id context-1) [(:id context-2) (:id context-3)])
+            _issue-2  (create-issue "issue-2" (:id context-2) [(:id context-3)])
+            _issue-2  (create-issue "issue-3" (:id context-2) [])
+            opts      ((repository/fetch-context {:db db}) {} [context-1 true])
+            _opts ;; we have to overwrite the future thing
+            ((repository/change-secondary-contexts-selection {:db db})
+             (->
+              opts
+              (assoc :test/indentity-instead-future true)
+              (assoc-in
+               [:selected-context :data :views :current :selected-secondary-contexts]
+               [(:id context-2) (:id context-3)])))
+            opts      ((repository/fetch-context {:db db}) {} [context-1 true])
+            opts      (merge opts (repository/start-linking-issue-to-selected-context
+                                   db
+                                   (repository/make-search-issues opts)))
+            _         (is (= 1 (count (first (:issues opts)))))
+            _         (is (= "issue-2" (:title (ffirst (:issues opts)))))
+            
+            ])))
 
   (testing "link issue to selected context"
     (reset-db)

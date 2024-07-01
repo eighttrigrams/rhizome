@@ -63,12 +63,12 @@
         (log/error e (str "Caught an exception in fetch-context " (.getMessage e)))
         (throw e)))))
 
+(defn the-future [arg]
+  (future arg))
+
 (defn- change-secondary-contexts-operation [db]
   (fn [opts]
-    (let [_context ((if-not (:test/indentity-instead-future opts) 
-                      future 
-                      identity)
-                    (datastore/update-context db {:context (:selected-context opts)}))]
+    (let [_context (the-future (datastore/update-context db {:context (:selected-context opts)}))]
       {;;:selected-context context
        :issues (search/search-issues db (assoc opts :skip-context-aggregation? true))})))
 
