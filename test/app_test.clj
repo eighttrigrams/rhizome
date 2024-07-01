@@ -146,7 +146,7 @@
     (reset-db)
     (let [context-1 (create-context "context-1")
           context-2 (create-context "context-2")
-          issue-1  (create-issue "issue-1" (:id context-1) [])
+          issue-1   (create-issue "issue-1" (:id context-1) [])
           opts      ((repository/fetch-context {:db db}) {} [context-2 true])
           opts      (merge opts
                            ((repository/change-secondary-contexts-selection {:db db})
