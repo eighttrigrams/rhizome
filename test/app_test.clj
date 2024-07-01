@@ -12,7 +12,6 @@
          :hostname "127.0.0.1"})
 
 (defn reset-db []
-  (jdbc/execute-one! db ["delete from events"])
   (jdbc/execute-one! db ["delete from collections"])
   (jdbc/execute-one! db ["delete from issue_issue"])
   (jdbc/execute-one! db ["delete from issues"]))
@@ -24,9 +23,9 @@
      :arg {:title title}})))
 
 (defn- update-context [context]
-  ((repository/list-resources {:db db})
-   {:cmd :update-context
-    :arg {:context context}}))
+  ((repository/update-context {:db db})
+   {}
+   {:context {:context context}}))
 
 (defn- create-issue [title 
                      context-id 
@@ -64,8 +63,8 @@
                                    :data {:a ["1" "2"]}))
           context (first (:contexts (repository/search-contexts db "")))]
       (is (=
-           {:a ["1" "2"]}
-           (:data (:selected-context ((repository/fetch-context {:db db}) {} [context false]))))))))
+           ["1" "2"]
+           (:a (:data (:selected-context ((repository/fetch-context {:db db}) {} [context false])))))))))
 
 (deftest search 
   (testing "aggregating contexts"
