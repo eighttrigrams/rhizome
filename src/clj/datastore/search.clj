@@ -183,17 +183,15 @@
     formatted-query))
 
 ;; TODO get rid of search-globally?
-(defn- do-fetch-ids 
-  [db {:keys [q search-globally? selected-context link-issue selected-issue]
-       :or   {q ""}
-       :as state} search-mode]
-  (let [events-view (get-events-view state)
-        selected-context (if (and search-globally?
-                                  (not 
-                                   (and (= :context link-issue)
-                                        (seq (:selected-secondary-contexts (:current (:views (:data selected-context)))))))) 
-                           nil selected-context)
-        selected-context (when (:id selected-context) selected-context)
+;; TODO pull out the actual firing off of the query from here (and from do-fetch-urgent-issues-ids)
+(defn- do-fetch-ids' 
+  [db {:keys [q link-issue selected-issue]
+       :or   {q ""}} 
+   selected-context
+   search-mode
+   events-view
+   urgent-issues-ids]
+  (let [selected-context (when (:id selected-context) selected-context)
         search-clause       (when (not= "" q)
                               [:raw (format "searchable @@ to_tsquery('simple', '%s')" 
                                             (convert-q-to-query-string q))])
@@ -206,14 +204,12 @@
                               (if link-issue
                                 [:in :collections.container_id [:inline (if (= :issue link-issue)
                                                                           context-ids-to-join-on-link-issue-issue
-                                                                          ;; TODO this should not be an in query, but an composed and query (intersection); then, later on, in filter-by-selected-secondary-contexts , we don't do any filtering any more 
                                                                           context-ids-to-join-on-link-issue-context)]]
                                 [:= :collections.container_id (:id selected-context)]))
         exists-clause       (when (not= 0 events-view)
                               [:and
                                [:<> :issues.date nil]
                                [:not= :issues.archived [:inline (= 1 events-view)]]])
-        urgent-issues (do-fetch-urgent-issues-ids db link-issue events-view selected-context q)
         formatted-query (sql/format (merge
                                      (when (and selected-context (= :context link-issue))
                                        {:group-by [:issues.id]
@@ -232,8 +228,8 @@
                                                        exists-clause
                                                        join-where-clause
                                                        search-clause]
-                                                 (when (seq urgent-issues)
-                                                   [:not [:in :issues.id [:inline (map :issues/id urgent-issues)]]])]}
+                                                 (when urgent-issues-ids
+                                                   [:not [:in :issues.id [:inline urgent-issues-ids]]])]}
                                      (when (and (= "" q)
                                                 (not selected-context)
                                                 (= 0 events-view))
@@ -241,8 +237,21 @@
         formatted-query (get-formatted-query formatted-query selected-context link-issue)
         issues (jdbc/execute! db formatted-query)]
     (log/info (str "count: " (count issues)))
-    ;; TODO this concatenation, and the querying for urgent-issues, should be one level higher, the fn here should not know about it since it already has a well-defined responsibility
-    (seq (concat urgent-issues issues))))
+    issues))
+
+(defn- do-fetch-ids 
+  [db {:keys [q search-globally? selected-context link-issue]
+       :or   {q ""}
+       :as   state} search-mode]
+  (let [selected-context (if (and search-globally?
+                                  (not 
+                                   (and (= :context link-issue)
+                                        (seq (:selected-secondary-contexts (:current (:views (:data selected-context)))))))) 
+                           nil selected-context)
+        events-view (get-events-view state)
+        urgent-issues (do-fetch-urgent-issues-ids db link-issue events-view selected-context q)
+        urgent-issues-ids (when (seq urgent-issues) (map :issues/id urgent-issues))]
+    (seq (concat urgent-issues (do-fetch-ids' db state selected-context search-mode events-view urgent-issues-ids)))))
 
 (defn- filter-issues
   [{:keys [link-issue 
