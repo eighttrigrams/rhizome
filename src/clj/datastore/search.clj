@@ -183,18 +183,21 @@
     (log/info (str "formatted-query: " formatted-query))
     formatted-query))
 
+(defn- get-search-clause [q]
+  (when (not= "" q)
+    [:raw (format "searchable @@ to_tsquery('simple', '%s')" 
+                  (convert-q-to-query-string q))]))
+
 ;; TODO get rid of search-globally?
 ;; TODO pull out the actual firing off of the query from here (and from do-fetch-urgent-issues-ids)
 (defn- do-fetch-ids' 
-  [db {:keys [q link-issue selected-issue]
-       :or   {q ""}} 
+  [{:keys [q link-issue selected-issue]
+    :or   {q ""}} 
    selected-context
    search-mode
    events-view
    urgent-issues-ids]
-  (let [search-clause       (when (not= "" q)
-                              [:raw (format "searchable @@ to_tsquery('simple', '%s')" 
-                                            (convert-q-to-query-string q))])
+  (let [search-clause       (get-search-clause q)
         join-clause         (if selected-context
                               [:collections [:= :issues.id :collections.item_id]]
                               [])
@@ -234,9 +237,11 @@
                                      (when (and (= "" q)
                                                 (not selected-context)
                                                 (= 0 events-view))
-                                       {:limit 500})))
-        formatted-query (get-formatted-query formatted-query selected-context link-issue)
-        issues (jdbc/execute! db formatted-query)]
+                                       {:limit 500})))]
+    (get-formatted-query formatted-query selected-context link-issue)))
+
+(defn- do-query [db formatted-query]
+  (let [issues (jdbc/execute! db formatted-query)]
     (log/info (str "count: " (count issues)))
     issues))
 
@@ -252,8 +257,9 @@
         selected-context (when (:id selected-context) selected-context)
         events-view (get-events-view state)
         urgent-issues (do-fetch-urgent-issues-ids db link-issue events-view selected-context q)
-        urgent-issues-ids (when (seq urgent-issues) (map :issues/id urgent-issues))]
-    (seq (concat urgent-issues (do-fetch-ids' db state selected-context search-mode events-view urgent-issues-ids)))))
+        urgent-issues-ids (when (seq urgent-issues) (map :issues/id urgent-issues))
+        issues-ids (do-query db (do-fetch-ids' state selected-context search-mode events-view urgent-issues-ids))]
+    (seq (concat urgent-issues-ids issues-ids))))
 
 (defn- filter-issues
   [{:keys [link-issue 
