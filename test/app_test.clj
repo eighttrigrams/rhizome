@@ -216,6 +216,7 @@
               (assoc-in
                [:selected-context :data :views :current :selected-secondary-contexts]
                [(:id context-2) (:id context-3)])))
+            ;; TODO review - a little odd that i have to fetch the context here again
             opts      ((repository/fetch-context {:db db}) {} [context-1 true])
             opts      (merge opts (repository/start-linking-issue-to-selected-context
                                    db
