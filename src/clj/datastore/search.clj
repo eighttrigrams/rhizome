@@ -256,9 +256,9 @@
                            nil selected-context)
         selected-context (when (:id selected-context) selected-context)
         events-view (get-events-view state)
-        urgent-issues (do-fetch-urgent-issues-ids db link-issue events-view selected-context q)
-        urgent-issues-ids (when (seq urgent-issues) (map :issues/id urgent-issues))
-        issues-ids (do-query db (do-fetch-ids' state selected-context search-mode events-view urgent-issues-ids))]
+        urgent-issues-ids (do-fetch-urgent-issues-ids db link-issue events-view selected-context q)
+        urgent-issues-ids-simplified (when (seq urgent-issues-ids) (map :issues/id urgent-issues-ids))
+        issues-ids (do-query db (do-fetch-ids' state selected-context search-mode events-view urgent-issues-ids-simplified))]
     (seq (concat urgent-issues-ids issues-ids))))
 
 (defn- filter-issues
