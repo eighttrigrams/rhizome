@@ -118,7 +118,7 @@
         link-issue? link-issue]
     (if (and (not link-issue?)
              (or secondary-contexts-unassigned-selected
-                 (seq selected-secondary-contexts-set)))
+                 secondary-contexts-inverted))
       ((if-not secondary-contexts-inverted filter remove)
        (fn [issue]
          (or 
@@ -201,7 +201,8 @@
    search-mode
    events-view
    issue-ids-to-remove
-   join-ids]
+   join-ids
+   and?]
   (-> 
    (sql/format 
     (merge
@@ -216,7 +217,7 @@
      (when join-ids
        {:group-by [:issues.id]
         :join     [:collections [:= :issues.id :collections.item_id]]})
-     (when (and selected-context (= :context link-issue))
+     (when and?
        {:having [:raw (str "COUNT(issues.id) = " (count join-ids))]})
      (when-not (and selected-context link-issue)
        {:order-by [[:issues.updated_at (if (= 1 search-mode)
@@ -247,21 +248,32 @@
         events-view (get-events-view state)
         urgent-issues-ids (do-fetch-urgent-issues-ids db link-issue events-view selected-context q)
         urgent-issues-ids-simplified (when (seq urgent-issues-ids) (map :issues/id urgent-issues-ids))
-        context-ids-to-join-on-link-issue-context (:selected-secondary-contexts (:current (:views (:data selected-context))))
+        context-ids-to-join-on-link-issue-context (-> selected-context :data :views :current :selected-secondary-contexts)
         context-ids-to-join-on-link-issue-issue (keys (:contexts (:data selected-issue)))
+        contexts-selected? (let [{{{{:keys [selected-secondary-contexts
+                                            secondary-contexts-inverted
+                                            secondary-contexts-unassigned-selected]} :current} :views} :data} selected-context]
+                             (not (or secondary-contexts-inverted
+                                      secondary-contexts-unassigned-selected
+                                      (not (seq selected-secondary-contexts)))))
         join-ids (when selected-context
                    (if link-issue
                      (if (= :issue link-issue)
                        context-ids-to-join-on-link-issue-issue
                        context-ids-to-join-on-link-issue-context)
-                     [(:id selected-context)]))
+                     (if contexts-selected?
+                       (conj (-> selected-context :data :views :current :selected-secondary-contexts)
+                             (:id selected-context))
+                       [(:id selected-context)])))
         issues-ids (do-query db 
                              (do-fetch-ids' state 
                                             selected-context 
                                             search-mode 
                                             events-view 
                                             urgent-issues-ids-simplified 
-                                            join-ids))]
+                                            join-ids
+                                            (or (and selected-context (= :context link-issue))
+                                                contexts-selected?)))]
     (seq (concat urgent-issues-ids issues-ids))))
 
 (defn- filter-issues
