@@ -91,6 +91,8 @@
   ;; TODO demo different filtering options, secondary-contexts, invert, no secondary contexts etc.
   )
 
+;; TODO on all display issues tests, demonstrate that it also works with a subsequent query with a modified search term (q)
+
 (deftest link-issue-to-issue 
   
   (testing "connect locally, within context"
