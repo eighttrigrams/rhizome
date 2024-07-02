@@ -70,30 +70,172 @@
 (deftest search 
   ;; TODO fix this
   #_(testing "aggregating contexts"
+      (reset-db)
+      (let [context-1    (create-context "context-1")
+            context-2-id (:id (create-context "context-2"))
+            context-3-id (:id (create-context "context-3"))
+            context-4-id (:id (create-context "context-4"))]
+        (update-context (assoc context-1 :data
+                               {:highlighted-secondary-contexts [(str context-4-id)
+                                                                 (str context-3-id)]}))
+        (create-issue "issue-1" (:id context-1) [context-2-id]) 
+        (create-issue "issue-2" (:id context-1) [context-3-id])
+        (is (= (list [context-4-id ["context-4" 0 true]]
+                     [context-3-id ["context-3" 1 true]]
+                     [(:id context-1) ["context-1" 2 false]]
+                     [context-2-id ["context-2" 1 false]]) 
+               (second (:issues ((repository/fetch-context {:db db})
+                                 {}
+                                 [context-1 false])))))))
+  
+  (testing "display globally"
     (reset-db)
-    (let [context-1    (create-context "context-1")
-          context-2-id (:id (create-context "context-2"))
-          context-3-id (:id (create-context "context-3"))
-          context-4-id (:id (create-context "context-4"))]
-      (update-context (assoc context-1 :data
-                             {:highlighted-secondary-contexts [(str context-4-id)
-                                                               (str context-3-id)]}))
-      (create-issue "issue-1" (:id context-1) [context-2-id]) 
-      (create-issue "issue-2" (:id context-1) [context-3-id])
-      (is (= (list [context-4-id ["context-4" 0 true]]
-                   [context-3-id ["context-3" 1 true]]
-                   [(:id context-1) ["context-1" 2 false]]
-                   [context-2-id ["context-2" 1 false]]) 
-             (second (:issues ((repository/fetch-context {:db db})
-                                                        {}
-                                                        [context-1 false])))))))
-  ;; TODO add case to demo global and local search
-  ;; TODO demo different filtering options, secondary-contexts, invert, no secondary contexts etc.
-  )
+    (let [context-1 (create-context "context-1")
+          context-2 (create-context "context-2")
+          _issue-1   (create-issue "issue-1" (:id context-1) [])
+          _issue-2  (create-issue "issue-2" (:id context-2) [])
+          opts      ((repository/start-global-search {:db db}) {})] 
+      (is (= 4 (count (first (:issues opts)))))))
+
+  (testing "select context and display"
+    (reset-db)
+    (let [context-1 (create-context "context-1")
+          context-2 (create-context "context-2")
+          _issue-1   (create-issue "issue-1" (:id context-1) [])
+          _issue-2  (create-issue "issue-2" (:id context-2) [])
+          opts      ((repository/fetch-context {:db db}) {} [context-1 true])] 
+      (is (= 1 (count (first (:issues opts)))))))
+  
+  (testing "select context and display, filter for context"
+    (reset-db)
+    (let [context-1 (create-context "context-1")
+          context-2 (create-context "context-2")
+          context-3 (create-context "context-3")
+          _issue-1  (create-issue "issue-1" (:id context-3) [(:id context-1)])
+          _issue-2  (create-issue "issue-2" (:id context-3) [(:id context-2) (:id context-1)])
+          _issue-3  (create-issue "issue-3" (:id context-3) [])
+          opts      ((repository/fetch-context {:db db}) {} [context-3 true])
+          _         (is (= 3 (count (first (:issues opts)))))
+ 
+          ;; TODO use nested testing blocks
+          _opts     ((repository/change-secondary-contexts-selection {:db db})
+                     (->
+                      opts
+                      (assoc :test/indentity-instead-future true)
+                      (assoc-in
+                       [:selected-context :data :views :current :selected-secondary-contexts]
+                       [(:id context-1) (:id context-2)])))
+            ;; TODO review - a little odd that i have to fetch the context here again
+          opts      ((repository/fetch-context {:db db}) {} [context-3 true]) 
+          _         (is (= 1 (count (first (:issues opts)))))
+          _         (is (= "issue-2" (:title (ffirst (:issues opts)))))
+
+          
+          _opts     ((repository/change-secondary-contexts-selection {:db db})
+                     (->
+                      opts
+                      (assoc :test/indentity-instead-future true)
+                      (assoc-in
+                       [:selected-context :data :views :current :secondary-contexts-inverted]
+                       true)))
+            ;; TODO review - a little odd that i have to fetch the context here again
+          opts      ((repository/fetch-context {:db db}) {} [context-3 true]) 
+          _         (is (= 1 (count (first (:issues opts)))))
+          _         (is (= "issue-3" (:title (ffirst (:issues opts)))))
+
+          
+          _opts     ((repository/change-secondary-contexts-selection {:db db})
+                     (->
+                      opts
+                      (assoc :test/indentity-instead-future true)
+                      (assoc-in
+                       [:selected-context :data :views :current :secondary-contexts-inverted]
+                       true)
+                      (assoc-in
+                       [:selected-context :data :views :current :secondary-contexts-unassigned-selected]
+                       true))
+                     )
+            ;; TODO review - a little odd that i have to fetch the context here again
+          opts      ((repository/fetch-context {:db db}) {} [context-3 true]) 
+          _         (is (= 0 (count (first (:issues opts)))))
+          
+          _opts     ((repository/change-secondary-contexts-selection {:db db})
+                     (->
+                      opts
+                      (assoc :test/indentity-instead-future true)
+                      (assoc-in
+                       [:selected-context :data :views :current :selected-secondary-contexts]
+                       [])
+                      (assoc-in
+                       [:selected-context :data :views :current :secondary-contexts-inverted]
+                       false))
+                     )
+            ;; TODO review - a little odd that i have to fetch the context here again
+          opts      ((repository/fetch-context {:db db}) {} [context-3 true]) 
+          _         (is (= 1 (count (first (:issues opts)))))
+          ]
+
+      ))
+
+      (testing "select context and display, filter for multiple contexts"
+        (reset-db)
+        (let [context-1 (create-context "context-1")
+              context-2 (create-context "context-2")
+              _issue-1  (create-issue "issue-1" (:id context-1) [])
+              _issue-2  (create-issue "issue-2" (:id context-2) [(:id context-1)])
+              _issue-3  (create-issue "issue-3" (:id context-2) [])
+              opts      ((repository/fetch-context {:db db}) {} [context-2 true])
+              _         (is (= 2 (count (first (:issues opts)))))
+              
+          ;; TODO use nested testing blocks
+              _opts     ((repository/change-secondary-contexts-selection {:db db})
+                         (->
+                          opts
+                          (assoc :test/indentity-instead-future true)
+                          (assoc-in
+                           [:selected-context :data :views :current :selected-secondary-contexts]
+                           [(:id context-1)])))
+            ;; TODO review - a little odd that i have to fetch the context here again
+              opts      ((repository/fetch-context {:db db}) {} [context-2 true]) 
+              _         (is (= 1 (count (first (:issues opts)))))
+              _         (is (= "issue-2" (:title (ffirst (:issues opts)))))
+
+              
+              _opts     ((repository/change-secondary-contexts-selection {:db db})
+                         (->
+                          opts
+                          (assoc :test/indentity-instead-future true)
+                          (assoc-in
+                           [:selected-context :data :views :current :secondary-contexts-inverted]
+                           true)))
+            ;; TODO review - a little odd that i have to fetch the context here again
+              opts      ((repository/fetch-context {:db db}) {} [context-2 true]) 
+              _         (is (= 1 (count (first (:issues opts)))))
+              _         (is (= "issue-3" (:title (ffirst (:issues opts)))))
+
+              
+              _opts     ((repository/change-secondary-contexts-selection {:db db})
+                         (->
+                          opts
+                          (assoc :test/indentity-instead-future true)
+                          (assoc-in
+                           [:selected-context :data :views :current :secondary-contexts-inverted]
+                           true)
+                          (assoc-in
+                           [:selected-context :data :views :current :selected-secondary-contexts]
+                           [(:id context-1)])
+                          (assoc-in
+                           [:selected-context :data :views :current :secondary-contexts-unassigned-selected]
+                           true)))
+            ;; TODO review - a little odd that i have to fetch the context here again
+              opts      ((repository/fetch-context {:db db}) {} [context-2 true]) 
+              _         (is (= 0 (count (first (:issues opts)))))])))
 
 ;; TODO on all display issues tests, demonstrate that it also works with a subsequent query with a modified search term (q)
 
 (deftest link-issue-to-issue 
+  
+  ;; TODO write test where i connect issue to issue in global view
   
   (testing "connect locally, within context"
     (reset-db)
@@ -104,7 +246,6 @@
           _issue-3  (create-issue "issue-3" (:id context-2) [])
           opts      ((repository/fetch-context {:db db}) {} [context-1 true]) 
           opts      (merge opts ((repository/select-issue {:db db}) opts issue-1 false))
-          
           opts      (merge opts (repository/start-linking-selected-issue-to-issue-with-local-search 
                                  db
                                  (repository/make-search-issues opts)))]
