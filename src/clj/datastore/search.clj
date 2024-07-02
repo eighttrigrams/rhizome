@@ -174,7 +174,7 @@
            db 
            urgent-events-query))))
 
-(defn- get-formatted-query [formatted-query selected-context link-issue]
+(defn- wrap-order-and-limit [formatted-query selected-context link-issue]
   (let [formatted-query (if (and selected-context link-issue) 
                           (let [[q :as original-query] formatted-query
                                 formatted-query        (str "SELECT * FROM (" q ") AS issues ORDER BY issues.updated_at DESC LIMIT 500")]
@@ -188,57 +188,46 @@
     [:raw (format "searchable @@ to_tsquery('simple', '%s')" 
                   (convert-q-to-query-string q))]))
 
-;; TODO get rid of search-globally?
-;; TODO pull out the actual firing off of the query from here (and from do-fetch-urgent-issues-ids)
+(defn- get-events-exist-clause [events-view]
+  (when (not= 0 events-view)
+    [:and
+     [:<> :issues.date nil]
+     [:not= :issues.archived [:inline (= 1 events-view)]]]))
+
 (defn- do-fetch-ids' 
-  [{:keys [q link-issue selected-issue]
+  [{:keys [q link-issue]
     :or   {q ""}} 
    selected-context
    search-mode
    events-view
-   urgent-issues-ids]
-  (let [search-clause       (get-search-clause q)
-        join-clause         (if selected-context
-                              [:collections [:= :issues.id :collections.item_id]]
-                              [])
-        context-ids-to-join-on-link-issue-context (:selected-secondary-contexts (:current (:views (:data selected-context))))
-        context-ids-to-join-on-link-issue-issue (keys (:contexts (:data selected-issue)))
-        join-where-clause   (when selected-context
-                              (if link-issue
-                                [:in :collections.container_id [:inline (if (= :issue link-issue)
-                                                                          context-ids-to-join-on-link-issue-issue
-                                                                          context-ids-to-join-on-link-issue-context)]]
-                                [:= :collections.container_id (:id selected-context)]))
-        exists-clause       (when (not= 0 events-view)
-                              [:and
-                               [:<> :issues.date nil]
-                               [:not= :issues.archived [:inline (= 1 events-view)]]])
-        formatted-query (sql/format (merge
-                                     (when (and selected-context (= :context link-issue))
-                                       {:group-by [:issues.id]
-                                        :having [:raw (str "COUNT(issues.id) = " (count context-ids-to-join-on-link-issue-context))]})
-                                     (if (and selected-context (= :issue link-issue))
-                                       ;; TODO maybe we don't need a distinction here and can simply resort to use group by
-                                       {:select-distinct-on (vec (concat [[:issues.id]] select))}
-                                       {:select select})
-                                     {:from     [:issues]
-                                      :order-by (if (and selected-context link-issue)
-                                                  [:issues.id]
-                                                  [[:issues.updated_at (if (= 1 search-mode)
-                                                                         :asc 
-                                                                         :desc)]])
-                                      :join     join-clause
-                                      :where    [:and [:and
-                                                       exists-clause
-                                                       join-where-clause
-                                                       search-clause]
-                                                 (when urgent-issues-ids
-                                                   [:not [:in :issues.id [:inline urgent-issues-ids]]])]}
-                                     (when (and (= "" q)
-                                                (not selected-context)
-                                                (= 0 events-view))
-                                       {:limit 500})))]
-    (get-formatted-query formatted-query selected-context link-issue)))
+   issue-ids-to-remove
+   join-ids]
+  (-> 
+   (sql/format 
+    (merge
+     {:select select
+      :from   [:issues]
+      :where  [:and [:and
+                     (get-events-exist-clause events-view)
+                     (when join-ids [:in :collections.container_id [:inline join-ids]])
+                     (get-search-clause q)]
+               (when issue-ids-to-remove
+                 [:not [:in :issues.id [:inline issue-ids-to-remove]]])]}
+     (when join-ids
+       {:group-by [:issues.id]
+        :join     [:collections [:= :issues.id :collections.item_id]]})
+     (when (and selected-context (= :context link-issue))
+       {:having [:raw (str "COUNT(issues.id) = " (count join-ids))]})
+     (when-not (and selected-context link-issue)
+       {:order-by [[:issues.updated_at (if (= 1 search-mode)
+                                         :asc 
+                                         :desc)]]})
+     (when (and (= "" q)
+                (not selected-context)
+                (= 0 events-view))
+       {:limit 500})))
+    ;; TODO i could do the sorting and limiting uniformly here
+   (wrap-order-and-limit selected-context link-issue)))
 
 (defn- do-query [db formatted-query]
   (let [issues (jdbc/execute! db formatted-query)]
@@ -246,7 +235,7 @@
     issues))
 
 (defn- do-fetch-ids 
-  [db {:keys [q search-globally? selected-context link-issue]
+  [db {:keys [q search-globally? selected-context selected-issue link-issue]
        :or   {q ""}
        :as   state} search-mode]
   (let [selected-context (if (and search-globally?
@@ -258,7 +247,21 @@
         events-view (get-events-view state)
         urgent-issues-ids (do-fetch-urgent-issues-ids db link-issue events-view selected-context q)
         urgent-issues-ids-simplified (when (seq urgent-issues-ids) (map :issues/id urgent-issues-ids))
-        issues-ids (do-query db (do-fetch-ids' state selected-context search-mode events-view urgent-issues-ids-simplified))]
+        context-ids-to-join-on-link-issue-context (:selected-secondary-contexts (:current (:views (:data selected-context))))
+        context-ids-to-join-on-link-issue-issue (keys (:contexts (:data selected-issue)))
+        join-ids (when selected-context
+                   (if link-issue
+                     (if (= :issue link-issue)
+                       context-ids-to-join-on-link-issue-issue
+                       context-ids-to-join-on-link-issue-context)
+                     [(:id selected-context)]))
+        issues-ids (do-query db 
+                             (do-fetch-ids' state 
+                                            selected-context 
+                                            search-mode 
+                                            events-view 
+                                            urgent-issues-ids-simplified 
+                                            join-ids))]
     (seq (concat urgent-issues-ids issues-ids))))
 
 (defn- filter-issues
