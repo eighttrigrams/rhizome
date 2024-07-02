@@ -90,7 +90,7 @@
   
   (testing "display globally"
     (reset-db)
-    (let [context-1 (create-context "context-1")
+    (let [context-1 (create-context "context-1") ;; TODO make it easier, via a data structure, to create a whole thing, contexts, issues and all
           context-2 (create-context "context-2")
           _issue-1   (create-issue "issue-1" (:id context-1) [])
           _issue-2  (create-issue "issue-2" (:id context-2) [])
@@ -214,6 +214,7 @@
               _         (is (= "issue-3" (:title (ffirst (:issues opts)))))
 
               
+              ;; TODO we should have a separate test here for this, where still one issue remains to be displayed
               _opts     ((repository/change-secondary-contexts-selection {:db db})
                          (->
                           opts
