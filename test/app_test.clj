@@ -181,11 +181,12 @@
         (reset-db)
         (let [context-1 (create-context "context-1")
               context-2 (create-context "context-2")
-              _issue-1  (create-issue "issue-1" (:id context-1) [])
-              _issue-2  (create-issue "issue-2" (:id context-2) [(:id context-1)])
-              _issue-3  (create-issue "issue-3" (:id context-2) [])
-              opts      ((repository/fetch-context {:db db}) {} [context-2 true])
-              _         (is (= 2 (count (first (:issues opts)))))
+              context-3 (create-context "context-3")
+              _issue-1  (create-issue "issue-1" (:id context-3) [(:id context-1)])
+              _issue-2  (create-issue "issue-2" (:id context-3) [(:id context-1) (:id context-2)])
+              _issue-3  (create-issue "issue-3" (:id context-3) [])
+              opts      ((repository/fetch-context {:db db}) {} [context-3 true])
+              _         (is (= 3 (count (first (:issues opts)))))
               
           ;; TODO use nested testing blocks
               _opts     ((repository/change-secondary-contexts-selection {:db db})
@@ -196,9 +197,8 @@
                            [:selected-context :data :views :current :selected-secondary-contexts]
                            [(:id context-1)])))
             ;; TODO review - a little odd that i have to fetch the context here again
-              opts      ((repository/fetch-context {:db db}) {} [context-2 true]) 
-              _         (is (= 1 (count (first (:issues opts)))))
-              _         (is (= "issue-2" (:title (ffirst (:issues opts)))))
+              opts      ((repository/fetch-context {:db db}) {} [context-3 true]) 
+              _         (is (= 2 (count (first (:issues opts)))))
 
               
               _opts     ((repository/change-secondary-contexts-selection {:db db})
@@ -209,12 +209,11 @@
                            [:selected-context :data :views :current :secondary-contexts-inverted]
                            true)))
             ;; TODO review - a little odd that i have to fetch the context here again
-              opts      ((repository/fetch-context {:db db}) {} [context-2 true]) 
+              opts      ((repository/fetch-context {:db db}) {} [context-3 true]) 
               _         (is (= 1 (count (first (:issues opts)))))
               _         (is (= "issue-3" (:title (ffirst (:issues opts)))))
 
               
-              ;; TODO we should have a separate test here for this, where still one issue remains to be displayed
               _opts     ((repository/change-secondary-contexts-selection {:db db})
                          (->
                           opts
@@ -224,13 +223,15 @@
                            true)
                           (assoc-in
                            [:selected-context :data :views :current :selected-secondary-contexts]
-                           [(:id context-1)])
+                           [(:id context-2)])
                           (assoc-in
                            [:selected-context :data :views :current :secondary-contexts-unassigned-selected]
                            true)))
             ;; TODO review - a little odd that i have to fetch the context here again
-              opts      ((repository/fetch-context {:db db}) {} [context-2 true]) 
-              _         (is (= 0 (count (first (:issues opts)))))])))
+              opts      ((repository/fetch-context {:db db}) {} [context-3 true]) 
+              _         (is (= 1 (count (first (:issues opts)))))
+              _         (is (= "issue-1" (:title (ffirst (:issues opts)))))
+              ])))
 
 ;; TODO on all display issues tests, demonstrate that it also works with a subsequent query with a modified search term (q)
 
