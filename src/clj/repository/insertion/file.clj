@@ -12,6 +12,8 @@
 (defn- classify [title]
   (condx #(str/ends-with? (str/lower-case title) %) 
          "mp3" ["MP3s" "Audio"] 
+         "ogg" ["OGGs" "Audio"] 
+         "m4a" ["M4As" "Audio"] 
          "wav" ["WAVs" "Audio"] 
          "mp4" ["MP4s" "Video"]
          "flv" ["FLVs" "Video"]

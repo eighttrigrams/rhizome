@@ -13,6 +13,8 @@
       (str/ends-with? (str/lower-case file-name) ".flv")
       (str/ends-with? (str/lower-case file-name) ".mov")
       (str/ends-with? (str/lower-case file-name) ".mp3")
+      (str/ends-with? (str/lower-case file-name) ".ogg")
+      (str/ends-with? (str/lower-case file-name) ".m4a")
       (str/ends-with? (str/lower-case file-name) ".wav")
       (str/ends-with? (str/lower-case file-name) ".pdf")
       (str/ends-with? (str/lower-case file-name) ".jpeg")
@@ -35,7 +37,7 @@
 (defn get-target [file-name]
   (str "/Users/daniel/"
        (case (get-suffix file-name)
-         ("mp3" "wav") "Music"
+         ("mp3" "wav" "ogg" "m4a") "Music"
          ("mp4" "flv" "mov") "Movies"
          ("pdf") "Documents"
          ("jpeg" "jpg" "png" "webp") "Pictures"
