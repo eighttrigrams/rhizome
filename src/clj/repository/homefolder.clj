@@ -17,7 +17,9 @@
       (str/ends-with? (str/lower-case file-name) ".pdf")
       (str/ends-with? (str/lower-case file-name) ".jpeg")
       (str/ends-with? (str/lower-case file-name) ".jpg")
-      (str/ends-with? (str/lower-case file-name) ".png")))
+      (str/ends-with? (str/lower-case file-name) ".png")
+      (str/ends-with? (str/lower-case file-name) ".webp")
+      ))
 
 (defn validate-not-exists [file-name]
   (when (.exists (io/file (str "/Users/daniel/Music/Tracked/" file-name)))
@@ -36,7 +38,7 @@
          ("mp3" "wav") "Music"
          ("mp4" "flv" "mov") "Movies"
          ("pdf") "Documents"
-         ("jpeg" "jpg" "png") "Pictures"
+         ("jpeg" "jpg" "png" "webp") "Pictures"
          nil)
        "/Tracked/" file-name))
 

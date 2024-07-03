@@ -19,7 +19,9 @@
          "pdf" ["PDFs"]
          "jpg" ["JPEGs" "Image"]
          "jpeg" ["JPEGs" "Image"]
-         "png" ["PNGs" "Image"]))
+         "png" ["PNGs" "Image"]
+         "webp" ["WEBPs" "Image"]
+         ))
 
 (defn- get-additional-context-ids [db additional-context-titles]
   (let [additional-context-ids 
