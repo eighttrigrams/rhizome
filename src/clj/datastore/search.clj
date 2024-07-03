@@ -202,7 +202,7 @@
    events-view
    issue-ids-to-remove
    join-ids
-   and?]
+   and-query?]
   (-> 
    (sql/format 
     (merge
@@ -217,7 +217,7 @@
      (when join-ids
        {:group-by [:issues.id]
         :join     [:collections [:= :issues.id :collections.item_id]]})
-     (when and?
+     (when and-query?
        {:having [:raw (str "COUNT(issues.id) = " (count join-ids))]})
      (when-not (and selected-context link-issue)
        {:order-by [[:issues.updated_at (if (= 1 search-mode)
@@ -239,32 +239,40 @@
   [db {:keys [q search-globally? selected-context selected-issue link-issue]
        :or   {q ""}
        :as   state} search-mode]
-  (let [selected-context (if (and search-globally?
+  (let [context-ids-to-join-on-link-issue-context (-> selected-context :data :views :current :selected-secondary-contexts)
+        context-ids-to-join-on-link-issue-issue (keys (:contexts (:data selected-issue)))
+        selected-context (when (:id selected-context) selected-context)
+        originally-selected-context selected-context
+        selected-context (if (and search-globally?
                                   (not 
                                    (and (= :context link-issue)
-                                        (seq (:selected-secondary-contexts (:current (:views (:data selected-context)))))))) 
+                                        (seq context-ids-to-join-on-link-issue-context)))) 
                            nil selected-context)
-        selected-context (when (:id selected-context) selected-context)
         events-view (get-events-view state)
         urgent-issues-ids (do-fetch-urgent-issues-ids db link-issue events-view selected-context q)
         urgent-issues-ids-simplified (when (seq urgent-issues-ids) (map :issues/id urgent-issues-ids))
-        context-ids-to-join-on-link-issue-context (-> selected-context :data :views :current :selected-secondary-contexts)
-        context-ids-to-join-on-link-issue-issue (keys (:contexts (:data selected-issue)))
-        contexts-selected? (let [{{{{:keys [selected-secondary-contexts
+        secondary-contexts-but-no-modifiers-selected? (let [{{{{:keys [selected-secondary-contexts
                                             secondary-contexts-inverted
                                             secondary-contexts-unassigned-selected]} :current} :views} :data} selected-context]
                              (not (or secondary-contexts-inverted
                                       secondary-contexts-unassigned-selected
                                       (not (seq selected-secondary-contexts)))))
-        join-ids (when selected-context
+        join-ids (if selected-context
                    (if link-issue
                      (if (= :issue link-issue)
                        context-ids-to-join-on-link-issue-issue
                        context-ids-to-join-on-link-issue-context)
-                     (if contexts-selected?
-                       (conj (-> selected-context :data :views :current :selected-secondary-contexts)
+                     (if secondary-contexts-but-no-modifiers-selected?
+                       (conj context-ids-to-join-on-link-issue-context
                              (:id selected-context))
-                       [(:id selected-context)])))
+                       [(:id selected-context)]))
+                   (when (and (not search-globally?) 
+                              (= :issue link-issue)
+                              (seq context-ids-to-join-on-link-issue-issue)
+                              (not originally-selected-context))
+                     context-ids-to-join-on-link-issue-issue)) 
+        and-query? (or (and selected-context (= :context link-issue)) 
+                       secondary-contexts-but-no-modifiers-selected?)
         issues-ids (do-query db 
                              (do-fetch-ids' state 
                                             selected-context 
@@ -272,8 +280,7 @@
                                             events-view 
                                             urgent-issues-ids-simplified 
                                             join-ids
-                                            (or (and selected-context (= :context link-issue))
-                                                contexts-selected?)))]
+                                            and-query?))]
     (seq (concat urgent-issues-ids issues-ids))))
 
 (defn- filter-issues

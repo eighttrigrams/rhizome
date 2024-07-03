@@ -239,7 +239,7 @@
   
   ;; TODO write test where i connect issue to issue in global view
   
-  (testing "connect locally, within context"
+  (testing "connect locally, within context, and display"
     (reset-db)
     (let [context-1 (create-context "context-1")
           context-2 (create-context "context-2")
@@ -254,7 +254,7 @@
       (is (= 1 (count (first (:issues opts)))))
       (is (= "issue-2" (:title (ffirst (:issues opts)))))))
   
-  (testing "connect locally, but outside context because connected issues"
+  (testing "connect locally, but outside context because connected issues, and display"
     (reset-db)
     (let [context-1 (create-context "context-1")
           context-2 (create-context "context-2")
@@ -271,7 +271,7 @@
       (is (= 1 (count (first (:issues opts)))))
       (is (= "issue-2" (:title (ffirst (:issues opts)))))))
   
-  (testing "connect globally"
+  (testing "connect globally, and display"
     (reset-db)
     (let [context-1 (create-context "context-1")
           context-2 (create-context "context-2")
@@ -285,8 +285,39 @@
                                  db
                                  (repository/make-search-issues opts)))]
       (is (= 4 (count (first (:issues opts)))))))
+  
+  (testing "connect locally in global search, issue has some secondary contexts, and display"
+    (reset-db)
+    (let [context-1 (create-context "context-1")
+          context-2 (create-context "context-2")
+          context-3 (create-context "context-3")
+          issue-1   (create-issue "issue-1" (:id context-1) [(:id context-2)])
+          _issue-2  (create-issue "issue-2" (:id context-2) [])
+          _issue-3  (create-issue "issue-3" (:id context-3) [])
+          ;; opts      ((repository/fetch-context {:db db}) {} [context-1 true]) 
+          opts      ((repository/select-issue {:db db}) {} issue-1 false)
+          opts      (merge opts (repository/start-linking-selected-issue-to-issue-with-local-search 
+                                 db
+                                 (repository/make-search-issues opts)))]
+      (is (= 1 (count (first (:issues opts)))))
+      (is (= "issue-2" (:title (ffirst (:issues opts)))))))
+  
+  (testing "connect globally, issue has NO secondary contexts, and display"
+    (reset-db)
+    (let [context-1 (create-context "context-1")
+          context-2 (create-context "context-2")
+          context-3 (create-context "context-3")
+          _issue-1   (create-issue "issue-1" (:id context-1) [])
+          _issue-2  (create-issue "issue-2" (:id context-2) [])
+          _issue-3  (create-issue "issue-3" (:id context-3) [])
+          ;; opts      ((repository/fetch-context {:db db}) {} [context-1 true]) 
+          opts      ((repository/select-issue {:db db}) {} context-3 false)
+          opts      (merge opts (repository/start-linking-selected-issue-to-issue-with-global-search 
+                                 db
+                                 (repository/make-search-issues opts)))]
+      (is (= 5 (count (first (:issues opts)))))))
 
-  (testing "with local search"
+  (testing "link issue actually, with local search"
     (reset-db)
     (let [context-1 (create-context "context-1")
           issue-1   (create-issue "issue-1" (:id context-1) [])
