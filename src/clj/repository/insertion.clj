@@ -4,6 +4,7 @@
             datastore
             [repository.insertion.substack :as substack]
             [repository.insertion.substack-note :as substack-note]
+            [repository.insertion.twitter-tweet :as twitter-tweet]
             [repository.insertion.apple-pods :as apple-pods]
             [repository.insertion.substack-external :as substack-external]
             [repository.insertion.youtube :as youtube]
@@ -53,6 +54,8 @@
           (substack-external/save-article db title context-ids-set alternative-behaviour?)
           (substack-note/match? title)
           (substack-note/ingest db title context-ids-set alternative-behaviour?)
+          (twitter-tweet/match? title)
+          (twitter-tweet/ingest db title context-ids-set alternative-behaviour?)
           (unz/match? title) 
           (unz/ingest db title context-ids-set alternative-behaviour?) 
           (takimag/match? title) 
