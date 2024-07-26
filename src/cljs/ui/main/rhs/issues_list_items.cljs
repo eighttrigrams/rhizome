@@ -20,6 +20,8 @@
                         (str "[substack]( " substack-note-link ")"))
                       (when-let [x-post-link (:x-post (:resource-links data))]
                         (str "[X]( " x-post-link ")"))
+                      (when-let [x-handle-link (:x-handle (:resource-links data))]
+                        (str "[X]( " x-handle-link ")"))
                       (when-let [article-link (:web-article (:resource-links data))]
                         (str "[link]( " article-link ")"))
                       (when-let [apple-podcast-link (:apple-podcast (:resource-links data))]
