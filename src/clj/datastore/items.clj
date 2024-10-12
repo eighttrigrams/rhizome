@@ -158,7 +158,7 @@
     (jdbc/execute-one! db
                        (sql/format {:update [:issues]
                                     :where  [:= :id [:inline item-id]]
-                                    :set    {:data [:inline (json/generate-string (assoc data :contexts contexts))]}})
+                                    :set    {:data [:inline (json/generate-string (assoc data "contexts" contexts))]}})
                        {:return-keys true})))
 
 (defn update-collection-title-in-collection-items
