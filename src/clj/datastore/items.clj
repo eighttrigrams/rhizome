@@ -30,11 +30,15 @@
       (update :select conj [[:array_agg :related_issues.id] :related_issues_ids])
       (update :join conj
               :issue_issue [:= :issues.id :issue_issue.left_id]
-              [:issues :related_issues] [:= :related_issues.id :issue_issue.right_id])))
+              [:issues :related_issues] [:= :related_issues.id :issue_issue.right_id])
+      (assoc :where [:and 
+                      (:where query)
+                      [:= :issue_issue.show_badge false]])))
 
 (defn- get-issue-with-related-issues [db id recursion-depth]
   (when-let [result (-> (basic-issues-query id)
                         (add-in-relations)
+                        (#(do (prn %) %))
                         sql/format
                         (#(jdbc/execute-one! db % {:return-keys true})))]
     (join-related-issues db result recursion-depth)))
@@ -139,7 +143,9 @@
                                                       (sql/format {:select [:issues.id :title :short_title]
                                                                    :from   [:collections]
                                                                    :join   [:issues [:= :collections.container_id :issues.id]]
-                                                                   :where  [:= :collections.item_id [:inline item-id]]})
+                                                                   :where  [:and 
+                                                                            [:= :collections.item_id [:inline item-id]]
+                                                                            [:= :collections.show_badge true]]})
                                                       {:return-keys true})))
                          item-id)]
     (jdbc/execute-one! db
@@ -194,7 +200,8 @@
                              (jdbc/execute! db
                                             (sql/format {:select [:item_id]
                                                          :from   [:collections]
-                                                         :where  [:= :container_id [:inline id]]})
+                                                         :where  [:and [:= :container_id [:inline id]]
+                                                                  [:= :collections.show_badge true]]})
                                             {:return-keys true})))]
     (doall (for [item-id item-ids]
              (update-collection-title-in-collection-items db item-id id short_title title)))))
