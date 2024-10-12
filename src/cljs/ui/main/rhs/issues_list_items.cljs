@@ -120,5 +120,5 @@
                                                          (> (:short_title_ints issue) 0))
                                                 {:number (:short_title_ints issue)})
                                               (when-let [file (:file (:resource-links (:data issue)))]
-                                                {:file file})
+                                                {:file {:file file}})
                                               (:contexts (:data issue))))]]]])
