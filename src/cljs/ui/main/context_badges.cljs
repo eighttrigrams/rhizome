@@ -3,14 +3,14 @@
 (defn component [contexts]
   [:span.contexts
    (doall
-    (map (fn [[idx {:keys [title date file]}]]
+    (map (fn [[idx {:keys [title date file number]}]]
            (case idx
              :file
              [:span.badge.light 
               {:key      idx
                :on-click (fn [e]
                            (.stopPropagation e)
-                           (js/fetch (str "/open/" (js/encodeURI title))))}
+                           (js/fetch (str "/open/" (js/encodeURI file))))}
               "🟢"]
              0
              [:span.badge.light
@@ -25,6 +25,6 @@
               {:key :date} date]
              :number
              [:span.badge.light
-              {:key :number} title]
+              {:key :number} number]
              [:span.badge {:key idx} title])) 
          contexts))])
