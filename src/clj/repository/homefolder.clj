@@ -17,6 +17,7 @@
       (str/ends-with? (str/lower-case file-name) ".m4a")
       (str/ends-with? (str/lower-case file-name) ".wav")
       (str/ends-with? (str/lower-case file-name) ".pdf")
+      (str/ends-with? (str/lower-case file-name) ".tiff")
       (str/ends-with? (str/lower-case file-name) ".jpeg")
       (str/ends-with? (str/lower-case file-name) ".jpg")
       (str/ends-with? (str/lower-case file-name) ".png")
@@ -39,7 +40,7 @@
        (case (get-suffix file-name)
          ("mp3" "wav" "ogg" "m4a") "Music"
          ("mp4" "flv" "mov") "Movies"
-         ("pdf") "Documents"
+         ("pdf" "tiff") "Documents"
          ("jpeg" "jpg" "png" "webp") "Pictures"
          nil)
        "/Tracked/" file-name))
