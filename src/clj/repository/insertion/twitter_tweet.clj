@@ -1,11 +1,9 @@
 (ns repository.insertion.twitter-tweet
   (:require [clojure.string :as str]
             datastore
-            [hickory.select :as select]
-            [datastore.get-item :as get-item]
+            [datastore.items :as items]
             [repository.insertion.common :as common]
-            utils
-            [utils.url :as url]))
+            utils))
 
 (defn match? [title]
   (re-matches #"https://x.com\/.*\/status/.*" title))
@@ -23,7 +21,7 @@
     (:id (datastore/upgrade-issue-to-context! db twitter))))
 
 (defn- create-or-take-handle-id [db handle-url twitter-platform-id twitter-handles-id]
-  (let [handle-id (:id (get-item/get-item-by-path db 
+  (let [handle-id (:id (items/get-item-by-path db 
                                                   "data->'resource-links'->>'x-handle'" 
                                                   handle-url))
         handle-id (or handle-id (get-handle-id db 
@@ -40,7 +38,7 @@
         handle-id (create-or-take-handle-id db handle-url twitter-platform-id twitter-handles-id)
         note-id (subs url 0 (or (str/index-of url "?")
                                 (count url)))]
-    (when (:id (get-item/get-item-by-path db "data->'resource-links'->>'x-post'" note-id))
+    (when (:id (items/get-item-by-path db "data->'resource-links'->>'x-post'" note-id))
       (throw (Exception. "x post already exists!")))
     (common/insert-item db
                         "X Post"

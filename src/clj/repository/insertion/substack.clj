@@ -2,7 +2,7 @@
   (:require [clojure.string :as str]
             datastore
             [hickory.select :as select]
-            [datastore.get-item :as get-item]
+            [datastore.items :as items]
             [repository.insertion.common :as common]
             [repository.chatgpt :as chatgpt]
             utils
@@ -46,7 +46,7 @@
                                    identifiers 
                                    substack-platform-id 
                                    substacks-id]
-  (let [substack-id (:id (get-item/get-item-by-path db 
+  (let [substack-id (:id (items/get-item-by-path db 
                                                     "data->'resource-links'->>'substack'" 
                                                     (last identifiers)))
         substack-id (or substack-id (get-substack-id db 
@@ -59,7 +59,7 @@
 
 (defn- validate-preconditions [db url title]
   (let [_ (when-not (seq title) (throw (Exception. "no post title")))
-        _ (when (:id (get-item/get-item-by-path db 
+        _ (when (:id (items/get-item-by-path db 
                                                 "data->'resource-links'->>'substack-article'" 
                                                 url))
             (throw (Exception. "substack article already exists!")))]))

@@ -2,11 +2,11 @@
   (:require [clojure.java.io :as io]
             [cambium.core :as log]
             datastore
-            [datastore.get-item :as get-item]))
+            [datastore.items :as items]))
 
 (defn- get-files-count [db file]
   (if file
-    (count (get-item/get-items-by-path db 
+    (count (items/get-items-by-path db 
                                        "data->'resource-links'->>'file'"
                                        file))
     0))

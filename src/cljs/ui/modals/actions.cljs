@@ -22,7 +22,8 @@
                                (dissoc @*state :modal)
                                api/update-issue
                                {:issue          issue 
-                                :issue-contexts issue-contexts}))
+                                :issue-contexts (map (fn [issue-context] 
+                                                       {:id issue-context :show-badges? true}) issue-contexts)}))
 
 (defn update-context! [*state context]
   (fetch-and-reset-with-method! *state 

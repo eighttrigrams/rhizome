@@ -2,7 +2,7 @@
   (:require [cambium.core :as log]
             [next.jdbc :as jdbc]
             [honey.sql :as sql]
-            [datastore.get-item :refer [get-item update-item] :rename {get-item get-issue}]))
+            [datastore.items :refer [get-item update-item] :rename {get-item get-issue}]))
 
 (defn delete-date [db issue-id]
   (jdbc/execute! db

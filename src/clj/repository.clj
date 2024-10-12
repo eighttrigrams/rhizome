@@ -4,7 +4,7 @@
             datastore
             privacy
             [datastore.search :as search]
-            [datastore.get-item :as get-item]
+            [datastore.items :as items]
             [cambium.core :as log]
             [repository.insertion :as insertion]
             [repository.deletion :as deletion]))
@@ -270,7 +270,7 @@
                                           selected-context 
                                           (get-selected-secondary-contexts-set state)
                                           alternative-behaviour?)]
-        (get-item/set-contexts-of-new-issue db (:id issue))
+        (items/set-collection-titles-of-new-issue db (:id issue))
         {:selected-issue nil
          :issues         (search/search-issues
                           db
@@ -288,7 +288,7 @@
     (let [selected-issue (datastore/get-issue db {:id issue-id})
           context-ids   (keys (:contexts (:data selected-issue)))] 
       (datastore/set-containers-of-item! db {:id issue-id} (vec (set (conj context-ids (:id selected-context)))))
-      (get-item/update-collection-title-in-collection-items db 
+      (items/update-collection-title-in-collection-items db 
                                                             issue-id 
                                                             (:id selected-context)
                                                             (:short_title selected-context)
@@ -321,14 +321,14 @@
   "when issue selected link to yet another context"
   [db {:keys [selected-issue selected-context] :as opts} arg]
   (let [selected-issue (or selected-issue
-                           (get-item/get-item db selected-context))
+                           (items/get-item db selected-context))
         contexts (merge (:contexts (:data selected-issue))
                         {(:id arg) (:title arg)})]
     (log/info (str "repository/link-selected-item-to-context " selected-issue))
     (try
       (datastore/reprioritize-context db arg)
       (datastore/set-containers-of-item! db selected-issue (vec (set (keys contexts))))
-      (get-item/update-collection-title-in-collection-items db 
+      (items/update-collection-title-in-collection-items db 
                                                             (:id selected-issue) 
                                                             (:id arg)
                                                             (:short_title arg)
@@ -452,7 +452,7 @@
         (datastore/set-containers-of-item! db
                                            selected-issue
                                            issue-contexts-ids)
-        (get-item/update-collection-title-in-collection-items db
+        (items/update-collection-title-in-collection-items db
                                                               (:id selected-issue)
                                                               (:id selected-context) nil nil true)
         {:selected-issue nil
@@ -464,27 +464,28 @@
 (defn update-issue [{:keys [db]}]
   (fn [opts arg]
     (log/info (str "repository/update-issue " arg))
-    (try
-      (datastore/set-containers-of-item! db
-                                         (or (:issue (:issue arg))
-                                             (:issue arg))
-                                         (:issue-contexts arg))
-      (get-item/update-collection-title-in-collection-items db
-                                                            (:id (or (:issue (:issue arg))
-                                                                     (:issue arg)))
-                                                            nil nil nil 
-                                                            (:issue-contexts arg))
-      (let [{:keys [data]} (get-item/get-item db (:issue (:issue arg)))]
-        {:selected-issue (datastore/update-issue db 
-                                                 (assoc-in (:issue arg) 
-                                                           [:issue :data]
-                                                           (merge 
-                                                            data
-                                                            (:data (:issue (:issue arg))))))
-         :issues         (search/search-issues db (dissoc opts :q))
-         :q              nil})
-      (catch Exception e
-        (log/error (str "Caught an update-issue " (.getMessage e)))))))
+    (let [issue-contexts (map :id (:issue-contexts arg))]
+      (try
+        (datastore/set-containers-of-item! db
+                                           (or (:issue (:issue arg))
+                                               (:issue arg))
+                                           issue-contexts)
+        (items/update-collection-title-in-collection-items db
+                                                              (:id (or (:issue (:issue arg))
+                                                                       (:issue arg)))
+                                                              nil nil nil 
+                                                              issue-contexts)
+        (let [{:keys [data]} (items/get-item db (:issue (:issue arg)))]
+          {:selected-issue (datastore/update-issue db 
+                                                   (assoc-in (:issue arg) 
+                                                             [:issue :data]
+                                                             (merge 
+                                                              data
+                                                              (:data (:issue (:issue arg))))))
+           :issues         (search/search-issues db (dissoc opts :q))
+           :q              nil})
+        (catch Exception e
+          (log/error (str "Caught an update-issue " (.getMessage e))))))))
 
 (defn update-context [{:keys [db]}]
   (fn [opts arg]

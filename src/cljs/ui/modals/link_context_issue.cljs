@@ -27,7 +27,7 @@
          [:div#link-context-issue-component
           {:tabIndex 0}
           (map 
-           (fn [[idx title]]
+           (fn [[idx {:keys [title]}]]
              [:div
               {:key idx
                :on-click      (remove-context idx)}

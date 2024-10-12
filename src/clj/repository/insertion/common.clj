@@ -1,11 +1,11 @@
 (ns repository.insertion.common
   (:require datastore
-            [datastore.get-item :as get-item]
+            [datastore.items :as items]
             [next.jdbc :as jdbc]
             [honey.sql :as sql]))
 
 (defn get-item-or-throw-error [db title]
-  (let [id (:id (get-item/get-item-by-title db {:title title}))
+  (let [id (:id (items/get-item-by-title db {:title title}))
         _ (when-not id (throw (Exception. (str "no id for " title))))]
     id))
 

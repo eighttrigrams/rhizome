@@ -4,7 +4,7 @@
             [honey.sql :as sql]
             [datastore.helpers
              :refer [un-namespace-keys]]
-            [datastore.get-item :refer [get-item update-item] :rename {get-item get-context}]))
+            [datastore.items :refer [get-item update-item] :rename {get-item get-context}]))
 
 (defn new-context [db {title :title}]
   (-> (jdbc/execute-one!

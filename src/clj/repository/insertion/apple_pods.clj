@@ -4,7 +4,7 @@
             [hickory.core :as html]
             [clj-http.client :as http]
             [hickory.select :as select]
-            [datastore.get-item :as get-item]
+            [datastore.items :as items]
             [repository.insertion.common :as common]
             utils))
 
@@ -35,7 +35,7 @@
   (let [podcasts-id (common/get-item-or-throw-error db "Podcasts")
         podcast-url (get-podcast-url url)
         podcast-title (extract-title podcast-url)
-        channel-id (:id (get-item/get-item-by-path db "data->'resource-links'->>'apple-podcast'" podcast-url))
+        channel-id (:id (items/get-item-by-path db "data->'resource-links'->>'apple-podcast'" podcast-url))
         channel-id (or channel-id
                        (let [channel (common/insert-item db 
                                                          podcast-title 
@@ -49,7 +49,7 @@
   (let [apple-podcasts-platform-id (common/get-item-or-throw-error db "Apple Podcasts")
         [podcast-id podcast-title] (create-podcast-or-take-existing db url apple-podcasts-platform-id)
         podcast-episodes-id (common/get-item-or-throw-error db "Podcast Episodes")]
-    (when (:id (get-item/get-item-by-path db "data->'resource-links'->>'apple-podcast-episode'" url))
+    (when (:id (items/get-item-by-path db "data->'resource-links'->>'apple-podcast-episode'" url))
       (throw (Exception. "apple podcast episode already exists!")))
     (let [title (-> url 
                     extract-title

@@ -1,4 +1,4 @@
-(ns datastore.get-item
+(ns datastore.items
   (:require [next.jdbc :as jdbc]
             [honey.sql :as sql]
             [cambium.core :as log]
@@ -68,7 +68,7 @@
   ([db {:keys [id]} {:keys [skip-relations? skip-containers? recursion-depth] :as m
                      :or {recursion-depth 3}}]
    (try
-     (let [collections (if-not skip-containers?
+     (let [collections (if-not skip-containers? ;; TODO looks unused; collections seems to be always nil, skip-containers i don't have any idea anymore what that is for
                          (:contexts (get-collections db id))
                          nil)
            relations (if-not skip-relations?
@@ -131,7 +131,7 @@
       sql/format
       (#(jdbc/execute! db % {:return-keys true}))))
 
-(defn set-contexts-of-new-issue [db item-id]
+(defn set-collection-titles-of-new-issue [db item-id]
   (let [data (:issues/data (jdbc/execute-one! db
                                               (sql/format {:select [:data]
                                                            :from   [:issues]
@@ -144,10 +144,11 @@
                (assoc data "contexts" {}))
         contexts (dissoc (into {}
                                (map (fn [{:issues/keys [id title short_title]}]
-                                      [id (if (seq short_title)
+                                      [id {:title (if (seq short_title)
                                             short_title
-                                            title)]
-                                      )(jdbc/execute! db
+                                            title)
+                                           :show-badge? true}]
+                                      ) (jdbc/execute! db
                                                       (sql/format {:select [:issues.id :title :short_title]
                                                                    :from   [:collections]
                                                                    :join   [:issues [:= :collections.container_id :issues.id]]
@@ -161,6 +162,9 @@
                        {:return-keys true})))
 
 (defn update-collection-title-in-collection-items
+  "Standard use case is that you know item-id references id via contexts. That id has a new title, so we update it.
+   @param constraints a list of ids; when set, the contexts of the item with item-id will be reduced to the ones present in that list
+     so the use case is not to set the title in an item's context (with a given id), but to remove contexts"
   ([db item-id id short_title title] 
    (update-collection-title-in-collection-items db item-id id short_title title nil))
   ([db item-id id short_title title constraints]
@@ -175,16 +179,22 @@
                 data
                 (assoc data "contexts" {}))
          data (update data "contexts" (fn [contexts]
-                                              (cond 
-                                                (true? constraints)
-                                                (dissoc contexts (str id))
-                                                (seq constraints)
-                                                (select-keys contexts (map str constraints))
-                                                :else
-                                                (assoc contexts (str id)  
-                                                       (if (seq short_title)
-                                                         short_title
-                                                         title)))))]
+                                        (cond
+                                          (true? constraints)
+                                          (dissoc contexts (str id))
+                                          (seq constraints)
+                                          (select-keys contexts (map str constraints))
+                                          :else
+                                          (if (map? (get contexts (str id)))
+                                            (assoc-in contexts [(str id) "title"]  
+                                                      (if (seq short_title)
+                                                        short_title
+                                                        title))
+                                            (assoc contexts (str id)   
+                                                   {:show-badge? true
+                                                    :title       (if (seq short_title)
+                                                                   short_title
+                                                                   title)})))))]
      (jdbc/execute-one! db
                         (sql/format {:update [:issues]
                                      :where  [:= :id [:inline item-id]]

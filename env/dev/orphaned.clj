@@ -1,7 +1,7 @@
 (ns orphaned
   (:require [next.jdbc :as jdbc]
             [honey.sql :as sql]
-            [datastore.get-item :refer [get-item]]))
+            [datastore.items :refer [get-item]]))
 
 (comment
   (let [db

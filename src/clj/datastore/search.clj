@@ -6,7 +6,7 @@
             [next.jdbc :as jdbc]
             [honey.sql :as sql]
             [datastore.issues.common :as common]
-            [datastore.get-item :as get-item]))
+            [datastore.items :as items]))
 
 (defmacro sectime
   [what expr]
@@ -351,7 +351,7 @@
   (reduce (fn [acc val]
             (if (secondary-contexts val)
               (conj acc [val (conj (secondary-contexts val) true)])
-              (if-let [title (:title (get-item/get-item db {:id val}))]
+              (if-let [title (:title (items/get-item db {:id val}))]
                 (conj acc [val [title 0 true]])
                 acc)))
           [] highlighted-secondary-contexts))

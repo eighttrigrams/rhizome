@@ -2,15 +2,14 @@
   (:require ["react-markdown$default" :as ReactMarkdown]
             [ui.actions :as actions]
             [clojure.string :as str]
-            [ajax.core :as ajax]
-            [ui.main.rhs.modifiers :as modifiers]))
+            [ajax.core :as ajax]))
 
 (defn- context-links-component [*state related-contexts]
   (when (seq related-contexts)
     [:<>
      [:h3 "Contexts"]
      [:ul
-      (map (fn [[id title]]
+      (map (fn [[id {:keys [title]}]]
              [:li
               {:key      id
                :on-click #(actions/select-context! *state {:id id} true)}

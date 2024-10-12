@@ -4,7 +4,7 @@
             [cheshire.core :as json]
             [clj-http.client :as http]
             datastore
-            [datastore.get-item :as get-item]
+            [datastore.items :as items]
             [repository.insertion.common :as common]
             [utils.url :as url]))
 
@@ -18,7 +18,7 @@
   [db author_name author_url youtube-channels-id]
   (let [channel-handle-simple (str/replace author_url "https://www.youtube.com/" "")
         channel-handle (str "YT" channel-handle-simple)
-        channel-id (:id (get-item/get-item-by-path db "data->'resource-links'->>'youtube-channel'" author_url))
+        channel-id (:id (items/get-item-by-path db "data->'resource-links'->>'youtube-channel'" author_url))
         channel-id (or channel-id
                        (let [channel (common/insert-item db 
                                                          author_name 
@@ -53,7 +53,7 @@
                                                     author_name
                                                     author_url
                                                     youtube-channels-id)]
-    (when (:id (get-item/get-item-by-path db "data->'resource-links'->>'youtube-video'" url))
+    (when (:id (items/get-item-by-path db "data->'resource-links'->>'youtube-video'" url))
       (throw (Exception. "youtube video already exists!")))
     (common/insert-item db 
                         title

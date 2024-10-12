@@ -3,7 +3,7 @@
             [honey.sql :as sql]
             [datastore.issues :as issues]
             [datastore.contexts :as contexts]
-            [datastore.get-item :as get-item]))
+            [datastore.items :as items]))
 
 ;; entity types
 ;; - issues
@@ -18,7 +18,7 @@
 ;; TODO move to search ns, explore varags here, make tut about varargs and destructuring?
 ;; TODO in minimals, show examples which use substitution/formatting
 
-(def get-issue get-item/get-item)
+(def get-issue items/get-item)
 
 (def update-issue-description issues/update-issue-description)
 
@@ -53,7 +53,7 @@
                                            :updated_at_ctx [:raw "NOW()"]
                                            :updated_at  [:raw "NOW()"]}})
                      {:return-keys true})
-  (get-item/get-item db item))
+  (items/get-item db item))
 
 (def cycle-search-mode contexts/cycle-search-mode)
 
@@ -69,7 +69,7 @@
 
 (def reprioritize-context contexts/reprioritize-context)
 
-(def get-context get-item/get-item)
+(def get-context items/get-item)
 
 (def new-context contexts/new-context)
 
