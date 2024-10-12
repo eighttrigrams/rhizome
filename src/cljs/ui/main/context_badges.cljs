@@ -3,7 +3,7 @@
 (defn component [contexts]
   [:span.contexts
    (doall
-    (map (fn [[idx {:keys [title date file number]}]]
+    (map (fn [[idx {:keys [title date file number context]}]]
            (case idx
              :file
              [:span.badge.light 
@@ -17,7 +17,7 @@
               {:key      idx
                :on-click (fn [e] 
                            (.stopPropagation e)
-                           (let [callback-fn title]
+                           (let [callback-fn context]
                              (callback-fn)))}
               "⭕"]
              :date

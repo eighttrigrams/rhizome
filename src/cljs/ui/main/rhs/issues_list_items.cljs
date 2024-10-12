@@ -111,7 +111,7 @@
      [context-badges/component (remove #(= (:id (:selected-context @*state))
                                            (first %)) 
                                        (merge (when (:is_context issue) 
-                                                {0 #(actions/select-context! *state issue)})
+                                                {0 {:context #(actions/select-context! *state issue)}})
                                               (when (:date issue)
                                                 {:date issue})
                                               (when (and (:selected-context @*state)
