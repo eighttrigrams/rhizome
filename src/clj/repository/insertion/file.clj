@@ -18,7 +18,7 @@
          "mp4" ["MP4s" "Video"]
          "flv" ["FLVs" "Video"]
          "mov" ["MOVs" "Video"]
-         "pdf" ["PDFs" "Documents"]
+         "pdf" ["PDFs"]
          "tiff" ["TIFFs" "Documents"]
          "jpg" ["JPEGs" "Image"]
          "jpeg" ["JPEGs" "Image"]
