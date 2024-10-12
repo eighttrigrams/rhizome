@@ -15,8 +15,6 @@
                   :related_issues_ids
                   .getArray
                   (map #(get-item db {:id %} {:skip-relations? true
-                                              ;; precautionary measure
-                                              :skip-containers? (= 0 recursion-depth)
                                               :recursion-depth (dec recursion-depth)}))
                   set))))
 
@@ -46,12 +44,6 @@
       sql/format
       (#(jdbc/execute-one! db % {:return-keys true}))))
 
-(defn- get-collections [db id]
-  (when-let [result (-> (basic-issues-query id)
-                        sql/format
-                        (#(jdbc/execute-one! db % {:return-keys true})))]
-    (-> result common/post-process-simple)))
-
 (defn get-item
   "Gets an issue, including related issues.
    
@@ -63,20 +55,15 @@
                        :contexts {224 \"some-context-title\"}})
    }
    "
-  ([db item] (get-item db item {:skip-relations? false
-                                :skip-containers? false}))
-  ([db {:keys [id]} {:keys [skip-relations? skip-containers? recursion-depth] :as m
+  ([db item] (get-item db item {:skip-relations? false}))
+  ([db {:keys [id]} {:keys [skip-relations? recursion-depth]
                      :or {recursion-depth 3}}]
    (try
-     (let [collections (if-not skip-containers? ;; TODO looks unused; collections seems to be always nil, skip-containers i don't have any idea anymore what that is for
-                         (:contexts (get-collections db id))
-                         nil)
-           relations (if-not skip-relations?
+     (let [relations (if-not skip-relations?
                        (:related_issues (get-issue-with-related-issues db id recursion-depth))
                        nil)]
        (-> (get-issue-without-related-issues db id)
            common/post-process-simple
-           (assoc :contexts (or collections {}))
            (assoc :related_issues (or relations #{}))))
      (catch java.lang.Exception e
        (prn "get-issue-----" (.getMessage e))
