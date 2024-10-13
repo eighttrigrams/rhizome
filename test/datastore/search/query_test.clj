@@ -30,6 +30,7 @@
           it2-id (create-item "it2" false)
           it3-id (create-item "it3" false)]
       (jdbc/execute-one! db ["insert into collections(container_id,item_id) values (?,?),(?,?),(?,?),(?,?),(?,?),(?,?)" cont1-id it1-id cont1-id it2-id cont2-id it1-id cont2-id it2-id cont3-id it1-id cont3-id it2-id])
+      ;; (jdbc/execute-one! db ["insert into collections(container_id,item_id) values (?,?),(?,?),(?,?),(?,?),(?,?)" cont1-id it1-id cont1-id it2-id cont2-id it1-id cont2-id it2-id cont3-id it1-id])
       (jdbc/execute-one! db ["insert into issue_issue(left_id,right_id) values (?,?),(?,?)" cont1-id it2-id cont1-id it3-id])
 
 
