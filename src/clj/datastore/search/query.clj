@@ -92,3 +92,15 @@
        {:limit 500})))
     ;; TODO i could do the sorting and limiting uniformly here
    (wrap-order-and-limit selected-context link-issue)))
+
+(defn do-fetch-ids' 
+  "This should later be a replacement for do-fetch-ids"
+  [{:keys [q _link-issue]
+    :or   {q ""}} 
+   _selected-context
+   _search-mode
+   _events-view
+   _issue-ids-to-remove
+   _join-ids
+   _and-query?]
+  )
