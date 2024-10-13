@@ -19,15 +19,17 @@
 
 (defn- delete-related-issues [db id]
   (jdbc/execute! db (sql/format {:delete-from [:issue_issue]
-                                 :where       [:= :left_id [:inline id]]
-                                 })))
+                                 :where       [:or
+                                               [:= :left_id [:inline id]]
+                                               [:= :right_id [:inline id]]]})))
 
 (defn relate-issues [db id related-issues-ids]
   (doall
    (for [related-issue-id related-issues-ids]
      (jdbc/execute! db (sql/format {:insert-into [:issue-issue]
                                     :columns     [:left_id :right_id]
-                                    :values      [[[:inline id] [:inline related-issue-id]]]})))))
+                                    :values      [[[:inline id] [:inline related-issue-id]]
+                                                  [[:inline related-issue-id] [:inline id]]]})))))
 
 (defn update-issue [db {:keys [issue related-issues-ids]}]
   (let [{:keys [date id archived]} issue]
