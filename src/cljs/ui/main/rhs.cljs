@@ -29,13 +29,6 @@
         *state issue idx #(scroll-into-view %)]])
     (:issues @*state))])
 
-(defn- related-issues-list-component [*state]
-  [:ul.cards
-   (for [related-issue (:related_issues (or (:selected-issue @*state)
-                                            (:selected-context @*state)))]
-     ^{:key (:id related-issue)}
-     [issues-list-items/regular-issues-list-item-component *state related-issue nil nil])])
-
 (defn component [_*state]
   (fn [*state]
     (let [state @*state]
@@ -44,7 +37,4 @@
          [input/component *state])
        [:div.scrollable
         {:class (when (= :issues (:active-search state)) :search-active)}
-        (if (or (not (:selected-issue state))
-                (= :issues (:active-search state)))
-          [issues-list-component *state]
-          [related-issues-list-component *state])]])))
+        [issues-list-component *state]]])))

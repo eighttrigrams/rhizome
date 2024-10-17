@@ -284,6 +284,7 @@
   "when context selected add an issue"
   [db {:keys [selected-context] :as opts} issue-id]
   (try
+    (prn "yo" (:title selected-context) issue-id)
     (datastore/reprioritize-issue db {:id issue-id})
     (let [selected-issue (datastore/get-issue db {:id issue-id})
           context-ids   (keys (:contexts (:data selected-issue)))] 
@@ -461,41 +462,29 @@
       (catch Exception e
         (log/error (str "Caught an repository/unlink-selected-item-from-container " (.getMessage e)))))))
 
-(defn update-issue [{:keys [db]}]
-  (fn [opts arg]
-    (log/info (str "repository/update-issue " arg))
-    (let [issue-contexts (map :id (:issue-contexts arg))]
-      (try
-        (datastore/set-containers-of-item! db
-                                           (or (:issue (:issue arg))
-                                               (:issue arg))
-                                           issue-contexts)
-        (items/update-collection-title-in-collection-items db
-                                                              (:id (or (:issue (:issue arg))
-                                                                       (:issue arg)))
-                                                              nil nil nil 
-                                                              issue-contexts)
-        (let [{:keys [data]} (items/get-item db (:issue (:issue arg)))]
-          {:selected-issue (datastore/update-issue db 
-                                                   (assoc-in (:issue arg) 
-                                                             [:issue :data]
-                                                             (merge 
-                                                              data
-                                                              (:data (:issue (:issue arg))))))
-           :issues         (search/search-issues db (dissoc opts :q))
-           :q              nil})
-        (catch Exception e
-          (log/error (str "Caught an update-issue " (.getMessage e))))))))
-
 (defn update-context [{:keys [db]}]
   (fn [opts arg]
     (log/info (str "repository/update-context " arg))
-    (let [selected-context (datastore/update-context db (:context arg))]
-      {:selected-context selected-context
-       :issues           (search/search-issues db (-> opts
-                                                      (dissoc :q)
-                                                      (assoc :selected-context selected-context)))
-       :q                nil})))
+    (let [issue-contexts (map :id (:issue-contexts arg))]
+      (try
+        (when (seq issue-contexts)
+          (datastore/set-containers-of-item! db
+                                             (or (:context (:context arg))
+                                                 (:context arg))
+                                             issue-contexts)
+          (items/update-collection-title-in-collection-items db
+                                                             (:id (or (:context (:context arg))
+                                                                      (:context arg)))
+                                                             nil nil nil 
+                                                             issue-contexts))
+        (let [selected-context (datastore/update-context db (:context arg))]
+          {:selected-context selected-context
+           :issues           (search/search-issues db (-> opts
+                                                          (dissoc :q)
+                                                          (assoc :selected-context selected-context)))
+           :q                nil})
+        (catch Exception e
+          (log/error (str "Caught an update-context " (.getMessage e))))))))
 
 (defn delete-selected-issue [{:keys [db]}]
   (fn [{:keys [selected-issue] :as opts}]

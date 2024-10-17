@@ -85,15 +85,15 @@
                               (let [skip-select? (and (deref modifiers/*alt-pressed?)
                                                       (not= :issues (:active-search @*state)))]
                                 (swap! *state (fn [state] (dissoc state :preview-issue))) 
-                                (actions/select-issue! *state 
+                                (actions/select-context! *state 
                                                        issue
                                                        skip-select?)
                                 (when skip-select?
                                   (select-fn idx)))
-                              (do (swap! *state (fn [state] ;; TODO review and dedup with issues-list-item/component
+                              (do (swap! *state (fn [state]
                                                   (-> state
                                                       (dissoc :preview-issue))))
-                                  (actions/select-issue! *state issue)))
+                                  (actions/select-context! *state issue)))
            :on-mouse-enter (on-mouse-enter *state issue)
            :on-mouse-leave (on-mouse-leave *state)}
           (when idx 

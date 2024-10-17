@@ -25,6 +25,4 @@
            (and (= "Digit9" code)
                 (or meta-pressed? alt-pressed?))
            (do (.preventDefault e)
-               (if (:selected-issue @*state)
-                 (actions/update-issue! *state (value-fn) (value-fn-2))
-                 (actions/update-context! *state (value-fn))))))))
+               (actions/update-context! *state (value-fn) (value-fn-2)))))))

@@ -17,7 +17,7 @@
                                              :update-context-description))
                                (assoc :arg item))))
 
-(defn update-issue! [*state issue issue-contexts]
+#_(defn update-issue! [*state issue issue-contexts]
   (fetch-and-reset-with-method! *state 
                                (dissoc @*state :modal)
                                api/update-issue
@@ -25,8 +25,10 @@
                                 :issue-contexts (map (fn [issue-context] 
                                                        {:id issue-context :show-badges? true}) issue-contexts)}))
 
-(defn update-context! [*state context]
+(defn update-context! [*state context issue-contexts]
   (fetch-and-reset-with-method! *state 
                                (dissoc @*state :modal)
                                api/update-context
-                               {:context        context}))
+                               {:context        context
+                                :issue-contexts (map (fn [issue-context] 
+                                                       {:id issue-context :show-badges? true}) issue-contexts)}))

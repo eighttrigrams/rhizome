@@ -25,9 +25,7 @@
     (key-handler/handle-edit-keys *state
                                   #(issue-edit/get-values (:id item) 
                                                           (:selected-issue @*state))
-                                  (if (= :edit-issue (:modal @*state))
-                                    #(link-context-issue/get-values)
-                                    nil))
+                                  #(link-context-issue/get-values))
     :description
     (key-handler/handle-modal-keys *state 
                                    #(do {:id          (:id item) 
@@ -48,5 +46,5 @@
          :edit-issue
          [:div#modal-component [issue-edit/component item :issue]]
          :edit-context
-         [:div#modal-component [issue-edit/component item :context]]
+         [:div#modal-component [issue-edit/component item :issue]]
          nil)])))

@@ -121,12 +121,11 @@
          ;; For a snappy response in the UI, set :selected-issue immediately.
          ;; The subsequent call to fetch-and-reset! then
          ;; will fetch and replace it, thereby filling in the related issues.
-         (swap! *state assoc :selected-issue issue))
+         (swap! *state assoc :selected-context issue))
        (fetch-and-reset-with-method! *state
                                      @*state 
-                                     api/select-issue 
-                                     issue 
-                                     skip-select?)))))
+                                     api/fetch-context 
+                                     [issue false])))))
 
 (defn select-first-issue! [*state]
   (when (seq (:issues @*state))

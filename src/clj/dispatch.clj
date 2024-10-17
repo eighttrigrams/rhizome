@@ -16,7 +16,6 @@
                                 store-current-view
                                 load-stored-context
                                 remove-stored-context
-                                update-issue
                                 update-context
                                 delete-selected-issue
                                 delete-issue
@@ -45,7 +44,6 @@
   remove-stored-context
   delete-selected-issue
   delete-issue 
-  update-issue
   update-context
   fetch-aggregated-contexts
   unlink-selected-item-from-container
