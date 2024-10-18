@@ -40,9 +40,9 @@
 
 (defn fetch-context [{:keys [db]}]
   (fn [_opts [arg fetch-as-issue?]]
-    (log/info "fetch-context")
     (try
       (let [selected-context      (datastore/get-context db arg)
+            _ (log/info "fetch-context" (:id selected-context) (:title selected-context))
             opts                  {:search-globally? false
                                    :selected-context selected-context}]
         (if fetch-as-issue?
