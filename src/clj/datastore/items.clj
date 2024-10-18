@@ -155,7 +155,6 @@
   ([db item-id id short_title title] 
    (update-collection-title-in-collection-items db item-id id short_title title nil))
   ([db item-id id short_title title constraints]
-   (log/info (str "constraints" (seq constraints)))
    (let [data (:issues/data (jdbc/execute-one! db
                                                (sql/format {:select [:data]
                                                             :from   [:issues]

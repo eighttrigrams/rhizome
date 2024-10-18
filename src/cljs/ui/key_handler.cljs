@@ -45,10 +45,7 @@
                (actions/upgrade-issue-to-context! *state)
                (and alt-pressed? 
                     (= "KeyT" code)
-                    selected-context
-                    selected-issue
-                    (or (> (count (:contexts (:data selected-issue))) 1)
-                        (:is_context selected-issue)))
+                    selected-context)
                (actions/unlink-selected-issue-from-selected-context *state)
                (= "KeyI" code)
                (swap! *state #(assoc % :active-search :issues :search-globally? false))

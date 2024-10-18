@@ -39,10 +39,11 @@
     {:public? (and @privacy/*public? (= :private privacy-mode))}))
 
 (defn fetch-context [{:keys [db]}]
-  (fn [_opts [arg fetch-as-issue?]]
+  (fn [old-state [arg fetch-as-issue?]]
+    (log/info (str "--keys--" (keys old-state) (:old-selected-context old-state)))
     (try
       (let [selected-context      (datastore/get-context db arg)
-            _ (log/info "fetch-context" (:id selected-context) (:title selected-context))
+            _ (log/info (str "fetch-context from (" (:id (:old-selected-context old-state)) "):\"" (:title (:old-selected-context old-state)) "\" to (" (:id selected-context) "):\"" (:title selected-context) "\""))
             opts                  {:search-globally? false
                                    :selected-context selected-context}]
         (if fetch-as-issue?
@@ -443,22 +444,26 @@
         (log/error (str "Caught an repository/upgrade-issue-to-context " (.getMessage e)))))))
 
 (defn unlink-selected-item-from-container [{:keys [db]}]
-  (fn [{:keys [selected-issue selected-context] :as state}]
+  (fn [{:keys [selected-context old-selected-context] :as state}]
     (try 
-      (log/info (str "repository/unlink-selected-item-from-container " (:id selected-issue)))
-      (let [selected-context-id (:id selected-context)
-            selected-issue (update-in selected-issue [:data :contexts] 
-                                      #(dissoc % selected-context-id))
-            issue-contexts-ids (keys (:contexts (:data selected-issue)))]
-        (datastore/set-containers-of-item! db
-                                           selected-issue
-                                           issue-contexts-ids)
-        (items/update-collection-title-in-collection-items db
-                                                              (:id selected-issue)
-                                                              (:id selected-context) nil nil true)
-        {:selected-issue nil
-         :issues (search/search-issues db state)
-         :aggregated-contexts ((fetch-aggregated-contexts {:db db}) state)})
+      (log/info (str "repository/unlink-selected-item-from-container - Removing " (:id selected-context) ":" (:title selected-context) " from " (:id old-selected-context) ":" (:title old-selected-context)))
+      (let [container-id (:id old-selected-context)
+            selected-item (update-in selected-context [:data :contexts]
+                                     #(dissoc % container-id))
+            issue-contexts-ids (keys (:contexts (:data selected-item)))]
+        (if (not (seq issue-contexts-ids))
+          state
+          (do
+            (datastore/set-containers-of-item! db
+                                               selected-item
+                                               issue-contexts-ids)
+            (items/update-collection-title-in-collection-items db
+                                                               (:id selected-item)
+                                                               (:id old-selected-context) nil nil true)
+            {:selected-issue nil
+             :selected-context old-selected-context
+             :issues (search/search-issues db (assoc state :selected-context old-selected-context))
+             :aggregated-contexts ((fetch-aggregated-contexts {:db db}) (assoc state :selected-context old-selected-context))})))
       (catch Exception e
         (log/error (str "Caught an repository/unlink-selected-item-from-container " (.getMessage e)))))))
 

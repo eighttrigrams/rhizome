@@ -68,9 +68,10 @@
   (if (true? (:link-context @*state))
     (fetch-and-reset! *state (assoc @*state :cmd :link-context :arg context))
     (do
-       ;; For a snappy response in the UI; see below
+      (prn "??? " (:selected-context @*state))
+      ;; For a snappy response in the UI; see below
+      (swap! *state assoc :old-selected-context (:selected-context @*state))
       (swap! *state assoc :selected-context context)
-      
       (fetch-and-reset-with-method-2! 
        *state 
        *state
@@ -118,7 +119,8 @@
          ;; For a snappy response in the UI, set :selected-issue immediately.
          ;; The subsequent call to fetch-and-reset! then
          ;; will fetch and replace it, thereby filling in the related issues.
-     (do (swap! *state assoc :selected-context issue)
+     (do (swap! *state assoc :old-selected-context (:selected-context @*state))
+         (swap! *state assoc :selected-context issue)
          (fetch-and-reset-with-method! *state
                                        @*state 
                                        api/fetch-context 
