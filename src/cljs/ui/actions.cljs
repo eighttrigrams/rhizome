@@ -8,11 +8,6 @@
 (defn fetch! [*state]
   (fetch-and-reset! *state @*state))
 
-(defn- exec-cmd 
-  ([*state cmd] (exec-cmd *state cmd nil))
-  ([*state cmd arg]
-   (fetch-and-reset! *state (assoc @*state :cmd cmd :arg arg))))
-
 (defn quit-search! [*state]
   (cond
     (= :contexts (:active-search @*state))
@@ -68,8 +63,8 @@
                                (assoc :cmd :insert-context)
                                (assoc :arg context))))
 
-(defn select-context! 
-  [*state context]
+(defn select-context!
+  [*state context select-as-issue?]
   (if (true? (:link-context @*state))
     (fetch-and-reset! *state (assoc @*state :cmd :link-context :arg context))
     (do
@@ -80,18 +75,20 @@
        *state 
        *state
        api/fetch-context
-       [context]))))
+       [context select-as-issue?]))))
 
 (defn select-first-context! [*state]
   (when (seq (:contexts @*state))
     (select-context! *state 
-                     (first (:contexts @*state)))))
+                     (first (:contexts @*state))
+                     false)))
 
 (defn- select-nth-context! [*state n]
   (when (and (seq (:contexts @*state))
              (> (count (:contexts @*state)) n))
     (select-context! *state 
-                     (nth (:contexts @*state) n))))
+                     (nth (:contexts @*state) n)
+                     false)))
 
 (defn select-second-context! [*state]
   (select-nth-context! *state 1))
@@ -125,7 +122,7 @@
          (fetch-and-reset-with-method! *state
                                        @*state 
                                        api/fetch-context 
-                                       [issue false])))))
+                                       [issue true])))))
 
 (defn select-first-issue! [*state]
   (when (seq (:issues @*state))

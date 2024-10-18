@@ -39,13 +39,15 @@
     {:public? (and @privacy/*public? (= :private privacy-mode))}))
 
 (defn fetch-context [{:keys [db]}]
-  (fn [_opts [arg]]
+  (fn [_opts [arg fetch-as-issue?]]
     (log/info "fetch-context")
     (try
       (let [selected-context      (datastore/get-context db arg)
             opts                  {:search-globally? false
                                    :selected-context selected-context}]
-        (datastore/reprioritize-context db arg)
+        (if fetch-as-issue?
+          (datastore/reprioritize-issue db arg)
+          (datastore/reprioritize-context db arg))
         (merge opts
                {:selected-context                        selected-context
                 :issues                                  (search/search-issues db 
