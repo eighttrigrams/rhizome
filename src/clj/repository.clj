@@ -421,11 +421,11 @@
           (= :context link-issue)
           (link-issue-to-selected-context db opts arg))))
 
-(defn select-issue [{:keys [db]}]
-  (fn [state issue skip-select?]
-    (prn "repository/select-issue")
+(defn reprioritize-issue [{:keys [db]}]
+  (fn [state issue]
+    (log/info (str "repository/reprioritize-issue" (:id issue) (:title issue)))
     (datastore/reprioritize-issue db issue)
-    {:selected-issue   (when-not skip-select? (datastore/get-issue db issue))
+    {:selected-issue   nil #_(when-not skip-select? (datastore/get-issue db issue))
      :issues           (search/search-issues db (dissoc state 
                                                         :search-globally?
                                                         :q

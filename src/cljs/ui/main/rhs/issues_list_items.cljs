@@ -84,12 +84,16 @@
            :on-click       #(if idx 
                               (let [skip-select? (and (deref modifiers/*alt-pressed?)
                                                       (not= :issues (:active-search @*state)))]
+                                (prn "skip-select?" skip-select?)
                                 (swap! *state (fn [state] (dissoc state :preview-issue))) 
-                                (actions/select-context! *state 
-                                                       issue
-                                                       skip-select?)
-                                (when skip-select?
-                                  (select-fn idx)))
+                                
+                                (if skip-select?
+                                  (do 
+                                    (actions/reprioritize-issue *state issue)
+                                    (select-fn idx))
+                                  (actions/select-context! *state 
+                                                           issue
+                                                           false)))
                               (do (swap! *state (fn [state]
                                                   (-> state
                                                       (dissoc :preview-issue))))

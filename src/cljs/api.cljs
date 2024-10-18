@@ -23,7 +23,7 @@
 
 (defn-over-http finish-linking-issue :return-value {})
 
-(defn-over-http select-issue :return-value {})
+(defn-over-http reprioritize-issue :return-value {})
 
 (defn-over-http cycle-search-mode :return-value {})
 

@@ -8,7 +8,7 @@
                                 change-secondary-contexts-inverted
                                 deselect-secondary-contexts
                                 finish-linking-issue
-                                select-issue
+                                reprioritize-issue
                                 cycle-search-mode
                                 show-events
                                 show-past-events
@@ -34,7 +34,7 @@
   change-secondary-contexts-inverted
   deselect-secondary-contexts
   finish-linking-issue
-  select-issue
+  reprioritize-issue
   cycle-search-mode
   show-events
   show-past-events

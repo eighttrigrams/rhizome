@@ -108,24 +108,27 @@
 (defn select-fifth-context! [*state suppress-reset-issue]
   (select-nth-context! *state suppress-reset-issue 4))
 
-(defn select-issue! 
-  ([*state issue] (select-issue! *state issue false))
-  ([*state issue skip-select?]
+(defn reprioritize-issue [*state issue]
+  (fetch-and-reset-with-method! *state
+                                @*state 
+                                api/reprioritize-issue 
+                                issue))
+
+(defn select-issue!
+  ([*state issue]
    (if (:link-issue @*state)
      (fetch-and-reset-with-method! *state
                                    @*state
                                    api/finish-linking-issue 
                                    (:id issue))
-     (do 
-       (when-not skip-select?
          ;; For a snappy response in the UI, set :selected-issue immediately.
          ;; The subsequent call to fetch-and-reset! then
          ;; will fetch and replace it, thereby filling in the related issues.
-         (swap! *state assoc :selected-context issue))
-       (fetch-and-reset-with-method! *state
-                                     @*state 
-                                     api/fetch-context 
-                                     [issue false])))))
+     (do (swap! *state assoc :selected-context issue)
+         (fetch-and-reset-with-method! *state
+                                       @*state 
+                                       api/fetch-context 
+                                       [issue false])))))
 
 (defn select-first-issue! [*state]
   (when (seq (:issues @*state))
@@ -218,11 +221,7 @@
   (fetch-and-reset-with-method! *state @*state api/cycle-search-mode))
 
 (defn show-context-as-issue! [*state]
-  (fetch-and-reset-with-method! *state
-                                @*state
-                                api/select-issue
-                                (:selected-context @*state)
-                                false))
+  (swap! *state assoc :selected-issue (:selected-context @*state)))
 
 (defn show-context-as-context-again! [*state]
   (fetch-and-reset-with-method! *state
