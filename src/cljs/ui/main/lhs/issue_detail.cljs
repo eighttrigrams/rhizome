@@ -1,20 +1,7 @@
 (ns ui.main.lhs.issue-detail
   (:require ["react-markdown$default" :as ReactMarkdown]
-            [ui.actions :as actions]
             [clojure.string :as str]
             [ajax.core :as ajax]))
-
-(defn- context-links-component [*state related-contexts]
-  (when (seq related-contexts)
-    [:<>
-     [:h3 "Contexts"]
-     [:ul
-      (map (fn [[id {:keys [title]}]]
-             [:li
-              {:key      id
-               :on-click #(actions/select-context! *state {:id id} true)}
-              title])
-           related-contexts)]]))
 
 (defn- display-youtube-video [description data]
   [:<>
@@ -118,21 +105,9 @@
                          :margin-top "20px"}}
       "Lowres here"]]))
 
-(defn component [*state suppress-switcher?]
-  (let [{:keys [selected-issue selected-context]} @*state
-        {{:keys [contexts]} :data} selected-issue]
+(defn component [*state]
+  (let [{:keys [selected-issue selected-context]} @*state]
     [:<>
-     [:h4 (when-not suppress-switcher?
-            (if selected-context
-              [:div
-               {:on-click #(actions/deselect-issue! *state)}
-               (str "[" (:title selected-context) "]")] 
-              
-              "[Overview]"))]
-     (when-not suppress-switcher?
-       [:<>
-        [context-links-component *state contexts]
-        [:hr]])
      (when-not (-> selected-issue :data :resource-links :image)
        [drop-target (:id selected-issue)])
      [the-issue-itself-component (or selected-issue

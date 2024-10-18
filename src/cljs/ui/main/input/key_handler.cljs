@@ -32,10 +32,6 @@
                 selected-context
                 (not selected-issue))
            (actions/store-current-view! *state {:title (.-value (get-title-el))})
-           (and (= :contexts active-search)
-                shift-pressed?
-                selected-issue)
-           (actions/select-first-context! *state true)
            (or (and shift-pressed?
                     (= :contexts active-search))
                (and (= :contexts active-search)
@@ -61,29 +57,29 @@
              (set! (.-value (get-title-el)) ""))
            #_(swap! *state dissoc nil)
            (= :contexts active-search)
-           (actions/select-first-context! *state false)
+           (actions/select-first-context! *state)
            (= :issues active-search)
            (actions/select-first-issue! *state)))
        (when (and alt-pressed?
                   (= "Digit2" code)
                   (= :contexts active-search))
          (.preventDefault e)
-         (actions/select-second-context! *state false))
+         (actions/select-second-context! *state))
        (when (and alt-pressed?
                   (= "Digit3" code)
                   (= :contexts active-search))
          (.preventDefault e)
-         (actions/select-third-context! *state false))
+         (actions/select-third-context! *state))
        (when (and alt-pressed?
                   (= "Digit4" code)
                   (= :contexts active-search))
          (.preventDefault e)
-         (actions/select-fourth-context! *state false))
+         (actions/select-fourth-context! *state))
        (when (and alt-pressed?
                   (= "Digit5" code)
                   (= :contexts active-search))
          (.preventDefault e)
-         (actions/select-fifth-context! *state false))
+         (actions/select-fifth-context! *state))
        (when (and alt-pressed?
                   (= "Digit2" code)
                   (= :issues active-search))

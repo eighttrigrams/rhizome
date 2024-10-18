@@ -24,8 +24,6 @@
 
 (def link-issue issues/link-issue)
 
-(def reprioritize-issue issues/reprioritize-issue) 
-
 (def update-issue issues/update-issue)
 
 (def update-issue-simple issues/update-issue-simple)
@@ -66,6 +64,8 @@
 (def update-context-description contexts/update-context-description)
 
 (def update-context contexts/update-context)
+
+(def reprioritize-issue issues/reprioritize-issue) 
 
 (def reprioritize-context contexts/reprioritize-context)
 

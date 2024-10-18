@@ -90,9 +90,7 @@
                                   (do 
                                     (actions/reprioritize-issue *state issue)
                                     (select-fn idx))
-                                  (actions/select-context! *state 
-                                                           issue
-                                                           false)))
+                                  (actions/select-context! *state issue)))
                               (do (swap! *state (fn [state]
                                                   (-> state
                                                       (dissoc :preview-issue))))

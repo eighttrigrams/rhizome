@@ -27,7 +27,7 @@
         [contexts-list *state]]]
       (:selected-issue @*state)
       [:div.details-component.scrollable
-       [issue-detail/component *state false]]
+       [issue-detail/component *state]]
       (:selected-context @*state)
       [:<>
        [context-detail/item-component *state]

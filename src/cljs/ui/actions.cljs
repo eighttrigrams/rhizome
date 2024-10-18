@@ -69,44 +69,41 @@
                                (assoc :arg context))))
 
 (defn select-context! 
-  ([*state context] (select-context! *state context false))
-  ([*state context suppress-reset-issue]
-   (if (true? (:link-context @*state))
-     (fetch-and-reset! *state (assoc @*state :cmd :link-context :arg context))
-     (do
+  [*state context]
+  (if (true? (:link-context @*state))
+    (fetch-and-reset! *state (assoc @*state :cmd :link-context :arg context))
+    (do
        ;; For a snappy response in the UI; see below
-       (swap! *state assoc :selected-context context)
-       
-       (fetch-and-reset-with-method-2! 
-        *state 
-        *state
-        api/fetch-context
-        [context suppress-reset-issue])))))
+      (swap! *state assoc :selected-context context)
+      
+      (fetch-and-reset-with-method-2! 
+       *state 
+       *state
+       api/fetch-context
+       [context]))))
 
-(defn select-first-context! [*state suppress-reset-issue]
+(defn select-first-context! [*state]
   (when (seq (:contexts @*state))
     (select-context! *state 
-                     (first (:contexts @*state)) 
-                     suppress-reset-issue)))
+                     (first (:contexts @*state)))))
 
-(defn- select-nth-context! [*state suppress-reset-issue n]
+(defn- select-nth-context! [*state n]
   (when (and (seq (:contexts @*state))
              (> (count (:contexts @*state)) n))
     (select-context! *state 
-                     (nth (:contexts @*state) n) 
-                     suppress-reset-issue)))
+                     (nth (:contexts @*state) n))))
 
-(defn select-second-context! [*state suppress-reset-issue]
-  (select-nth-context! *state suppress-reset-issue 1))
+(defn select-second-context! [*state]
+  (select-nth-context! *state 1))
 
-(defn select-third-context! [*state suppress-reset-issue]
-  (select-nth-context! *state suppress-reset-issue 2))
+(defn select-third-context! [*state]
+  (select-nth-context! *state 2))
 
-(defn select-fourth-context! [*state suppress-reset-issue]
-  (select-nth-context! *state suppress-reset-issue 3))
+(defn select-fourth-context! [*state]
+  (select-nth-context! *state 3))
 
-(defn select-fifth-context! [*state suppress-reset-issue]
-  (select-nth-context! *state suppress-reset-issue 4))
+(defn select-fifth-context! [*state]
+  (select-nth-context! *state 4))
 
 (defn reprioritize-issue [*state issue]
   (fetch-and-reset-with-method! *state

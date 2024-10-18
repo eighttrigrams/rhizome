@@ -39,7 +39,7 @@
     {:public? (and @privacy/*public? (= :private privacy-mode))}))
 
 (defn fetch-context [{:keys [db]}]
-  (fn [_opts [arg suppress-reset-issue?]]
+  (fn [_opts [arg]]
     (log/info "fetch-context")
     (try
       (let [selected-context      (datastore/get-context db arg)
@@ -52,13 +52,11 @@
                                                                                (-> opts
                                                                                    (dissoc :q)
                                                                                    (assoc :skip-context-aggregation? true)))
-                :active-search                           (when-not suppress-reset-issue?
-                                                           :issues)
+                :active-search                           :issues
                 :context-to-fetch                        nil
                 :unassigned-secondary-contexts-selected? false
-                :q                                       nil}
-               (when (not suppress-reset-issue?)
-                 {:selected-issue nil})))
+                :q                                       nil
+                :selected-issue nil}))
       (catch Exception e
         (log/error e (str "Caught an exception in fetch-context " (.getMessage e)))
         (throw e)))))
