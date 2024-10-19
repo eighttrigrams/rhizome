@@ -319,14 +319,14 @@
       (log/error (str "Caught an exception in link-issue-to-selected-context " (.getMessage e)))
       (throw e))))
 
-(defn- link-selected-issue-to-context 
-  "when issue selected link to yet another context"
+(defn- link-selected-context-to-context 
+  "link selected context as an item to a container"
   [db {:keys [selected-issue selected-context] :as opts} arg]
   (let [selected-issue (or selected-issue
                            (items/get-item db selected-context))
         contexts (merge (:contexts (:data selected-issue))
                         {(:id arg) (:title arg)})]
-    (log/info (str "repository/link-selected-item-to-context " selected-issue))
+    (log/info (str "repository/link-selected-context-to-context " selected-issue))
     (try
       (datastore/reprioritize-context db arg)
       (datastore/set-containers-of-item! db selected-issue (vec (set (keys contexts))))
@@ -336,8 +336,8 @@
                                                             (:short_title arg)
                                                             (:title arg))
       (merge {:link-context   nil
-              :selected-issue (datastore/get-issue db selected-issue)
               :active-search  nil
+              :selected-context (datastore/get-issue db selected-context)
               :issues         (search/search-issues db (dissoc opts :q))
               :q              nil}
              (when selected-context
@@ -515,7 +515,7 @@
          :link-issue-to-selected-context (start-linking-issue-to-selected-context db opts)
          :start-linking-selected-issue-to-context (start-linking-selected-issue-to-context-with-local-search db opts)
          :start-context-search (start-context-search db opts)
-         :link-context (link-selected-issue-to-context db opts arg)
+         :link-context (link-selected-context-to-context db opts arg)
          :insert-context
          {:selected-context                        (datastore/new-context db arg)
           :selected-issue                          nil
