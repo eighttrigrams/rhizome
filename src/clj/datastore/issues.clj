@@ -103,9 +103,3 @@
                              context-ids-set)))]
      (insert-issue-relations! db values)
      (get-issue db {:id issue-id}))))
-
-(defn link-issue [db issue-id related-issue-id]
-  (let [issue (get-issue db {:id issue-id})
-        related-issues-ids (seq (set (remove #{issue-id} (conj (map :id (:related_issues issue)) related-issue-id))))]
-    (delete-related-issues db issue-id)
-    (relate-issues db issue-id related-issues-ids)))

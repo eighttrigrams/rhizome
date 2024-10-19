@@ -22,8 +22,6 @@
 
 (def update-issue-description issues/update-issue-description)
 
-(def link-issue issues/link-issue)
-
 (def update-issue issues/update-issue)
 
 (def update-issue-simple issues/update-issue-simple)

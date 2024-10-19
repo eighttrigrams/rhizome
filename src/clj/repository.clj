@@ -346,26 +346,6 @@
         (log/error (str "Caught an exception in link-selected-item-to-context " (.getMessage e)))
         (throw e)))))
 
-(defn- link-issue-to-selected-issue [db {:keys [selected-issue] :as opts} related-issue-id]
-  (try
-    (datastore/reprioritize-issue db {:id related-issue-id})
-    (datastore/link-issue db (:id selected-issue) related-issue-id)
-    {:selected-issue   (datastore/get-issue db selected-issue)
-     :issues           (search/search-issues db (-> opts
-                                                    (dissoc :search-globally?)
-                                                    (assoc-in [:selected-context 
-                                                               :data 
-                                                               :views
-                                                               :current
-                                                               :selected-secondary-contexts] [])))
-     :active-search    nil
-     :link-issue       nil
-     :search-globally? false
-     :q                nil}
-    (catch Exception e
-      (log/error (str "Caught an exception in link-issue-to-selected-issue " (.getMessage e)))
-      (throw e))))
-
 (defn search-contexts [db opts]
   {:contexts (search/search-contexts db opts)})
 
@@ -417,9 +397,7 @@
 
 (defn finish-linking-issue [{:keys [db]}]
   (fn [{:keys [link-issue] :as opts} arg]
-    (cond (= :issue link-issue)
-          (link-issue-to-selected-issue db opts arg)
-          (= :context link-issue)
+    (cond (= :context link-issue)
           (link-issue-to-selected-context db opts arg))))
 
 (defn reprioritize-issue [{:keys [db]}]
