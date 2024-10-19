@@ -2,20 +2,8 @@
   (:require [cambium.core :as log]
             [next.jdbc :as jdbc]
             [honey.sql :as sql]
+            [datastore.issues.common :as issues.common]
             [datastore.items :refer [get-item update-item] :rename {get-item get-issue}]))
-
-(defn delete-date [db issue-id]
-  (jdbc/execute! db
-                 (sql/format {:update [:issues]
-                       :set    {:date nil
-                                :archived nil}
-                       :where [:= :id [:inline issue-id]]})))
-
-(defn- insert-date [db issue-id date archived]
-  (jdbc/execute! db (sql/format {:update [:issues]
-                                 :set    {:date [:inline date]
-                                          :archived [:inline archived]}
-                                 :where [:= :id [:inline issue-id]]})))
 
 (defn- delete-related-issues [db id]
   (jdbc/execute! db (sql/format {:delete-from [:issue_issue]
@@ -33,12 +21,12 @@
 
 (defn update-issue [db {:keys [issue related-issues-ids]}]
   (let [{:keys [date id archived]} issue]
-    (delete-date db id)
+    (issues.common/delete-date db id)
     (delete-related-issues db id)
     (relate-issues db id related-issues-ids)
     (update-item db issue :issue)
     (when date
-      (insert-date db id date archived))
+      (issues.common/insert-date db id date archived))
     (get-issue db issue)))
 
 (defn update-issue-simple [db issue]

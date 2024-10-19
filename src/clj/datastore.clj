@@ -2,6 +2,7 @@
   (:require [next.jdbc :as jdbc]
             [honey.sql :as sql]
             [datastore.issues :as issues]
+            [datastore.issues.common :as issues.common]
             [datastore.contexts :as contexts]
             [datastore.items :as items]))
 
@@ -86,7 +87,7 @@
 
 (defn delete-item
   [db {:keys [id]}]
-  (issues/delete-date db id)
+  (issues.common/delete-date db id)
   (jdbc/execute! db (sql/format {:delete-from [:collections]
                                  :where [:= :item_id [:inline id]]}))
   (jdbc/execute! db (sql/format {:delete-from [:issue_issue]

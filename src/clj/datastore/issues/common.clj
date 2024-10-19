@@ -1,7 +1,22 @@
 (ns datastore.issues.common
   (:require [cheshire.core :as json]
+            [next.jdbc :as jdbc]
+            [honey.sql :as sql]
             [datastore.helpers
              :refer [un-namespace-keys simplify-date]]))
+
+(defn delete-date [db issue-id]
+  (jdbc/execute! db
+                 (sql/format {:update [:issues]
+                       :set    {:date nil
+                                :archived nil}
+                       :where [:= :id [:inline issue-id]]})))
+
+(defn insert-date [db issue-id date archived]
+  (jdbc/execute! db (sql/format {:update [:issues]
+                                 :set    {:date [:inline date]
+                                          :archived [:inline archived]}
+                                 :where [:= :id [:inline issue-id]]})))
 
 (defn- parse-data [context]
   (if (:data context)

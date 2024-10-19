@@ -199,9 +199,12 @@
     (doall (for [item-id item-ids]
              (update-collection-title-in-collection-items db item-id id short_title title)))))
 
-(defn update-item [db 
-                   {:keys [id title short_title tags data] :as item} 
+(defn update-item [db
+                   {:keys [id title short_title tags data date archived] :as item}
                    mode]
+  (common/delete-date db id)
+  (when date
+    (common/insert-date db id date archived))
   (let [old-item (get-item db item)
         old-data (:data old-item)
         set (merge {:title       [:inline title]
@@ -223,7 +226,7 @@
     (when (and (= :context mode)
                (or (not= (:title old-item) title)
                    (not= (:short_title old-item) short_title)))
-      (future 
+      (future
         (try
           (update-collection-title-in-collection-items-for-children db id title short_title)
           (catch Exception e
