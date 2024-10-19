@@ -491,17 +491,6 @@
         (catch Exception e
           (log/error (str "Caught an update-context " (.getMessage e))))))))
 
-(defn delete-selected-issue [{:keys [db]}]
-  (fn [{:keys [selected-issue] :as opts}]
-    (try
-      (deletion/delete-item db selected-issue)
-      {:issues         (search/search-issues db opts)
-       :selected-issue nil
-       :aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)}
-      (catch Exception e
-        (log/error (str "Caught an exception in repository/delete-selected-issue " e))
-        {}))))
-
 (defn start-global-search [{:keys [db]}]
   (fn [state]
     {:issues           (search/search-issues

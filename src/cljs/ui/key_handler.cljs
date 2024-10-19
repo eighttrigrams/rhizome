@@ -31,8 +31,6 @@
                (actions/show-events! *state)
                (and selected-issue (= "KeyE" code))
                (swap! *state #(assoc % :modal :edit-issue))
-               (and selected-issue (= "Delete" code))
-               (actions/delete-selected-issue! *state)
                (and selected-context (= "Delete" code))
                (actions/delete-context! *state)
                (and selected-context (= "KeyE" code))

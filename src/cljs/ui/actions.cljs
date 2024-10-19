@@ -228,10 +228,6 @@
 (defn flip-privacy! [*state]
   (fetch-and-reset-with-method! *state @*state api/flip-privacy))
 
-(defn delete-selected-issue! [*state]
-  (when (js/window.confirm "Delete currently selected issue?")
-    (fetch-and-reset-with-method! *state @*state api/delete-selected-issue)))
-
 (defn delete-issue! [*state idx]
   (when (js/window.confirm "Delete this issue?")
     (fetch-and-reset-with-method! *state @*state api/delete-issue idx)))

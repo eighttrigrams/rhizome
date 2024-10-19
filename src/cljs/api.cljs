@@ -39,8 +39,6 @@
 
 (defn-over-http remove-stored-context :return-value {})
 
-(defn-over-http delete-selected-issue :return-value {})
-
 (defn-over-http delete-issue :return-value {})
 
 (defn-over-http fetch-context :return-value {})
