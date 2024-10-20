@@ -7,7 +7,7 @@
   [:li.card.issue-card
    {:class    (when (= (:id (:selected-context @*state)) ;; TODO review on :id
                        (:id context)) :selected)
-    :on-click #(actions/select-context! *state context false)}
+    :on-click #(actions/select-context! *state context)}
    [:div.issue-card-inner-as-of-yet-unused
     [ili/title-component (:title context) (:data context)]
     [context-badges/component (:contexts (:data context))]]])

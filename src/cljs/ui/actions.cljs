@@ -63,32 +63,43 @@
                                (assoc :cmd :insert-context)
                                (assoc :arg context))))
 
-(defn select-context!
-  [*state context select-as-issue?]
-  (if (true? (:link-context @*state))
-    (fetch-and-reset! *state (assoc @*state :cmd :link-context :arg context))
-    (fetch-and-reset-with-method-2! 
+(defn- select-a-context [*state context select-as-issue?]
+  (fetch-and-reset-with-method-2! 
      *state 
      (assoc @*state
-            :active-search :issues
+            :active-search :issues ;; TODO set nil when called from select-issue! ?
             :old-selected-context (:selected-context @*state)
-              ;; For a snappy response in the UI; see below
+            ;; For a snappy response in the UI, set :selected-issue immediately.
+            ;; The subsequent call to fetch-and-reset! then
+            ;; will fetch and replace it, thereby filling in the related issues.
             :selected-context context)
      api/fetch-context
-     [context select-as-issue?])))
+     [context select-as-issue?]))
+
+(defn select-context!
+  [*state context]
+  (if (true? (:link-context @*state))
+    (fetch-and-reset! *state (assoc @*state :cmd :link-context :arg context))
+    (select-a-context *state context false)))
+
+(defn select-issue!
+  ([*state issue]
+   (if (:link-issue @*state)
+     (fetch-and-reset-with-method! *state
+                                   @*state
+                                   api/finish-linking-issue 
+                                   (:id issue))
+     (select-a-context *state issue false))))
 
 (defn select-first-context! [*state]
   (when (seq (:contexts @*state))
-    (select-context! *state 
-                     (first (:contexts @*state))
-                     false)))
+    (select-context! *state (first (:contexts @*state)))))
 
 (defn- select-nth-context! [*state n]
   (when (and (seq (:contexts @*state))
              (> (count (:contexts @*state)) n))
     (select-context! *state 
-                     (nth (:contexts @*state) n)
-                     false)))
+                     (nth (:contexts @*state) n))))
 
 (defn select-second-context! [*state]
   (select-nth-context! *state 1))
@@ -107,24 +118,6 @@
                                 @*state 
                                 api/reprioritize-issue 
                                 issue))
-
-(defn select-issue!
-  ([*state issue]
-   (if (:link-issue @*state)
-     (fetch-and-reset-with-method! *state
-                                   @*state
-                                   api/finish-linking-issue 
-                                   (:id issue))
-     (fetch-and-reset-with-method! *state
-                                   (assoc @*state
-                                          :active-search nil
-                                          :old-selected-context (:selected-context @*state)
-                                          ;; For a snappy response in the UI, set :selected-issue immediately.
-                                          ;; The subsequent call to fetch-and-reset! then
-                                          ;; will fetch and replace it, thereby filling in the related issues.
-                                          :selected-context issue) 
-                                   api/fetch-context 
-                                   [issue true]))))
 
 (defn select-first-issue! [*state]
   (when (seq (:issues @*state))

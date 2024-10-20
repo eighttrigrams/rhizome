@@ -90,11 +90,11 @@
                                   (do 
                                     (actions/reprioritize-issue *state issue)
                                     (select-fn idx))
-                                  (actions/select-context! *state issue true)))
+                                  (actions/select-issue! *state issue)))
                               (do (swap! *state (fn [state]
                                                   (-> state
                                                       (dissoc :preview-issue))))
-                                  (actions/select-context! *state issue true)))
+                                  (actions/select-issue! *state issue)))
            :on-mouse-enter (on-mouse-enter *state issue)
            :on-mouse-leave (on-mouse-leave *state)}
           (when idx 
@@ -112,7 +112,7 @@
      [context-badges/component (remove #(= (:id (:selected-context @*state))
                                            (first %)) 
                                        (merge (when (:is_context issue) 
-                                                {0 {:context #(actions/select-context! *state issue false)}})
+                                                {0 {:context #(actions/select-context! *state issue)}})
                                               (when (:date issue)
                                                 {:date issue})
                                               (when (and (:selected-context @*state)
