@@ -21,13 +21,13 @@
          :user     "develop"
          :password "develop"
          :port     5432}
-  #_{:dbtype   "postgresql"
+  {:dbtype   "postgresql"
   :dbname   "cometoid_dev"
   :user     "daniel"
   :password "abcdef"
   :port     5437
   :hostname "127.0.0.1"}
-  {:dbtype   "postgresql"
+  #_{:dbtype   "postgresql"
   :dbname   "cometoid"
   :user     "daniel"
   :password "abcdef"
