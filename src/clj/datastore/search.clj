@@ -13,7 +13,7 @@
   [what expr]
   `(let [start# (. System (currentTimeMillis))
          ret# ~expr]
-     (log/info (str "Elapsed time - " ~what ": " (/ (double (- (. System (currentTimeMillis)) start#)) 1000.0) " secs"))
+     #_(log/info (str "Elapsed time - " ~what ": " (/ (double (- (. System (currentTimeMillis)) start#)) 1000.0) " secs"))
      ret#))
 
 (defn- query-string-contexts-query [q _selected-context]
