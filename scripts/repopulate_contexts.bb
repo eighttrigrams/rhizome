@@ -8,7 +8,8 @@
 ;; (pods/load-pod "./pod-babashka-postgresql")
 
 (require '[pod.babashka.postgresql :as pg]
-         '[cheshire.core :as json])
+         '[cheshire.core :as json]
+         '[clojure.string :as str])
 
 
 ;; insert into collections(container_id,item_id,show_badge) select left_id,right_id,false from issue_issue where not exists (select 1 from collections where container_id = left_id and item_id = right_id);
@@ -20,12 +21,19 @@
          :user     "develop"
          :password "develop"
          :port     5432}
-  {:dbtype   "postgresql"
+  #_{:dbtype   "postgresql"
   :dbname   "cometoid_dev"
   :user     "daniel"
   :password "abcdef"
   :port     5437
-  :hostname "127.0.0.1"})
+  :hostname "127.0.0.1"}
+  {:dbtype   "postgresql"
+  :dbname   "cometoid"
+  :user     "daniel"
+  :password "abcdef"
+  :port     5437
+  :hostname "127.0.0.1"
+  })
 
 (defn- make-contexts [{:keys [context_ids context_titles context_short_titles]}]
   (into {} (map (fn [context-id context-title context-short-title]
@@ -40,5 +48,11 @@
                   collections on items.id = collections.item_id join issues contexts on contexts.id = collections.container_id \n
                 group by items.id"])
      (map (fn [{:keys [issues/id issues/data] :as item}]
-            (pg/execute! db 
-                         [(str "update issues set data = '" (json/generate-string (assoc data :contexts (make-contexts item))) "' where id = " id)]))))
+            (let [stringy (-> (json/generate-string (assoc data 
+                                                           :contexts (make-contexts item)
+                                                           :highlighted-secondary-contexts []))
+                              (str/replace "'" "''"))]
+              (try (pg/execute! db 
+                                [(str "update issues set data = '" stringy "' where id = " id)])
+                   (catch Exception e
+                     (prn "got an exception with " id "..." (.getMessage e) "..." stringy)))))))
