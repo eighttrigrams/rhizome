@@ -67,7 +67,7 @@
   (fetch-and-reset-with-method-2! 
      *state 
      (assoc @*state
-            :active-search :issues ;; TODO set nil when called from select-issue! ?
+            :active-search (when-not select-as-issue? :issues)
             :old-selected-context (:selected-context @*state)
             ;; For a snappy response in the UI, set :selected-issue immediately.
             ;; The subsequent call to fetch-and-reset! then
