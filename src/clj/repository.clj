@@ -50,15 +50,15 @@
           (datastore/reprioritize-context db arg))
         (merge opts
                {:selected-context                        selected-context
+                :selected-issue (when fetch-as-issue? selected-context)
+                ;; :active-search                           :issues
                 :issues                                  (search/search-issues db 
                                                                                (-> opts
                                                                                    (dissoc :q)
                                                                                    (assoc :skip-context-aggregation? true)))
-                ;; :active-search                           :issues
                 :context-to-fetch                        nil
                 :unassigned-secondary-contexts-selected? false
-                :q                                       nil
-                :selected-issue nil}))
+                :q                                       nil}))
       (catch Exception e
         (log/error e (str "Caught an exception in fetch-context " (.getMessage e)))
         (throw e)))))
