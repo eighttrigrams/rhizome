@@ -143,7 +143,7 @@
 
 (defn- do-query [db formatted-query]
   (let [issues (jdbc/execute! db formatted-query)]
-    (log/info (str "count: " (count issues)))
+    #_(log/info (str "count: " (count issues)))
     issues))
 
 (defn- do-fetch-ids 
