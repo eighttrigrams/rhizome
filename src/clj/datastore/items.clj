@@ -125,7 +125,8 @@
                 (assoc data "contexts" {}))
          data (update data "contexts" (fn [contexts]
                                         (cond
-                                          (true? contexts)
+                                          ;; this reads weird, due to double use of new-contexts
+                                          (true? new-contexts)
                                           (dissoc contexts (str id))
                                           (map? new-contexts)
                                           new-contexts
