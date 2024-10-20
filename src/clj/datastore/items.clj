@@ -7,37 +7,12 @@
 
 (declare get-item)
 
-(defn- join-related-issues [db issue recursion-depth]
-  (-> issue
-      (dissoc :related_issues_ids)
-      (assoc :related_issues
-             (->> issue
-                  :related_issues_ids
-                  .getArray
-                  (map #(get-item db {:id %} {:skip-relations? true
-                                              :recursion-depth (dec recursion-depth)}))
-                  set))))
-
 (defn- basic-issues-query [id]
   {:select   [:issues.*]
    :from     [:issues]
    :where    [:= :issues.id [:inline id]]
-   :group-by [:issues.id] ;; TODO remove
+   :group-by [:issues.id]
    :order-by [[:issues.updated_at :desc]]})
-
-(defn- add-in-relations [query]
-  (-> (if (:join query) query (assoc query :join []))
-      (update :select conj [[:array_agg :related_issues.id] :related_issues_ids])
-      (update :join conj
-              :issue_issue [:= :issues.id :issue_issue.left_id]
-              [:issues :related_issues] [:= :related_issues.id :issue_issue.right_id])))
-
-(defn- get-issue-with-related-issues [db id recursion-depth]
-  (when-let [result (-> (basic-issues-query id)
-                        (add-in-relations)
-                        sql/format
-                        (#(jdbc/execute-one! db % {:return-keys true})))]
-    (join-related-issues db result recursion-depth)))
 
 (defn- get-issue-without-related-issues [db id]
   (-> (basic-issues-query id)
@@ -55,19 +30,15 @@
                        :contexts {224 \"some-context-title\"}})
    }
    "
-  ([db item] (get-item db item {:skip-relations? false}))
-  ([db {:keys [id]} {:keys [skip-relations? recursion-depth]
-                     :or {recursion-depth 3}}]
-   (try
-     (let [relations (if-not skip-relations?
-                       (:related_issues (get-issue-with-related-issues db id recursion-depth))
-                       nil)]
-       (-> (get-issue-without-related-issues db id)
-           common/post-process-simple
-           (assoc :related_issues (or relations #{}))))
-     (catch java.lang.Exception e
-       (prn "get-issue-----" (.getMessage e))
-       (throw e)))))
+  [db {:keys [id]}]
+  (try
+    (let [relations nil]
+      (-> (get-issue-without-related-issues db id)
+          common/post-process-simple
+          (assoc :related_issues (or relations #{}))))
+    (catch java.lang.Exception e
+      (prn "get-issue-----" (.getMessage e))
+      (throw e))))
 
 (defn- basic-title-query [title]
   {:select   [:issues.*]
@@ -107,8 +78,7 @@
   (try
     (-> (get-issue-without-related-issues-by-path db path url)
         common/post-process-simple
-        (assoc :contexts {})
-        (assoc :related_issues {}))
+        (assoc :contexts {}))
     (catch java.lang.Exception e
       (prn "get-issue-----" (.getMessage e))
       (throw e))))

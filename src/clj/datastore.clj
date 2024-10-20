@@ -90,9 +90,5 @@
   (issues.common/delete-date db id)
   (jdbc/execute! db (sql/format {:delete-from [:collections]
                                  :where [:= :item_id [:inline id]]}))
-  (jdbc/execute! db (sql/format {:delete-from [:issue_issue]
-                                 :where [:or
-                                         [:= :left_id [:inline id]]
-                                         [:= :right_id [:inline id]]]}))
   (jdbc/execute! db (sql/format {:delete-from [:issues]
                                  :where [:= :id [:inline id]]})))
