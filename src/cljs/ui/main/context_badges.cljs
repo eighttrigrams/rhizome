@@ -3,7 +3,7 @@
 (defn component [contexts]
   [:span.contexts
    (doall
-    (map (fn [[idx {:keys [title date file number context]}]]
+    (map (fn [[idx {:keys [title date file number context show-badge?]}]]
            (case idx
              :file
              [:span.badge.light 
@@ -25,6 +25,7 @@
               {:key :date} date]
              :number
              [:span.badge.light
-              {:key :number} number]
-             [:span.badge {:key idx} title])) 
+              {:key :number} number] 
+             (when show-badge?
+               [:span.badge {:key idx} title]))) 
          contexts))])

@@ -112,7 +112,7 @@
      so the use case is not to set the title in an item's context (with a given id), but to remove contexts"
   ([db item-id id short_title title] 
    (update-collection-title-in-collection-items db item-id id short_title title nil))
-  ([db item-id id short_title title constraints]
+  ([db item-id id short_title title new-contexts]
    (let [data (:issues/data (jdbc/execute-one! db
                                                (sql/format {:select [:data]
                                                             :from   [:issues]
@@ -125,10 +125,10 @@
                 (assoc data "contexts" {}))
          data (update data "contexts" (fn [contexts]
                                         (cond
-                                          (true? constraints)
+                                          (true? contexts)
                                           (dissoc contexts (str id))
-                                          (seq constraints)
-                                          (select-keys contexts (map str constraints))
+                                          (map? new-contexts)
+                                          new-contexts
                                           :else
                                           (if (map? (get contexts (str id)))
                                             (assoc-in contexts [(str id) "title"]  
