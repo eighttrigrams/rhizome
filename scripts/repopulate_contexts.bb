@@ -24,8 +24,11 @@
   :hostname "127.0.0.1"})
 
 (defn- make-contexts [{:keys [context_ids context_titles context_short_titles]}]
-  (into {} (map (fn [context-id context-title context-short-title] [context-id {:title (or context-short-title context-title)
-                                                                                :show-badge? true}])
+  (into {} (map (fn [context-id context-title context-short-title]
+                  [context-id {:title       (or (and context-short-title
+                                                     (not-empty context-short-title))
+                                                context-title)
+                               :show-badge? true}])
                 context_ids context_titles context_short_titles)))
 
 (->> (pg/execute! db ["select items.id,items.data,array_agg(contexts.id) context_ids,array_agg(contexts.title) context_titles,array_agg(contexts.short_title) context_short_titles \n

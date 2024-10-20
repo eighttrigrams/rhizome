@@ -67,16 +67,15 @@
   [*state context select-as-issue?]
   (if (true? (:link-context @*state))
     (fetch-and-reset! *state (assoc @*state :cmd :link-context :arg context))
-    (do
-      (prn "??? " (:selected-context @*state))
-      ;; For a snappy response in the UI; see below
-      (swap! *state assoc :old-selected-context (:selected-context @*state))
-      (swap! *state assoc :selected-context context)
-      (fetch-and-reset-with-method-2! 
-       *state 
-       *state
-       api/fetch-context
-       [context select-as-issue?]))))
+    (fetch-and-reset-with-method-2! 
+     *state 
+     (assoc @*state
+            :active-search :issues
+            :old-selected-context (:selected-context @*state)
+              ;; For a snappy response in the UI; see below
+            :selected-context context)
+     api/fetch-context
+     [context select-as-issue?])))
 
 (defn select-first-context! [*state]
   (when (seq (:contexts @*state))
@@ -116,15 +115,16 @@
                                    @*state
                                    api/finish-linking-issue 
                                    (:id issue))
-         ;; For a snappy response in the UI, set :selected-issue immediately.
-         ;; The subsequent call to fetch-and-reset! then
-         ;; will fetch and replace it, thereby filling in the related issues.
-     (do (swap! *state assoc :old-selected-context (:selected-context @*state))
-         (swap! *state assoc :selected-context issue)
-         (fetch-and-reset-with-method! *state
-                                       @*state 
-                                       api/fetch-context 
-                                       [issue true])))))
+     (fetch-and-reset-with-method! *state
+                                   (assoc @*state
+                                          :active-search nil
+                                          :old-selected-context (:selected-context @*state)
+                                          ;; For a snappy response in the UI, set :selected-issue immediately.
+                                          ;; The subsequent call to fetch-and-reset! then
+                                          ;; will fetch and replace it, thereby filling in the related issues.
+                                          :selected-context issue) 
+                                   api/fetch-context 
+                                   [issue true]))))
 
 (defn select-first-issue! [*state]
   (when (seq (:issues @*state))

@@ -73,7 +73,12 @@
 (defn fetch-and-reset-with-method-2!
   [*state state method & args]
   (apply fetch-and-reset-with-method! *state state method args)
-  (when (:selected-context @*state)
-    (go (-> (api/fetch-aggregated-contexts @*state)
-          <p!
-          (#(swap! *state assoc :aggregated-contexts %))))))
+  (js/setTimeout (fn []
+                   (when (:selected-context @*state)
+                     (go (-> (api/fetch-aggregated-contexts @*state)
+                             <p!
+                             (#(do 
+                                 (prn "%" %)
+                                 (when %
+                                   (swap! *state assoc :aggregated-contexts %))))))))
+                 200))

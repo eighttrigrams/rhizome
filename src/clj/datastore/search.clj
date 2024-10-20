@@ -310,6 +310,7 @@
 
 (defn fetch-aggregated-contexts [db {{{:keys [highlighted-secondary-contexts]} :data} :selected-context
                                      :as opts}]
+  (log/info (str "fetch-aggregated-contects " (:title (:selected-context opts))))
   (sectime
    "fetch-aggregated-contexts"
    (try
@@ -330,7 +331,7 @@
 (defn search-issues [db {:keys [skip-context-aggregation?
                                 only-context-aggregation?]
                          :as opts}]
-  (log/info (str "search-issues:" skip-context-aggregation? ":" only-context-aggregation?))
+  (log/info (str "search-issues - skip-context-aggregation? " skip-context-aggregation? " : only-context-aggregation? " only-context-aggregation?))
   (sectime
    "search-issues"
    (try

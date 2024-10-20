@@ -40,12 +40,11 @@
 
 (defn fetch-context [{:keys [db]}]
   (fn [old-state [arg fetch-as-issue?]]
-    (log/info (str "--keys--" (keys old-state) (:old-selected-context old-state)))
     (try
       (let [selected-context      (datastore/get-context db arg)
-            _ (log/info (str "fetch-context from (" (:id (:old-selected-context old-state)) "):\"" (:title (:old-selected-context old-state)) "\" to (" (:id selected-context) "):\"" (:title selected-context) "\""))
             opts                  {:search-globally? false
                                    :selected-context selected-context}]
+        (log/info (str "fetch-context from (" (:id (:old-selected-context old-state)) "):\"" (:title (:old-selected-context old-state)) "\" to (" (:id selected-context) "):\"" (:title selected-context) "\""))
         (if fetch-as-issue?
           (datastore/reprioritize-issue db arg)
           (datastore/reprioritize-context db arg))
@@ -55,7 +54,7 @@
                                                                                (-> opts
                                                                                    (dissoc :q)
                                                                                    (assoc :skip-context-aggregation? true)))
-                :active-search                           :issues
+                ;; :active-search                           :issues
                 :context-to-fetch                        nil
                 :unassigned-secondary-contexts-selected? false
                 :q                                       nil
