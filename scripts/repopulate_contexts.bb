@@ -10,6 +10,10 @@
 (require '[pod.babashka.postgresql :as pg]
          '[cheshire.core :as json])
 
+
+;; insert into collections(container_id,item_id,show_badge) select left_id,right_id,false from issue_issue where not exists (select 1 from collections where container_id = left_id and item_id = right_id);
+
+
 (def db #_{:dbtype   "postgresql"
          :host     "your-db-host-name"
          :dbname   "your-db"
