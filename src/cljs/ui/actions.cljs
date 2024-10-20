@@ -63,7 +63,7 @@
                                (assoc :cmd :insert-context)
                                (assoc :arg context))))
 
-(defn- select-a-context [*state context select-as-issue?]
+(defn- select-item! [*state context select-as-issue?]
   (fetch-and-reset-with-method-2! 
      *state 
      (assoc @*state
@@ -80,7 +80,7 @@
   [*state context]
   (if (true? (:link-context @*state))
     (fetch-and-reset! *state (assoc @*state :cmd :link-context :arg context))
-    (select-a-context *state context false)))
+    (select-item! *state context false)))
 
 (defn select-issue!
   ([*state issue]
@@ -89,7 +89,7 @@
                                    @*state
                                    api/finish-linking-issue 
                                    (:id issue))
-     (select-a-context *state issue false))))
+     (select-item! *state issue true))))
 
 (defn select-first-context! [*state]
   (when (seq (:contexts @*state))

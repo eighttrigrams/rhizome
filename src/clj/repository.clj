@@ -44,7 +44,7 @@
       (let [selected-context      (datastore/get-context db arg)
             opts                  {:search-globally? false
                                    :selected-context selected-context}]
-        (log/info (str "fetch-context from (" (:id (:old-selected-context old-state)) "):\"" (:title (:old-selected-context old-state)) "\" to (" (:id selected-context) "):\"" (:title selected-context) "\""))
+        (log/info (str "fetch-context as " (if fetch-as-issue? "issue" "context") " from (" (:id (:old-selected-context old-state)) "):\"" (:title (:old-selected-context old-state)) "\" to (" (:id selected-context) "):\"" (:title selected-context) "\""))
         (if fetch-as-issue?
           (datastore/reprioritize-issue db arg)
           (datastore/reprioritize-context db arg))
