@@ -20,22 +20,10 @@
       (#(jdbc/execute-one! db % {:return-keys true}))))
 
 (defn get-item
-  "Gets an issue, including related issues.
-   
-   {:id 123
-    :title \"some-title-1\"
-    :contexts {223 \"some-context-title-1\"}
-    :related_issues '({:id 124
-                       :title \"some-title-2\"
-                       :contexts {224 \"some-context-title\"}})
-   }
-   "
   [db {:keys [id]}]
   (try
-    (let [relations nil]
-      (-> (get-issue-without-related-issues db id)
-          common/post-process-simple
-          (assoc :related_issues (or relations #{}))))
+    (-> (get-issue-without-related-issues db id)
+        common/post-process-simple)
     (catch java.lang.Exception e
       (prn "get-issue-----" (.getMessage e))
       (throw e))))
