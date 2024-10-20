@@ -26,14 +26,7 @@
   :user     "daniel"
   :password "abcdef"
   :port     5437
-  :hostname "127.0.0.1"}
-  #_{:dbtype   "postgresql"
-  :dbname   "cometoid"
-  :user     "daniel"
-  :password "abcdef"
-  :port     5437
-  :hostname "127.0.0.1"
-  })
+  :hostname "127.0.0.1"})
 
 (defn- make-contexts [{:keys [context_ids context_titles context_short_titles]}]
   (into {} (map (fn [context-id context-title context-short-title]
