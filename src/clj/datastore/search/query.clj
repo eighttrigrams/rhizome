@@ -43,7 +43,7 @@
                                 formatted-query        (str "SELECT * FROM (" q ") AS issues ORDER BY issues.updated_at DESC LIMIT 500")]
                             (assoc original-query 0 formatted-query))
                           formatted-query)]
-    (log/info (str "formatted-query: " formatted-query))
+    #_(log/info (str "formatted-query: " formatted-query))
     formatted-query))
 
 (defn- get-search-clause [q]
