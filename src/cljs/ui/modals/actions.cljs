@@ -30,5 +30,4 @@
                                (dissoc @*state :modal)
                                api/update-context
                                {:context        context
-                                :issue-contexts (map (fn [issue-context] 
-                                                       {:id issue-context :show-badges? true}) issue-contexts)}))
+                                :issue-contexts issue-contexts}))

@@ -1,6 +1,7 @@
 (ns datastore
   (:require [next.jdbc :as jdbc]
             [honey.sql :as sql]
+            [cambium.core :as log]
             [datastore.issues :as issues]
             [datastore.issues.common :as issues.common]
             [datastore.contexts :as contexts]
@@ -34,6 +35,7 @@
    @params container-ids
    @returns the updated item."
   [db selected-issue container-ids]
+  (log/info (str "set-containers-of-item!" (:id selected-issue) (:title selected-issue) container-ids))
   (jdbc/execute! db (sql/format {:delete-from [:collections]
                                  :where [:= :item_id [:inline (:id selected-issue)]]}))
   (doall (for [container-id container-ids]

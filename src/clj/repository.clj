@@ -446,19 +446,22 @@
 
 (defn update-context [{:keys [db]}]
   (fn [opts arg]
-    (log/info (str "repository/update-context " arg))
-    (let [issue-contexts (map :id (:issue-contexts arg))]
+    (log/info (str "repository/update-context " (doall (map (fn [a] (prn a)) arg))))
+    (let [context (or (:context (:context arg)) (:context arg))
+          issue-contexts-ids (keys (:issue-contexts arg))]
       (try
-        (when (seq issue-contexts)
-          (datastore/set-containers-of-item! db
-                                             (or (:context (:context arg))
-                                                 (:context arg))
-                                             issue-contexts)
-          (items/update-collection-title-in-collection-items db
-                                                             (:id (or (:context (:context arg))
-                                                                      (:context arg)))
-                                                             nil nil nil 
-                                                             issue-contexts))
+        (when (seq issue-contexts-ids)
+          (try
+            (datastore/set-containers-of-item! db
+                                               context
+                                               issue-contexts-ids) 
+            (items/update-collection-title-in-collection-items db
+                                                               (:id context)
+                                                               nil nil nil 
+                                                               issue-contexts-ids)
+            (catch Exception e
+              (log/error (str "Caught an exception in update-context container section"))
+              (throw e))))
         (let [selected-context (datastore/update-context db (:context arg))]
           {:selected-context selected-context
            :issues           (search/search-issues db (-> opts
