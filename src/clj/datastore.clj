@@ -31,7 +31,8 @@
 (def new-issue issues/new-issue)
 
 (defn set-containers-of-item!
-  "Sets the containers of a given item and calculated the derived ones.
+  "@deprecated remove
+   Sets the containers of a given item and calculated the derived ones.
    @params container-ids
    @returns the updated item."
   [db selected-issue container-ids]

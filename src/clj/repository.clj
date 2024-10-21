@@ -5,6 +5,7 @@
             privacy
             [datastore.search :as search]
             [datastore.items :as items]
+            [datastore.relations :as datastore.relations]
             [cambium.core :as log]
             [repository.insertion :as insertion]
             [repository.deletion :as deletion]))
@@ -270,7 +271,7 @@
                                           selected-context 
                                           (get-selected-secondary-contexts-set state)
                                           alternative-behaviour?)]
-        (items/set-collection-titles-of-new-issue db (:id issue))
+        (datastore.relations/set-collection-titles-of-new-issue db (:id issue))
         {:selected-issue nil
          :issues         (search/search-issues
                           db
@@ -284,12 +285,11 @@
   "when context selected add an issue"
   [db {:keys [selected-context] :as opts} issue-id]
   (try
-    (prn "yo" (:title selected-context) issue-id)
     (datastore/reprioritize-issue db {:id issue-id})
     (let [selected-issue (datastore/get-issue db {:id issue-id})
           context-ids   (keys (:contexts (:data selected-issue)))] 
       (datastore/set-containers-of-item! db {:id issue-id} (vec (set (conj context-ids (:id selected-context)))))
-      (items/update-collection-title-in-collection-items db 
+      (datastore.relations/update-collection-title-in-collection-items db 
                                                             issue-id 
                                                             (:id selected-context)
                                                             (:short_title selected-context)
@@ -329,7 +329,7 @@
     (try
       (datastore/reprioritize-context db arg)
       (datastore/set-containers-of-item! db selected-issue (vec (set (keys contexts))))
-      (items/update-collection-title-in-collection-items db 
+      (datastore.relations/update-collection-title-in-collection-items db 
                                                             (:id selected-issue) 
                                                             (:id arg)
                                                             (:short_title arg)
@@ -434,7 +434,7 @@
             (datastore/set-containers-of-item! db
                                                selected-item
                                                issue-contexts-ids)
-            (items/update-collection-title-in-collection-items db
+            (datastore.relations/update-collection-title-in-collection-items db
                                                                (:id selected-item)
                                                                (:id old-selected-context) nil nil true)
             {:selected-issue nil
@@ -447,15 +447,9 @@
 (defn update-context [{:keys [db]}]
   (fn [opts arg]
     (let [context (or (:context (:context arg)) (:context arg))
-          issue-contexts (:issue-contexts arg)
-          issue-contexts-ids (keys issue-contexts)]
+          issue-contexts (:issue-contexts arg)]
       (try
-        (when (seq issue-contexts-ids)
-          (datastore/set-containers-of-item! db context issue-contexts-ids) 
-          (items/update-collection-title-in-collection-items db
-                                                             (:id context)
-                                                             nil nil nil 
-                                                             issue-contexts))
+        (datastore.relations/set-the-containers-of-item! db context issue-contexts)
         (let [selected-context (datastore/update-context db (:context arg))]
           {:selected-context selected-context
            :issues           (search/search-issues db (-> opts
