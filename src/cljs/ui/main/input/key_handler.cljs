@@ -100,11 +100,6 @@
                   (= :issues active-search))
          (.preventDefault e)
          (actions/select-fifth-issue! *state))
-       (when (and alt-pressed?
-                  selected-issue
-                  (= "KeyA" code))
-         (.preventDefault e)
-         (actions/link-with-global-search! *state))
        (when (and (= "KeyI" code)
                   alt-pressed?)
          (.preventDefault e)

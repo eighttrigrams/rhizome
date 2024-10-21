@@ -338,28 +338,6 @@
 (defn search-contexts [db opts]
   {:contexts (search/search-contexts db opts)})
 
-(defn start-linking-selected-issue-to-issue-with-local-search [db opts]
-  {:issues           (search/search-issues db (make-search-issues
-                                               (assoc opts
-                                                      :link-issue :issue
-                                                      :search-globally? false
-                                                      :q "")))
-   :active-search    :issues
-   :search-globally? false
-   :link-issue       :issue
-   :q                ""})
-
-(defn start-linking-selected-issue-to-issue-with-global-search [db opts]
-  {:issues           (search/search-issues db (make-search-issues
-                                               (assoc opts
-                                                      :link-issue :issue
-                                                      :search-globally? true
-                                                      :q "")))
-   :active-search    :issues
-   :search-globally? true
-   :link-issue       :issue
-   :q                ""})
-
 (defn start-linking-selected-issue-to-context-with-local-search [db opts]
   {:contexts (search/search-contexts db (assoc opts 
                                                :q "" 
@@ -483,8 +461,6 @@
                                      (not selected-context))
                         {:contexts (search/search-contexts db "")})))
          :start-global-search ((start-global-search {:db db}) opts)
-         :link-with-global-search (start-linking-selected-issue-to-issue-with-global-search db opts)
-         :link-with-local-search (start-linking-selected-issue-to-issue-with-local-search db opts)
          :link-issue-to-selected-context (start-linking-issue-to-selected-context db opts)
          :start-linking-selected-issue-to-context (start-linking-selected-issue-to-context-with-local-search db opts)
          :start-context-search (start-context-search db opts)

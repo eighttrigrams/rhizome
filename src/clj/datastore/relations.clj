@@ -123,15 +123,6 @@
                                                  (:short_title container)
                                                  (:title container))))
 
-#_(defn link-item-to-selected-container!
-  [db item container]
-  (set-containers-of-item! db {:id issue-id} (vec (set (conj context-ids (:id selected-context))))) 
-  (update-collection-title-in-collection-items db 
-                                               (:id item) 
-                                               (:id container)
-                                               (:short_title container)
-                                               (:title container)))
-
 (defn unlink-item-from-container!
   [db item container]
   (let [selected-item (update-in item [:data :contexts] #(dissoc % (:id container)))

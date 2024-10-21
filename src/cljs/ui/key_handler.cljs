@@ -48,10 +48,6 @@
                (actions/unlink-selected-issue-from-selected-context *state)
                (= "KeyI" code)
                (swap! *state #(assoc % :active-search :issues :search-globally? false))
-               (and alt-pressed? selected-issue (= "KeyA" code))
-               (actions/link-with-global-search! *state)
-               #_(and (not alt-pressed?) selected-issue (= "KeyA" code))
-               #_(actions/link-with-local-search! *state)
                (and selected-context 
                     (not selected-issue)
                     (= "KeyA" code)
