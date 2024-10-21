@@ -226,7 +226,8 @@
   (fn [opts issue]
     (try
       (deletion/delete-item db issue)
-      {:issues         (search/search-issues db opts)}
+      {:issues         (search/search-issues db opts)
+       :issue-view? false}
       (catch Exception e
         (log/error (str "Caught an exception in repository/delete-issue" e))
         {}))))
@@ -237,7 +238,8 @@
       (deletion/delete-item db arg)
       {:issues           (search/search-issues db opts)
        :contexts         (search/search-contexts db "")
-       :selected-context nil}
+       :selected-context nil
+       :issue-view? false}
       (catch Exception e
         (log/error (str "Caught an exception in repository/delete-context " e))
         {}))))
