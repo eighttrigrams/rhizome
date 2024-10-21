@@ -286,14 +286,8 @@
   [db {:keys [selected-context] :as opts} issue-id]
   (try
     (datastore/reprioritize-issue db {:id issue-id})
-    (let [selected-issue (datastore/get-issue db {:id issue-id})
-          context-ids   (keys (:contexts (:data selected-issue)))] 
-      (datastore/set-containers-of-item! db {:id issue-id} (vec (set (conj context-ids (:id selected-context)))))
-      (datastore.relations/update-collection-title-in-collection-items db 
-                                                            issue-id 
-                                                            (:id selected-context)
-                                                            (:short_title selected-context)
-                                                            (:title selected-context))
+    (let [selected-issue (datastore/get-issue db {:id issue-id})] 
+      (datastore.relations/link-item-to-container! db selected-issue selected-context)
       (let [opts (-> opts
                                              (dissoc :search-globally? 
                                                      :q
@@ -322,25 +316,21 @@
   "link selected context as an item to a container"
   [db {:keys [selected-issue selected-context] :as opts} arg]
   (let [selected-issue (or selected-issue
-                           (items/get-item db selected-context))
-        contexts (merge (:contexts (:data selected-issue))
-                        {(:id arg) (:title arg)})]
+                           (items/get-item db selected-context))]
     (log/info (str "repository/link-selected-context-to-context " selected-issue))
     (try
       (datastore/reprioritize-context db arg)
-      (datastore/set-containers-of-item! db selected-issue (vec (set (keys contexts))))
-      (datastore.relations/update-collection-title-in-collection-items db 
-                                                            (:id selected-issue) 
-                                                            (:id arg)
-                                                            (:short_title arg)
-                                                            (:title arg))
-      (merge {:link-context   nil
-              :active-search  nil
-              :selected-context (datastore/get-issue db selected-context)
-              :issues         (search/search-issues db (dissoc opts :q))
-              :q              nil}
-             (when selected-context
-               {:aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)}))
+      (datastore.relations/link-item-to-container! db selected-issue arg)
+      (let [fresh-selected-context (datastore/get-issue db selected-context)]
+        (merge {:link-context   nil
+                :active-search  nil
+                :selected-context fresh-selected-context
+                :issues         (search/search-issues db (dissoc opts :q))
+                :q              nil}
+               (when selected-context
+                 {:aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)})
+               (when selected-issue
+                 {:selected-issue fresh-selected-context})))
       (catch Exception e 
         (log/error (str "Caught an exception in link-selected-item-to-context " (.getMessage e)))
         (throw e)))))
@@ -424,23 +414,12 @@
   (fn [{:keys [selected-context old-selected-context] :as state}]
     (try 
       (log/info (str "repository/unlink-selected-item-from-container - Removing " (:id selected-context) ":" (:title selected-context) " from " (:id old-selected-context) ":" (:title old-selected-context)))
-      (let [container-id (:id old-selected-context)
-            selected-item (update-in selected-context [:data :contexts]
-                                     #(dissoc % container-id))
-            issue-contexts-ids (keys (:contexts (:data selected-item)))]
-        (if (not (seq issue-contexts-ids))
-          state
-          (do
-            (datastore/set-containers-of-item! db
-                                               selected-item
-                                               issue-contexts-ids)
-            (datastore.relations/update-collection-title-in-collection-items db
-                                                               (:id selected-item)
-                                                               (:id old-selected-context) nil nil true)
-            {:selected-issue nil
-             :selected-context old-selected-context
-             :issues (search/search-issues db (assoc state :selected-context old-selected-context))
-             :aggregated-contexts ((fetch-aggregated-contexts {:db db}) (assoc state :selected-context old-selected-context))})))
+      (if (not (datastore.relations/unlink-item-from-container! db selected-context old-selected-context))
+        state
+        {:selected-issue nil
+         :selected-context old-selected-context
+         :issues (search/search-issues db (assoc state :selected-context old-selected-context))
+         :aggregated-contexts ((fetch-aggregated-contexts {:db db}) (assoc state :selected-context old-selected-context))})
       (catch Exception e
         (log/error (str "Caught an repository/unlink-selected-item-from-container " (.getMessage e)))))))
 
@@ -450,12 +429,16 @@
           issue-contexts (:issue-contexts arg)]
       (try
         (datastore.relations/set-the-containers-of-item! db context issue-contexts)
-        (let [selected-context (datastore/update-context db (:context arg))]
-          {:selected-context selected-context
-           :issues           (search/search-issues db (-> opts
-                                                          (dissoc :q)
-                                                          (assoc :selected-context selected-context)))
-           :q                nil})
+        (let [selected-context (datastore/update-context db 
+                                                         ;; TODO simply use context
+                                                         (:context arg))]
+          (merge {:selected-context selected-context
+                  :issues           (search/search-issues db (-> opts
+                                                                 (dissoc :q)
+                                                                 (assoc :selected-context selected-context)))
+                  :q                nil}
+                 (when (:selected-issue opts)
+                   {:selected-issue selected-context})))
         (catch Exception e
           (log/error (str "Caught an update-context " (.getMessage e))))))))
 

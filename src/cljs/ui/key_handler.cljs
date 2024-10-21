@@ -6,8 +6,7 @@
   (handle-keys* 
    (fn [code ctrl-pressed? meta-pressed? alt-pressed? shift-pressed? _e]
      (let [{:keys [selected-issue
-                   selected-context]} @*state
-           in-notes-mode? (-> *state deref :selected-context :data :views :current :notes-mode)]
+                   selected-context]} @*state]
        (cond (= "Escape" code)
              (cond (and (not selected-context)
                         (not= 0 (:events-view @*state)))
@@ -29,12 +28,14 @@
                (actions/show-past-events! *state)
                (= "KeyV" code)
                (actions/show-events! *state)
+               
                (and selected-issue (= "KeyE" code))
                (swap! *state #(assoc % :modal :edit-issue))
-               (and selected-context (= "Delete" code))
-               (actions/delete-context! *state)
                (and selected-context (= "KeyE" code))
                (swap! *state #(assoc % :modal :edit-context))
+
+               (and selected-context (= "Delete" code))
+               (actions/delete-context! *state)
                (and alt-pressed? (= "KeyI" code))
                (actions/start-global-search! *state)
                (and alt-pressed?
@@ -49,13 +50,13 @@
                (swap! *state #(assoc % :active-search :issues :search-globally? false))
                (and alt-pressed? selected-issue (= "KeyA" code))
                (actions/link-with-global-search! *state)
-               (and (not alt-pressed?) selected-issue (= "KeyA" code))
-               (actions/link-with-local-search! *state)
+               #_(and (not alt-pressed?) selected-issue (= "KeyA" code))
+               #_(actions/link-with-local-search! *state)
                (and selected-context 
                     (not selected-issue)
                     (= "KeyA" code)
                     (and (not (-> @*state :selected-context :data :views :current :secondary-contexts-inverted)) 
-                       (not (-> @*state :selected-context :data :views :current :secondary-contexts-unassigned-selected))))
+                         (not (-> @*state :selected-context :data :views :current :secondary-contexts-unassigned-selected))))
                (actions/link-issue-to-selected-context! *state)
                (and (= "KeyC" code)
                     (not meta-pressed?)
@@ -66,8 +67,8 @@
                     (not meta-pressed?)
                     (not ctrl-pressed?)
                     (not shift-pressed?)
-                    (or selected-issue
-                        selected-context))
+                    selected-context
+                    (not selected-issue))
                (actions/start-linking-context *state)
                (and
                 (or

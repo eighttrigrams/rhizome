@@ -4,6 +4,11 @@
             [cambium.core :as log]
             [cheshire.core :as json]))
 
+(defn- get-title [container]
+  (or (and (string? (:short_title container))
+           (not-empty (:short_title container)))
+      (:title container)))
+
 (defn set-collection-titles-of-new-issue [db item-id]
   (let [data (:issues/data (jdbc/execute-one! db
                                               (sql/format {:select [:data]
@@ -75,6 +80,7 @@
                                      :set    {:data [:inline (json/generate-string data)]}})
                         {:return-keys true}))))
 
+;;  TODO make private
 (defn update-collection-title-in-collection-items-for-children 
   [db id title short_title]
   (let [item-ids (doall (map :collections/item_id
@@ -88,7 +94,7 @@
 
 (defn- set-containers-of-item!
   [db item containers]
-  (log/info (str "datastore.relations/set-containers-of-item!" (:id item) (:title item) (keys containers)))
+  (log/info (str "datastore.relations/set-containers-of-item!" (:id item) (:title item) containers))
   (jdbc/execute! db (sql/format {:delete-from [:collections]
                                  :where [:= :item_id [:inline (:id item)]]}))
   (doall (for [[container-id {:keys [show-badge?]}] containers]
@@ -103,3 +109,38 @@
   (when (seq (keys containers))
     (set-containers-of-item! db item containers)
     (update-collection-title-in-collection-items db (:id item) nil nil nil containers)))
+
+(defn link-item-to-container!
+  [db item container]
+  (let [contexts (merge (:contexts (:data item))
+                        {(:id container) 
+                         {:title (get-title container)
+                          :show-badge? true}})]
+    (set-containers-of-item! db item contexts)
+    (update-collection-title-in-collection-items db 
+                                                 (:id item) 
+                                                 (:id container)
+                                                 (:short_title container)
+                                                 (:title container))))
+
+#_(defn link-item-to-selected-container!
+  [db item container]
+  (set-containers-of-item! db {:id issue-id} (vec (set (conj context-ids (:id selected-context))))) 
+  (update-collection-title-in-collection-items db 
+                                               (:id item) 
+                                               (:id container)
+                                               (:short_title container)
+                                               (:title container)))
+
+(defn unlink-item-from-container!
+  [db item container]
+  (let [selected-item (update-in item [:data :contexts] #(dissoc % (:id container)))
+       containers (:contexts (:data selected-item))]
+    (if-not (seq (keys containers))
+      false
+      (do
+        (set-containers-of-item! db selected-item containers)
+        (datastore.relations/update-collection-title-in-collection-items db
+                                                                         (:id selected-item)
+                                                                         (:id container) nil nil true)
+        true))))
