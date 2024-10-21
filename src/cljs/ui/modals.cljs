@@ -34,9 +34,7 @@
 
 (defn component [*state]
   (fn [_*state]
-    (let [item (if (:selected-issue @*state)
-                 (:selected-issue @*state)
-                 (:selected-context @*state))]
+    (let [item (:selected-context @*state)]
       [:div
        {:on-key-down (handle-keys *state item)
         :on-click #(.stopPropagation %)}

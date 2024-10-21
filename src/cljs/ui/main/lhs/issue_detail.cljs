@@ -106,12 +106,11 @@
       "Lowres here"]]))
 
 (defn component [*state]
-  (let [{:keys [selected-issue selected-context]} @*state]
+  (let [{:keys [selected-context]} @*state]
     [:<>
-     (when-not (-> selected-issue :data :resource-links :image)
-       [drop-target (:id selected-issue)])
-     [the-issue-itself-component (or selected-issue
-                                     selected-context)]]))
+     (when-not (-> selected-context :data :resource-links :image)
+       [drop-target (:id selected-context)])
+     [the-issue-itself-component selected-context]]))
 
 (defn preview-component [issue]
   (the-issue-itself-component issue))
