@@ -28,7 +28,7 @@
 (defn deselect-context! [*state]
   (fetch-and-reset! *state (assoc @*state :cmd :deselect-context)))
 
-(defn deselect-issue! [*state]
+#_(defn deselect-issue! [*state]
   (fetch-and-reset! *state (dissoc @*state :selected-issue :preview-issue :q))
   (js/setTimeout (fn [_] (swap! *state dissoc :loading)) 500))
 
@@ -68,6 +68,7 @@
      *state 
      (assoc @*state
             :active-search (when-not select-as-issue? :issues)
+            :issue-view? select-as-issue?
             :old-selected-context (:selected-context @*state)
             ;; For a snappy response in the UI, set :selected-issue immediately.
             ;; The subsequent call to fetch-and-reset! then
@@ -203,14 +204,11 @@
 (defn cycle-search-mode! [*state]
   (fetch-and-reset-with-method! *state @*state api/cycle-search-mode))
 
-(defn show-context-as-issue! [*state]
-  (swap! *state assoc :selected-issue (:selected-context @*state)))
+(defn enter-issue-view! [*state]
+  (swap! *state assoc :issue-view? true))
 
-(defn show-context-as-context-again! [*state]
-  (fetch-and-reset-with-method! *state
-                                @*state
-                                api/fetch-context
-                                [(:selected-context @*state) false]))
+(defn exit-issue-view! [*state]
+  (swap! *state assoc :issue-view? false))
 
 (defn flip-privacy! [*state]
   (fetch-and-reset-with-method! *state @*state api/flip-privacy))

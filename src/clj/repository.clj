@@ -51,7 +51,6 @@
           (datastore/reprioritize-context db arg))
         (merge opts
                {:selected-context                        selected-context
-                :selected-issue (when fetch-as-issue? selected-context)
                 ;; :active-search                           :issues
                 :issues                                  (search/search-issues db 
                                                                                (-> opts
@@ -179,7 +178,6 @@
         {:issues         (search/search-issues db (assoc opts :selected-context selected-context))
          :selected-context selected-context
          :contexts       []
-         :selected-issue nil
          :q              nil})
       (let [opts (-> opts
                      (dissoc :q)
@@ -189,7 +187,6 @@
                                             (search/search-contexts db opts)
                                             [])
          :events-view (:events-view opts)
-         :selected-issue                  nil
          :q                               nil}))))
 
 (defn show-events [{:keys [db]}]
@@ -229,8 +226,7 @@
   (fn [opts issue]
     (try
       (deletion/delete-item db issue)
-      {:issues         (search/search-issues db opts)
-       :selected-issue nil}
+      {:issues         (search/search-issues db opts)}
       (catch Exception e
         (log/error (str "Caught an exception in repository/delete-issue" e))
         {}))))
@@ -272,10 +268,9 @@
                                           (get-selected-secondary-contexts-set state)
                                           alternative-behaviour?)]
         (datastore.relations/set-collection-titles-of-new-issue db (:id issue))
-        {:selected-issue nil
-         :issues         (search/search-issues
+        {:issues         (search/search-issues
                           db
-                          (dissoc state :q :selected-issue))
+                          (dissoc state :q))
          :q              nil
          :aggregated-contexts ((fetch-aggregated-contexts {:db db}) state)})
       (catch Exception e
@@ -300,8 +295,7 @@
                                                         :selected-secondary-contexts] []))
             issues (search/search-issues db opts)
             aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)]
-        {:selected-issue   nil
-         :issues           issues
+        {:issues           issues
          :active-search    nil
          :link-issue       nil
          :link-context     nil
@@ -328,9 +322,7 @@
                 :issues         (search/search-issues db (dissoc opts :q))
                 :q              nil}
                (when selected-context
-                 {:aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)})
-               (when selected-issue
-                 {:selected-issue fresh-selected-context})))
+                 {:aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)})))
       (catch Exception e 
         (log/error (str "Caught an exception in link-selected-item-to-context " (.getMessage e)))
         (throw e)))))
@@ -371,20 +363,18 @@
   (fn [state issue]
     (log/info (str "repository/reprioritize-issue" (:id issue) (:title issue)))
     (datastore/reprioritize-issue db issue)
-    {:selected-issue   nil #_(when-not skip-select? (datastore/get-issue db issue))
-     :issues           (search/search-issues db (dissoc state 
+    {:issues           (search/search-issues db (dissoc state 
                                                         :search-globally?
-                                                        :q
-                                                        :selected-issue))
+                                                        :q))
      :active-search    nil
      :search-globally? false
      :q                nil}))
 
 (defn upgrade-issue-to-context [{:keys [db]}]
-  (fn [{:keys [selected-issue]}]
+  (fn [{:keys [selected-context]}]
     (try
-      (log/info (str "repository/upgrade-issue-to-context" (:id selected-issue)))
-      {:selected-issue (datastore/upgrade-issue-to-context! db selected-issue)}
+      (log/info (str "repository/upgrade-issue-to-context" (:id selected-context)))
+      {:selected-context (datastore/upgrade-issue-to-context! db selected-context)}
       (catch Exception e
         (log/error (str "Caught an repository/upgrade-issue-to-context " (.getMessage e)))))))
 
@@ -394,8 +384,7 @@
       (log/info (str "repository/unlink-selected-item-from-container - Removing " (:id selected-context) ":" (:title selected-context) " from " (:id old-selected-context) ":" (:title old-selected-context)))
       (if (not (datastore.relations/unlink-item-from-container! db selected-context old-selected-context))
         state
-        {:selected-issue nil
-         :selected-context old-selected-context
+        {:selected-context old-selected-context
          :issues (search/search-issues db (assoc state :selected-context old-selected-context))
          :aggregated-contexts ((fetch-aggregated-contexts {:db db}) (assoc state :selected-context old-selected-context))})
       (catch Exception e
@@ -414,9 +403,7 @@
                   :issues           (search/search-issues db (-> opts
                                                                  (dissoc :q)
                                                                  (assoc :selected-context selected-context)))
-                  :q                nil}
-                 (when (:selected-issue opts)
-                   {:selected-issue selected-context})))
+                  :q                nil}))
         (catch Exception e
           (log/error (str "Caught an update-context " (.getMessage e))))))))
 
@@ -467,14 +454,13 @@
          :link-context (link-selected-context-to-context db opts arg)
          :insert-context
          {:selected-context                        (datastore/new-context db arg)
-          :selected-issue                          nil
           :aggregated-contexts                     '()
           :issues                                  []
           :q                                       nil
           :active-search                           :issues
           :unassigned-secondary-contexts-selected? false}
          :update-issue-description
-         {:selected-issue (datastore/update-issue-description db arg)
+         {:selected-context (datastore/update-issue-description db arg)
           :issues         (search/search-issues db (dissoc opts :q))
           :q              nil}
          :update-context-description

@@ -287,7 +287,6 @@
    highlighted-secondary-contexts]
   (let [issues (search-issues' db (-> opts
                                       (assoc :q "")
-                                      (dissoc :selected-issue)
                                       (assoc :events-view 0)
                                       (assoc-in [:selected-context :data :views :current :events-view] 0)
                                       (assoc-in [:selected-context :data :views :current :search-mode] 0)

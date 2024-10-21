@@ -25,7 +25,7 @@
        [:div.scrollable
         {:class :search-active}
         [contexts-list *state]]]
-      (:selected-issue @*state)
+      (:issue-view? @*state)
       [:div.details-component.scrollable
        [issue-detail/component *state]]
       (:selected-context @*state)

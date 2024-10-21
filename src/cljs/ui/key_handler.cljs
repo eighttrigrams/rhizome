@@ -5,8 +5,8 @@
 (defn handle-keys [*state]
   (handle-keys* 
    (fn [code ctrl-pressed? meta-pressed? alt-pressed? shift-pressed? _e]
-     (let [{:keys [selected-issue
-                   selected-context]} @*state]
+     (let [{:keys [selected-context
+                   issue-view?]} @*state]
        (cond (= "Escape" code)
              (cond (and (not selected-context)
                         (not= 0 (:events-view @*state)))
@@ -14,8 +14,8 @@
                    (and (:active-search @*state)
                         (not alt-pressed?))
                    (actions/quit-search! *state)
-                   (and (not alt-pressed?) selected-issue)
-                   (actions/deselect-issue! *state)
+                   (and (not alt-pressed?) issue-view?)
+                   (actions/exit-issue-view! *state)
                    (and alt-pressed? (common/something-to-deselect? *state))
                    (actions/deselect-secondary-contexts! *state)
                    (and (not alt-pressed?) selected-context)
@@ -28,19 +28,15 @@
                (actions/show-past-events! *state)
                (= "KeyV" code)
                (actions/show-events! *state)
-               
-               (and selected-issue (= "KeyE" code))
-               (swap! *state #(assoc % :modal :edit-issue))
                (and selected-context (= "KeyE" code))
                (swap! *state #(assoc % :modal :edit-context))
-
                (and selected-context (= "Delete" code))
                (actions/delete-context! *state)
                (and alt-pressed? (= "KeyI" code))
                (actions/start-global-search! *state)
                (and alt-pressed?
                     (= "KeyU" code)
-                    selected-issue)
+                    selected-context)
                (actions/upgrade-issue-to-context! *state)
                (and alt-pressed? 
                     (= "KeyT" code)
@@ -48,8 +44,7 @@
                (actions/unlink-selected-issue-from-selected-context *state)
                (= "KeyI" code)
                (swap! *state #(assoc % :active-search :issues :search-globally? false))
-               (and selected-context 
-                    (not selected-issue)
+               (and selected-context
                     (= "KeyA" code)
                     (and (not (-> @*state :selected-context :data :views :current :secondary-contexts-inverted)) 
                          (not (-> @*state :selected-context :data :views :current :secondary-contexts-unassigned-selected))))
@@ -63,24 +58,18 @@
                     (not meta-pressed?)
                     (not ctrl-pressed?)
                     (not shift-pressed?)
-                    selected-context
-                    (not selected-issue))
+                    selected-context)
                (actions/start-linking-context *state)
-               (and
-                (or
-                 selected-issue
-                 selected-context)
-                (= "KeyD" code))
+               (and selected-context
+                    (= "KeyD" code))
                (swap! *state #(assoc % :modal :description))
                (and selected-context
-                    (not selected-issue)
                     (= "KeyS" code))
                (actions/cycle-search-mode! *state)
                (and selected-context
-                    (not selected-issue)
+                    (not issue-view?)
                     (= "KeyF" code))
-               (actions/show-context-as-issue! *state)
-               (and selected-issue
-                    (:is_context selected-issue)
+               (actions/enter-issue-view! *state)
+               (and issue-view?
                     (= "KeyF" code))
-               (actions/show-context-as-context-again! *state)))))))
+               (actions/exit-issue-view! *state)))))))

@@ -30,21 +30,6 @@
 
 (def new-issue issues/new-issue)
 
-(defn set-containers-of-item!
-  "@deprecated remove
-   Sets the containers of a given item and calculated the derived ones.
-   @params container-ids
-   @returns the updated item."
-  [db selected-issue container-ids]
-  (log/info (str "set-containers-of-item!" (:id selected-issue) (:title selected-issue) container-ids))
-  (jdbc/execute! db (sql/format {:delete-from [:collections]
-                                 :where [:= :item_id [:inline (:id selected-issue)]]}))
-  (doall (for [container-id container-ids]
-           (jdbc/execute! db (sql/format {:insert-into [:collections]
-                                          :columns [:item_id :container_id]
-                                          :values [[[:inline (:id selected-issue)]
-                                                    [:inline container-id]]]})))))
-
 (defn upgrade-issue-to-context! [db {:keys [id] :as item}]
   (jdbc/execute-one! db
                      (sql/format {:update [:issues]
