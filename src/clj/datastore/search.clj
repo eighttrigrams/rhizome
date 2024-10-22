@@ -296,8 +296,8 @@
     (sectime
      "get-aggregated-contexts#after-search-issues'"
      (->> issues
-          (filter #(get-in % [:data :contexts :show-badge?]))
           (map #(get-in % [:data :contexts]))
+          (map #(filter (fn [[_id {:keys [show-badge?]}]] show-badge?) %))
           (map seq)
           (apply concat)
           (group-by first)
