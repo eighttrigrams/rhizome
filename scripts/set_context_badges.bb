@@ -5,27 +5,24 @@
          '[clojure.string :as str])
 
 (def db #_{:dbtype   "postgresql"
-         :host     "your-db-host-name"
-         :dbname   "your-db"
-         :user     "develop"
-         :password "develop"
-         :port     5432}
+           :host     "your-db-host-name"
+           :dbname   "your-db"
+           :user     "develop"
+           :password "develop"
+           :port     5432}
   {:dbtype   "postgresql"
-  :dbname   "cometoid_dev"
-  :user     "daniel"
-  :password "abcdef"
-  :port     5437
-  :hostname "127.0.0.1"})
+   :dbname   "cometoid_dev"
+   :user     "daniel"
+   :password "abcdef"
+   :port     5437
+   :hostname "127.0.0.1"})
 
 (defn- make-contexts [{:keys [contexts]}
                       {:keys [context_ids]}]
   (reduce (fn [acc context_id]
             (let [context-id (keyword (str context_id))]
-              (prn "get co" (get contexts context-id) context-id context_id)
               (if (get contexts context-id)
-                (do
-                  (prn "yoo")
-                  (assoc-in contexts [context-id :show-badge?] false))
+                (assoc-in contexts [context-id :show-badge?] false)
                 acc)))
           contexts context_ids))
 
@@ -33,13 +30,12 @@
                   from issues items join \n
                   collections on items.id = collections.item_id join issues contexts on contexts.id = collections.container_id \n
                   where collections.show_badge = false \n
-                group by items.id"])
+                group by items.id"]) 
      (map (fn [{:keys [issues/id issues/data] :as item}]
-            (prn "id" id)
             (let [stringy (-> (json/generate-string (assoc data :contexts (make-contexts data item)))
                               (str/replace "'" "''"))]
-              (prn stringy)
               (try (pg/execute! db 
                                 [(str "update issues set data = '" stringy "' where id = " id)])
                    (catch Exception e
-                     (prn "got an exception with " id "..." (.getMessage e) "..." stringy)))))))
+                     (prn "got an exception with " id "..." (.getMessage e) "..." stringy))))))
+     count)
