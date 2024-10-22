@@ -25,7 +25,7 @@
                                                          channel-handle
                                                          #{youtube-channels-id}
                                                          {:youtube-channel author_url})]
-                         (:id (datastore/upgrade-issue-to-context! db channel))))]
+                         (:id channel)))]
     channel-id))
 
 (defn match? [title]
