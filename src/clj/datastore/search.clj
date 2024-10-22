@@ -296,6 +296,7 @@
     (sectime
      "get-aggregated-contexts#after-search-issues'"
      (->> issues
+          (filter #(get-in % [:data :contexts :show-badge?]))
           (map #(get-in % [:data :contexts]))
           (map seq)
           (apply concat)
