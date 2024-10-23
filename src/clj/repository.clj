@@ -387,7 +387,8 @@
         state
         {:selected-context old-selected-context
          :issues (search/search-issues db (assoc state :selected-context old-selected-context))
-         :aggregated-contexts ((fetch-aggregated-contexts {:db db}) (assoc state :selected-context old-selected-context))})
+         :aggregated-contexts ((fetch-aggregated-contexts {:db db}) (assoc state :selected-context old-selected-context))
+         :issue-view? false})
       (catch Exception e
         (log/error (str "Caught an repository/unlink-selected-item-from-container " (.getMessage e)))))))
 
