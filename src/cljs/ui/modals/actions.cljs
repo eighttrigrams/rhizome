@@ -9,17 +9,15 @@
                      (assoc :loading true)))
   (js/setTimeout (fn [_] (swap! *state dissoc :loading)) 500))
 
-(defn save-description! [*state type item]
+(defn save-description! [*state item]
   (fetch-and-reset! *state (-> @*state
                                (dissoc :modal)
-                               (assoc :cmd (if (= :issue type)
-                                             :update-issue-description
-                                             :update-context-description))
+                               (assoc :cmd :update-context-description)
                                (assoc :arg item))))
 
 (defn update-context! [*state context issue-contexts]
   (fetch-and-reset-with-method! *state 
                                (dissoc @*state :modal)
-                               api/update-context
+                               api/update-item
                                {:context        context
                                 :issue-contexts issue-contexts}))

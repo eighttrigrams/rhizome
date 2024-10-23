@@ -4,7 +4,6 @@
             datastore
             privacy
             [datastore.search :as search]
-            [datastore.items :as items]
             [datastore.relations :as datastore.relations]
             [cambium.core :as log]
             [repository.insertion :as insertion]
@@ -42,7 +41,7 @@
 (defn fetch-context [{:keys [db]}]
   (fn [old-state [arg fetch-as-issue?]]
     (try
-      (let [selected-context      (datastore/get-context db arg)
+      (let [selected-context      (datastore/get-item db arg)
             opts                  {:search-globally? false
                                    :selected-context selected-context}]
         (log/info (str "fetch-context as " (if fetch-as-issue? "issue" "context") " from (" (:id (:old-selected-context old-state)) "):\"" (:title (:old-selected-context old-state)) "\" to (" (:id selected-context) "):\"" (:title selected-context) "\""))
@@ -68,9 +67,8 @@
 
 (defn- change-secondary-contexts-operation [db]
   (fn [opts]
-    (let [_context (the-future (datastore/update-context db {:context (:selected-context opts)}))]
-      {;;:selected-context context
-       :issues (search/search-issues db (assoc opts :skip-context-aggregation? true))})))
+    (let [_context (the-future (datastore/update-item db {:context (:selected-context opts)}))]
+      {:issues (search/search-issues db (assoc opts :skip-context-aggregation? true))})))
 
 (defn change-secondary-contexts-selection [{:keys [db]}]
   (change-secondary-contexts-operation db))
@@ -83,51 +81,52 @@
 
 (defn deselect-secondary-contexts [{:keys [db]}]
   (fn [opts]
-    (let [context (datastore/update-context db {:context (:selected-context
-                                                          (-> opts
-                                                              (assoc-in
-                                                               [:selected-context
-                                                                :data
-                                                                :views
-                                                                :current
-                                                                :selected-secondary-contexts]
-                                                               [])
-                                                              (assoc-in
-                                                               [:selected-context
-                                                                :data
-                                                                :views
-                                                                :current
-                                                                :secondary-contexts-inverted]
-                                                               false)
-                                                              (assoc-in
-                                                               [:selected-context
-                                                                :data
-                                                                :views
-                                                                :current
-                                                                :secondary-contexts-unassigned-selected]
-                                                               false)
-                                                              (assoc-in
-                                                               [:selected-context
-                                                                :data
-                                                                :views
-                                                                :current
-                                                                :search-mode]
-                                                               0)
-                                                              (assoc-in
-                                                               [:selected-context
-                                                                :data
-                                                                :views
-                                                                :current
-                                                                :events-view]
-                                                               0)
-                                                              (assoc-in
-                                                               [:selected-context
-                                                                :data
-                                                                :views
-                                                                :current
-                                                                :notes-mode]
-                                                               false)
-                                                              ))})]
+    (let [context (datastore/update-item db (:selected-context
+                                             (-> opts
+                                                 (assoc-in
+                                                  [:selected-context
+                                                   :data
+                                                   :views
+                                                   :current
+                                                   :selected-secondary-contexts]
+                                                  [])
+                                                 (assoc-in
+                                                  [:selected-context
+                                                   :data
+                                                   :views
+                                                   :current
+                                                   :secondary-contexts-inverted]
+                                                  false)
+                                                 (assoc-in
+                                                  [:selected-context
+                                                   :data
+                                                   :views
+                                                   :current
+                                                   :secondary-contexts-unassigned-selected]
+                                                  false)
+                                                 (assoc-in
+                                                  [:selected-context
+                                                   :data
+                                                   :views
+                                                   :current
+                                                   :search-mode]
+                                                  0)
+                                                 (assoc-in
+                                                  [:selected-context
+                                                   :data
+                                                   :views
+                                                   :current
+                                                   :events-view]
+                                                  0)
+                                                 (assoc-in
+                                                  [:selected-context
+                                                   :data
+                                                   :views
+                                                   :current
+                                                   :notes-mode]
+                                                  false)
+                                                 )))]
+      (prn "--->" context)
       {:issues                          (search/search-issues
                                          db
                                          (assoc opts :selected-context context))
@@ -283,7 +282,7 @@
   [db {:keys [selected-context] :as opts} issue-id]
   (try
     (datastore/reprioritize-issue db {:id issue-id})
-    (let [selected-issue (datastore/get-issue db {:id issue-id})] 
+    (let [selected-issue (datastore/get-item db {:id issue-id})] 
       (datastore.relations/link-item-to-container! db selected-issue selected-context)
       (let [opts (-> opts
                                              (dissoc :search-globally? 
@@ -312,12 +311,12 @@
   "link selected context as an item to a container"
   [db {:keys [selected-issue selected-context] :as opts} arg]
   (let [selected-issue (or selected-issue
-                           (items/get-item db selected-context))]
+                           (datastore/get-item db selected-context))]
     (log/info (str "repository/link-selected-context-to-context " selected-issue))
     (try
       (datastore/reprioritize-context db arg)
       (datastore.relations/link-item-to-container! db selected-issue arg)
-      (let [fresh-selected-context (datastore/get-issue db selected-context)]
+      (let [fresh-selected-context (datastore/get-item db selected-context)]
         (merge {:link-context   nil
                 :active-search  nil
                 :selected-context fresh-selected-context
@@ -392,15 +391,14 @@
       (catch Exception e
         (log/error (str "Caught an repository/unlink-selected-item-from-container " (.getMessage e)))))))
 
-(defn update-context [{:keys [db]}]
+(defn update-item [{:keys [db]}]
   (fn [opts arg]
     (let [context (or (:context (:context arg)) (:context arg))
           issue-contexts (:issue-contexts arg)]
       (try
+        (log/info (str "repository/update-item" (:id context) (:title context) arg))
         (datastore.relations/set-the-containers-of-item! db context issue-contexts)
-        (let [selected-context (datastore/update-context db 
-                                                         ;; TODO simply use context
-                                                         (:context arg))]
+        (let [selected-context (datastore/update-item db context)]
           (merge {:selected-context selected-context
                   :issues           (search/search-issues db (-> opts
                                                                  (dissoc :q)
@@ -461,10 +459,6 @@
           :q                                       nil
           :active-search                           :issues
           :unassigned-secondary-contexts-selected? false}
-         :update-issue-description
-         {:selected-context (datastore/update-issue-description db arg)
-          :issues         (search/search-issues db (dissoc opts :q))
-          :q              nil}
          :update-context-description
          {:selected-context (datastore/update-context-description db arg)}
          :deselect-context

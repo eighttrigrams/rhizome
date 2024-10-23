@@ -1,12 +1,11 @@
 (ns repository.deletion
   (:require [clojure.java.io :as io]
             [cambium.core :as log]
-            datastore
-            [datastore.items :as items]))
+            datastore))
 
 (defn- get-files-count [db file]
   (if file
-    (count (items/get-items-by-path db 
+    (count (datastore/get-items-by-path db 
                                        "data->'resource-links'->>'file'"
                                        file))
     0))

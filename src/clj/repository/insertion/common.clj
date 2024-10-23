@@ -1,11 +1,10 @@
 (ns repository.insertion.common
   (:require datastore
-            [datastore.items :as items]
             [next.jdbc :as jdbc]
             [honey.sql :as sql]))
 
 (defn get-item-or-throw-error [db title]
-  (let [id (:id (items/get-item-by-title db {:title title}))
+  (let [id (:id (datastore/get-item-by-title db {:title title}))
         _ (when-not id (throw (Exception. (str "no id for " title))))]
     id))
 
@@ -22,11 +21,10 @@
                              (map (fn [{:issues/keys [id short_title title]}]
                                     [id (if (seq short_title) short_title title)]))
                              (into {})))
-        issue    (datastore/update-issue db 
-                                         {:issue (update issue :data 
-                                                         (fn [data] 
-                                                           (assoc data 
-                                                                  :resource-links resource-links
-                                                                  :contexts contexts)))
-                                          :related-issues-ids '()})]
+        issue    (datastore/update-item db 
+                                        (update issue :data 
+                                                (fn [data] 
+                                                  (assoc data 
+                                                         :resource-links resource-links
+                                                         :contexts contexts))))]
     issue))

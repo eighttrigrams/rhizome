@@ -2,7 +2,6 @@
   (:require [clojure.string :as str]
             datastore
             [hickory.select :as select]
-            [datastore.items :as items]
             [repository.insertion.common :as common]
             [repository.chatgpt :as chatgpt]
             utils
@@ -15,11 +14,11 @@
     subdomain-full-url] 
    substack-platform-id
    substacks-id]
-  (let [substack (common/insert-item db 
-                                     subdomain-url
-                                     subdomain-handle 
-                                     #{substack-platform-id substacks-id}
-                                     {:substack subdomain-full-url})]
+  (let [substack (datastore/new-issue db 
+                                      subdomain-url
+                                      subdomain-handle 
+                                      #{substack-platform-id substacks-id}
+                                      {:substack subdomain-full-url})]
     (:id (datastore/upgrade-issue-to-context! db substack))))
 
 (defn-  convert [url]
@@ -46,7 +45,7 @@
                                    identifiers 
                                    substack-platform-id 
                                    substacks-id]
-  (let [substack-id (:id (items/get-item-by-path db 
+  (let [substack-id (:id (datastore/get-item-by-path db 
                                                     "data->'resource-links'->>'substack'" 
                                                     (last identifiers)))
         substack-id (or substack-id (get-substack-id db 
@@ -59,7 +58,7 @@
 
 (defn- validate-preconditions [db url title]
   (let [_ (when-not (seq title) (throw (Exception. "no post title")))
-        _ (when (:id (items/get-item-by-path db 
+        _ (when (:id (datastore/get-item-by-path db 
                                                 "data->'resource-links'->>'substack-article'" 
                                                 url))
             (throw (Exception. "substack article already exists!")))]))
@@ -89,7 +88,7 @@
                                   (convert url))
                                 substack-platform-id
                                 substacks-id)
-          issue                (common/insert-item db 
+          issue                (datastore/new-issue db 
                                                    title 
                                                    "" 
                                                    (conj context-ids-set 
@@ -98,5 +97,5 @@
                                                          substack-platform-id) 
                                                    {:substack-article url})]
       (when (and issue summary)
-        (datastore/update-issue-description db (assoc issue :description 
-                                                      (utils/wrap-summary summary)))))))
+        (datastore/update-item db (assoc issue :description 
+                                         (utils/wrap-summary summary)))))))

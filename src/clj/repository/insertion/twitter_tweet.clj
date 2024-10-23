@@ -1,7 +1,6 @@
 (ns repository.insertion.twitter-tweet
   (:require [clojure.string :as str]
             datastore
-            [datastore.items :as items]
             [repository.insertion.common :as common]
             utils))
 
@@ -21,7 +20,7 @@
     (:id (datastore/upgrade-issue-to-context! db twitter))))
 
 (defn- create-or-take-handle-id [db handle-url twitter-platform-id twitter-handles-id]
-  (let [handle-id (:id (items/get-item-by-path db 
+  (let [handle-id (:id (datastore/get-item-by-path db 
                                                   "data->'resource-links'->>'x-handle'" 
                                                   handle-url))
         handle-id (or handle-id (get-handle-id db 
@@ -38,7 +37,7 @@
         handle-id (create-or-take-handle-id db handle-url twitter-platform-id twitter-handles-id)
         note-id (subs url 0 (or (str/index-of url "?")
                                 (count url)))]
-    (when (:id (items/get-item-by-path db "data->'resource-links'->>'x-post'" note-id))
+    (when (:id (datastore/get-item-by-path db "data->'resource-links'->>'x-post'" note-id))
       (throw (Exception. "x post already exists!")))
     (common/insert-item db
                         "X Post"
@@ -48,3 +47,4 @@
                               twitter-platform-id
                               handle-id)
                         {:x-post note-id})))
+                      

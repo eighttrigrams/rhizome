@@ -1,7 +1,6 @@
 (ns repository.insertion.substack-note
   (:require [clojure.string :as str]
             datastore
-            [datastore.items :as items]
             [repository.insertion.common :as common]
             utils))
 
@@ -17,7 +16,7 @@
     (:id (datastore/upgrade-issue-to-context! db substack))))
 
 (defn- create-or-take-author-id [db author-url substack-platform-id]
-  (let [author-id (:id (items/get-item-by-path db 
+  (let [author-id (:id (datastore/get-item-by-path db 
                                                   "data->'resource-links'->>'substack-author'" 
                                                   author-url))
         author-id (or author-id (get-author-id db 
@@ -35,7 +34,7 @@
         author-id (create-or-take-author-id db author-url substack-platform-id)
         note-id (subs url 0 (or (str/index-of url "?")
                                 (count url)))]
-    (when (:id (items/get-item-by-path db "data->'resource-links'->>'substack-note'" note-id))
+    (when (:id (datastore/get-item-by-path db "data->'resource-links'->>'substack-note'" note-id))
       (throw (Exception. "substack note already exists!")))
     (common/insert-item db 
                         "Substack Note" 

@@ -8,7 +8,7 @@
   (let [_ 1]
     (try
       (log/info (str "Uploading preview file: " id))
-      (let [item (datastore/get-issue db {:id id})
+      (let [item (datastore/get-item db {:id id})
             downscale-image? (= "false" alternative-behaviour?)
             data (or (:data item) {})
             data (if downscale-image?  
@@ -24,7 +24,7 @@
             lowres-path (str "/Users/daniel/Pictures/Tracked/Preview/Lowres/" 
                              id 
                              ".png")]
-        (datastore/update-issue-simple db (assoc item :data data)) 
+        (datastore/update-item db (assoc item :data data)) 
         (io/copy (:tempfile uploaded-file) (io/file path))
         (when downscale-image?
           (log/info "Will downscale image now")

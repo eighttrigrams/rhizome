@@ -2,7 +2,6 @@
   (:require [clojure.string :as str]
             [clojure.set :as set]
             datastore
-            [datastore.items :as items]
             [utils :refer [condx]]
             [repository.insertion.common :as common]
             [repository.homefolder :as home]))
@@ -36,9 +35,9 @@
 
 (defn- validate-not-exists [db file-name]
   (home/validate-not-exists file-name)
-  (when (:id (items/get-item-by-path db "data->'resource-links'->>'file'" file-name))
+  (when (:id (datastore/get-item-by-path db "data->'resource-links'->>'file'" file-name))
     (throw (Exception. "file already exists!")))
-  (when (:id (items/get-item-by-path db "data->'resource-links'->>'image'" file-name))
+  (when (:id (datastore/get-item-by-path db "data->'resource-links'->>'image'" file-name))
     (throw (Exception. "image already exists!"))))
 
 (defn match? [title]

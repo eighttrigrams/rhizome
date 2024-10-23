@@ -28,5 +28,5 @@
                                                        articles-id) 
                                                  {:web-article url})]
     (when (and issue summary)
-      (datastore/update-issue-description db (assoc issue :description 
-                                                    (utils/wrap-summary summary))))))
+      (datastore/update-context-description db (assoc issue :description 
+                                                      (utils/wrap-summary summary))))))

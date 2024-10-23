@@ -23,7 +23,7 @@
      :arg {:title title}})))
 
 (defn- update-context [context]
-  ((repository/update-context {:db db})
+  ((repository/update-item {:db db})
    {}
    ;; TODO review
    {:context {:context context}}))

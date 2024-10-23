@@ -12,10 +12,7 @@
                   (or meta-pressed? alt-pressed?)
                   (= :description modal))
              (do (.preventDefault e)
-                 (actions/save-description!
-                  *state
-                  (if (:selected-issue @*state) :issue :context)
-                  (value-fn))))))))
+                 (actions/save-description! *state (value-fn))))))))
 
 (defn handle-edit-keys [*state value-fn value-fn-2]
   (handle-keys*
