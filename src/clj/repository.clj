@@ -127,7 +127,6 @@
                                                    :notes-mode]
                                                   false)
                                                  )))]
-      (prn "--->" context)
       {:issues                          (search/search-issues
                                          db
                                          (assoc opts :selected-context context))
