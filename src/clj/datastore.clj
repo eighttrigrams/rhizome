@@ -62,11 +62,11 @@
 
 (declare get-item)
 
-(defn upgrade-issue-to-context! [db {:keys [id] :as item}]
+(defn upgrade-issue-to-context! [db {:keys [id is_context] :as item}]
   (jdbc/execute-one! db
                      (sql/format {:update [:issues]
                                   :where  [:= :id [:inline id]]
-                                  :set    {:is_context true
+                                  :set    {:is_context (not is_context)
                                            :updated_at_ctx [:raw "NOW()"]
                                            :updated_at  [:raw "NOW()"]}})
                      {:return-keys true})
