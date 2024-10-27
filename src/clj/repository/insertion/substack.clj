@@ -1,6 +1,7 @@
 (ns repository.insertion.substack
   (:require [clojure.string :as str]
             datastore
+            [cambium.core :as log]
             [hickory.select :as select]
             [repository.insertion.common :as common]
             [repository.chatgpt :as chatgpt]
@@ -14,12 +15,12 @@
     subdomain-full-url] 
    substack-platform-id
    substacks-id]
-  (let [substack (datastore/new-issue db 
-                                      subdomain-url
-                                      subdomain-handle 
-                                      #{substack-platform-id substacks-id}
-                                      {:substack subdomain-full-url})]
-    (:id (datastore/upgrade-issue-to-context! db substack))))
+  (let [substack (common/insert-item db 
+                                     subdomain-url
+                                     subdomain-handle 
+                                     #{substack-platform-id substacks-id}
+                                     {:substack subdomain-full-url})]
+    (:id substack)))
 
 (defn-  convert [url]
   (let [subdomain (url/get-subdomain url)
@@ -88,14 +89,18 @@
                                   (convert url))
                                 substack-platform-id
                                 substacks-id)
-          issue                (datastore/new-issue db 
-                                                   title 
-                                                   "" 
-                                                   (conj context-ids-set 
-                                                         (or substack-id articles-id) ;; hack 
-                                                         articles-id 
-                                                         substack-platform-id) 
-                                                   {:substack-article url})]
-      (when (and issue summary)
-        (datastore/update-item db (assoc issue :description 
-                                         (utils/wrap-summary summary)))))))
+          context-ids-set     (conj context-ids-set
+                                    (or substack-id articles-id) ;; hack 
+                                    articles-id 
+                                    substack-platform-id)
+          _ (log/info (str "context-ids-set: " context-ids-set))
+          item                (common/insert-item db 
+                                                  title 
+                                                  "" 
+                                                  context-ids-set 
+                                                  {:substack-article url})]
+      (log/info (str "created new item" item))
+      (if (and item summary)
+        (datastore/update-item db (assoc item :description 
+                                         (utils/wrap-summary summary)))
+        item))))

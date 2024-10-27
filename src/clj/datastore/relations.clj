@@ -33,6 +33,7 @@
                                                                    :where  [:= :collections.item_id [:inline item-id]]})
                                                       {:return-keys true})))
                          item-id)]
+    (log/info (str "item-id: " item-id ". contexts: " contexts "."))
     (jdbc/execute-one! db
                        (sql/format {:update [:issues]
                                     :where  [:= :id [:inline item-id]]

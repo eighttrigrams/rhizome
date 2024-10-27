@@ -263,12 +263,14 @@
        {:keys [title]}
        alternative-behaviour?]
     (try
-      (let [issue (insertion/insert-issue db 
+      (log/info (str "repository/insert-issue"))
+      (let [item (insertion/insert-issue db 
                                           title
                                           selected-context 
                                           (get-selected-secondary-contexts-set state)
                                           alternative-behaviour?)]
-        (datastore.relations/set-collection-titles-of-new-issue db (:id issue))
+        (log/info (str "inserted item" (:id item) (:title item)))
+        (datastore.relations/set-collection-titles-of-new-issue db (:id item))
         {:issues         (search/search-issues
                           db
                           (dissoc state :q))

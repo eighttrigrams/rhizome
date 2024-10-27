@@ -186,24 +186,6 @@
             (log/error (.getMessage e))))))) 
   (get-item db item))
 
-(defn new-context [db {title :title}]
-  (-> (jdbc/execute-one!
-       db
-       (sql/format {:insert-into [:issues]
-                    :columns     [:inserted_at
-                                  :updated_at
-                                  :updated_at_ctx
-                                  :title
-                                  :is_context]
-                    :values      [[[:raw "NOW()"]
-                                   [:raw "NOW()"]
-                                   [:raw "NOW()"]
-                                   [:inline title]
-                                   true]]})
-       {:return-keys true})
-      un-namespace-keys
-      (dissoc :searchable)))
-
 (defn update-context-description [db {:keys [id description]}]
   (jdbc/execute-one! db
                      (sql/format {:update [:issues]
@@ -337,3 +319,21 @@
                              context-ids-set)))]
      (insert-issue-relations! db values)
      (get-item db {:id issue-id}))))
+
+(defn new-context [db {title :title}]
+  (-> (jdbc/execute-one!
+       db
+       (sql/format {:insert-into [:issues]
+                    :columns     [:inserted_at
+                                  :updated_at
+                                  :updated_at_ctx
+                                  :title
+                                  :is_context]
+                    :values      [[[:raw "NOW()"]
+                                   [:raw "NOW()"]
+                                   [:raw "NOW()"]
+                                   [:inline title]
+                                   true]]})
+       {:return-keys true})
+      un-namespace-keys
+      (dissoc :searchable)))

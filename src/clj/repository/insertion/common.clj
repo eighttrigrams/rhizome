@@ -10,7 +10,7 @@
 
 (defn insert-item 
   [db title short-title context-ids-set resource-links]
-  (let [issue    (datastore/new-issue db 
+  (let [item    (datastore/new-issue db 
                                       title
                                       short-title
                                       context-ids-set)
@@ -21,10 +21,10 @@
                              (map (fn [{:issues/keys [id short_title title]}]
                                     [id (if (seq short_title) short_title title)]))
                              (into {})))
-        issue    (datastore/update-item db 
-                                        (update issue :data 
+        item    (datastore/update-item db 
+                                        (update item :data 
                                                 (fn [data] 
                                                   (assoc data 
                                                          :resource-links resource-links
                                                          :contexts contexts))))]
-    issue))
+    item))
