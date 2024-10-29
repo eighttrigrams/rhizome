@@ -42,6 +42,9 @@
                     (= "KeyT" code)
                     selected-context)
                (actions/unlink-selected-issue-from-selected-context *state)
+               (and alt-pressed? 
+                    (= "KeyB" code))
+               (actions/select-last-context! *state)
                (= "KeyI" code)
                (swap! *state #(assoc % :active-search :issues :search-globally? false))
                (and selected-context

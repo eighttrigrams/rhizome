@@ -77,6 +77,13 @@
      api/fetch-context
      [context select-as-issue?]))
 
+(defn select-last-context! [*state]
+  (prn "select last context")
+  (fetch-and-reset-with-method-2! 
+   *state 
+   @*state
+   api/select-last-context))
+
 (defn select-context!
   [*state context]
   (if (true? (:link-context @*state))

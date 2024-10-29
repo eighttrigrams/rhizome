@@ -51,6 +51,8 @@
 
 (defn-over-http unlink-selected-item-from-container :return-value {})
 
+(defn-over-http select-last-context :return-value {})
+
 (defn-over-http delete-context :return-value {})
 
 (defn-over-http fetch-aggregated-contexts :return-value {})

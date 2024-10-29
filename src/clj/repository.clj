@@ -383,16 +383,29 @@
 
 (defn unlink-selected-item-from-container [{:keys [db]}]
   (fn [{:keys [selected-context old-selected-context] :as state}]
-    (try 
-      (log/info (str "repository/unlink-selected-item-from-container - Removing " (:id selected-context) ":" (:title selected-context) " from " (:id old-selected-context) ":" (:title old-selected-context)))
-      (if (not (datastore.relations/unlink-item-from-container! db selected-context old-selected-context))
+    (try  
+      (if (or (not (datastore.relations/unlink-item-from-container! db selected-context old-selected-context))
+              (not old-selected-context))
         state
-        {:selected-context old-selected-context
-         :issues (search/search-issues db (assoc state :selected-context old-selected-context))
-         :aggregated-contexts ((fetch-aggregated-contexts {:db db}) (assoc state :selected-context old-selected-context))
-         :issue-view? false})
+        (do
+          (log/info (str "repository/unlink-selected-item-from-container - Removing " (:id selected-context) ":" (:title selected-context) " from " (:id old-selected-context) ":" (:title old-selected-context)))
+          {:selected-context old-selected-context
+           :issues (search/search-issues db (assoc state :selected-context old-selected-context))
+           :aggregated-contexts ((fetch-aggregated-contexts {:db db}) (assoc state :selected-context old-selected-context))
+           :issue-view? false}))
       (catch Exception e
         (log/error (str "Caught an repository/unlink-selected-item-from-container " (.getMessage e)))))))
+
+(defn select-last-context [{:keys [db]}]
+  (fn [{:keys [old-selected-context] :as state}]
+    (if-not old-selected-context
+      state
+      (do 
+        (log/info (str "repository/select-last-context - " (:id old-selected-context) ":" (:title old-selected-context)))
+        {:selected-context    old-selected-context
+         :issues              (search/search-issues db (assoc state :selected-context old-selected-context))
+         :aggregated-contexts ((fetch-aggregated-contexts {:db db}) (assoc state :selected-context old-selected-context))
+         :issue-view?         false}))))
 
 (defn update-item [{:keys [db]}]
   (fn [opts arg]
