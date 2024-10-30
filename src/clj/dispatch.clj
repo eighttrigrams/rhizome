@@ -24,7 +24,8 @@
                                 fetch-context
                                 fetch-aggregated-contexts
                                 delete-context
-                                flip-privacy]]))
+                                flip-privacy
+                                fetch-issue-description]]))
 
 (defdispatch-with-args handler 
   list-resources 
@@ -50,4 +51,5 @@
   upgrade-issue-to-context
   fetch-context
   delete-context
-  flip-privacy)
+  flip-privacy
+  fetch-issue-description)

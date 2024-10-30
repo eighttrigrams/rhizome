@@ -67,10 +67,14 @@
                     300)))
 
 (defn- on-mouse-enter [*state issue]
-  #(when-not (:loading @*state)
-                       (swap! *state assoc
-                              :preview-issue issue
-                              :mouse :enter)))
+  #(do (when-not (:loading @*state)
+         (swap! *state assoc
+                :preview-issue issue
+                :mouse :enter)
+         (when-not (:active-search @*state)
+           (js/setTimeout (fn [_]
+                      (actions/fetch-issue-description! *state issue))
+                    300)))))
 
 (defn regular-issues-list-item-component [*state issue idx select-fn]
   [:li.issue-card

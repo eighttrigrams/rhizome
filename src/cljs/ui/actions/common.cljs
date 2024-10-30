@@ -11,19 +11,28 @@
   (utils/debounce save-input! 500))
 
 (defn reset-state! [new-state *state]
-  (reset! *state (dissoc new-state :enter-pressed?)))
+  (when new-state ;; could be because ignore-issue-description
+    (reset! *state (dissoc new-state :enter-pressed?))))
 
-(defn- update-state [{:keys [issues contexts aggregated-contexts] :as i} 
+(defn- update-state [{:keys [issues contexts aggregated-contexts issue-description ignore-issue-description] :as i} 
                      state]
-  (merge 
-   (if (map? state) state @state)
-   i
-   {:issues (if (and issues (first issues)) 
-              (first issues)
-              (:issues state))
-    :contexts (or contexts (:contexts state))}
-   (when aggregated-contexts
-     {:aggregated-contexts aggregated-contexts})))
+  (cond ignore-issue-description
+        nil
+        issue-description 
+        (let [state (if (map? state) state @state)
+              state (assoc-in
+                     state [:preview-issue :description] issue-description)]
+          state)
+        :else
+        (merge 
+         (if (map? state) state @state)
+         i
+         {:issues   (if (and issues (first issues)) 
+                      (first issues)
+                      (:issues state))
+          :contexts (or contexts (:contexts state))}
+         (when aggregated-contexts
+           {:aggregated-contexts aggregated-contexts}))))
 
 (defn- list-resources [state]
   (api/list-resources (dissoc state :issues :contexts)))
@@ -56,16 +65,24 @@
 
 (defn fetch-and-reset-with-method!
   [*state state method & args]
-  (let [state' (assoc (if (map? state) 
+  (let [state''' (if (map? state) 
                         state
                         @state)
-                      :loading true :preview-issue nil)]
+        state' (assoc state'''
+                :loading (if (= :dont-reset-preview-issue (last args))
+                           (:loading state''')
+                           true)
+                :preview-issue (if (= :dont-reset-preview-issue (last args))
+                                 (:preview-issue state''')
+                                 nil))]
     (reset! *state state')
     (go (-> (apply fetch-resources-with-method (if (map? state) 
                                                  state'
                                                  state)
                    method 
-                   args)
+                   (if (= :dont-reset-preview-issue (last args))
+                     (drop-last args)
+                     args))
             <!
             (reset-state! *state)
             (dissoc-loading *state)))))

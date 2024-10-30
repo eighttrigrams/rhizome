@@ -56,3 +56,5 @@
 (defn-over-http delete-context :return-value {})
 
 (defn-over-http fetch-aggregated-contexts :return-value {})
+
+(defn-over-http fetch-issue-description :return-value {})

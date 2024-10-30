@@ -309,6 +309,14 @@
       (log/error (str "Caught an exception in link-issue-to-selected-context " (.getMessage e)))
       (throw e))))
 
+(defn fetch-issue-description [{:keys [db]}]
+  (fn [state issue]
+    (log/info (str "fetch issue description for" (:title issue)))
+    (let [item (datastore/get-item db issue)]
+     (assoc state 
+            :issue-description (:description item)
+            :ignore-issue-description (or (nil? (:description item)) (not (seq (:description item))))))))
+
 (defn- link-selected-context-to-context 
   "link selected context as an item to a container"
   [db {:keys [selected-issue selected-context] :as opts} arg]
