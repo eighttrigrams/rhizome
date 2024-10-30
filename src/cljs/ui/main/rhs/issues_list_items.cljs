@@ -72,9 +72,10 @@
                 :preview-issue issue
                 :mouse :enter)
          (when-not (:active-search @*state)
-           (js/setTimeout (fn [_]
+          ;;  (js/setTimeout (fn [_]
                       (actions/fetch-issue-description! *state issue))
-                    300)))))
+                    ;; 300)
+                          )))
 
 (defn regular-issues-list-item-component [*state issue idx select-fn]
   [:li.issue-card
