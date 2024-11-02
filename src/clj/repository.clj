@@ -262,8 +262,6 @@
         :as state} 
        {:keys [title]}
        alternative-behaviour?]
-    (log/info "hello")
-    (throw (Exception. "eine"))
     (try
       (log/info (str "repository/insert-issue"))
       (let [item (insertion/insert-issue db 
