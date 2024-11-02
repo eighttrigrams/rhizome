@@ -262,6 +262,8 @@
         :as state} 
        {:keys [title]}
        alternative-behaviour?]
+    (log/info "hello")
+    (throw (Exception. "eine"))
     (try
       (log/info (str "repository/insert-issue"))
       (let [item (insertion/insert-issue db 
@@ -279,36 +281,6 @@
       (catch Exception e
         (log/error (str "Caught an exception in insert-issue " (.getMessage e)))))))
 
-(defn- link-issue-to-selected-context 
-  "when context selected add an issue"
-  [db {:keys [selected-context] :as opts} issue-id]
-  (try
-    (datastore/reprioritize-issue db {:id issue-id})
-    (let [selected-issue (datastore/get-item db {:id issue-id})] 
-      (datastore.relations/link-item-to-container! db selected-issue selected-context)
-      (let [opts (-> opts
-                                             (dissoc :search-globally? 
-                                                     :q
-                                                     :link-issue
-                                                     :link-context)
-                                             (assoc-in [:selected-context 
-                                                        :data 
-                                                        :views 
-                                                        :current 
-                                                        :selected-secondary-contexts] []))
-            issues (search/search-issues db opts)
-            aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)]
-        {:issues           issues
-         :active-search    nil
-         :link-issue       nil
-         :link-context     nil
-         :search-globally? false
-         :q                nil
-         :aggregated-contexts aggregated-contexts}))
-    (catch Exception e
-      (log/error (str "Caught an exception in link-issue-to-selected-context " (.getMessage e)))
-      (throw e))))
-
 (defn fetch-issue-description [{:keys [db]}]
   (fn [state issue]
     (log/info (str "fetch issue description for" (:title issue)))
@@ -317,26 +289,27 @@
             :issue-description (:description item)
             :ignore-issue-description (or (nil? (:description item)) (not (seq (:description item))))))))
 
-(defn- link-selected-context-to-context 
-  "link selected context as an item to a container"
-  [db {:keys [selected-issue selected-context] :as opts} arg]
-  (let [selected-issue (or selected-issue
-                           (datastore/get-item db selected-context))]
-    (log/info (str "repository/link-selected-context-to-context " selected-issue))
-    (try
-      (datastore/reprioritize-context db arg)
-      (datastore.relations/link-item-to-container! db selected-issue arg)
-      (let [fresh-selected-context (datastore/get-item db selected-context)]
-        (merge {:link-context   nil
-                :active-search  nil
-                :selected-context fresh-selected-context
-                :issues         (search/search-issues db (dissoc opts :q))
-                :q              nil}
-               (when selected-context
-                 {:aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)})))
-      (catch Exception e 
-        (log/error (str "Caught an exception in link-selected-item-to-context " (.getMessage e)))
-        (throw e)))))
+(defn link-selected-context-to-context "link selected context as an item to a container"
+  [{:keys [db]}]
+  (fn 
+    [{:keys [selected-issue selected-context] :as opts} arg shift-pressed? _alt-pressed?]
+    (let [selected-issue (or selected-issue
+                             (datastore/get-item db selected-context))]
+      (log/info (str "repository/link-selected-context-to-context " selected-issue " - " shift-pressed?))
+      (try
+        (datastore/reprioritize-context db arg)
+        (datastore.relations/link-item-to-container! db selected-issue arg (not shift-pressed?))
+        (let [fresh-selected-context (datastore/get-item db selected-context)]
+          (merge {:link-context   nil
+                  :active-search  nil
+                  :selected-context fresh-selected-context
+                  :issues         (search/search-issues db (dissoc opts :q))
+                  :q              nil}
+                 (when selected-context
+                   {:aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)})))
+        (catch Exception e 
+          (log/error (str "Caught an exception in link-selected-item-to-context " (.getMessage e)))
+          (throw e))))))
 
 (defn search-contexts [db opts]
   {:contexts (search/search-contexts db opts)})
@@ -366,9 +339,42 @@
    :q                ""})
 
 (defn finish-linking-issue [{:keys [db]}]
-  (fn [{:keys [link-issue] :as opts} arg]
-    (cond (= :context link-issue)
-          (link-issue-to-selected-context db opts arg))))
+  (fn [{:keys [selected-context] :as opts} issue-id shift-pressed? alt-pressed?]
+    (try
+      (log/info (str "finish-linking-issue " shift-pressed? " - " alt-pressed?))
+      (datastore/reprioritize-issue db {:id issue-id})
+      (let [selected-issue (datastore/get-item db {:id issue-id})] 
+        
+        (if (and shift-pressed? alt-pressed?)
+          (do 
+            (datastore.relations/link-item-to-container! db selected-issue selected-context false)
+            (datastore.relations/link-item-to-container! db selected-context selected-issue false))
+          (datastore.relations/link-item-to-container! db selected-issue selected-context (not shift-pressed?)))
+
+        (let [opts                (-> opts
+                                      (dissoc :search-globally? 
+                                              :q
+                                              :link-issue
+                                              :link-context)
+                                      (assoc-in [:selected-context 
+                                                 :data 
+                                                 :views 
+                                                 :current 
+                                                 :selected-secondary-contexts] []))
+              issues              (search/search-issues db opts)
+              aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)
+              selected-context (datastore/get-item db selected-context)]
+          {:issues              issues
+           :active-search       nil
+           :selected-context selected-context
+           :link-issue          nil
+           :link-context        nil
+           :search-globally?    false
+           :q                   nil
+           :aggregated-contexts aggregated-contexts}))
+      (catch Exception e
+        (log/error (str "Caught an exception in link-issue-to-selected-context " (.getMessage e)))
+        (throw e)))))
 
 (defn reprioritize-issue [{:keys [db]}]
   (fn [state issue]
@@ -392,11 +398,12 @@
 (defn unlink-selected-item-from-container [{:keys [db]}]
   (fn [{:keys [selected-context old-selected-context] :as state}]
     (try  
+      (log/info (str "repository/unlink-selected-item-from-container - Try removing " (:id selected-context) ":" (:title selected-context) " from " (:id old-selected-context) ":" (:title old-selected-context)))
       (if (or (not (datastore.relations/unlink-item-from-container! db selected-context old-selected-context))
               (not old-selected-context))
         state
         (do
-          (log/info (str "repository/unlink-selected-item-from-container - Removing " (:id selected-context) ":" (:title selected-context) " from " (:id old-selected-context) ":" (:title old-selected-context)))
+          (log/info (str "repository/unlink-selected-item-from-container - Removing now"))
           {:selected-context old-selected-context
            :issues (search/search-issues db (assoc state :selected-context old-selected-context))
            :aggregated-contexts ((fetch-aggregated-contexts {:db db}) (assoc state :selected-context old-selected-context))
@@ -475,7 +482,6 @@
          :link-issue-to-selected-context (start-linking-issue-to-selected-context db opts)
          :start-linking-selected-issue-to-context (start-linking-selected-issue-to-context-with-local-search db opts)
          :start-context-search (start-context-search db opts)
-         :link-context (link-selected-context-to-context db opts arg)
          :insert-context
          {:selected-context                        (datastore/new-context db arg)
           :aggregated-contexts                     '()

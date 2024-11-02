@@ -3,7 +3,8 @@
                                        fetch-and-reset-with-method!
                                        fetch-and-reset-with-method-2!]]
             api
-            [goog.async.Debouncer]))
+            [goog.async.Debouncer]
+            [ui.main.rhs.modifiers :as modifiers]))
 
 (defn fetch! [*state]
   (fetch-and-reset! *state @*state))
@@ -85,41 +86,48 @@
    api/select-last-context))
 
 (defn select-context!
-  [*state context]
-  (if (true? (:link-context @*state))
-    (fetch-and-reset! *state (assoc @*state :cmd :link-context :arg context))
-    (select-item! *state context false)))
+  ([*state context] (select-context! *state context false false))
+  ([*state context shift-pressed? alt-pressed?]
+   (if (true? (:link-context @*state))
+    ;; (fetch-and-reset! *state (assoc @*state :cmd :link-context :arg context))
+     (fetch-and-reset-with-method! *state @*state api/link-selected-context-to-context context shift-pressed? alt-pressed?)
+     (select-item! *state context false))))
 
 (defn select-issue!
-  ([*state issue]
+  ([*state issue] (select-issue! *state issue false false))
+  ([*state issue shift-pressed? alt-pressed?]
    (if (:link-issue @*state)
      (fetch-and-reset-with-method! *state
                                    @*state
                                    api/finish-linking-issue 
-                                   (:id issue))
+                                   (:id issue)
+                                   shift-pressed? 
+                                   alt-pressed?)
      (select-item! *state issue true))))
 
-(defn select-first-context! [*state]
+(defn select-first-context! [*state shift-pressed? alt-pressed?]
   (when (seq (:contexts @*state))
-    (select-context! *state (first (:contexts @*state)))))
+    (select-context! *state (first (:contexts @*state)) shift-pressed? alt-pressed?)))
 
-(defn- select-nth-context! [*state n]
+(defn- select-nth-context! [*state n shift-pressed? alt-pressed?]
   (when (and (seq (:contexts @*state))
              (> (count (:contexts @*state)) n))
     (select-context! *state 
-                     (nth (:contexts @*state) n))))
+                     (nth (:contexts @*state) n)
+                     shift-pressed?
+                     alt-pressed?)))
 
-(defn select-second-context! [*state]
-  (select-nth-context! *state 1))
+(defn select-second-context! [*state shift-pressed? alt-pressed?]
+  (select-nth-context! *state 1 shift-pressed? alt-pressed?))
 
-(defn select-third-context! [*state]
-  (select-nth-context! *state 2))
+(defn select-third-context! [*state shift-pressed? alt-pressed?]
+  (select-nth-context! *state 2 shift-pressed? alt-pressed?))
 
-(defn select-fourth-context! [*state]
-  (select-nth-context! *state 3))
+(defn select-fourth-context! [*state shift-pressed? alt-pressed?]
+  (select-nth-context! *state 3 shift-pressed? alt-pressed?))
 
-(defn select-fifth-context! [*state]
-  (select-nth-context! *state 4))
+(defn select-fifth-context! [*state shift-pressed? alt-pressed?]
+  (select-nth-context! *state 4 shift-pressed? alt-pressed?))
 
 (defn reprioritize-issue [*state issue]
   (fetch-and-reset-with-method! *state
@@ -127,26 +135,26 @@
                                 api/reprioritize-issue 
                                 issue))
 
-(defn select-first-issue! [*state]
+(defn select-first-issue! [*state shift-pressed? alt-pressed?]
   (when (seq (:issues @*state))
-    (select-issue! *state (first (:issues @*state)))))
+    (select-issue! *state (first (:issues @*state)) shift-pressed? alt-pressed?)))
 
-(defn- select-nth-issue! [*state n]
+(defn- select-nth-issue! [*state n shift-pressed? alt-pressed?]
   (when (and (seq (:issues @*state))
              (> (count (:issues @*state)) n))
-    (select-issue! *state (nth (:issues @*state) n))))
+    (select-issue! *state (nth (:issues @*state) n) shift-pressed? alt-pressed?)))
 
-(defn select-second-issue! [*state]
-  (select-nth-issue! *state 1))
+(defn select-second-issue! [*state shift-pressed? alt-pressed?]
+  (select-nth-issue! *state 1 shift-pressed? alt-pressed?))
 
-(defn select-third-issue! [*state]
-  (select-nth-issue! *state 2))
+(defn select-third-issue! [*state shift-pressed? alt-pressed?]
+  (select-nth-issue! *state 2 shift-pressed? alt-pressed?))
 
-(defn select-fourth-issue! [*state]
-  (select-nth-issue! *state 3))
+(defn select-fourth-issue! [*state shift-pressed? alt-pressed?]
+  (select-nth-issue! *state 3 shift-pressed? alt-pressed?))
 
-(defn select-fifth-issue! [*state]
-  (select-nth-issue! *state 4))
+(defn select-fifth-issue! [*state shift-pressed? alt-pressed?]
+  (select-nth-issue! *state 4 shift-pressed? alt-pressed?))
 
 (defn start-context-search [*state]
   (fetch-and-reset! *state 

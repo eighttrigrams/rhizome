@@ -44,42 +44,39 @@
   "Standard use case is that you know item-id references id via contexts. That id has a new title, so we update it.
    @param constraints a list of ids; when set, the contexts of the item with item-id will be reduced to the ones present in that list
      so the use case is not to set the title in an item's context (with a given id), but to remove contexts"
-  ([db item-id id short_title title] 
-   (update-collection-title-in-collection-items db item-id id short_title title nil))
-  ([db item-id id short_title title new-contexts]
-   (let [data (:issues/data (jdbc/execute-one! db
-                                               (sql/format {:select [:data]
-                                                            :from   [:issues]
-                                                            :where  [:= :id [:inline item-id]]})
-                                               {:return-keys true}))
-         data (cond (nil? data) {}
-                    :else (json/parse-string (.getValue data)))
-         data (if (get data "contexts")
-                data
-                (assoc data "contexts" {}))
-         data (update data "contexts" (fn [contexts]
-                                        (cond
-                                          ;; this reads weird, due to double use of new-contexts
-                                          (true? new-contexts)
-                                          (dissoc contexts (str id))
-                                          (map? new-contexts)
-                                          new-contexts
-                                          :else
-                                          (if (map? (get contexts (str id)))
-                                            (assoc-in contexts [(str id) "title"]  
-                                                      (if (seq short_title)
-                                                        short_title
-                                                        title))
-                                            (assoc contexts (str id)   
-                                                   {:show-badge? true
-                                                    :title       (if (seq short_title)
-                                                                   short_title
-                                                                   title)})))))]
-     (jdbc/execute-one! db
-                        (sql/format {:update [:issues]
-                                     :where  [:= :id [:inline item-id]]
-                                     :set    {:data [:inline (json/generate-string data)]}})
-                        {:return-keys true}))))
+  [db item-id id {:keys [short_title title new-contexts show-badge? remove-from-container?]}]
+  (let [data (:issues/data (jdbc/execute-one! db
+                                              (sql/format {:select [:data]
+                                                           :from   [:issues]
+                                                           :where  [:= :id [:inline item-id]]})
+                                              {:return-keys true}))
+        data (cond (nil? data) {}
+                   :else (json/parse-string (.getValue data)))
+        data (if (get data "contexts")
+               data
+               (assoc data "contexts" {}))
+        data (update data "contexts" (fn [contexts]
+                                       (cond
+                                         remove-from-container?
+                                         (dissoc contexts (str id))
+                                         (map? new-contexts)
+                                         new-contexts
+                                         :else
+                                         (if (map? (get contexts (str id)))
+                                           (assoc-in contexts [(str id) "title"]  
+                                                     (if (seq short_title)
+                                                       short_title
+                                                       title))
+                                           (assoc contexts (str id)   
+                                                  {:show-badge? show-badge?
+                                                   :title       (if (seq short_title)
+                                                                  short_title
+                                                                  title)})))))]
+    (jdbc/execute-one! db
+                       (sql/format {:update [:issues]
+                                    :where  [:= :id [:inline item-id]]
+                                    :set    {:data [:inline (json/generate-string data)]}})
+                       {:return-keys true})))
 
 ;;  TODO make private
 (defn update-collection-title-in-collection-items-for-children 
@@ -91,11 +88,11 @@
                                                          :where  [:= :container_id [:inline id]]})
                                             {:return-keys true})))]
     (doall (for [item-id item-ids]
-             (update-collection-title-in-collection-items db item-id id short_title title)))))
+             (update-collection-title-in-collection-items db item-id id {:short_title short_title :title title})))))
 
 (defn- set-containers-of-item!
   [db item containers]
-  (log/info (str "datastore.relations/set-containers-of-item!" (:id item) (:title item) containers))
+  (log/info (str "datastore.relations/set-containers-of-item! " (:id item) "." (:title item) "..." containers))
   (jdbc/execute! db (sql/format {:delete-from [:collections]
                                  :where [:= :item_id [:inline (:id item)]]}))
   (doall (for [[container-id {:keys [show-badge?]}] containers]
@@ -109,30 +106,36 @@
   [db item containers]
   (when (seq (keys containers))
     (set-containers-of-item! db item containers)
-    (update-collection-title-in-collection-items db (:id item) nil nil nil containers)))
+    (update-collection-title-in-collection-items db (:id item) nil
+                                                 {:short_title nil :title nil :new-contexts containers})))
 
 (defn link-item-to-container!
-  [db item container]
+  [db item container show-badge?]
   (let [contexts (merge (:contexts (:data item))
                         {(:id container) 
                          {:title (get-title container)
-                          :show-badge? true}})]
+                          :show-badge? show-badge?}})]
     (set-containers-of-item! db item contexts)
     (update-collection-title-in-collection-items db 
                                                  (:id item) 
                                                  (:id container)
-                                                 (:short_title container)
-                                                 (:title container))))
+                                                 {:short_title (:short_title container)
+                                                  :title (:title container)
+                                                  :show-badge? show-badge?})))
 
 (defn unlink-item-from-container!
   [db item container]
   (let [selected-item (update-in item [:data :contexts] #(dissoc % (:id container)))
        containers (:contexts (:data selected-item))]
-    (if-not (seq (keys containers))
+    (log/info (str "containers " containers))
+    (if-not (seq (keys containers)) ;; TODO actually, if container is_context, then I can remove it safely 
       false
       (do
         (set-containers-of-item! db selected-item containers)
         (datastore.relations/update-collection-title-in-collection-items db
                                                                          (:id selected-item)
-                                                                         (:id container) nil nil true)
+                                                                         (:id container) 
+                                                                         {:short_title nil
+                                                                          :title nil
+                                                                          :remove-from-container? true})
         true))))
