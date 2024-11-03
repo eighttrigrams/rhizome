@@ -262,22 +262,19 @@
         :as state} 
        {:keys [title]}
        alternative-behaviour?]
-    (try
-      (log/info (str "repository/insert-issue"))
-      (let [item (insertion/insert-issue db 
-                                          title
-                                          selected-context 
-                                          (get-selected-secondary-contexts-set state)
-                                          alternative-behaviour?)]
-        (log/info (str "inserted item" (:id item) (:title item)))
-        (datastore.relations/set-collection-titles-of-new-issue db (:id item))
-        {:issues         (search/search-issues
-                          db
-                          (dissoc state :q))
-         :q              nil
-         :aggregated-contexts ((fetch-aggregated-contexts {:db db}) state)})
-      (catch Exception e
-        (log/error (str "Caught an exception in insert-issue " (.getMessage e)))))))
+    (log/info (str "repository/insert-issue"))
+    (let [item (insertion/insert-issue db 
+                                       title
+                                       selected-context 
+                                       (get-selected-secondary-contexts-set state)
+                                       alternative-behaviour?)]
+      (log/info (str "inserted item" (:id item) (:title item)))
+      (datastore.relations/set-collection-titles-of-new-issue db (:id item))
+      {:issues         (search/search-issues
+                        db
+                        (dissoc state :q))
+       :q              nil
+       :aggregated-contexts ((fetch-aggregated-contexts {:db db}) state)})))
 
 (defn fetch-issue-description [{:keys [db]}]
   (fn [state issue]
