@@ -90,7 +90,9 @@
   ([*state context shift-pressed? alt-pressed?]
    (if (true? (:link-context @*state))
     ;; (fetch-and-reset! *state (assoc @*state :cmd :link-context :arg context))
-     (fetch-and-reset-with-method! *state @*state api/link-selected-context-to-context context shift-pressed? alt-pressed?)
+     (do 
+       (prn "here we are")
+       (fetch-and-reset-with-method! *state @*state api/link-selected-context-to-context context shift-pressed? alt-pressed?))
      (select-item! *state context false))))
 
 (defn select-issue!

@@ -30,10 +30,12 @@
                 (= :issues active-search)
                 selected-context)
            (actions/store-current-view! *state {:title (.-value (get-title-el))})
-           (or (and shift-pressed?
-                    (= :contexts active-search))
-               (and (= :contexts active-search)
-                    (= 0 (count (:contexts @*state)))))
+           (and
+            (not (:link-context @*state))
+            (or (and shift-pressed?
+                     (= :contexts active-search))
+                (and (= :contexts active-search)
+                     (= 0 (count (:contexts @*state))))))
            (do
              (actions/new-context! *state {:title (.-value (get-title-el))})
              (set! (.-value (get-title-el)) ""))
