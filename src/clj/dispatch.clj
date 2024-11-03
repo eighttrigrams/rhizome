@@ -1,5 +1,6 @@
 (ns dispatch
-  (:require [net.eighttrigrams.defn-over-http.core :refer [defdispatch-with-args]]
+  (:require [net.eighttrigrams.defn-over-http.core :refer [defdispatch]]
+            [cambium.core :as log]
             [datastore.config :as config]
             [repository :refer [list-resources 
                                 insert-issue
@@ -28,7 +29,12 @@
                                 flip-privacy
                                 fetch-issue-description]]))
 
-(defdispatch-with-args handler 
+(defn- handle-error [e]
+  (log/error {:error-handler :handle-error} e "an error occured"))
+
+(defdispatch handler 
+  {:error-handler handle-error
+   :pass-server-args? true}
   list-resources 
   insert-issue
   change-secondary-contexts-selection
