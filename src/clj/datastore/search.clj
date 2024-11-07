@@ -410,39 +410,31 @@
 
 (defn fetch-aggregated-contexts [db {{{:keys [highlighted-secondary-contexts]} :data} :selected-context
                                      :as opts}]
-  (log/info (str "fetch-aggregated-contects " (:title (:selected-context opts))))
+  #_(log/info (str "fetch-aggregated-contects " (:title (:selected-context opts))))
   (sectime
    "fetch-aggregated-contexts"
-   (try
-     (let [opts (
+   (let [opts (
                 ;; TODO instead of doing this, make sure q is always at least ""
-                 if (:q opts) 
-                  (update opts :q remove-some-chars)
+               if (:q opts) 
+                (update opts :q remove-some-chars)
                  ;; for destructuring in searcj-issues' to work properly when :q is present but has nil value
-                  (dissoc opts :q))]
-       (sectime "get-aggregated-contexts"
-                    (get-aggregated-contexts db 
-                                             opts 
-                                             highlighted-secondary-contexts)))
-     (catch Exception e
-       (log/error (str "error in fetch-aggregated-contexts: " (.getMessage e) " - params were: " (with-out-str (pp/pprint opts))))
-       (throw e)))))
+                (dissoc opts :q))]
+     (sectime "get-aggregated-contexts"
+              (get-aggregated-contexts db 
+                                       opts 
+                                       highlighted-secondary-contexts)))))
 
 (defn search-issues [db {:keys [skip-context-aggregation?
                                 only-context-aggregation?]
                          :as opts}]
-  (log/info (str "search-issues - skip-context-aggregation? " skip-context-aggregation? " : only-context-aggregation? " only-context-aggregation?))
+  ;; (log/info (str "search-issues - skip-context-aggregation? " skip-context-aggregation? " : only-context-aggregation? " only-context-aggregation?))
   (sectime
    "search-issues"
-   (try
-     (let [opts (
+   (let [opts (
                 ;; TODO instead of doing this, make sure q is always at least ""
-                 if (:q opts) 
-                  (update opts :q remove-some-chars)
+               if (:q opts) 
+                (update opts :q remove-some-chars)
                  ;; for destructuring in searcj-issues' to work properly when :q is present but has nil value
-                  (dissoc opts :q))]
-       [(sectime "search-issues/issues" 
-                 (search-issues' db opts)) {}])
-     (catch Exception e
-       (log/error (str "error in search-issues: " (.getMessage e) " - params were: " (with-out-str (pp/pprint opts))))
-       (throw e)))))
+                (dissoc opts :q))]
+     [(sectime "search-issues/issues" 
+               (search-issues' db opts)) {}])))
