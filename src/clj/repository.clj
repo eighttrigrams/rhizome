@@ -429,7 +429,7 @@
                                                                            selected-context]
         :as                                                               opts}] 
     (log-opts opts) 
-    ;; {:clj-kondo/ignore [:unresolved-var]}
+    ;; {:clj-kondo/ignore [:unresolved-var]} ;;;
     (merge
      {:cmd                             nil
       :arg                             nil}
