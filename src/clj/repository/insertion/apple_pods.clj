@@ -41,7 +41,7 @@
                                                          ""
                                                          #{podcasts-id apple-podcasts-platform-id}
                                                          {:apple-podcast podcast-url})]
-                         (:id (datastore/upgrade-issue-to-context! db channel))))]
+                         (:id channel)))]
     [channel-id podcast-title]))
 
 (defn ingest [db url context-ids-set _should-capture-summary?]
