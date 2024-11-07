@@ -40,27 +40,23 @@
 
 (defn fetch-context [{:keys [db]}]
   (fn [old-state [arg fetch-as-issue?]]
-    (try
-      (let [selected-context      (datastore/get-item db arg)
-            opts                  {:search-globally? false
-                                   :selected-context selected-context}]
-        (log/info (str "fetch-context as " (if fetch-as-issue? "issue" "context") " from (" (:id (:old-selected-context old-state)) "):\"" (:title (:old-selected-context old-state)) "\" to (" (:id selected-context) "):\"" (:title selected-context) "\""))
-        (if fetch-as-issue?
-          (datastore/reprioritize-issue db arg)
-          (datastore/reprioritize-context db arg))
-        (merge opts
-               {:selected-context                        selected-context
+    (let [selected-context (datastore/get-item db arg)
+          opts             {:search-globally? false
+                            :selected-context selected-context}]
+      (log/info (str "fetch-context as " (if fetch-as-issue? "issue" "context") " from (" (:id (:old-selected-context old-state)) "):\"" (:title (:old-selected-context old-state)) "\" to (" (:id selected-context) "):\"" (:title selected-context) "\""))
+      (if fetch-as-issue?
+        (datastore/reprioritize-issue db arg)
+        (datastore/reprioritize-context db arg))
+      (merge opts
+             {:selected-context                        selected-context
                 ;; :active-search                           :issues
-                :issues                                  (search/search-issues db 
-                                                                               (-> opts
-                                                                                   (dissoc :q)
-                                                                                   (assoc :skip-context-aggregation? true)))
-                :context-to-fetch                        nil
-                :unassigned-secondary-contexts-selected? false
-                :q                                       nil}))
-      (catch Exception e
-        (log/error e (str "Caught an exception in fetch-context " (.getMessage e)))
-        (throw e)))))
+              :issues                                  (search/search-issues db 
+                                                                             (-> opts
+                                                                                 (dissoc :q)
+                                                                                 (assoc :skip-context-aggregation? true)))
+              :context-to-fetch                        nil
+              :unassigned-secondary-contexts-selected? false
+              :q                                       nil}))))
 
 (defn the-future [arg]
   (future arg))
@@ -223,25 +219,17 @@
 
 (defn delete-issue [{:keys [db]}]
   (fn [opts issue]
-    (try
-      (deletion/delete-item db issue)
-      {:issues         (search/search-issues db opts)
-       :issue-view? false}
-      (catch Exception e
-        (log/error (str "Caught an exception in repository/delete-issue" e))
-        {}))))
+    (deletion/delete-item db issue)
+    {:issues         (search/search-issues db opts)
+     :issue-view? false}))
 
 (defn delete-context [{:keys [db]}]
   (fn [opts arg]
-    (try 
-      (deletion/delete-item db arg)
-      {:issues           (search/search-issues db opts)
-       :contexts         (search/search-contexts db "")
-       :selected-context nil
-       :issue-view? false}
-      (catch Exception e
-        (log/error (str "Caught an exception in repository/delete-context " e))
-        {}))))
+    (deletion/delete-item db arg)
+    {:issues           (search/search-issues db opts)
+     :contexts         (search/search-contexts db "")
+     :selected-context nil
+     :issue-view? false}))
 
 (defn- get-selected-secondary-contexts-set 
   [{{{{{:keys [selected-secondary-contexts
@@ -278,7 +266,6 @@
 
 (defn fetch-issue-description [{:keys [db]}]
   (fn [state issue]
-    (log/info (str "fetch issue description for" (:title issue)))
     (let [item (datastore/get-item db issue)]
      (assoc state 
             :issue-description (:description item)
@@ -291,20 +278,16 @@
     (let [selected-issue (or selected-issue
                              (datastore/get-item db selected-context))]
       (log/info (str "repository/link-selected-context-to-context " selected-issue " - " shift-pressed?))
-      (try
-        (datastore/reprioritize-context db arg)
-        (datastore.relations/link-item-to-container! db selected-issue arg (not shift-pressed?))
-        (let [fresh-selected-context (datastore/get-item db selected-context)]
-          (merge {:link-context   nil
-                  :active-search  nil
-                  :selected-context fresh-selected-context
-                  :issues         (search/search-issues db (dissoc opts :q))
-                  :q              nil}
-                 (when selected-context
-                   {:aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)})))
-        (catch Exception e 
-          (log/error (str "Caught an exception in link-selected-item-to-context " (.getMessage e)))
-          (throw e))))))
+      (datastore/reprioritize-context db arg)
+      (datastore.relations/link-item-to-container! db selected-issue arg (not shift-pressed?))
+      (let [fresh-selected-context (datastore/get-item db selected-context)]
+        (merge {:link-context   nil
+                :active-search  nil
+                :selected-context fresh-selected-context
+                :issues         (search/search-issues db (dissoc opts :q))
+                :q              nil}
+               (when selected-context
+                 {:aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)}))))))
 
 (defn search-contexts [db opts]
   {:contexts (search/search-contexts db opts)})
@@ -384,27 +367,21 @@
 
 (defn upgrade-issue-to-context [{:keys [db]}]
   (fn [{:keys [selected-context]}]
-    (try
-      (log/info (str "repository/upgrade-issue-to-context" (:id selected-context)))
-      {:selected-context (datastore/upgrade-issue-to-context! db selected-context)}
-      (catch Exception e
-        (log/error (str "Caught an repository/upgrade-issue-to-context " (.getMessage e)))))))
+    (log/info (str "repository/upgrade-issue-to-context" (:id selected-context)))
+    {:selected-context (datastore/upgrade-issue-to-context! db selected-context)}))
 
 (defn unlink-selected-item-from-container [{:keys [db]}]
   (fn [{:keys [selected-context old-selected-context] :as state}]
-    (try  
-      (log/info (str "repository/unlink-selected-item-from-container - Try removing " (:id selected-context) ":" (:title selected-context) " from " (:id old-selected-context) ":" (:title old-selected-context)))
-      (if (or (not (datastore.relations/unlink-item-from-container! db selected-context old-selected-context))
-              (not old-selected-context))
-        state
-        (do
-          (log/info (str "repository/unlink-selected-item-from-container - Removing now"))
-          {:selected-context old-selected-context
-           :issues (search/search-issues db (assoc state :selected-context old-selected-context))
-           :aggregated-contexts ((fetch-aggregated-contexts {:db db}) (assoc state :selected-context old-selected-context))
-           :issue-view? false}))
-      (catch Exception e
-        (log/error (str "Caught an repository/unlink-selected-item-from-container " (.getMessage e)))))))
+    (log/info (str "repository/unlink-selected-item-from-container - Try removing " (:id selected-context) ":" (:title selected-context) " from " (:id old-selected-context) ":" (:title old-selected-context)))
+    (if (or (not (datastore.relations/unlink-item-from-container! db selected-context old-selected-context))
+            (not old-selected-context))
+      state
+      (do
+        (log/info (str "repository/unlink-selected-item-from-container - Removing now"))
+        {:selected-context old-selected-context
+         :issues (search/search-issues db (assoc state :selected-context old-selected-context))
+         :aggregated-contexts ((fetch-aggregated-contexts {:db db}) (assoc state :selected-context old-selected-context))
+         :issue-view? false}))))
 
 (defn select-last-context [{:keys [db]}]
   (fn [{:keys [old-selected-context] :as state}]
@@ -421,17 +398,14 @@
   (fn [opts arg]
     (let [context (or (:context (:context arg)) (:context arg))
           issue-contexts (:issue-contexts arg)]
-      (try
-        (log/info (str "repository/update-item" (:id context) (:title context) arg))
-        (datastore.relations/set-the-containers-of-item! db context issue-contexts)
-        (let [selected-context (datastore/update-item db context)]
-          (merge {:selected-context selected-context
-                  :issues           (search/search-issues db (-> opts
-                                                                 (dissoc :q)
-                                                                 (assoc :selected-context selected-context)))
-                  :q                nil}))
-        (catch Exception e
-          (log/error (str "Caught an update-context " (.getMessage e))))))))
+      (log/info (str "repository/update-item" (:id context) (:title context) arg))
+      (datastore.relations/set-the-containers-of-item! db context issue-contexts)
+      (let [selected-context (datastore/update-item db context)]
+        (merge {:selected-context selected-context
+                :issues           (search/search-issues db (-> opts
+                                                               (dissoc :q)
+                                                               (assoc :selected-context selected-context)))
+                :q                nil})))))
 
 (defn start-global-search [{:keys [db]}]
   (fn [state]
@@ -454,45 +428,42 @@
                                                                            active-search
                                                                            selected-context]
         :as                                                               opts}] 
-    (log-opts opts)
-    (try
-      #_{:clj-kondo/ignore [:unresolved-var]}
-      (merge
-       {:cmd                             nil
-        :arg                             nil}
-       (case cmd
-         nil
-         (cond (= :issues active-search)
-               {:issues (search/search-issues db 
-                                              (assoc (make-search-issues opts)
-                                                     :skip-context-aggregation? true))}
-               (= :contexts active-search) (search-contexts db opts)
-               :else
-               (merge {:issues   (search/search-issues db opts)
-                       :public?  (and @privacy/*public? (= :private privacy-mode))}
-                      (when-not (and (not= 0 (:events-view opts)) 
-                                     (not selected-context))
-                        {:contexts (search/search-contexts db "")})))
-         :start-global-search ((start-global-search {:db db}) opts)
-         :link-issue-to-selected-context (start-linking-issue-to-selected-context db opts)
-         :start-linking-selected-issue-to-context (start-linking-selected-issue-to-context-with-local-search db opts)
-         :start-context-search (start-context-search db opts)
-         :insert-context
-         {:selected-context                        (datastore/new-context db arg)
-          :aggregated-contexts                     '()
-          :issues                                  []
-          :q                                       nil
-          :active-search                           :issues
-          :unassigned-secondary-contexts-selected? false}
-         :update-context-description
-         {:selected-context (datastore/update-context-description db arg)}
-         :deselect-context
-         {:issues           (search/search-issues db (dissoc opts :selected-context :q))
-          :contexts         (search/search-contexts db "")
-          :selected-context nil
-          :q                nil}
+    (log-opts opts) 
+    ;; {:clj-kondo/ignore [:unresolved-var]}
+    (merge
+     {:cmd                             nil
+      :arg                             nil}
+     (case cmd
+       nil
+       (cond (= :issues active-search)
+             {:issues (search/search-issues db 
+                                            (assoc (make-search-issues opts)
+                                                   :skip-context-aggregation? true))}
+             (= :contexts active-search) (search-contexts db opts)
+             :else
+             (merge {:issues   (search/search-issues db opts)
+                     :public?  (and @privacy/*public? (= :private privacy-mode))}
+                    (when-not (and (not= 0 (:events-view opts)) 
+                                   (not selected-context))
+                      {:contexts (search/search-contexts db "")})))
+       :start-global-search ((start-global-search {:db db}) opts)
+       :link-issue-to-selected-context (start-linking-issue-to-selected-context db opts)
+       :start-linking-selected-issue-to-context (start-linking-selected-issue-to-context-with-local-search db opts)
+       :start-context-search (start-context-search db opts)
+       :insert-context
+       {:selected-context                        (datastore/new-context db arg)
+        :aggregated-contexts                     '()
+        :issues                                  []
+        :q                                       nil
+        :active-search                           :issues
+        :unassigned-secondary-contexts-selected? false}
+       :update-context-description
+       {:selected-context (datastore/update-context-description db arg)}
+       :deselect-context
+       {:issues           (search/search-issues db (dissoc opts :selected-context :q))
+        :contexts         (search/search-contexts db "")
+        :selected-context nil
+        :q                nil}
 
          ;; TODO remove :else clause. fix where there are cases where this fires but there shoulnd't be
-         :else {}))
-      (catch Exception e
-        (log/error (str "Caught an exception in list-resources(mainfn): " (.getMessage e)))))))
+       :else {}))))
