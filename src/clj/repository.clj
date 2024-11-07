@@ -318,41 +318,37 @@
 
 (defn finish-linking-issue [{:keys [db]}]
   (fn [{:keys [selected-context] :as opts} issue-id shift-pressed? alt-pressed?]
-    (try
-      (log/info (str "finish-linking-issue " shift-pressed? " - " alt-pressed?))
-      (datastore/reprioritize-issue db {:id issue-id})
-      (let [selected-issue (datastore/get-item db {:id issue-id})] 
-        
-        (if (and shift-pressed? alt-pressed?)
-          (do 
-            (datastore.relations/link-item-to-container! db selected-issue selected-context false)
-            (datastore.relations/link-item-to-container! db selected-context selected-issue false))
-          (datastore.relations/link-item-to-container! db selected-issue selected-context (not shift-pressed?)))
+    (log/info (str "finish-linking-issue " shift-pressed? " - " alt-pressed?))
+    (datastore/reprioritize-issue db {:id issue-id})
+    (let [selected-issue (datastore/get-item db {:id issue-id})] 
+      
+      (if (and shift-pressed? alt-pressed?)
+        (do 
+          (datastore.relations/link-item-to-container! db selected-issue selected-context false)
+          (datastore.relations/link-item-to-container! db selected-context selected-issue false))
+        (datastore.relations/link-item-to-container! db selected-issue selected-context (not shift-pressed?)))
 
-        (let [opts                (-> opts
-                                      (dissoc :search-globally? 
-                                              :q
-                                              :link-issue
-                                              :link-context)
-                                      (assoc-in [:selected-context 
-                                                 :data 
-                                                 :views 
-                                                 :current 
-                                                 :selected-secondary-contexts] []))
-              issues              (search/search-issues db opts)
-              aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)
-              selected-context (datastore/get-item db selected-context)]
-          {:issues              issues
-           :active-search       nil
-           :selected-context selected-context
-           :link-issue          nil
-           :link-context        nil
-           :search-globally?    false
-           :q                   nil
-           :aggregated-contexts aggregated-contexts}))
-      (catch Exception e
-        (log/error (str "Caught an exception in link-issue-to-selected-context " (.getMessage e)))
-        (throw e)))))
+      (let [opts                (-> opts
+                                    (dissoc :search-globally? 
+                                            :q
+                                            :link-issue
+                                            :link-context)
+                                    (assoc-in [:selected-context 
+                                               :data 
+                                               :views 
+                                               :current 
+                                               :selected-secondary-contexts] []))
+            issues              (search/search-issues db opts)
+            aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)
+            selected-context (datastore/get-item db selected-context)]
+        {:issues              issues
+         :active-search       nil
+         :selected-context selected-context
+         :link-issue          nil
+         :link-context        nil
+         :search-globally?    false
+         :q                   nil
+         :aggregated-contexts aggregated-contexts}))))
 
 (defn reprioritize-issue [{:keys [db]}]
   (fn [state issue]
