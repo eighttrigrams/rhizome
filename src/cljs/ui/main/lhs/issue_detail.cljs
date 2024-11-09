@@ -108,7 +108,8 @@
 (defn component [*state]
   (let [{:keys [selected-context]} @*state]
     [:<>
-     (when-not (-> selected-context :data :resource-links :image)
+     (when-not (or (-> selected-context :data :resource-links :image)
+                   (= :description (:modal @*state)))
        [drop-target (:id selected-context)])
      [the-issue-itself-component selected-context]]))
 

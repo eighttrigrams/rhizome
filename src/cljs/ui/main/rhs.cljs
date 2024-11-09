@@ -39,4 +39,5 @@
          [input/component *state])
        [:div.scrollable
         {:class (when (= :issues (:active-search state)) :search-active)}
-        [issues-list-component *state]]])))
+        (when (not= :description (:modal state))
+          [issues-list-component *state])]])))
