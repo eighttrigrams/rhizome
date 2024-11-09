@@ -5,7 +5,6 @@
             [ui.main.context-badges :as context-badges]
             [ui.main.rhs.modifiers :as modifiers]))
 
-;; TODO extract ns
 (defn title-component [title data]
   [:span.title
    [:> ReactMarkdown
@@ -77,7 +76,10 @@
                     ;; 300)
                           )))
 
-(defn regular-issues-list-item-component [*state issue idx select-fn]
+(defn regular-issues-list-item-component [*state issue idx {:keys [allow-delete-on-right-click?
+                                                                   select-fn
+                                                                   show-context-selector?]
+                                                            :as   _opts}]
   [:li.issue-card
    (merge {:class          (str "card"
                                 (when (not (or (:preview-image-lowres (:data issue))
@@ -100,9 +102,9 @@
                                                   (-> state
                                                       (dissoc :preview-issue))))
                                   (actions/select-issue! *state issue)))
-           :on-mouse-enter (on-mouse-enter *state issue)
-           :on-mouse-leave (on-mouse-leave *state)}
-          (when idx 
+           :on-mouse-enter (when idx (on-mouse-enter *state issue))
+           :on-mouse-leave (when idx (on-mouse-leave *state))}
+          (when (and idx allow-delete-on-right-click?) 
             {:id             (str "issue-card-" idx)
              :on-context-menu (fn [e]
                                 (.preventDefault e) 
@@ -116,7 +118,7 @@
      [title-component (:title issue) (:data issue)]
      [context-badges/component (remove #(= (:id (:selected-context @*state))
                                            (first %)) 
-                                       (merge (when (:is_context issue) 
+                                       (merge (when (and (:is_context issue) show-context-selector?) 
                                                 {0 {:context #(actions/select-context! *state issue)}})
                                               (when (:date issue)
                                                 {:date issue})

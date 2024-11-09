@@ -26,7 +26,9 @@
       [:<>
        {:key (:id issue)}
        [issues-list-items/regular-issues-list-item-component 
-        *state issue idx #(scroll-into-view %)]])
+        *state issue idx {:allow-delete-on-right-click? true
+                          :select-fn #(scroll-into-view %)
+                          :show-context-selector? true}]])
     (:issues @*state))])
 
 (defn component [_*state]

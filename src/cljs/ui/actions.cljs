@@ -79,7 +79,6 @@
      [context select-as-issue?]))
 
 (defn select-last-context! [*state]
-  (prn "select last context")
   (fetch-and-reset-with-method-2! 
    *state 
    @*state

@@ -2,14 +2,14 @@
   (:require [ui.main.input :as input]
             [ui.main.lhs.context-detail :as context-detail]
             [ui.main.lhs.issue-detail :as issue-detail]
-            [ui.main.lhs.list-item :as list-item]))
+            [ui.main.rhs.issues-list-items :as issues-list-items]))
 
 (defn- contexts-list [*state]
   [:ul.cards
    (doall 
     (for [context (:contexts @*state)]
       ^{:key (:id context)}
-      [list-item/component *state context]))])
+      [issues-list-items/regular-issues-list-item-component *state context nil nil {}]))])
 
 (defn component [_*state]
   (fn [*state]
@@ -30,7 +30,7 @@
        [issue-detail/component *state]]
       (:selected-context @*state)
       [:<>
-       [context-detail/item-component *state]
+       [:ul.cards [issues-list-items/regular-issues-list-item-component *state (:selected-context @*state) nil nil {}]]
        [:div.scrollable.card-shown.details-component
         [context-detail/component *state]]]
       :else

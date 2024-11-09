@@ -1,12 +1,6 @@
 (ns ui.main.lhs.context-detail
   (:require [ui.actions :as actions]
-            [ui.main.lhs.list-item :as list-item]
-            [ui.main.lhs.issue-detail :as issue-detail]
             ["react-markdown$default" :as ReactMarkdown]))
-
-(defn item-component [*state]
-  [:ul.cards
-   [list-item/component *state (:selected-context @*state)]])
 
 (defn re-focus []
   (when-let [el (.getElementById js/document "search-input")]
