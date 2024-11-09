@@ -11,12 +11,7 @@
 
 (defn save-description-and-leave-open! [*state item]
   (fetch-and-reset! *state (-> @*state
-                               (assoc :cmd :update-context-description)
-                               (assoc :arg item))))
-
-(defn save-description! [*state item]
-  (fetch-and-reset! *state (-> @*state
-                               (dissoc :modal)
+                               #_(dissoc :modal)
                                (assoc :cmd :update-context-description)
                                (assoc :arg item))))
 
