@@ -42,17 +42,18 @@
            ;; to make the div able to listen to key events, https://stackoverflow.com/a/3149416
            :tabIndex    0
            :on-key-up #(when true 
-                         (prn "no")
                         (reset! modifiers/*alt-pressed? false))
            :on-key-down #(do
                            (when (.-altKey %)
-                             (prn "yo")
                              (reset! modifiers/*alt-pressed? true))
                            ((key-handler/handle-keys *state) %))}
           [main/component *state]]
          [:div#modals-layer
           (when (:modal @*state)
             [:<>
-             [:div.mask 
+             [:div
+              {:class (if (= :description (:modal @*state))
+                        "description-modal"
+                        "mask")}
               [:div#modals-component
                [modals/component *state]]]])]])})))

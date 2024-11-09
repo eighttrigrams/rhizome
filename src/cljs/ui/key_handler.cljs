@@ -29,7 +29,7 @@
                (= "KeyV" code)
                (actions/show-events! *state)
                (and selected-context (= "KeyE" code))
-               (swap! *state #(assoc % :modal :edit-context))
+               (swap! *state #(assoc % :modal :edit-context :issue-view? false))
                (and selected-context (= "Delete" code))
                (actions/delete-context! *state)
                (and alt-pressed? (= "KeyI" code))
@@ -65,7 +65,7 @@
                (actions/start-linking-context *state)
                (and selected-context
                     (= "KeyD" code))
-               (swap! *state #(assoc % :modal :description))
+               (swap! *state #(assoc % :modal :description :issue-view? true))
                (and selected-context
                     (= "KeyS" code))
                (actions/cycle-search-mode! *state)

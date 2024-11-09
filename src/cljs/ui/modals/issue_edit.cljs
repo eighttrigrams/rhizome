@@ -72,7 +72,7 @@
        {:type           :checkbox
         :defaultChecked (:archived issue)}]])])
 
-(defn component [issue mode]
+(defn component [issue]
   (let [*date-visible?  (r/atom (boolean (:date issue)))]
     (reset! *related-issues (into {} (map (fn [{:keys [id title]}] [id title]) (:related_issues issue))))
     (r/create-class
@@ -81,13 +81,11 @@
       (fn [_item]
         [:<>
          [basic-elements-component issue]
-         (when (= :issue mode)
-           [:<>
-            [:hr]
-            [:h4 "Event"]
-            [event-component issue *date-visible?]
-            [:hr]
-            [link-context-issue/component issue]])])})))
+         [:hr]
+         [:h4 "Event"]
+         [event-component issue *date-visible?]
+         [:hr]
+         [link-context-issue/component issue]])})))
 
 (defn get-values [id issue?]
   #_{:context                {:id          id

@@ -41,8 +41,6 @@
        (case (:modal @*state)
          :description
          [textarea-component item]
-         :edit-issue
-         [:div#modal-component [issue-edit/component item :issue]]
          :edit-context
-         [:div#modal-component [issue-edit/component item :issue]]
+         [:div#modal-component [issue-edit/component item]]
          nil)])))

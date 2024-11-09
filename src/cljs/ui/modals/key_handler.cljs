@@ -8,6 +8,11 @@
      (let [{:keys [modal]} @*state]
        (cond (= "Escape" code)
              (actions/cancel-modal! *state)
+             (and (= "Digit8" code) 
+                  (or meta-pressed? alt-pressed?)
+                  (= :description modal))
+             (do (.preventDefault e)
+                 (actions/save-description-and-leave-open! *state (value-fn)))
              (and (= "Digit9" code) 
                   (or meta-pressed? alt-pressed?)
                   (= :description modal))

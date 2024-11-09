@@ -66,9 +66,18 @@ ul.cards {
     left: 187px;
 }
 
+.description-modal {
+    top: 10px;
+    left: 410px;
+    width: 600px;
+    height: 100vh;
+    position: absolute;
+    margin: auto;
+}
+
 #modals-component textarea {
     background-color: wheat;
-    height: 100vh;
+    height: 95vh;
     width: 600px;
     tab-size: 2;
 }
