@@ -150,7 +150,6 @@
         post-process-simple
         (assoc :contexts {}))
     (catch java.lang.Exception e
-      (prn "get-issue-----" (.getMessage e))
       (throw e))))
 
 (defn get-items-by-path [db path url]

@@ -255,14 +255,22 @@
                                        title
                                        selected-context 
                                        (get-selected-secondary-contexts-set state)
-                                       alternative-behaviour?)]
-      (log/info {:item (select-keys item [:id :title])} "Inserted item")
-      (datastore.relations/set-collection-titles-of-new-issue db (:id item))
-      {:issues         (search/search-issues
-                        db
-                        (dissoc state :q))
-       :q              nil
-       :aggregated-contexts ((fetch-aggregated-contexts {:db db}) state)})))
+                                       alternative-behaviour?)
+          log-data {:item (select-keys item [:id :title])}]
+      (assoc (if (:previously-existing-item? item)
+               (do 
+                 (log/info log-data "Item already exists - no insertion.") 
+                 ((fetch-context {:db db}) state [item true]))
+               (do
+                 (log/info log-data "Inserted item")
+                 (datastore.relations/set-collection-titles-of-new-issue db (:id item))
+                 {:issues         '()
+                  :selected-context item
+                  :q              nil
+                  :aggregated-contexts '()}))
+             :active-search nil
+             :issue-view? true
+             :old-selected-context selected-context))))
 
 (defn fetch-issue-description [{:keys [db]}]
   (fn [state issue]

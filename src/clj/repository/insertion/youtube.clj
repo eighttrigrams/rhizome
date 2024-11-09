@@ -51,11 +51,12 @@
         channel-id (create-channel-or-take-existing db 
                                                     author_name
                                                     author_url
-                                                    youtube-channels-id)]
-    (when (:id (datastore/get-item-by-path db "data->'resource-links'->>'youtube-video'" url))
-      (throw (Exception. "youtube video already exists!")))
-    (common/insert-item db 
-                        title
-                        ""
-                        (conj context-ids-set channel-id youtube-videos-id video-id) 
-                        {:youtube-video url})))
+                                                    youtube-channels-id)
+        existing-item (datastore/get-item-by-path db "data->'resource-links'->>'youtube-video'" url)]
+    (if (:id existing-item)
+      (assoc (datastore/get-item db existing-item) :previously-existing-item? true)
+      (common/insert-item db 
+                          title
+                          ""
+                          (conj context-ids-set channel-id youtube-videos-id video-id) 
+                          {:youtube-video url}))))
