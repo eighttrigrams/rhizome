@@ -68,11 +68,15 @@ ul.cards {
 
 .description-modal {
     top: 10px;
-    left: 410px;
+    left: 50%;
     width: 600px;
     height: 100vh;
-    position: absolute;
+    position: fixed;
     margin: auto;
+}
+
+.description-modal #modals-component {
+    position: initial;
 }
 
 #modals-component textarea {
