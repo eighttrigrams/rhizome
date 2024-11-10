@@ -129,10 +129,15 @@
 (defn unlink-item-from-container!
   [db item container]
   (let [selected-item (update-in item [:data :contexts] #(dissoc % (:id container)))
-       containers (:contexts (:data selected-item))]
-    (log/info (str "containers " containers))
-    (if-not (seq (keys containers)) ;; TODO actually, if container is_context, then I can remove it safely 
-      false
+        containers (:contexts (:data selected-item))]
+    (log/info {:is_context (:is_context item)
+               :containers containers} "unlink-item-from-container!")
+    (if-not (or (seq (keys containers))
+                (:is_context item)) 
+      (do
+        (log/info {:item (select-keys item [:id :title])
+                   :container (select-keys item [:id :title])} "can't unlink item from container")
+        false)
       (do
         (set-containers-of-item! db selected-item containers)
         (datastore.relations/update-collection-title-in-collection-items db
