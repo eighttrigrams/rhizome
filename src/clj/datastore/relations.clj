@@ -78,7 +78,6 @@
                                     :set    {:data [:inline (json/generate-string data)]}})
                        {:return-keys true})))
 
-;;  TODO make private
 (defn update-collection-title-in-collection-items-for-children 
   [db id title short_title]
   (let [item-ids (doall (map :collections/item_id
