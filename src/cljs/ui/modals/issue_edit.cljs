@@ -51,7 +51,8 @@
                        [:input#issue-highlighted-secondary-contexts.line
                         {:autoComplete :off
                          :defaultValue (str/join " " (:highlighted-secondary-contexts
-                                                      (:data issue)))}]]])}))
+                                                      (:data issue)))}]]
+                      "id:" (:id issue)])}))
 
 (defn event-component [issue *date-visible?]
   [:<>
