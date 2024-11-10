@@ -403,7 +403,8 @@
     (let [context (or (:context (:context arg)) (:context arg))
           issue-contexts (:issue-contexts arg)]
       (log/info (str "repository/update-item" (:id context) (:title context) arg))
-      (datastore.relations/set-the-containers-of-item! db context issue-contexts)
+      (let [is_context (:is_context (datastore/get-item db context))]
+        (datastore.relations/set-the-containers-of-item! db context issue-contexts is_context))
       (let [selected-context (datastore/update-item db context)]
         (merge {:selected-context selected-context
                 :issues           (search/search-issues db (-> opts

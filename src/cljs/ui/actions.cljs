@@ -29,10 +29,6 @@
 (defn deselect-context! [*state]
   (fetch-and-reset! *state (assoc @*state :cmd :deselect-context)))
 
-#_(defn deselect-issue! [*state]
-  (fetch-and-reset! *state (dissoc @*state :selected-issue :preview-issue :q))
-  (js/setTimeout (fn [_] (swap! *state dissoc :loading)) 500))
-
 (defn load-stored-context [*state idx]
   (fetch-and-reset-with-method! *state
                                 @*state

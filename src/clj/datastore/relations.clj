@@ -103,11 +103,15 @@
                                                     [:inline show-badge?]]]})))))
 
 (defn set-the-containers-of-item! 
-  [db item containers]
-  (when (seq (keys containers))
-    (set-containers-of-item! db item containers)
-    (update-collection-title-in-collection-items db (:id item) nil
-                                                 {:short_title nil :title nil :new-contexts containers})))
+  [db item containers is_context]
+  (if (or is_context
+          (seq (keys containers)))
+    (do
+      (set-containers-of-item! db item containers)
+      (update-collection-title-in-collection-items db (:id item) nil
+                                                   {:short_title nil :title nil :new-contexts containers}))
+    (log/info {:is_context is_context
+               :item (select-keys item [:id :title])} "cant take out the remaining context if item is not a context")))
 
 (defn link-item-to-container!
   [db item container show-badge?]

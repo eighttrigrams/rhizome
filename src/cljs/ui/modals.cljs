@@ -21,10 +21,10 @@
 
 (defn- handle-keys [*state item]
   (case (:modal @*state)
-    (:edit-context :edit-issue)
+    :edit-context
     (key-handler/handle-edit-keys *state
                                   #(issue-edit/get-values (:id item) 
-                                                          (:selected-issue @*state))
+                                                          (:selected-context @*state))
                                   #(link-context-issue/get-values))
     :description
     (key-handler/handle-modal-keys *state 
