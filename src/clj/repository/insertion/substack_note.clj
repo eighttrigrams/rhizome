@@ -13,7 +13,7 @@
                                      "" 
                                      #{substack-platform-id}
                                      {:substack-author author-url})]
-    (:id (datastore/upgrade-issue-to-context! db substack))))
+    (:id substack)))
 
 (defn- create-or-take-author-id [db author-url substack-platform-id]
   (let [author-id (:id (datastore/get-item-by-path db 

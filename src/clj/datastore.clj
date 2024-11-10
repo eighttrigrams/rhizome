@@ -62,15 +62,21 @@
 
 (declare get-item)
 
-(defn upgrade-issue-to-context! [db {:keys [id is_context] :as item}]
-  (jdbc/execute-one! db
-                     (sql/format {:update [:issues]
-                                  :where  [:= :id [:inline id]]
-                                  :set    {:is_context (not is_context)
-                                           :updated_at_ctx [:raw "NOW()"]
-                                           :updated_at  [:raw "NOW()"]}})
-                     {:return-keys true})
-  (get-item db item))
+(defn switch-between-issue-and-context! [db {:keys [id is_context] :as item}]
+  (let [contexts (-> item :data :contexts)]
+    (if (or
+           (not is_context) 
+           (seq contexts))
+      (jdbc/execute-one! db
+                         (sql/format {:update [:issues]
+                                      :where  [:= :id [:inline id]]
+                                      :set    {:is_context (not is_context)
+                                               :updated_at_ctx [:raw "NOW()"]
+                                               :updated_at  [:raw "NOW()"]}})
+                         {:return-keys true})
+      (log/info {:has-contexts? (seq contexts)
+                 :is-context? is_context} "can't flip context"))
+    (get-item db item)))
 
 (defn get-contained-items-count [db id]
   (count (jdbc/execute! db

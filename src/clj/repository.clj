@@ -372,7 +372,7 @@
 (defn upgrade-issue-to-context [{:keys [db]}]
   (fn [{:keys [selected-context]}]
     (log/info (str "repository/upgrade-issue-to-context" (:id selected-context)))
-    {:selected-context (datastore/upgrade-issue-to-context! db selected-context)}))
+    {:selected-context (datastore/switch-between-issue-and-context! db selected-context)}))
 
 (defn unlink-selected-item-from-container [{:keys [db]}]
   (fn [{:keys [selected-context old-selected-context] :as state}]

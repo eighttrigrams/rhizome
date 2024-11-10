@@ -17,7 +17,7 @@
                                     (str "X@" (str/replace handle-url "https://x.com/" "")) 
                                     #{twitter-platform-id twitter-handles-id}
                                     {:x-handle handle-url})]
-    (:id (datastore/upgrade-issue-to-context! db twitter))))
+    (:id twitter)))
 
 (defn- create-or-take-handle-id [db handle-url twitter-platform-id twitter-handles-id]
   (let [handle-id (:id (datastore/get-item-by-path db 
