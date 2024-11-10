@@ -47,19 +47,6 @@
       update-contexts
       (dissoc :searchable)))
 
-;; entity types
-;; - issues
-;; - context
-;; - context-issue-relation
-;; TODO
-;; think about groups
-;; normal contexts are folders
-;; groups are superfolders
-;; directed acyclycal graph
-
-;; TODO move to search ns, explore varags here, make tut about varargs and destructuring?
-;; TODO in minimals, show examples which use substitution/formatting
-
 (declare get-item)
 
 (defn switch-between-issue-and-context! [db {:keys [id is_context] :as item}]
