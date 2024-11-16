@@ -73,7 +73,8 @@
   (-> 
    (sql/format 
     (merge
-     {:select select
+     {:select (if selected-context (vec (concat select [:collections.annotation]))
+                  select)
       :from   [:issues]
       :where  [:and [:and
                      (get-events-exist-clause events-view)
@@ -82,7 +83,9 @@
                (when issue-ids-to-remove
                  [:not [:in :issues.id [:inline issue-ids-to-remove]]])]}
      (when join-ids
-       {:group-by [:issues.id]
+       {:group-by (if selected-context
+                    [:issues.id :collections.annotation]
+                    [:issues.id])
         :join     [:collections [:= :issues.id :collections.item_id]]})
      (when and-query?
        {:having [:raw (str "COUNT(issues.id) = " (count join-ids))]})

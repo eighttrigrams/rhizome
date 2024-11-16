@@ -12,6 +12,25 @@ li.card.simple-card {
     height: 56px;
 }
 
+li.card.simple-card.bigger {
+    height: 75px;
+}
+
+
+li.card.bigger {
+    height: 125px;
+}
+
+li.card.bigger .relation-annotation {
+    position: relative;
+    top: 120px;
+    float: right;
+}
+
+li.card.simple-card.bigger .relation-annotation {
+    top: 68px;
+}
+
 li.card img {
     max-width: 203px;
     background-color: rgb(28, 16, 23);

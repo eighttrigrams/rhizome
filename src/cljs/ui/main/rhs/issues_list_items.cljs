@@ -77,6 +77,7 @@
                           )))
 
 (defn regular-issues-list-item-component [*state issue idx {:keys [allow-delete-on-right-click?
+                                                                   show-relation-annotation?
                                                                    select-fn
                                                                    show-context-selector?]
                                                             :as   _opts}]
@@ -86,6 +87,7 @@
                                                (:preview-image (:data issue))
                                                (:image (:resource-links (:data issue)))))
                                   " simple-card")
+                                (when show-relation-annotation? " bigger")
                                 (when (= (:id (:selected-issue @*state))
                                          (:id issue)) " selected"))
            :on-click       #(if idx 
@@ -109,6 +111,8 @@
              :on-context-menu (fn [e]
                                 (.preventDefault e) 
                                 (actions/delete-issue! *state issue))}))
+   (when show-relation-annotation? [:div {:class "relation-annotation"}
+                                    (:annotation issue)])
    [:div.issue-card-inner
     (when (or (:preview-image-lowres (:data issue))
               (:preview-image (:data issue))
