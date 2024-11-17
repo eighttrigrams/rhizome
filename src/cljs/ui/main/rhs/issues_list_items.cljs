@@ -87,7 +87,8 @@
                                                (:preview-image (:data issue))
                                                (:image (:resource-links (:data issue)))))
                                   " simple-card")
-                                (when show-relation-annotation? " bigger")
+                                (when (and show-relation-annotation?
+                                           (not-empty (:annotation issue))) " bigger")
                                 (when (= (:id (:selected-issue @*state))
                                          (:id issue)) " selected"))
            :on-click       #(if idx 
@@ -111,8 +112,10 @@
              :on-context-menu (fn [e]
                                 (.preventDefault e) 
                                 (actions/delete-issue! *state issue))}))
-   (when show-relation-annotation? [:div {:class "relation-annotation"}
-                                    (:annotation issue)])
+   (when (and show-relation-annotation?
+              (not-empty (:annotation issue)))
+     [:div {:class "relation-annotation"}
+      (:annotation issue)])
    [:div.issue-card-inner
     (when (or (:preview-image-lowres (:data issue))
               (:preview-image (:data issue))
