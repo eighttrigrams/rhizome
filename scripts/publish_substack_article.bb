@@ -43,10 +43,10 @@
     (pg/execute-one! (db :prod) [(str "update issues set data = '" (json/generate-string %) "' where id = ?") id])))
 
 (comment
-  (let [id 25722]
-    (update-substack-article id  "https://vaporgrid.substack.com/p/5-two-brains")
-    (insert-relation id)
-    (update-badge id))
+  (let [id 28470]
+    (update-substack-article id  "https://vaporgrid.substack.com/p/trains-on-time")
+    #_(insert-relation id)
+    #_(update-badge id))
   )
 
 ;; "{"contexts":{"10934":{"title":"Pod Ep.","show-badge?":true},"22971":{"title":"VaporGrid","show-badge?":true}},
