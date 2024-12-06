@@ -18,7 +18,9 @@ body {
     width: 1440px;
     margin: auto;
     height: 100vh;
-    background-color:rgb(61, 14, 14);
+    /* background-color:rgb(61, 14, 14); */
+    /* background-color: rgb(69, 56, 56); */
+    background-color: rgb(136, 131, 131);
     color: #cbc9b5;
 }
 
