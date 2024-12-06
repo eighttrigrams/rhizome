@@ -55,6 +55,10 @@ li.card img {
     top: 17px;
 }
 
+li.card.simple-card .issue-card-inner-right {
+    width: 98%;
+}
+
 .scrollable.search-active li.card {
     z-index: 1005;
 }
