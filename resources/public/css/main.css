@@ -22,7 +22,7 @@ a {
 }
 
 .scrollable.card-shown {
-    top: 133px;
+    top: 183px;
     height: calc(100vh - 150px);
 }
 
