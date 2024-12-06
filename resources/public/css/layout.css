@@ -26,18 +26,18 @@ body {
     position: absolute;
     left: 0;
     top: 0;
-    width: 600px;
+    width: 720px;
     height: 100vh;
 }
 
 #rhs-component {
     position: absolute;
-    left: 600px;
+    left: 720px;
     top: 0;
     height: 100vh;
-    width: 840px;
+    width: 720px;
 }
 
 #search-input {
-    width: 600px;
+    width: 720px;
 }

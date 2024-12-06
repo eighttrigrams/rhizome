@@ -2,7 +2,7 @@ li.card {
     position: relative;
     /* background-color: rgb(102, 15, 69); */
     background-color: rgb(54, 34, 46);
-    height: 115px;
+    height: 151px;
     margin-bottom: 10px;
     border-radius: 4px;
     padding: 15px;
@@ -10,7 +10,7 @@ li.card {
 }
 
 li.card.simple-card {
-    height: 56px;
+    height: 92px;
 }
 
 li.card.simple-card.bigger {
@@ -22,18 +22,21 @@ li.card.bigger {
     height: 125px;
 }
 
-li.card.bigger .relation-annotation {
-    position: relative;
-    top: 120px;
-    float: right;
+li.card .relation-annotation {
+    position: absolute;
+    color: brown;
+    top: 1px;
 }
 
-li.card.simple-card.bigger .relation-annotation {
-    top: 68px;
+li.card .img-container {
+    position: relative;
+    width: 140px;
+    height: 132px;
+    display: inline-block;
 }
 
 li.card img {
-    max-width: 203px;
+    max-width: 132px;
     background-color: rgb(28, 16, 23);
     max-height: 132px;
     width: auto;
@@ -41,12 +44,15 @@ li.card img {
     display: inline-block;
     margin-right: 10px;
     position: relative;
-    left: -5px;
-    top: -10px;
+    left: 1px;
+    top: 10px;
 }
 
 .issue-card-inner-right {
     display: inline-block;
+    position: absolute;
+    width: 75%;
+    top: 17px;
 }
 
 .scrollable.search-active li.card {
