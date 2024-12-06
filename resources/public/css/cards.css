@@ -75,12 +75,14 @@ li.card.selected {
 li.card span.title {
     position: relative;
     top: -20px;
+    
 }
 
 li.card.issue-card span.title {
     position: absolute;
     top: -15px;
     font-size: 20px;
+    line-height: 1.1;
     
     /* https://stackoverflow.com/a/13924997 */
     overflow: hidden;

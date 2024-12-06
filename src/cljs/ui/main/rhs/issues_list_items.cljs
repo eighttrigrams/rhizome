@@ -35,27 +35,28 @@
                       " " title))}]])
 
 (defn- image-preview-component [data]
-  (cond (:preview-image-lowres data)
-               [:img {:src     (str "/imgs/Preview/Lowres/" (:preview-image-lowres data))
-                      :style   {:visibility :hidden
-                                :height "0px"}
-                      :on-load (fn [t]
-                                 (set! (-> (.-target t) .-style .-height) "180px")
-                                 (set! (.. t -target -style -visibility) "visible"))}]
-               (:preview-image data)
-               [:img {:src     (str "/imgs/Preview/" (:preview-image data))
-                      :style   {:visibility :hidden
-                                :height "0px"}
-                      :on-load (fn [t]
-                                 (set! (-> (.-target t) .-style .-height) "180px")
-                                 (set! (.. t -target -style -visibility) "visible"))}]
-               (:image (:resource-links data))
-               [:img {:src     (str "/imgs/" (:image (:resource-links data)))
-                      :style   {:visibility :hidden
-                                :height "0px"}
-                      :on-load (fn [t]
-                                 (set! (-> (.-target t) .-style .-height) "180px")
-                                 (set! (.. t -target -style -visibility) "visible"))}]))
+  [:div.img-container
+   (cond (:preview-image-lowres data)
+         [:img {:src     (str "/imgs/Preview/Lowres/" (:preview-image-lowres data))
+                :style   {:visibility :hidden
+                          :height "0px"}
+                :on-load (fn [t]
+                           (set! (-> (.-target t) .-style .-height) "180px")
+                           (set! (.. t -target -style -visibility) "visible"))}]
+         (:preview-image data)
+         [:img {:src     (str "/imgs/Preview/" (:preview-image data))
+                :style   {:visibility :hidden
+                          :height "0px"}
+                :on-load (fn [t]
+                           (set! (-> (.-target t) .-style .-height) "180px")
+                           (set! (.. t -target -style -visibility) "visible"))}]
+         (:image (:resource-links data))
+         [:img {:src     (str "/imgs/" (:image (:resource-links data)))
+                :style   {:visibility :hidden
+                          :height "0px"}
+                :on-load (fn [t]
+                           (set! (-> (.-target t) .-style .-height) "180px")
+                           (set! (.. t -target -style -visibility) "visible"))}])])
 
 (defn- on-mouse-leave [*state]
   #(do
