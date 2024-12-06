@@ -36,6 +36,7 @@ li.card .img-container {
 }
 
 li.card img {
+    border-radius: 3px;
     max-width: 132px;
     background-color: rgb(28, 16, 23);
     max-height: 132px;
