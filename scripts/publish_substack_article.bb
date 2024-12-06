@@ -24,7 +24,9 @@
     (pg/execute-one! (db :prod) ["select issues.id, issues.title, issues.data from issues where id = ?" %]) 
     (assoc-in % [:issues/data :resource-links :substack-article] url) 
     (get % :issues/data)
-    (pg/execute-one! (db :prod) [(str "update issues set data = '" (json/generate-string %) "' where id = ?") id])))
+    (json/generate-string %)
+    (str/replace % "'" "''")
+    (pg/execute-one! (db :prod) [(str "update issues set data = '" % "' where id = ?") id])))
 
 (defn insert-relation [id]
   (pg/execute! (db :prod) ["insert into collections (container_id, item_id) select 30065, ? where not exists (select * from collections where container_id = 30065 and item_id = ?)" id id])
@@ -43,8 +45,8 @@
     (pg/execute-one! (db :prod) [(str "update issues set data = '" (json/generate-string %) "' where id = ?") id])))
 
 (comment
-  (let [id 28470]
-    (update-substack-article id  "https://vaporgrid.substack.com/p/trains-on-time")
+  (let [id 14408]
+    (update-substack-article id  "https://markferreira.substack.com/p/the-masculinity-of-cooking")
     #_(insert-relation id)
     #_(update-badge id))
   )

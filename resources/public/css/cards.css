@@ -1,6 +1,7 @@
 li.card {
     position: relative;
-    background-color: rgb(102, 15, 69);
+    /* background-color: rgb(102, 15, 69); */
+    background-color: rgb(54, 34, 46);
     height: 115px;
     margin-bottom: 10px;
     border-radius: 4px;
