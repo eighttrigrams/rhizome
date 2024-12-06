@@ -38,7 +38,8 @@
               title
               " "
               [:span {:on-click (remove-context idx)}
-               "[Remove]"]])
+               "[Remove]"]
+              [:input]])
            @*selectable-contexts)]])})))
 
 (defn get-values []
