@@ -226,10 +226,13 @@
 (defn delete-context [{:keys [db]}]
   (fn [opts arg]
     (deletion/delete-item db arg)
-    {:issues           (search/search-issues db opts)
-     :contexts         (search/search-contexts db "")
-     :selected-context nil
-     :issue-view? false}))
+    (if (:old-selected-context opts)
+      (assoc ((fetch-context {:db db}) opts [(:old-selected-context opts) false])
+             :issue-view? false)
+      {:issues           (search/search-issues db opts)
+       :contexts         (search/search-contexts db "")
+       :selected-context nil
+       :issue-view? false})))
 
 (defn- get-selected-secondary-contexts-set 
   [{{{{{:keys [selected-secondary-contexts
