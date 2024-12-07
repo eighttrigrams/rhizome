@@ -21,8 +21,10 @@
                                  :where [:= :id [:inline issue-id]]})))
 
 (defn- update-contexts [item]
-  (let [m (zipmap (.getArray (:collections_id item))
-                  (.getArray (:collections_annotation item)))]
+  (let [m (if (seq (:collectsions_id item))
+            (zipmap (.getArray (:collections_id item))
+                    (.getArray (:collections_annotation item)))
+            {})]
     (->
      item
      (update-in [:data :contexts] 
