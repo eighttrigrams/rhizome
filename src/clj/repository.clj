@@ -274,7 +274,9 @@
                  :selected-context    item
                  :q                   nil
                  :aggregated-contexts '()}))))
-         {})))))
+         {:issues (search/search-issues db (-> state
+                                               (dissoc :q)
+                                               (assoc :skip-context-aggregation? true)))})))))
 
 (defn fetch-issue-description [{:keys [db]}]
   (fn [state issue]
