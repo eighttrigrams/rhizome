@@ -20,11 +20,6 @@
                                           :archived [:inline archived]}
                                  :where [:= :id [:inline issue-id]]})))
 
-(defn- parse-data [context]
-  (if (:data context)
-    (update context :data #(json/parse-string (.toString %) true))
-    context))
-
 (defn- update-contexts [item]
   (update-in item [:data :contexts] 
              (fn [contexts]
@@ -39,13 +34,23 @@
   (update-contexts {:data {:contexts {"123" "Name"
                                       "456" {:title "Name" :show-badge? true}}}}))
 
-(defn post-process-simple [query-result]
+(defn- parse-data [context]
+  (if (:data context)
+    (update context :data #(json/parse-string (.toString %) true))
+    context))
+
+;; TODO maybe move to common
+(defn post-process-base [query-result]
   (-> query-result
       un-namespace-keys
       simplify-date
       parse-data
-      update-contexts
       (dissoc :searchable)))
+
+(defn- post-process [query-result]
+  (-> query-result
+      post-process-base
+      update-contexts))
 
 (declare get-item)
 
@@ -98,7 +103,7 @@
   [db {:keys [id]}]
   (try
     (-> (get-issue-without-related-issues db id)
-        post-process-simple)
+        post-process)
     (catch java.lang.Exception e
       (prn "get-issue-----" (.getMessage e))
       (throw e))))
@@ -119,7 +124,7 @@
   [db {:keys [title]}]
   (try
     (-> (get-issue-without-related-issues-by-title db title)
-        post-process-simple
+        post-process
         (assoc :contexts {})
         (assoc :related_issues {}))
     (catch java.lang.Exception e
@@ -140,7 +145,7 @@
   [db path url]
   (try
     (-> (get-issue-without-related-issues-by-path db path url)
-        post-process-simple
+        post-process
         (assoc :contexts {}))
     (catch java.lang.Exception e
       (throw e))))

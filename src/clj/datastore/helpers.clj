@@ -1,4 +1,5 @@
-(ns datastore.helpers)
+(ns datastore.helpers
+  (:require [cheshire.core :as json]))
 
 (defn namespace-keys
   [ns-str m]

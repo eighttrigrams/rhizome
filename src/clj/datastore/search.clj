@@ -5,7 +5,36 @@
             [clojure.pprint :as pp]
             [next.jdbc :as jdbc]
             [honey.sql :as sql]
-            datastore))
+            datastore
+            [datastore.helpers
+             :refer [un-namespace-keys]]))
+
+(defn get-title
+  [db {:keys [id]}] 
+  (-> {:select   [:issues.title]
+       :from     [:issues]
+       :where    [:= :issues.id [:inline id]]
+       :group-by [:issues.id]
+       :order-by [[:issues.updated_at :desc]]}
+      sql/format
+      (#(jdbc/execute-one! db % {:return-keys true}))
+      un-namespace-keys
+      :title))
+
+(defn update-contexts [item]
+  (update-in item [:data :contexts] 
+             (fn [contexts]
+               (into {} 
+                     (map (fn [[k v]]
+                            [(Integer/parseInt (name k)) (if (map? v) v
+                                                             {:title       v
+                                                              :show-badge? true})])
+                          contexts)))))
+
+(defn post-process [query-result]
+  (-> query-result
+      datastore/post-process-base
+      update-contexts))
 
 (def select [:issues.title
              :issues.short_title
@@ -161,7 +190,7 @@
       (->>
        (query-string-contexts-query q (:selected-context opts))
        (jdbc/execute! db)
-       (map datastore/post-process-simple)
+       (map post-process)
        (filter-contexts opts))
       (catch Exception e
         (log/error (str "error in search/search-contexts: " e " - param was: " q))
@@ -344,7 +373,7 @@
        :as opts}]
        (let [issues (do-fetch-ids db opts search-mode)]
          (->> issues
-              (map datastore/post-process-simple)
+              (map post-process)
               (sort-issues opts)
               (filter-by-selected-secondary-contexts opts)
               (filter-issues opts))))
@@ -365,7 +394,7 @@
   (reduce (fn [acc val]
             (if (secondary-contexts val)
               (conj acc [val (conj (secondary-contexts val) true)])
-              (if-let [title (:title (datastore/get-item db {:id val}))]
+              (if-let [title (get-title db {:id val})]
                 (conj acc [val [title 0 true]])
                 acc)))
           [] highlighted-secondary-contexts))
