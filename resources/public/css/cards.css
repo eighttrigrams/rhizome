@@ -112,6 +112,8 @@ span.badge {
     padding: 3px;
     line-height: 1.8;
     margin-right: 3px;
+    position: relative;
+    top: -4px;
 }
 
 span.badge.light {
