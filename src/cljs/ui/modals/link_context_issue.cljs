@@ -16,14 +16,13 @@
      {:component-did-mount #(.focus (get-component-el))
       :reagent-render      ;
       (fn [_selected-context _issue]
-        (prn @*selectable-contexts)
+        #_(prn @*selectable-contexts)
         [:<>
          [:h4 "Related contexts"]
          [:div#link-context-issue-component
           {:tabIndex 0}
           (map 
-           (fn [[idx {:keys [title show-badge?]}]]
-             (prn "idx" title show-badge?)
+           (fn [[idx {:keys [title annotation show-badge?]}]]
              [:div
               {:key idx}
               [:input {:type :checkbox
@@ -39,7 +38,12 @@
               " "
               [:span {:on-click (remove-context idx)}
                "[Remove]"]
-              [:input]])
+              [:input {:value annotation
+                       :on-change (fn [evt]
+                                    (swap! *selectable-contexts
+                                           assoc-in
+                                           [idx :annotation] 
+                                           (.-value (.-target evt))))}]])
            @*selectable-contexts)]])})))
 
 (defn get-values []

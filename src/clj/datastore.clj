@@ -31,13 +31,13 @@
                 (fn [contexts]
                   (into {} 
                         (map (fn [[k v]]
-                               [(Integer/parseInt (name k)) (if (map? v) 
-                                                              
-                                                                (assoc v :annotation (get m (:id v)))
-                                                              
-
-                                                                {:title       v
-                                                                 :show-badge? true})])
+                               (let [id (Integer/parseInt (name k))]
+                                 [id
+                                  (if (map? v)
+                                    (assoc v :annotation (get m id))
+                                    {:title       v
+                                     :annotation nil
+                                     :show-badge? true})]))
                              contexts))))
      (dissoc :collections_id :collections_annotation))))
 
@@ -87,7 +87,7 @@
 
 (defn- basic-issues-query [id]
   {:select   [:issues.*
-              [[:array_agg :collections.id] :collections_id]
+              [[:array_agg :collections.container_id] :collections_id]
               [[:array_agg :collections.annotation] :collections_annotation]]
    :from     [:issues]
    :join     [:collections [:= :issues.id :collections.item_id]]
@@ -112,10 +112,12 @@
 
 (defn get-item
   [db {:keys [id]}]
-  (try
+  (-> (get-issue-without-related-issues db id)
+        post-process)
+  #_(try
     (-> (get-issue-without-related-issues db id)
         post-process)
-    (catch java.lang.Exception e
+    #_(catch java.lang.Exception e
       (prn "get-issue-----" (.getMessage e))
       (throw e))))
 
@@ -166,27 +168,38 @@
       sql/format
       (#(jdbc/execute! db % {:return-keys true}))))
 
-(defn update-item [db {:keys [id title short_title tags data date archived] :as item}]
-  (delete-date db id)
-  (when date
-    (insert-date db id date archived))
-  (let [old-item (get-item db item)
-        old-data (:data old-item)
-        set (merge {:title       [:inline title]
-                    :short_title [:inline short_title]
-                    :tags        [:inline tags]}
-                   (merge {:data       [:inline (json/generate-string
-                                                 (if data
-                                                   (merge old-data data)
-                                                   {}))]}))
+(defn- update-item' [db {:keys [id title short_title tags data] :as item}]
+  (let [old-item      (get-item db item)
+        old-data      (:data old-item)
+        data          (if data
+                        (merge old-data data)
+                        {})
+        data (if (and (:contexts data) (map? (:contexts data)))
+               (update data :contexts (fn [contexts]
+                                        (->> contexts
+                                             (map (fn [[k v]] [k (dissoc v :annotation)]))
+                                             (into {}))))
+               data)
+        _ (prn "data" data)
+        set           (merge {:title       [:inline title]
+                              :short_title [:inline short_title]
+                              :tags        [:inline tags]}
+                             (merge {:data [:inline (json/generate-string data)]}))
         formatted-sql (sql/format {:update [:issues]
                                    :where  [:= :id [:inline id]]
                                    :set    set})
-        _result (jdbc/execute-one! db
-                                   formatted-sql
-                                   {:return-keys true})]
-    (when (or (not= (:title old-item) title)
-              (not= (:short_title old-item) short_title))
+        _result       (jdbc/execute-one! db
+                                         formatted-sql
+                                         {:return-keys true})]
+    (or (not= (:title old-item) title)
+        (not= (:short_title old-item) short_title))))
+
+(defn update-item [db {:keys [id title short_title date archived] :as item}]
+  (delete-date db id)
+  (when date
+    (insert-date db id date archived))
+  (let [has-title-changed? (update-item' db item)]
+    (when has-title-changed?
       (future
         (try
           (datastore.relations/update-collection-title-in-collection-items-for-children db id title short_title)

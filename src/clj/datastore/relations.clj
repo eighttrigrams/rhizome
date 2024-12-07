@@ -94,11 +94,12 @@
   (log/info (str "datastore.relations/set-containers-of-item! " (:id item) "." (:title item) "..." containers))
   (jdbc/execute! db (sql/format {:delete-from [:collections]
                                  :where [:= :item_id [:inline (:id item)]]}))
-  (doall (for [[container-id {:keys [show-badge?]}] containers]
+  (doall (for [[container-id {:keys [show-badge? annotation]}] containers]
            (jdbc/execute! db (sql/format {:insert-into [:collections]
-                                          :columns [:item_id :container_id :show_badge]
+                                          :columns [:item_id :container_id :annotation :show_badge]
                                           :values [[[:inline (:id item)]
                                                     [:inline container-id]
+                                                    [:inline annotation]
                                                     [:inline show-badge?]]]})))))
 
 (defn set-the-containers-of-item! 
