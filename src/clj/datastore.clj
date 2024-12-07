@@ -46,6 +46,7 @@
                                       "456" {:title "Name" :show-badge? true}}}}))
 
 (defn- post-process [query-result]
+  (prn "query-result" query-result)
   (-> query-result
       post-process-base
       update-contexts))
@@ -95,10 +96,20 @@
    :group-by [:issues.id]
    :order-by [[:issues.updated_at :desc]]})
 
+(defn- simple-issues-query [id]
+  {:select   [:issues.*]
+   :from     [:issues]
+   :where    [:= :issues.id [:inline id]]
+   :group-by [:issues.id]
+   :order-by [[:issues.updated_at :desc]]})
+
 (defn- get-issue-without-related-issues [db id]
-  (-> (basic-issues-query id)
-      sql/format
-      (#(jdbc/execute-one! db % {:return-keys true}))))
+  (or (-> (basic-issues-query id)
+          sql/format
+          (#(jdbc/execute-one! db % {:return-keys true})))
+      (-> (simple-issues-query id)
+          sql/format
+          (#(jdbc/execute-one! db % {:return-keys true})))))
 
 (defn get-item
   [db {:keys [id]}]
