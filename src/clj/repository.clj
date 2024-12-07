@@ -256,6 +256,7 @@
                                        selected-context 
                                        (get-selected-secondary-contexts-set state)
                                        alternative-behaviour?)
+          _ (prn "item" item)
           log-data {:item (select-keys item [:id :title])}]
       (assoc (if (:previously-existing-item? item)
                (do 
