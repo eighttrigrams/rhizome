@@ -34,8 +34,6 @@
   (update-contexts {:data {:contexts {"123" "Name"
                                       "456" {:title "Name" :show-badge? true}}}}))
 
-
-
 (defn- post-process [query-result]
   (-> query-result
       post-process-base
