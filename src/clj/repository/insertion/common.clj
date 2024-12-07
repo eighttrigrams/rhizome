@@ -19,7 +19,8 @@
                                                             :where  [:in :issues.id 
                                                                      [:inline (seq context-ids-set)]]}))
                              (map (fn [{:issues/keys [id short_title title]}]
-                                    [id (if (seq short_title) short_title title)]))
+                                    [id {:title (if (seq short_title) short_title title)
+                                         :show-badge? true}]))
                              (into {})))
         item    (datastore/update-item db 
                                         (update item :data 

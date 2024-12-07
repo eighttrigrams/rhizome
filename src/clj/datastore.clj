@@ -135,14 +135,10 @@
 
 (defn get-item-by-title 
   [db {:keys [title]}]
-  (try
-    (-> (get-issue-without-related-issues-by-title db title)
-        post-process
-        (assoc :contexts {})
-        (assoc :related_issues {}))
-    (catch java.lang.Exception e
-      (prn "get-issue-----" (.getMessage e))
-      (throw e))))
+  (-> (get-issue-without-related-issues-by-title db title)
+      post-process
+      (assoc :contexts {})
+      (assoc :related_issues {})))
 
 (defn- basic-find-query [path match]
   {:select   [:issues.*]
@@ -177,10 +173,10 @@
         data (if (and (:contexts data) (map? (:contexts data)))
                (update data :contexts (fn [contexts]
                                         (->> contexts
-                                             (map (fn [[k v]] [k (dissoc v :annotation)]))
+                                             (map (fn [[k v]] 
+                                                    [k (dissoc v :annotation)]))
                                              (into {}))))
                data)
-        _ (prn "data" data)
         set           (merge {:title       [:inline title]
                               :short_title [:inline short_title]
                               :tags        [:inline tags]}
