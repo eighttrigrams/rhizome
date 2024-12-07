@@ -7,7 +7,7 @@
             [honey.sql :as sql]
             datastore
             [datastore.helpers
-             :refer [un-namespace-keys]]))
+             :refer [un-namespace-keys post-process-base]]))
 
 (defn get-title
   [db {:keys [id]}] 
@@ -33,7 +33,7 @@
 
 (defn post-process [query-result]
   (-> query-result
-      datastore/post-process-base
+      post-process-base
       update-contexts))
 
 (def select [:issues.title

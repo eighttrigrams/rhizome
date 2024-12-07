@@ -5,7 +5,7 @@
             [cambium.core :as log]
             datastore.relations
             [datastore.helpers
-             :refer [un-namespace-keys simplify-date]]))
+             :refer [un-namespace-keys post-process-base]]))
 
 (defn delete-date [db issue-id]
   (jdbc/execute! db
@@ -34,18 +34,7 @@
   (update-contexts {:data {:contexts {"123" "Name"
                                       "456" {:title "Name" :show-badge? true}}}}))
 
-(defn- parse-data [context]
-  (if (:data context)
-    (update context :data #(json/parse-string (.toString %) true))
-    context))
 
-;; TODO maybe move to common
-(defn post-process-base [query-result]
-  (-> query-result
-      un-namespace-keys
-      simplify-date
-      parse-data
-      (dissoc :searchable)))
 
 (defn- post-process [query-result]
   (-> query-result

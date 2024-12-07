@@ -17,3 +17,15 @@
   (update m :date 
           #(when % 
              (.format (java.text.SimpleDateFormat. "yyyy-MM-dd") %))))
+
+(defn- parse-data [context]
+  (if (:data context)
+    (update context :data #(json/parse-string (.toString %) true))
+    context))
+
+(defn post-process-base [query-result]
+  (-> query-result
+      un-namespace-keys
+      simplify-date
+      parse-data
+      (dissoc :searchable)))
