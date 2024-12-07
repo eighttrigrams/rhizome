@@ -257,22 +257,23 @@
                                        (get-selected-secondary-contexts-set state)
                                        alternative-behaviour?)]
       (merge
-       {:active-search        nil
-        :issue-view?          true
-        :old-selected-context selected-context}
+       {:active-search nil}
        (if (map? item)
-         (let [log-data {:item (select-keys item [:id :title])}]
-           (if (:previously-existing-item? item)
-             (do 
-               (log/info log-data "Item already exists - no insertion.") 
-               ((fetch-context {:db db}) state [item true]))
-             (do
-               (log/info log-data "Inserted item")
-               (datastore.relations/set-collection-titles-of-new-issue db (:id item))
-               {:issues         '()
-                :selected-context item
-                :q              nil
-                :aggregated-contexts '()})))
+         (merge 
+          {:issue-view? true
+           :old-selected-context selected-context}
+          (let [log-data {:item (select-keys item [:id :title])}]
+            (if (:previously-existing-item? item)
+              (do 
+                (log/info log-data "Item already exists - no insertion.") 
+                ((fetch-context {:db db}) state [item true]))
+              (do
+                (log/info log-data "Inserted item")
+                (datastore.relations/set-collection-titles-of-new-issue db (:id item))
+                {:issues              '()
+                 :selected-context    item
+                 :q                   nil
+                 :aggregated-contexts '()}))))
          {})))))
 
 (defn fetch-issue-description [{:keys [db]}]
