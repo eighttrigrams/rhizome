@@ -88,8 +88,6 @@
                                                (:preview-image (:data issue))
                                                (:image (:resource-links (:data issue)))))
                                   " simple-card")
-                                (when (and show-relation-annotation?
-                                           (not-empty (:annotation issue))) " bigger")
                                 (when (= (:id (:selected-issue @*state))
                                          (:id issue)) " selected"))
            :on-click       #(if idx 

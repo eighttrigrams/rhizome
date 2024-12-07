@@ -13,15 +13,6 @@ li.card.simple-card {
     height: 92px;
 }
 
-li.card.simple-card.bigger {
-    height: 75px;
-}
-
-
-li.card.bigger {
-    height: 125px;
-}
-
 li.card .relation-annotation {
     position: absolute;
     color: brown;
