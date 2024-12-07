@@ -21,14 +21,23 @@
                                  :where [:= :id [:inline issue-id]]})))
 
 (defn- update-contexts [item]
-  (update-in item [:data :contexts] 
-             (fn [contexts]
-               (into {} 
-                     (map (fn [[k v]]
-                            [(Integer/parseInt (name k)) (if (map? v) v
-                                                             {:title       v
-                                                              :show-badge? true})])
-                          contexts)))))
+  (let [m (zipmap (.getArray (:collections_id item))
+                  (.getArray (:collections_annotation item)))]
+    (->
+     item
+     (update-in [:data :contexts] 
+                (fn [contexts]
+                  (into {} 
+                        (map (fn [[k v]]
+                               [(Integer/parseInt (name k)) (if (map? v) 
+                                                              
+                                                                (assoc v :annotation (get m (:id v)))
+                                                              
+
+                                                                {:title       v
+                                                                 :show-badge? true})])
+                             contexts))))
+     (dissoc :collections_id :collections_annotation))))
 
 (comment
   (update-contexts {:data {:contexts {"123" "Name"
@@ -75,8 +84,11 @@
 (declare get-item)
 
 (defn- basic-issues-query [id]
-  {:select   [:issues.*]
+  {:select   [:issues.*
+              [[:array_agg :collections.id] :collections_id]
+              [[:array_agg :collections.annotation] :collections_annotation]]
    :from     [:issues]
+   :join     [:collections [:= :issues.id :collections.item_id]]
    :where    [:= :issues.id [:inline id]]
    :group-by [:issues.id]
    :order-by [[:issues.updated_at :desc]]})
