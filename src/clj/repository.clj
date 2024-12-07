@@ -395,8 +395,9 @@
 
 (defn select-last-context [{:keys [db]}]
   (fn [{:keys [old-selected-context] :as state}]
+    (prn "old" old-selected-context)
     (if-not old-selected-context
-      state
+      {}
       (do 
         (log/info (str "repository/select-last-context - " (:id old-selected-context) ":" (:title old-selected-context)))
         {:selected-context    old-selected-context
