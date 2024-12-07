@@ -101,13 +101,9 @@
    (let [base (select/select (select/descendant (select/class "post-header")
                                                 (select/tag "div")) tree)]
      (doall (->> base
-                 (filter (fn [item]
-                           (string? (first (:content item)))
-                           #_(string? (first (:content item)))))
-                 (map (fn [item]
-                        (first (:content item))))
-                 (filter (fn [item]
-                           (re-matches #"[A-Z][a-z]{2,4}\s\d\d,\s\d\d\d\d" item)))
+                 (filter (fn [item] (string? (first (:content item)))))
+                 (map (fn [item] (first (:content item))))
+                 (filter (fn [item] (re-matches #"[A-Z][a-z]{2,4}\s\d\d,\s\d\d\d\d" item)))
                  first))))
 
 (defn get-post [url extract-content]
