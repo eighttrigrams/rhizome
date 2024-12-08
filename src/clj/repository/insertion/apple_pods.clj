@@ -1,11 +1,9 @@
 (ns repository.insertion.apple-pods
   (:require [clojure.string :as str]
             datastore
-            [hickory.core :as html]
-            [clj-http.client :as http]
-            [hickory.select :as select]
             [repository.insertion.common :as common]
-            utils))
+            utils
+            scrapers.apple))
 
 (defn match? [title]
   (re-matches #"https:\/\/podcasts.apple.com\/.*\/podcast\/.*\/id.*\?i=.*" title))
@@ -16,12 +14,7 @@
     rest))
 
 (defn extract-title [url]
-  (let [tree (html/as-hickory (html/parse (:body (http/get url))))
-        title (first (:content 
-                      (first 
-                       (select/select
-                        (select/tag "title")
-                        tree))))]
+  (let [title (:title (scrapers.apple/get-episode url))]
     (-> title
         (str/replace "‎" "")
         (str/replace #"auf.Apple.Podcasts" "")

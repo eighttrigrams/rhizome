@@ -4,6 +4,13 @@
             [clj-http.client :as http]
             [hickory.core :as html]))
 
+(defn get-name [tree name]
+   (-> (select/select (select/attr "name" (fn [x] (= x name))) tree)
+       first
+       :attrs
+       :content
+       str/trim))
+
 (defn get-property [tree name]
    (-> (select/select (select/attr "property" (fn [x] (= x name))) tree)
        first
