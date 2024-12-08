@@ -3,7 +3,8 @@
             [clojure.string :as str]
             [hickory.select :as select]
             [hickory.core :as html]
-            [clj-http.client :as http]))
+            [clj-http.client :as http]
+            scrapers.common))
 
 (defn extract-content [hickory-tree]
   (:content (first (:content (first (select/select
@@ -53,7 +54,7 @@
      date
      (-> tree 
          extract-content  
-         utils/extract-text)]))
+         scrapers.common/extract-text)]))
 
 (comment
   (get-post "https://woodfromeden.substack.com/p/the-anti-autism-manifesto" 

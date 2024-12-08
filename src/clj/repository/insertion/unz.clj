@@ -3,7 +3,8 @@
             [hickory.select :as select]
             [repository.insertion.common :as common]
             [repository.chatgpt :as chatgpt]
-            utils))
+            utils
+            scrapers.common))
 
 (defn- extract-content [hickory-tree]
   (:content (first (drop 2 (:content (first (select/select
@@ -17,7 +18,7 @@
 
 (defn ingest [db url context-ids-set should-capture-summary?]
   (let [articles-id     (common/get-item-or-throw-error db "Articles")
-        [title content] (utils/get-post url extract-content)
+        [title content] (scrapers.common/get-post url extract-content)
         summary              (and should-capture-summary?
                                   (chatgpt/get-summary content))
         issue                (common/insert-item db 
