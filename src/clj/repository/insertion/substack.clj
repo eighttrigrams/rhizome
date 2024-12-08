@@ -97,10 +97,10 @@
                                                   context-ids-set 
                                                   {:substack-article url})]
       (datastore/insert-date db (:id item) date true)
+      (log/info (str "created new item" item))
       (when image (try (upload/upload-preview-file db {:tempfile image} (:id item) "false")
                        (catch Exception e
                          (log/error (str "problem while trying to create preview image for substack article. message" (.getMessage e))))))
-      (log/info (str "created new item" item))
       (if (and item summary)
         (datastore/update-item db (assoc item :description 
                                          (utils/wrap-summary summary)))
