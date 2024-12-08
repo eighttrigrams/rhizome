@@ -5,7 +5,9 @@
             [clj-http.client :as http]
             datastore
             [repository.insertion.common :as common]
-            [utils.url :as url]))
+            [utils.url :as url]
+            upload
+            scrapers.youtube))
 
 (defn query [url]
   (json/parse-string (:body (http/get (str "https://www.youtube.com/oembed?" 
@@ -52,11 +54,15 @@
                                                     author_name
                                                     author_url
                                                     youtube-channels-id)
-        existing-item (datastore/get-item-by-path db "data->'resource-links'->>'youtube-video'" url)]
+        existing-item (datastore/get-item-by-path db "data->'resource-links'->>'youtube-video'" url)
+        image (:image (scrapers.youtube/get-video url))]
     (if (:id existing-item)
       (assoc (datastore/get-item db existing-item) :previously-existing-item? true)
-      (common/insert-item db 
-                          title
-                          ""
-                          (conj context-ids-set channel-id youtube-videos-id video-id) 
-                          {:youtube-video url}))))
+      (let [id (:id (common/insert-item db 
+                                        title
+                                        ""
+                                        (conj context-ids-set channel-id youtube-videos-id video-id) 
+                                        {:youtube-video url}))]
+        (when image (try (upload/upload-preview-file db {:tempfile image} id "false")
+                     (catch Exception e
+                       (log/error (str "problem while trying to create preview image for youtube video. message" (.getMessage e))))))))))

@@ -11,13 +11,6 @@
      (select/and (select/tag "div")
                  (select/class "available-content")) hickory-tree))))))
 
-(defn- get-property [tree name]
-   (-> (select/select (select/attr "property" (fn [x] (= x name))) tree)
-       first
-       :attrs
-       :content
-       str/trim))
-
 (defn- convert-month [month]
   (get {"Jan" "01"
         "Feb" "02"
@@ -47,9 +40,9 @@
 
 (defn get-post [url extract-content]
   (let [tree (html/as-hickory (html/parse (:body (http/get url))))
-        title (get-property tree "og:title")
-        subtitle (get-property tree "og:description")
-        image (get-property tree "og:image")
+        title (scrapers.common/get-property tree "og:title")
+        subtitle (scrapers.common/get-property tree "og:description")
+        image (scrapers.common/get-property tree "og:image")
         [date year] (-> tree extract-date convert-date)]
     {:title   (str title " - " subtitle) 
      :date    date
