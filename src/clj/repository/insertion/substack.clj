@@ -149,7 +149,7 @@
                                                   "" 
                                                   context-ids-set 
                                                   {:substack-article url})
-          item                (datastore/insert-date db (:id item) date nil)]
+          item                (datastore/insert-date db (:id item) date true)]
       (log/info (str "created new item" item))
       (if (and item summary)
         (datastore/update-item db (assoc item :description 
