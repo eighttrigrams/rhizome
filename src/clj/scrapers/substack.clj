@@ -49,13 +49,21 @@
   (let [tree (html/as-hickory (html/parse (:body (http/get url))))
         title (get-property tree "og:title")
         subtitle (get-property tree "og:description")
-        date (-> tree extract-date convert-date)]
-    [(str title " - " subtitle) 
-     date
-     (-> tree 
-         extract-content  
-         scrapers.common/extract-text)]))
+        image (get-property tree "og:image")
+        [date year] (-> tree extract-date convert-date)]
+    {:title   (str title " - " subtitle) 
+     :date    date
+     :year    year
+     :image   (when image (:body (http/get image {:as :byte-array})))
+     :content (-> tree 
+                  extract-content  
+                  scrapers.common/extract-text)}))
 
 (comment
-  (get-post "https://woodfromeden.substack.com/p/the-anti-autism-manifesto" 
-            extract-content))
+  (:image (get-post "https://woodfromeden.substack.com/p/the-anti-autism-manifesto" 
+                    extract-content))
+  
+  (def data (:body (http/get "https://substackcdn.com/image/fetch/w_1200,h_600,c_fill,f_jpg,q_auto:good,fl_progressive:steep,g_auto/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F824250b3-83d1-45f4-8c49-f7530aa9e9c6_1536x1024.jpeg" 
+                             {:as :byte-array})))
+  (require '[clojure.java.io :as io])
+  (io/copy data (io/file "/Users/daniel/Desktop/test1.png")))

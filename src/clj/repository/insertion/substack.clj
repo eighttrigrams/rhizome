@@ -6,7 +6,8 @@
             [repository.chatgpt :as chatgpt]
             utils
             [utils.url :as url]
-            [scrapers.substack :as substack]))
+            [scrapers.substack :as substack]
+            upload))
 
 (defn match? [title]
   (re-matches #"https://.*\.substack.com\/p\/.*" title))
@@ -71,7 +72,8 @@
           substack-platform-id (common/get-item-or-throw-error db "Substack")
           substacks-id         (common/get-item-or-throw-error db "Substacks")
           articles-id          (common/get-item-or-throw-error db "Articles")
-          [title [date year] content] (substack/get-post url substack/extract-content)
+          {:keys [title content date year image]}
+          ,,(substack/get-post url substack/extract-content)
           year-id              (common/get-item-or-throw-error db year)
           _                    (validate-preconditions db url title)
           summary              (and should-capture-summary?
@@ -88,13 +90,14 @@
                                     articles-id 
                                     substack-platform-id
                                     year-id)
-          _ (log/info (str "context-ids-set: " context-ids-set))
+          _ (log/info         (str "context-ids-set: " context-ids-set))
           item                (common/insert-item db 
                                                   title 
                                                   "" 
                                                   context-ids-set 
-                                                  {:substack-article url})
-          item                (datastore/insert-date db (:id item) date true)]
+                                                  {:substack-article url})]
+      (datastore/insert-date db (:id item) date true)
+      (when image (upload/upload-preview-file db {:tempfile image} (:id item) "false"))
       (log/info (str "created new item" item))
       (if (and item summary)
         (datastore/update-item db (assoc item :description 
