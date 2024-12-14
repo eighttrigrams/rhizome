@@ -1,7 +1,7 @@
 (ns upload
   (:require [clojure.java.io :as io]
             [cambium.core :as log]
-            [personalist.datastore :as datastore]
+            [et.personalist :as datastore]
             [clojure.java.shell :refer [sh]]))
 
 (defn upload-preview-file [db uploaded-file id alternative-behaviour?]

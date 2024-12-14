@@ -1,7 +1,7 @@
 (ns repository.deletion
   (:require [clojure.java.io :as io]
             [cambium.core :as log]
-            [personalist.datastore :as datastore]))
+            [et.personalist :as datastore]))
 
 (defn- get-files-count [db file]
   (if file

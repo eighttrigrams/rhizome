@@ -1,6 +1,6 @@
 (ns repository.insertion.substack
   (:require [clojure.string :as str]
-            [personalist.datastore :as datastore]
+            [et.personalist :as datastore]
             [cambium.core :as log]
             [repository.insertion.common :as common]
             [repository.chatgpt :as chatgpt]

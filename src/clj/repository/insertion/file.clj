@@ -1,7 +1,7 @@
 (ns repository.insertion.file
   (:require [clojure.string :as str]
             [clojure.set :as set]
-            [personalist.datastore :as datastore]
+            [et.personalist :as datastore]
             [utils :refer [condx]]
             [repository.insertion.common :as common]
             [repository.homefolder :as home]))

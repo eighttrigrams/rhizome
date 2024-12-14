@@ -1,5 +1,5 @@
 (ns repository.insertion.takimag 
-  (:require [personalist.datastore :as datastore]
+  (:require [et.personalist :as datastore]
             [hickory.select :as select]
             [repository.insertion.common :as common]
             [repository.chatgpt :as chatgpt]
