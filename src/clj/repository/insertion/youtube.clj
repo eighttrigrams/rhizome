@@ -3,7 +3,7 @@
             [cambium.core :as log]
             [cheshire.core :as json]
             [clj-http.client :as http]
-            datastore
+            [personalist.datastore :as datastore]
             [repository.insertion.common :as common]
             [utils.url :as url]
             upload

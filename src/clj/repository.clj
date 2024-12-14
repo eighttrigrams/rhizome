@@ -1,10 +1,10 @@
 (ns repository ;; data-driven logic
   (:require [mount.core :as mount]
             [datastore.config :as config]
-            datastore
+            [personalist.datastore :as datastore]
             privacy
-            [datastore.search :as search]
-            [datastore.relations :as datastore.relations]
+            [personalist.datastore.search :as search]
+            [personalist.datastore.relations :as datastore.relations]
             [cambium.core :as log]
             [repository.insertion :as insertion]
             [repository.deletion :as deletion]))

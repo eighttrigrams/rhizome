@@ -1,6 +1,6 @@
 (ns repository.insertion.apple-pods
   (:require [clojure.string :as str]
-            datastore
+            [personalist.datastore :as datastore]
             [repository.insertion.common :as common]
             utils
             scrapers.apple))
