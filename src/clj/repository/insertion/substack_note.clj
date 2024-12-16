@@ -1,6 +1,6 @@
 (ns repository.insertion.substack-note
   (:require [clojure.string :as str]
-            [et.personalist :as datastore]
+            [et.vp.ds :as datastore]
             [repository.insertion.common :as common]
             utils))
 

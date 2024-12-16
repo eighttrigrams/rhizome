@@ -1,5 +1,5 @@
 (ns repository.insertion.unz
-  (:require [et.personalist :as datastore]
+  (:require [et.vp.ds :as datastore]
             [hickory.select :as select]
             [repository.insertion.common :as common]
             [repository.chatgpt :as chatgpt]

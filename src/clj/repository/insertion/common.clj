@@ -1,5 +1,5 @@
 (ns repository.insertion.common
-  (:require [et.personalist :as datastore]
+  (:require [et.vp.ds :as datastore]
             [next.jdbc :as jdbc]
             [honey.sql :as sql]))
 
