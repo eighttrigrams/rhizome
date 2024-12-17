@@ -10,19 +10,19 @@
 (defn match? [title]
   (re-matches #"https://.*\.github.com\/.*/.*" title))
 
-(defn- get-substack-id 
+(defn- get-github-user-id 
   [db 
    [subdomain-handle
     subdomain-url 
     subdomain-full-url] 
    github-platform-id
    github-orgs-id]
-  (let [substack (common/insert-item db 
-                                     subdomain-url
-                                     subdomain-handle 
-                                     #{github-platform-id github-orgs-id}
-                                     {:substack subdomain-full-url})]
-    (:id substack)))
+  (let [github-user (common/insert-item db 
+                                        subdomain-url
+                                        subdomain-handle 
+                                        #{github-platform-id github-orgs-id}
+                                        {:github-user subdomain-full-url})]
+    (:id github-user)))
 
 (defn-  convert [url]
   (let [subdomain (url/get-subdomain url)
@@ -48,14 +48,14 @@
                                      identifiers 
                                      github-platform-id 
                                      github-users-id]
-  (let [substack-id (:id (datastore/get-item-by-path db 
+  (let [github-user-id (:id (datastore/get-item-by-path db 
                                                      "data->'resource-links'->>'github-user'" 
                                                      (last identifiers)))
-        substack-id (or substack-id (get-substack-id db 
+        github-user-id (or github-user-id (get-github-user-id db 
                                                      identifiers 
                                                      github-platform-id
                                                      github-users-id))]
-    substack-id))
+    github-user-id))
 
 (defn- validate-preconditions [db url title]
   (let [_ (when-not (seq title) (throw (Exception. "no post title")))
@@ -68,27 +68,26 @@
   (fn save-article [db url context-ids-set]
     (let [url                  (url/url-without-query-params url)
           github-platform-id (common/get-item-or-throw-error db "GitHub")
-          github-user-id      (common/get-item-or-throw-error db "GitHub User")
-
-          ;; TODO add to libraries and to GitHub Repos
-
-          libraries-id       (common/get-item-or-throw-error db "Library") ;; TODO should be repository, probably
+          github-users-id      (common/get-item-or-throw-error db "GitHub User")
+          github-repos-id      (common/get-item-or-throw-error db "GitHub Repo")
+          libraries-id       (common/get-item-or-throw-error db "Library")
         ;;   {:keys [title content date year image]}
         ;;   ,,(substack/get-post url substack/extract-content)
         ;;   year-id              (common/get-item-or-throw-error db year)
           _                    (validate-preconditions db url "TODO")
         ;;   summary              (and should-capture-summary?
                                     ;; (chatgpt/get-summary content))
-          substack-id          (create-or-take-github-user-id 
+          github-user-id       (create-or-take-github-user-id 
                                 db 
                                 (if external?
                                   (convert-external url)
                                   (convert url))
                                 github-platform-id
-                                github-user-id)
+                                github-users-id)
           context-ids-set     (conj context-ids-set
-                                    (or substack-id libraries-id) ;; hack 
+                                    (or github-user-id libraries-id) ;; hack 
                                     libraries-id 
+                                    github-repos-id
                                     github-platform-id)
           _ (log/info         (str "context-ids-set: " context-ids-set))
           item                (common/insert-item db 
