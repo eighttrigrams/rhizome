@@ -38,12 +38,22 @@
                  (filter (fn [item] (re-matches #"[A-Z][a-z]{2,4}\s\d\d,\s\d\d\d\d" item)))
                  first))))
 
+(defn- extract-date-for-pods [tree]
+   (let [base (select/select (select/descendant ;; difference is I don't filter for post-header
+                              (select/tag "div")) tree)]
+     (doall (->> base
+                 (filter (fn [item] (string? (first (:content item)))))
+                 (map (fn [item] (first (:content item))))
+                 (filter (fn [item] (re-matches #"[A-Z][a-z]{2,4}\s\d\d,\s\d\d\d\d" item)))
+                 first))))
+
 (defn get-post [url extract-content]
   (let [tree (html/as-hickory (html/parse (:body (http/get url))))
         title (scrapers.common/get-property tree "og:title")
         subtitle (scrapers.common/get-property tree "og:description")
         image (scrapers.common/get-property tree "og:image")
-        [date year] (-> tree extract-date convert-date)]
+        date  (or (extract-date tree) (extract-date-for-pods tree))
+        [date year] (convert-date date)]
     {:title   (str title " - " subtitle) 
      :date    date
      :year    year
@@ -53,6 +63,9 @@
                   scrapers.common/extract-text)}))
 
 (comment
+  (def tree (html/as-hickory (html/parse (:body (http/get "https://astralflight.substack.com/p/mkultramerica-the-unabomber?utm_source=%2Finbox%2Fsaved&utm_medium=reader2")))))
+  (extract-date-for-pods tree)
+
   (:image (get-post "https://woodfromeden.substack.com/p/the-anti-autism-manifesto" 
                     extract-content))
   
