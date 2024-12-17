@@ -27,6 +27,11 @@
                         (str "[apple podcasts]( " apple-podcast-link ")")) 
                       (when-let [apple-pod-ep-link (:apple-podcast-episode (:resource-links data))]
                         (str "[apple podcasts]( " apple-pod-ep-link ")")) 
+                      (when-let [github-link (:github-repo (:resource-links data))]
+                        (str "[github]( " github-link ")"))
+                      (when-let [github-link (:github-user (:resource-links data))]
+                        (str "[GH@" (str/replace github-link "https://github.com/" "") "](" 
+                             github-link ")"))
                       (when-let [youtube-link (:youtube-video (:resource-links data))]
                         (str "[youtube]( " youtube-link ")")) 
                       (when-let [youtube-link (:youtube-channel (:resource-links data))]

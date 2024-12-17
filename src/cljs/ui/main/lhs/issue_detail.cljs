@@ -52,7 +52,11 @@
     {:style {:font-size "35px"}}
     [:> ReactMarkdown
      {:children (str (when-let [youtube-link (:youtube-video (:resource-links data))]
-                       (str "[youtube]( " youtube-link ") "))
+                       (str "[youtube]( " youtube-link ") ")) 
+                     (when-let [github-link (:github-repo (:resource-links data))]
+                       (str "[github]( " github-link ") ")) 
+                     (when-let [github-link (:github-user (:resource-links data))]
+                       (str "[github]( " github-link ") ")) 
                      (when-let [youtube-link (:youtube-channel (:resource-links data))]
                         (str "[YT" (str/replace youtube-link "https://www.youtube.com/" "") "](" 
                              youtube-link ")"))

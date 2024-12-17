@@ -15,16 +15,14 @@
 
 (defn- get-github-user-id 
   [db 
-   [subdomain-handle
-    subdomain-url 
-    subdomain-full-url] 
+   user 
    github-platform-id
    github-orgs-id]
   (let [github-user (common/insert-item db 
-                                        subdomain-url
-                                        subdomain-handle 
+                                        user
+                                        (str "GH@" user) 
                                         #{github-platform-id github-orgs-id}
-                                        {:github-user subdomain-full-url})]
+                                        {:github-user (str "https://github.com/" user)})]
     (:id github-user)))
 
 (defn get-subdomain [url-string]
@@ -46,15 +44,15 @@
   (get-subdomain "https://github.com/eighttrigrams/tracker")
   (convert "https://github.com/eighttrigrams/tracker"))
 
-(defn- create-or-take-github-user-id [db 
-                                     identifiers 
-                                     github-platform-id 
-                                     github-users-id]
+(defn- create-or-take-github-user-id [db  
+                                      user 
+                                      github-platform-id 
+                                      github-users-id]
   (let [github-user-id (:id (datastore/get-item-by-path db 
-                                                     "data->'resource-links'->>'github-user'" 
-                                                     (last identifiers)))
+                                                        "data->'resource-links'->>'github-user'" 
+                                                        user))
         github-user-id (or github-user-id (get-github-user-id db 
-                                                     identifiers 
+                                                     user 
                                                      github-platform-id
                                                      github-users-id))]
     github-user-id))
@@ -76,7 +74,7 @@
         [title short-title] (convert url)
         github-user-id     (create-or-take-github-user-id 
                             db
-                            (convert url)
+                            (first (get-subdomain url))
                             github-platform-id
                             github-users-id)
         context-ids-set    (conj context-ids-set
