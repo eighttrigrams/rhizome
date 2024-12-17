@@ -50,7 +50,7 @@
                                       github-users-id]
   (let [github-user-id (:id (datastore/get-item-by-path db 
                                                         "data->'resource-links'->>'github-user'" 
-                                                        user))
+                                                        (str "https://github.com/" user)))
         github-user-id (or github-user-id (get-github-user-id db 
                                                      user 
                                                      github-platform-id
