@@ -10,7 +10,7 @@
    [:> ReactMarkdown
     {:children (if (:substack (:resource-links data)) 
                  (let [substack-link (:substack (:resource-links data))]
-                   (str "[Substack]( " substack-link ") " title))
+                   (str "[substack]( " substack-link ") " title))
                  (str (when-let [article-link (:substack-article (:resource-links data))]
                         (str "[substack]( " article-link ")"))
                       (when-let [substack-author-link (:substack-author (:resource-links data))]
@@ -30,12 +30,12 @@
                       (when-let [github-link (:github-repo (:resource-links data))]
                         (str "[github]( " github-link ")"))
                       (when-let [github-link (:github-user (:resource-links data))]
-                        (str "[GH@" (str/replace github-link "https://github.com/" "") "](" 
+                        (str "[github](" 
                              github-link ")"))
                       (when-let [youtube-link (:youtube-video (:resource-links data))]
                         (str "[youtube]( " youtube-link ")")) 
                       (when-let [youtube-link (:youtube-channel (:resource-links data))]
-                        (str "[YT" (str/replace youtube-link "https://www.youtube.com/" "") "](" 
+                        (str "[youtube](" 
                              youtube-link ")"))
                       " " title))}]])
 
