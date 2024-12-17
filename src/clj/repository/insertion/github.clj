@@ -83,10 +83,13 @@
                                  github-repos-id
                                  github-platform-id)
         _                  (log/info         (str "context-ids-set: " context-ids-set))
-        item               (common/insert-item db 
+        existing-item      (datastore/get-item-by-path db "data->'resource-links'->>'github-repo'" url)]
+    (if (:id existing-item)
+      (assoc (datastore/get-item db existing-item) :previously-existing-item? true)
+      (let [item (common/insert-item db 
                                                title 
                                                short-title
                                                context-ids-set 
                                                {:github-repo url})]
-    (log/info (str "created new item" item))
-    item))
+        (log/info (str "created new item" item))
+        item))))
