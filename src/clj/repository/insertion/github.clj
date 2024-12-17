@@ -57,20 +57,12 @@
                                                      github-users-id))]
     github-user-id))
 
-(defn- validate-preconditions [db url title]
-  (let [_ (when-not (seq title) (throw (Exception. "no post title")))
-        _ (when (:id (datastore/get-item-by-path db 
-                                                "data->'resource-links'->>'github-repo'" 
-                                                url))
-            (throw (Exception. "github repo already exists!")))]))
-
 (defn save-article [db url context-ids-set]
   (let [url                (url/url-without-query-params url)
         github-platform-id (common/get-item-or-throw-error db "GitHub")
         github-users-id    (common/get-item-or-throw-error db "GitHub User")
         github-repos-id    (common/get-item-or-throw-error db "GitHub Repo")
         libraries-id       (common/get-item-or-throw-error db "Library")
-        _                  (validate-preconditions db url url)
         [title short-title] (convert url)
         github-user-id     (create-or-take-github-user-id 
                             db
