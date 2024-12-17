@@ -8,6 +8,7 @@
             [repository.insertion.apple-pods :as apple-pods]
             [repository.insertion.substack-external :as substack-external]
             [repository.insertion.youtube :as youtube]
+            [repository.insertion.github :as github]
             #_[repository.insertion.file :as file]
             [repository.insertion.unz :as unz]
             [repository.insertion.takimag :as takimag]
@@ -46,6 +47,8 @@
           #_(file/ingest db title context-ids-set nil)
           (youtube/match? title) 
           (youtube/ingest db title context-ids-set nil)
+          (github/match? title) 
+          (github/save-article db title context-ids-set)
           (apple-pods/match? title) 
           (apple-pods/ingest db title context-ids-set nil)
           (substack/match? title)
