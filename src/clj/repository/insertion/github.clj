@@ -44,17 +44,17 @@
      only-domain
      (str "https://" only-domain)]))
 
-(defn- create-or-take-github-org-id [db 
+(defn- create-or-take-github-user-id [db 
                                      identifiers 
                                      github-platform-id 
-                                     github-orgs-id]
+                                     github-users-id]
   (let [substack-id (:id (datastore/get-item-by-path db 
-                                                     "data->'resource-links'->>'github-org'" 
+                                                     "data->'resource-links'->>'github-user'" 
                                                      (last identifiers)))
         substack-id (or substack-id (get-substack-id db 
                                                      identifiers 
                                                      github-platform-id
-                                                     github-orgs-id))]
+                                                     github-users-id))]
     substack-id))
 
 (defn- validate-preconditions [db url title]
@@ -68,7 +68,10 @@
   (fn save-article [db url context-ids-set]
     (let [url                  (url/url-without-query-params url)
           github-platform-id (common/get-item-or-throw-error db "GitHub")
-          github-org-id      (common/get-item-or-throw-error db "GitHub Organisation")
+          github-user-id      (common/get-item-or-throw-error db "GitHub User")
+
+          ;; TODO add to libraries and to GitHub Repos
+
           libraries-id       (common/get-item-or-throw-error db "Library") ;; TODO should be repository, probably
         ;;   {:keys [title content date year image]}
         ;;   ,,(substack/get-post url substack/extract-content)
@@ -76,13 +79,13 @@
           _                    (validate-preconditions db url "TODO")
         ;;   summary              (and should-capture-summary?
                                     ;; (chatgpt/get-summary content))
-          substack-id          (create-or-take-github-org-id 
+          substack-id          (create-or-take-github-user-id 
                                 db 
                                 (if external?
                                   (convert-external url)
                                   (convert url))
                                 github-platform-id
-                                github-org-id)
+                                github-user-id)
           context-ids-set     (conj context-ids-set
                                     (or substack-id libraries-id) ;; hack 
                                     libraries-id 
