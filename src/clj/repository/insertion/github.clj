@@ -24,17 +24,24 @@
                                         {:github-user subdomain-full-url})]
     (:id github-user)))
 
+(defn get-subdomain [url-string]
+  (let [url (java.net.URL. url-string)
+        host (.getPath url)
+        [_ user repo] (str/split host #"\/")]
+    [user repo]))
+
 (defn-  convert [url]
-  (let [subdomain (url/get-subdomain url)
-        subdomain-handle (str subdomain ".substack")
-        subdomain-url (str subdomain-handle ".com")
-        subdomain-full-url (str "https://" subdomain-url)]
+  (let [[user repo] (get-subdomain url)]
     [;; short-title
-     subdomain-handle
+     (str user "/" repo)
      ;; title
-     subdomain-url
+     (str user "/" repo)
      ;; link
-     subdomain-full-url]))
+     url]))
+
+(comment 
+  (get-subdomain "https://github.com/eighttrigrams/tracker")
+  (convert "https://github.com/eighttrigrams/tracker"))
 
 (defn- create-or-take-github-user-id [db 
                                      identifiers 
