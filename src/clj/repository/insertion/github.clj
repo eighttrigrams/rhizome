@@ -8,7 +8,10 @@
             upload))
 
 (defn match? [title]
-  (re-matches #"https://.*\.github.com\/.*/.*" title))
+  (re-matches #"https://github.com\/.*" title))
+
+(comment
+  (match? "https://github.com/taoensso/telemere"))
 
 (defn- get-github-user-id 
   [db 
@@ -69,12 +72,8 @@
         github-users-id    (common/get-item-or-throw-error db "GitHub User")
         github-repos-id    (common/get-item-or-throw-error db "GitHub Repo")
         libraries-id       (common/get-item-or-throw-error db "Library")
-        ;;   {:keys [title content date year image]}
-        ;;   ,,(substack/get-post url substack/extract-content)
-        ;;   year-id              (common/get-item-or-throw-error db year)
-        _                  (validate-preconditions db url "TODO")
-        ;;   summary              (and should-capture-summary?
-                                    ;; (chatgpt/get-summary content))
+        _                  (validate-preconditions db url url)
+        [title short-title] (convert url)
         github-user-id     (create-or-take-github-user-id 
                             db
                             (convert url)
@@ -87,8 +86,8 @@
                                  github-platform-id)
         _                  (log/info         (str "context-ids-set: " context-ids-set))
         item               (common/insert-item db 
-                                               "abc" 
-                                               "" 
+                                               title 
+                                               short-title
                                                context-ids-set 
                                                {:github-repo url})]
     (log/info (str "created new item" item))
