@@ -64,9 +64,11 @@
     (let [url                  (url/url-without-query-params url)
           substack-platform-id (common/get-item-or-throw-error db "Substack")
           substacks-id         (common/get-item-or-throw-error db "Substacks")
-          articles-id          (common/get-item-or-throw-error db "Articles")
-          {:keys [title content date year image]}
+          {:keys [title content date year image type]}
           ,,(substack/get-post url substack/extract-content)
+          articles-id          (common/get-item-or-throw-error db (if (= :podcast-episode type)
+                                                                    "Podcast Episodes"
+                                                                    "Articles"))
           year-id              (common/get-item-or-throw-error db year)
           summary              (and should-capture-summary?
                                     (chatgpt/get-summary content))

@@ -47,6 +47,16 @@
                  (filter (fn [item] (re-matches #"[A-Z][a-z]{2,4}\s\d\d,\s\d\d\d\d" item)))
                  first))))
 
+(defn podcast-episode? [tree]
+  (and
+   (extract-date-for-pods tree)
+   (not (extract-date tree))
+   (try
+     (scrapers.common/get-name tree "twitter:player")
+     true
+     (catch Exception _e
+       false))))
+
 (defn get-post [url extract-content]
   (let [tree (html/as-hickory (html/parse (:body (http/get url))))
         title (scrapers.common/get-property tree "og:title")
@@ -60,11 +70,15 @@
      :image   (when image (:body (http/get image {:as :byte-array})))
      :content (-> tree 
                   extract-content  
-                  scrapers.common/extract-text)}))
+                  scrapers.common/extract-text)
+     :type (if (podcast-episode? tree)
+             :podcast-episode
+             :article)}))
 
 (comment
   (def tree (html/as-hickory (html/parse (:body (http/get "https://astralflight.substack.com/p/mkultramerica-the-unabomber?utm_source=%2Finbox%2Fsaved&utm_medium=reader2")))))
   (extract-date-for-pods tree)
+  (podcast-episode? tree)
 
   (:image (get-post "https://woodfromeden.substack.com/p/the-anti-autism-manifesto" 
                     extract-content))
