@@ -74,6 +74,7 @@
         :defaultChecked (:archived issue)}]])])
 
 (defn component [issue]
+  (prn "this is great!!!!!!!")
   (let [*date-visible?  (r/atom (boolean (:date issue)))]
     (reset! *related-issues (into {} (map (fn [{:keys [id title]}] [id title]) (:related_issues issue))))
     (r/create-class
