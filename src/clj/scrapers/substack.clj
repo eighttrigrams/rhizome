@@ -54,7 +54,7 @@
         image (scrapers.common/get-property tree "og:image")
         date  (or (extract-date tree) (extract-date-for-pods tree))
         [date year] (convert-date date)]
-    {:title   (str title " - " subtitle) 
+    {:title   (subs (str title " - " subtitle) 0 255)
      :date    date
      :year    year
      :image   (when image (:body (http/get image {:as :byte-array})))
