@@ -10,7 +10,7 @@
 (defn clean [_]
   (b/delete {:path "target"}))
 
-(defn build [_]
+(defn jar [_]
   (clean nil)
   (b/copy-dir {:src-dirs ["src/clj" "src/cljc" "resources"]
                :target-dir class-dir})

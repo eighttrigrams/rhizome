@@ -14,7 +14,8 @@
             [cambium.core :as log]
             [ring.middleware.resource :refer [wrap-resource]]
             [ring.middleware.file :refer [wrap-file]]
-            [ring.middleware.multipart-params :refer [wrap-multipart-params]]))
+            [ring.middleware.multipart-params :refer [wrap-multipart-params]])
+  (:gen-class))
 
 (defn api-handler [{{msg :msg} :body}]
   (tap> [:resources (r/list-resources)])
