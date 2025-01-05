@@ -64,7 +64,8 @@
         image (scrapers.common/get-property tree "og:image")
         date  (or (extract-date tree) (extract-date-for-pods tree))
         [date year] (convert-date date)]
-    {:title   (subs (str title " - " subtitle) 0 255)
+    {:title   (subs (str title " - " subtitle) 0 (min 255 
+                                                      (count (str title " - " subtitle))))
      :date    date
      :year    year
      :image   (when image (:body (http/get image {:as :byte-array})))
@@ -79,11 +80,12 @@
   (def tree (html/as-hickory (html/parse (:body (http/get "https://astralflight.substack.com/p/mkultramerica-the-unabomber?utm_source=%2Finbox%2Fsaved&utm_medium=reader2")))))
   (extract-date-for-pods tree)
   (podcast-episode? tree)
-
+  
   (:image (get-post "https://woodfromeden.substack.com/p/the-anti-autism-manifesto" 
                     extract-content))
   
   (def data (:body (http/get "https://substackcdn.com/image/fetch/w_1200,h_600,c_fill,f_jpg,q_auto:good,fl_progressive:steep,g_auto/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F824250b3-83d1-45f4-8c49-f7530aa9e9c6_1536x1024.jpeg" 
                              {:as :byte-array})))
   (require '[clojure.java.io :as io])
-  (io/copy data (io/file "/Users/daniel/Desktop/test1.png")))
+  (io/copy data (io/file "/Users/daniel/Desktop/test1.png"))
+  )
