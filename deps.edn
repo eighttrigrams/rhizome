@@ -23,6 +23,5 @@
                                                                        :git/sha "dfb30dd"}}
                    :main-opts   ["-m" "cognitect.test-runner"]
                    :exec-fn     cognitect.test-runner.api/test}
-           :build {:deps       {io.github.clojure/tools.build {:git/tag "TAG"
-                                                               :git/sha "SHA"}}
+           :build {:deps       {io.github.clojure/tools.build {:git/tag "v0.10.6" :git/sha "52cf7d6"}}
                    :ns-default build}}}
