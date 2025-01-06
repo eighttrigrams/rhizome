@@ -29,7 +29,10 @@
          [month day] (str/split date-and-month #"\s")
          month (scrapers.substack.common/convert-month month)
          day (format "%02d" (Integer/parseInt day))
-         title (scrapers.common/get-property tree "og:description")]
+         title (scrapers.common/get-property tree "og:description")
+         title (subs title
+                     (min 255 
+                          (count title)))]
      {:date (str year "-" month "-" day)
       :year year
       :title title}))
