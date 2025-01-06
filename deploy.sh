@@ -2,5 +2,5 @@
 
 npm i
 npx shadow-cljs release app
-# clj -M -m uberdeps.uberjar --target server.jar
+cp server.jar server.jar.bkp
 clj -T:build jar
