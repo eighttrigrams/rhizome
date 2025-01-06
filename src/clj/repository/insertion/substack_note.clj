@@ -38,7 +38,7 @@
         note-id (subs url 0 (or (str/index-of url "?")
                                 (count url)))
         tree (scrapers.substack-note/get-tree note-id)
-        {:keys [title date year image]} (scrapers.substack-note/get-date tree)
+        {:keys [title date year image description]} (scrapers.substack-note/get-date tree)
         year-id (common/get-item-or-throw-error db year)]
     (when (:id (datastore/get-item-by-path db "data->'resource-links'->>'substack-note'" note-id))
       (throw (Exception. "substack note already exists!")))
@@ -50,7 +50,8 @@
                                          substack-platform-id
                                          author-id
                                          year-id) 
-                                   {:substack-note note-id})]
+                                   {:substack-note note-id})
+          item (datastore/update-item db (assoc item :description description))]
       (when image (try (upload/upload-preview-file db {:tempfile image} (:id item) "false")
                            (catch Exception e
                              (log/error (str "problem while trying to create preview image for substack note. message" (.getMessage e))))))

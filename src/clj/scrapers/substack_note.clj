@@ -29,15 +29,16 @@
          [month day] (str/split date-and-month #"\s")
          month (scrapers.substack.common/convert-month month)
          day (format "%02d" (Integer/parseInt day))
-         title (scrapers.common/get-property tree "og:description")
-         title (subs title
+         description (scrapers.common/get-property tree "og:description")
+         title (subs description
                      0
                      (min 255 
-                          (count title)))
+                          (count description)))
          image (scrapers.common/get-property tree "og:image")]
      {:date (str year "-" month "-" day)
       :year year
       :title title
+      :description description
       :image (when image (:body (http/get image {:as :byte-array})))}))
 
 (comment
