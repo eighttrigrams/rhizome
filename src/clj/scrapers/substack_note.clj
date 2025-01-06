@@ -31,6 +31,7 @@
          day (format "%02d" (Integer/parseInt day))
          title (scrapers.common/get-property tree "og:description")
          title (subs title
+                     0
                      (min 255 
                           (count title)))]
      {:date (str year "-" month "-" day)
