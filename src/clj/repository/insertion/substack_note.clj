@@ -36,12 +36,12 @@
         note-id (subs url 0 (or (str/index-of url "?")
                                 (count url)))
         tree (scrapers.substack-note/get-tree note-id)
-        {:keys [date year]} (scrapers.substack-note/get-date tree)
+        {:keys [title date year]} (scrapers.substack-note/get-date tree)
         year-id (common/get-item-or-throw-error db year)]
     (when (:id (datastore/get-item-by-path db "data->'resource-links'->>'substack-note'" note-id))
       (throw (Exception. "substack note already exists!")))
     (let [item (common/insert-item db 
-                                   "Substack Note" 
+                                   title 
                                    "" 
                                    (conj context-ids-set 
                                          poasts-id

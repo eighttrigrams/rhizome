@@ -29,10 +29,12 @@
          [month day] (str/split date-and-month #"\s")
          _ (prn "?" day)
          month (scrapers.substack.common/convert-month month)
-         day (format "%02d" (Integer/parseInt day))]
+         day (format "%02d" (Integer/parseInt day))
+         title (scrapers.common/get-property tree "og:description")]
      (prn month ".." day)
      {:date (str year "-" month "-" day)
-      :year year}))
+      :year year
+      :title title}))
 
 (comment
   (def tree (html/as-hickory (html/parse (:body (http/get "https://substack.com/@theheavenlyheritage/note/c-80757692")))))
