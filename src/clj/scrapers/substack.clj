@@ -4,30 +4,17 @@
             [hickory.select :as select]
             [hickory.core :as html]
             [clj-http.client :as http]
-            scrapers.common))
+            scrapers.common
+            scrapers.substack.common))
 
 (defn extract-content [hickory-tree]
   (:content (first (:content (first (select/select
      (select/and (select/tag "div")
                  (select/class "available-content")) hickory-tree))))))
 
-(defn- convert-month [month]
-  (get {"Jan" "01"
-        "Feb" "02"
-        "Mar" "03"
-        "Apr" "04"
-        "May" "05"
-        "Jun" "06"
-        "Jul" "07"
-        "Aug" "08"
-        "Sep" "09"
-        "Oct" "10"
-        "Nov" "11"
-        "Dec" "12"} month))
-
 (defn- convert-date [date]
   (let [[month day year] (filter #(not-empty %) (str/split date #"[\s,]"))]
-    [(str year  "-" (convert-month month) "-" day) year]))
+    [(str year  "-" (scrapers.substack.common/convert-month month) "-" day) year]))
 
 (defn- extract-date [tree]
    (let [base (select/select (select/descendant (select/class "post-header")

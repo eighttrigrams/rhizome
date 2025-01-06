@@ -33,10 +33,12 @@
          title (subs title
                      0
                      (min 255 
-                          (count title)))]
+                          (count title)))
+         image (scrapers.common/get-property tree "og:image")]
      {:date (str year "-" month "-" day)
       :year year
-      :title title}))
+      :title title
+      :image (when image (:body (http/get image {:as :byte-array})))}))
 
 (comment
   (def tree (html/as-hickory (html/parse (:body (http/get "https://substack.com/@theheavenlyheritage/note/c-80757692")))))
