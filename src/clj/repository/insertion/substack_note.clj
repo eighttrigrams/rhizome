@@ -51,7 +51,7 @@
                                          author-id
                                          year-id) 
                                    {:substack-note note-id})
-          item (datastore/update-item db (assoc item :description description))]
+          item (datastore/update-context-description db (assoc item :description description))]
       (when image (try (upload/upload-preview-file db {:tempfile image} (:id item) "false")
                            (catch Exception e
                              (log/error (str "problem while trying to create preview image for substack note. message" (.getMessage e))))))
