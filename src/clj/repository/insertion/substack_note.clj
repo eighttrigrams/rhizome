@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [et.vp.ds :as datastore]
             [repository.insertion.common :as common]
+            scrapers.substack-note
             utils))
 
 (defn- get-author-id 
@@ -33,7 +34,10 @@
         author-url (subs url 0 (str/index-of url "/note/"))
         author-id (create-or-take-author-id db author-url substack-platform-id)
         note-id (subs url 0 (or (str/index-of url "?")
-                                (count url)))]
+                                (count url)))
+        tree (scrapers.substack-note/get-tree note-id)
+        {:keys [_date year]} (scrapers.substack-note/get-date tree)
+        year-id (common/get-item-or-throw-error db year)]
     (when (:id (datastore/get-item-by-path db "data->'resource-links'->>'substack-note'" note-id))
       (throw (Exception. "substack note already exists!")))
     (common/insert-item db 
@@ -42,5 +46,6 @@
                         (conj context-ids-set 
                               poasts-id
                               substack-platform-id
-                              author-id) 
+                              author-id
+                              year-id) 
                         {:substack-note note-id})))

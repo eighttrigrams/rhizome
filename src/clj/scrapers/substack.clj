@@ -77,7 +77,7 @@
              :article)}))
 
 (comment
-  (def tree (html/as-hickory (html/parse (:body (http/get "https://astralflight.substack.com/p/mkultramerica-the-unabomber?utm_source=%2Finbox%2Fsaved&utm_medium=reader2")))))
+  (def tree (html/as-hickory (html/parse (:body (http/get "https://astralflight.substack.com/p/michael-tracey-on-trump-syria-neocons")))))
   (extract-date-for-pods tree)
   (podcast-episode? tree)
   
