@@ -32,7 +32,7 @@
                                 substacks-id)
           context-ids-set     (conj context-ids-set
                                     #_(or substack-id articles-id) ;; hack 
-                                    #_articles-id 
+                                    articles-id 
                                     substack-platform-id
                                     #_year-id
                                     )
