@@ -50,7 +50,7 @@
         subtitle (scrapers.common/get-property tree "og:description")
         image (scrapers.common/get-property tree "og:image")
         date  (or (extract-date tree) (extract-date-for-pods tree))
-        [date year] (convert-date date)]
+        [date year] (if date (convert-date date) [nil nil])]
     {:title   (subs (str title " - " subtitle) 0 
                     (min 255 
                          (count (str title " - " subtitle))))

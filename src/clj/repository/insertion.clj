@@ -7,6 +7,7 @@
             [repository.insertion.twitter-tweet :as twitter-tweet]
             [repository.insertion.apple-pods :as apple-pods]
             [repository.insertion.substack-external :as substack-external]
+            [repository.insertion.substack-plain :as substack-plain]
             [repository.insertion.youtube :as youtube]
             [repository.insertion.github :as github]
             #_[repository.insertion.file :as file]
@@ -55,6 +56,8 @@
           ((substack/make:save-article false) db title context-ids-set alternative-behaviour?)
           (substack-external/match? title)
           (substack-external/save-article db title context-ids-set alternative-behaviour?)
+          (substack-plain/match? title)
+          (substack-plain/save-article db title context-ids-set alternative-behaviour?)
           (substack-note/match? title)
           (substack-note/ingest db title context-ids-set alternative-behaviour?)
           (twitter-tweet/match? title)
