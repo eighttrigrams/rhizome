@@ -112,20 +112,14 @@
 (defn component [_*state]
   (fn [*state]
     [:<>
-     (if (or (= 0 (:events-view (:current (:views (:data (:selected-context @*state))))))
-             (nil? (:events-view (:current (:views (:data (:selected-context @*state)))))))
-       [:h4 "Search mode: "
-        (case (:search-mode (:current (:views (:data (:selected-context @*state)))))
-          0 "Normal"
-          1 "Reverse"
-          2 "A->Z,0->9"
-          3 "9->0,Z->A"
-          nil "Normal")]
-       [:h4 "Events View: "
-        (case (:events-view (:current (:views (:data (:selected-context @*state)))))
-          0 "Normal"
-          1 "Events"
-          nil "Normal")])
+     [:h4 "Search mode: "
+      (case (:search-mode (:current (:views (:data (:selected-context @*state)))))
+        0 "Normal"
+        1 "Reverse"
+        2 "A->Z,0->9"
+        3 "9->0,Z->A"
+        4 "Events"
+        nil "Normal")]
      [views-component *state]
      [invert-component *state]
      [secondary-contexts-component *state]]))

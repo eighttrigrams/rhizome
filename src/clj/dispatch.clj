@@ -11,8 +11,6 @@
                                 finish-linking-issue
                                 reprioritize-issue
                                 cycle-search-mode
-                                show-past-events
-                                deselect-events
                                 store-current-view
                                 load-stored-context
                                 remove-stored-context
@@ -43,8 +41,6 @@
   finish-linking-issue
   reprioritize-issue
   cycle-search-mode
-  show-past-events
-  deselect-events
   store-current-view
   load-stored-context
   remove-stored-context

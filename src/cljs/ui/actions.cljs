@@ -204,12 +204,6 @@
                                 @*state
                                 api/change-secondary-contexts-inverted))
 
-(defn show-past-events! [*state]
-  (fetch-and-reset-with-method! *state @*state api/show-past-events))
-
-(defn deselect-events! [*state]
-  (fetch-and-reset-with-method! *state @*state api/deselect-events))
-
 (defn cycle-search-mode! [*state]
   (fetch-and-reset-with-method! *state @*state api/cycle-search-mode))
 

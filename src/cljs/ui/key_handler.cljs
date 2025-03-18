@@ -8,10 +8,7 @@
      (let [{:keys [selected-context
                    issue-view?]} @*state]
        (cond (= "Escape" code)
-             (cond (and (not selected-context)
-                        (not= 0 (:events-view @*state)))
-                   (actions/deselect-events! *state)
-                   (and (:active-search @*state)
+             (cond (and (:active-search @*state)
                         (not alt-pressed?))
                    (actions/quit-search! *state)
                    (and (not alt-pressed?) issue-view?)
@@ -24,8 +21,6 @@
              (cond 
                (and (= "KeyG" code) ctrl-pressed? shift-pressed?)
                (actions/flip-privacy! *state)
-               (and selected-context (= "KeyV" code))
-               (actions/show-past-events! *state)
                (and selected-context (= "KeyE" code))
                (swap! *state #(assoc % :modal :edit-context :issue-view? false))
                (and selected-context (= "Delete" code))

@@ -184,14 +184,6 @@
          :events-view (:events-view opts)
          :q                               nil}))))
 
-(defn show-past-events [{:keys [db]}]
-  ;; currently only used in global mode, so the else branch won't execute
-  (make-events-fn db 2 datastore/show-past-events))
-
-(defn deselect-events [{:keys [db]}]
-  ;; currently only used in global mode, so the else branch won't execute
-  (make-events-fn db 0 datastore/deselect-events))
-
 (defn store-current-view [{:keys [db]}]
   (fn [{:keys [selected-context]} item]
     (let [selected-context (datastore/store-current-view db selected-context item)]
