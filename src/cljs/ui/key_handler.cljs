@@ -24,7 +24,7 @@
              (cond 
                (and (= "KeyG" code) ctrl-pressed? shift-pressed?)
                (actions/flip-privacy! *state)
-               (= "KeyV" code)
+               (and selected-context (= "KeyV" code))
                (actions/show-past-events! *state)
                (and selected-context (= "KeyE" code))
                (swap! *state #(assoc % :modal :edit-context :issue-view? false))
