@@ -119,6 +119,7 @@
         2 "A->Z,0->9"
         3 "9->0,Z->A"
         4 "Events"
+        5 "Added"
         nil "Normal")]
      [views-component *state]
      [invert-component *state]
