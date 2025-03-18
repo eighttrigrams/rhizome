@@ -8,10 +8,9 @@
 
 (defn- issue-creation-permitted? 
   [{{{{{:keys [secondary-contexts-unassigned-selected
-               events-view]} :current} :views} :data} :selected-context}]
+               search-mode]} :current} :views} :data} :selected-context}]
   (and (not secondary-contexts-unassigned-selected)
-       (or (= 0 events-view) 
-           (nil? events-view))))
+       (= 0 search-mode)))
 
 ;; TODO replace a couple of whens with a cond
 (defn handle-keys [*state]

@@ -166,24 +166,6 @@
                    :search-mode] 0))
     opts))
 
-(defn- make-events-fn [db mode-number db-fn]
-  (fn [{:keys [selected-context] :as opts}]
-    (if selected-context
-      (let [selected-context (db-fn db selected-context)]
-        {:issues         (search/search-issues db (assoc opts :selected-context selected-context))
-         :selected-context selected-context
-         :contexts       []
-         :q              nil})
-      (let [opts (-> opts
-                     (dissoc :q)
-                     (assoc :events-view mode-number))]
-        {:issues                          (search/search-issues db opts)
-         :contexts                        (if (= 0 (:events-view opts))
-                                            (search/search-contexts db opts)
-                                            [])
-         :events-view (:events-view opts)
-         :q                               nil}))))
-
 (defn store-current-view [{:keys [db]}]
   (fn [{:keys [selected-context]} item]
     (let [selected-context (datastore/store-current-view db selected-context item)]
