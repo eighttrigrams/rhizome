@@ -113,13 +113,6 @@
                                                    :data
                                                    :views
                                                    :current
-                                                   :events-view]
-                                                  0)
-                                                 (assoc-in
-                                                  [:selected-context
-                                                   :data
-                                                   :views
-                                                   :current
                                                    :notes-mode]
                                                   false)
                                                  )))]
@@ -138,12 +131,6 @@
     (-> opts
         (cond-> :selected-context
           (update :selected-context (fn [a] (dissoc a :search_mode))))
-        (assoc :events-view 0)
-        #_(assoc-in [:selected-context 
-                   :data 
-                   :views
-                   :current
-                   :selected-secondary-contexts] [])
         (assoc-in [:selected-context
                    :data
                    :views
@@ -154,11 +141,6 @@
                    :views
                    :current
                    :secondary-contexts-unassigned-selected] false)
-        (assoc-in [:selected-context
-                   :data
-                   :views
-                   :current
-                   :events-view] 0)
         (assoc-in [:selected-context
                    :data
                    :views
@@ -427,10 +409,8 @@
              (= :contexts active-search) (search-contexts db opts)
              :else
              (merge {:issues   (search/search-issues db opts)
-                     :public?  (and @privacy/*public? (= :private privacy-mode))}
-                    (when-not (and (not= 0 (:events-view opts)) 
-                                   (not selected-context))
-                      {:contexts (search/search-contexts db "")})))
+                     :public?  (and @privacy/*public? (= :private privacy-mode))
+                     :contexts (search/search-contexts db "")}))
        :start-global-search ((start-global-search {:db db}) opts)
        :link-issue-to-selected-context (start-linking-issue-to-selected-context db opts)
        :start-linking-selected-issue-to-context (start-linking-selected-issue-to-context-with-local-search db opts)

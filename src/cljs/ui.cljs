@@ -8,7 +8,6 @@
 (def original-state {:issues                          []
                      :contexts                        []
                      :selected-context                nil
-                     :events-view                     0
                      :active-search                   nil
                      :modal                           nil})
 
