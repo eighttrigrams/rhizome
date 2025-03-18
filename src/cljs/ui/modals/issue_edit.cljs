@@ -20,9 +20,6 @@
 (defn- get-event-el []
   (.getElementById js/document "has-date"))
 
-(defn- get-event-archived-el []
-  (.getElementById js/document "event-archived"))
-
 (defn- get-date-el []
   (.getElementById js/document "date-picker"))
 
@@ -67,11 +64,7 @@
       [:p "Event"]
       [:input#date-picker
        {:type         :date
-        :defaultValue (:date issue)}]
-      [:p "Event archived?"]
-      [:input#event-archived
-       {:type           :checkbox
-        :defaultChecked (:archived issue)}]])])
+        :defaultValue (:date issue)}]])])
 
 (defn component [issue]
   (let [*date-visible?  (r/atom (boolean (:date issue)))]
@@ -100,8 +93,6 @@
                         :short_title     (.-value (get-short-title-el))
                         :tags            (.-value (get-tags-el))
                         :has-event?      (.-checked (get-event-el))
-                        :archived        (when (get-event-archived-el) 
-                                           (.-checked (get-event-archived-el)))
                         :date            (when (get-date-el) (.-value (get-date-el)))
                         :data            {:highlighted-secondary-contexts (str/split (.-value (get-highlighted-secondary-contexts-el)) #" ")}}
     ;;  :related-issues-ids (keys @*related-issues)

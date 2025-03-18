@@ -55,4 +55,4 @@
       (when image (try (upload/upload-preview-file db {:tempfile image} (:id item) "false")
                            (catch Exception e
                              (log/error (str "problem while trying to create preview image for substack note. message" (.getMessage e))))))
-      (datastore/insert-date db (:id item) date true))))
+      (datastore/insert-date db (:id item) date))))

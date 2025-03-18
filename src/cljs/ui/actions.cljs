@@ -204,9 +204,6 @@
                                 @*state
                                 api/change-secondary-contexts-inverted))
 
-(defn show-events! [*state]
-  (fetch-and-reset-with-method! *state @*state api/show-events))
-
 (defn show-past-events! [*state]
   (fetch-and-reset-with-method! *state @*state api/show-past-events))
 

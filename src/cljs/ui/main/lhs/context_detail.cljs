@@ -125,7 +125,6 @@
         (case (:events-view (:current (:views (:data (:selected-context @*state)))))
           0 "Normal"
           1 "Events"
-          2 "Archived"
           nil "Normal")])
      [views-component *state]
      [invert-component *state]

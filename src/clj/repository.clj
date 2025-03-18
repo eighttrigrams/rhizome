@@ -184,9 +184,6 @@
          :events-view (:events-view opts)
          :q                               nil}))))
 
-(defn show-events [{:keys [db]}]
-  (make-events-fn db 1 datastore/show-events))
-
 (defn show-past-events [{:keys [db]}]
   ;; currently only used in global mode, so the else branch won't execute
   (make-events-fn db 2 datastore/show-past-events))

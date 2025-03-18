@@ -11,7 +11,6 @@
                                 finish-linking-issue
                                 reprioritize-issue
                                 cycle-search-mode
-                                show-events
                                 show-past-events
                                 deselect-events
                                 store-current-view
@@ -44,7 +43,6 @@
   finish-linking-issue
   reprioritize-issue
   cycle-search-mode
-  show-events
   show-past-events
   deselect-events
   store-current-view

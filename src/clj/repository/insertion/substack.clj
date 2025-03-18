@@ -95,7 +95,7 @@
                                                   "" 
                                                   context-ids-set 
                                                   {:substack-article url})]
-          (datastore/insert-date db (:id item) date true)
+          (datastore/insert-date db (:id item) date)
           (log/info (str "created new item" item))
           (when image (try (upload/upload-preview-file db {:tempfile image} (:id item) "false")
                            (catch Exception e
