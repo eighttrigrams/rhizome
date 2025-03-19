@@ -10,7 +10,8 @@
   [{{{{{:keys [secondary-contexts-unassigned-selected
                search-mode]} :current} :views} :data} :selected-context}]
   (and (not secondary-contexts-unassigned-selected)
-       (= 0 search-mode)))
+       (or (nil? search-mode)
+           (= 0 search-mode))))
 
 ;; TODO replace a couple of whens with a cond
 (defn handle-keys [*state]
