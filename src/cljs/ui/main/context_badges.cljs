@@ -1,6 +1,8 @@
-(ns ui.main.context-badges)
+(ns ui.main.context-badges 
+  (:require
+    [ui.actions :as actions]))
 
-(defn component [contexts]
+(defn component [*state contexts]
   [:span.contexts
    (doall
     (map (fn [[idx {:keys [title date file number context show-badge?]}]]
@@ -27,5 +29,9 @@
              [:span.badge.light
               {:key :number} number] 
              (when show-badge?
-               [:span.badge {:key idx} title]))) 
+               [:span.badge {:key idx
+                             :on-click (fn [_e]
+                                         (when-not (or (:link-context @*state)
+                                                       (:link-issue @*state))
+                                           (actions/select-context! *state {:id idx})))} title]))) 
          contexts))])
