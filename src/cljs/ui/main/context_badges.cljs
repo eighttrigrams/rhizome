@@ -30,7 +30,8 @@
               {:key :number} number] 
              (when show-badge?
                [:span.badge {:key idx
-                             :on-click (fn [_e]
+                             :on-click (fn [e]
+                                         (.stopPropagation e)
                                          (when-not (or (:link-context @*state)
                                                        (:link-issue @*state))
                                            (actions/select-context! *state {:id idx})))} title]))) 
