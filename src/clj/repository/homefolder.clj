@@ -3,6 +3,8 @@
             [clojure.string :as str]
             [clojure.java.io :as io]))
 
+(def homefolder (-> (read-string (slurp "./config.edn")) :folders :homefolder))
+
 (defn- get-suffix [file-name]
   (let [idx (str/last-index-of file-name ".")]
     (str/lower-case (subs file-name (inc idx)))))
@@ -25,18 +27,18 @@
       ))
 
 (defn validate-not-exists [file-name]
-  (when (.exists (io/file (str "/Users/daniel/Music/Tracked/" file-name)))
+  (when (.exists (io/file (str homefolder "Music/Tracked/" file-name)))
     (throw (Exception. (str "File already exists: " file-name))))
-  (when (.exists (io/file (str "/Users/daniel/Pictures/Tracked/" file-name)))
+  (when (.exists (io/file (str homefolder "Pictures/Tracked/" file-name)))
     (throw (Exception. (str "File already exists: " file-name))))
-  (when (.exists (io/file (str "/Users/daniel/Documents/Tracked/" file-name)))
+  (when (.exists (io/file (str homefolder "Documents/Tracked/" file-name)))
     (throw (Exception. (str "File already exists: " file-name))))
-  (when (.exists (io/file (str "/Users/daniel/Movies/Tracked/" file-name)))
+  (when (.exists (io/file (str homefolder "Movies/Tracked/" file-name)))
     (throw (Exception. (str "File already exists: " file-name)))))
 
 ;; when adding files, also see file.clj (this here is 1 of 3 places)
 (defn get-target [file-name]
-  (str "/Users/daniel/"
+  (str homefolder
        (case (get-suffix file-name)
          ("mp3" "wav" "ogg" "m4a") "Music"
          ("mp4" "flv" "mov") "Movies"
@@ -48,10 +50,10 @@
 (defn move-file [file-name]
   (let [target (get-target file-name)]
     (log/info (str "Will move " file-name " to " (str/replace target file-name "")))
-    (.renameTo (io/file (str "/Users/daniel/Downloads/Tracked/" file-name))
+    (.renameTo (io/file (str homefolder "Downloads/Tracked/" file-name))
                (io/file target))))
 
 (defn list-files []
-  (->> (vec (file-seq (io/file "/Users/daniel/Downloads/Tracked/")))
+  (->> (vec (file-seq (io/file (str homefolder "Downloads/Tracked/"))))
        (filter #(not (.isDirectory %)))
        (map #(.getName %))))

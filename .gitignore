@@ -18,3 +18,5 @@ tracker-*.log*
 *.jks
 *.pkcs12
 *.pem
+files
+resources/public/imgs

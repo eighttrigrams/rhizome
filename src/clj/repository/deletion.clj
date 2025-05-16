@@ -3,6 +3,8 @@
             [cambium.core :as log]
             [et.vp.ds :as datastore]))
 
+(def homefolder (-> (read-string (slurp "./config.edn")) :folders :homefolder))
+
 (defn- get-files-count [db file]
   (if file
     (count (datastore/get-items-by-path db 
@@ -11,7 +13,7 @@
     0))
 
 (defn- file-path [folder file]
-  (str "/Users/daniel/" folder "/Tracked/" file))
+  (str homefolder folder "/Tracked/" file))
 
 (defn- found-files [file]
   (if-not file
@@ -30,8 +32,8 @@
         (io/delete-file (io/file file-path))))))
 
 (defn- delete-preview-images [id]
-  (let [highres-path (str "/Users/daniel/Pictures/Tracked/Preview/" id ".png")
-        lowres-path (str "/Users/daniel/Pictures/Tracked/Preview/Lowres/" id ".png")]
+  (let [highres-path (str homefolder "Pictures/Tracked/Preview/" id ".png")
+        lowres-path (str homefolder "Pictures/Tracked/Preview/Lowres/" id ".png")]
     (when (.exists (io/file highres-path))
       (log/info (str "Will remove " highres-path))
       (.delete (io/file highres-path)))

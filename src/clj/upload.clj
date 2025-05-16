@@ -4,6 +4,8 @@
             [et.vp.ds :as datastore]
             [clojure.java.shell :refer [sh]]))
 
+(def homefolder (-> (read-string (slurp "./config.edn")) :folders :homefolder))
+
 (defn upload-preview-file [db uploaded-file id alternative-behaviour?]
   (let [_ 1]
     (try
@@ -18,10 +20,10 @@
                    (-> data 
                        (assoc :preview-image (str id ".png"))
                        (dissoc :preview-image-lowres)))
-            path (str "/Users/daniel/Pictures/Tracked/Preview/" 
+            path (str homefolder "Pictures/Tracked/Preview/" 
                       id 
                       ".png")
-            lowres-path (str "/Users/daniel/Pictures/Tracked/Preview/Lowres/" 
+            lowres-path (str homefolder "Pictures/Tracked/Preview/Lowres/" 
                              id 
                              ".png")]
         (datastore/update-item db (assoc item :data data)) 
