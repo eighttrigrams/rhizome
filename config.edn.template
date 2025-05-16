@@ -7,6 +7,7 @@
  :substack {:external-substacks ["www.arktosjournal.com"
                                  "www.eugyppius.com"
                                  "www.alexkaschuta.com"]}
+ :dev? true
  :db 
  {:dbtype   "postgresql"
   :dbname   ""
@@ -15,5 +16,6 @@
   :port     5432
   :hostname "127.0.0.1"
   :dev? true
-  :private-addr "b"}}
+  :private-addr "b"}
+  :folders {:homefolder "/Users/daniel/"}}
  
