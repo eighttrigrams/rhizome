@@ -75,14 +75,21 @@
        (GET "/" [] (response/resource-response "public/index.html")))
      req))) ;; TODO use route/resources (see cljsc-webstacks)
 
+(def dev? (true? (-> (read-string (slurp "./config.edn")) :dev?)))
+
 (defn app [mode]
   (fn [req]
-    ((-> (routes mode)
-          wrap-env-defaults
-          (wrap-resource "public")
-          (wrap-file "./public" {:allow-symlinks? true})
-         wrap-multipart-params)
-     req)))
+    (let [pipeline (if dev? 
+                     #(-> %
+                         (wrap-resource "public" {:allow-symlinks? true}))
+                     #(-> % 
+                          (wrap-resource "public")
+                          (wrap-file "./public" {:allow-symlinks? true})))] 
+      ((-> (routes mode) 
+           wrap-env-defaults
+           pipeline
+           wrap-multipart-params)
+       req))))
 
 (mount/defstate ^{:on-reload :noop} http-server
   :start
