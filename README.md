@@ -5,8 +5,9 @@ An issue tracking system.
 ## Getting started
 
 ```bash
+$ ln -s </absolute-path-to-your-git-workspace>/tracker/files/Pictures/Tracked resources/public/imgs
 $ npm i
-$ cp config.edn.template config.edn # Edit!
+$ cp config.edn.template config.edn # Edit! Make sure that :folders :homefolder points to /<.../your-git-workspace>/tracker/files/
 $1 ./dev.sh                  # Server
 $2 npx shadow-cljs watch app # Frontend
 ```
