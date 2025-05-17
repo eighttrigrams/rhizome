@@ -29,7 +29,6 @@
 
 (defn- image-component [title data]
   (let [resource-links (:resource-links data)]
-    (prn "lowres?" (:lowres? data) (keys data))
     [:<>
      (when (not (:lowres? data))
        (when-let [preview-image-link (:preview-image data)]
