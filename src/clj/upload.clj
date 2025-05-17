@@ -16,9 +16,15 @@
             data (if downscale-image?  
                    (-> data 
                        (assoc :preview-image-lowres (str id ".png"))
+                       ;; introduced because of the comment 2 below
+                       (assoc :lowres? true)
+                       ;; this doesn't work properly as update-item will merge the data with the old data
                        (dissoc :preview-image))
                    (-> data 
                        (assoc :preview-image (str id ".png"))
+                       ;; introduced because: see comment below
+                       (assoc :lowres? false)
+                       ;; this doesn't work properly as update-item will merge the data with the old data
                        (dissoc :preview-image-lowres)))
             path (str homefolder "Pictures/Tracked/Preview/" 
                       id 

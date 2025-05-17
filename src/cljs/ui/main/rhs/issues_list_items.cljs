@@ -41,14 +41,22 @@
 
 (defn- image-preview-component [data]
   [:div.img-container
-   (cond (:preview-image-lowres data)
+   (cond (or (and (:preview-image-lowres data)
+                  (not (:preview-image data)))
+             (and (:preview-image-lowres data)
+                  (:preview-image data)
+                  (:lowres? data)))
          [:img {:src     (str "/imgs/Preview/Lowres/" (:preview-image-lowres data))
                 :style   {:visibility :hidden
                           :height "0px"}
                 :on-load (fn [t]
                            (set! (-> (.-target t) .-style .-height) "180px")
                            (set! (.. t -target -style -visibility) "visible"))}]
-         (:preview-image data)
+         (or (and (:preview-image data)
+                  (not (:preview-image data)))
+             (and (:preview-image-lowres data)
+                  (:preview-image data)
+                  (not (:lowres? data))))
          [:img {:src     (str "/imgs/Preview/" (:preview-image data))
                 :style   {:visibility :hidden
                           :height "0px"}
