@@ -53,7 +53,7 @@
                            (set! (-> (.-target t) .-style .-height) "180px")
                            (set! (.. t -target -style -visibility) "visible"))}]
          (or (and (:preview-image data)
-                  (not (:preview-image data)))
+                  (not (:preview-image-lowres data)))
              (and (:preview-image-lowres data)
                   (:preview-image data)
                   (not (:lowres? data))))
