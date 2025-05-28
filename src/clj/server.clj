@@ -2,7 +2,7 @@
   (:require [ring.adapter.jetty :as j]
             privacy
             upload
-            [compojure.core :refer [defroutes context GET POST]]
+            [compojure.core :refer [context GET POST]]
             [ring.util.response :as response]
             [ring.middleware.json :as json]
             [env :refer [wrap-env-defaults]]
@@ -26,18 +26,13 @@
   (opener/open file-id)
   {:status 200})
 
-(defn- api [mode]
+(defn- api []
   (fn [req]
-    (if (or (and (= :public mode)
-                 #_true
-                 (or (not @privacy/*public?)
-                     (and (not (:dev? config/config))
-                          (or (not (= (:public-addr config/config) (:remote-addr req)))
-                              (not (= (:public-user-agent config/config) (get-in req [:headers "user-agent"])))))))
-            (and (= :private mode)
-                 (not (:dev? config/config))
-                 (or (not (= (:private-addr config/config) (:remote-addr req)))
-                     (not (= (:private-user-agent config/config) (get-in req [:headers "user-agent"]))))))
+    (if
+     (and
+      (not (:dev? config/config))
+      (or (not (= (:private-addr config/config) (:remote-addr req)))
+          (not (= (:private-user-agent config/config) (get-in req [:headers "user-agent"])))))
       (do
         (log/warn (pr-str req))
         {:status 403})
@@ -51,7 +46,7 @@
                                      (:db config/config))
                                     (assoc-in
                                      [:body :server-args :privacy-mode]
-                                     mode)))))
+                                     :private)))))
           json/wrap-json-response
           (json/wrap-json-body {:keywords? true})))
        req))))
@@ -64,12 +59,12 @@
     ;; Process the uploaded file here. For example, save it to a directory.
     (response/response "File uploaded successfully!")))
 
-(defn- routes [mode]
+(defn- routes []
   (fn [req]
     (
      (context "/" []
        (context "/api" []
-         (POST "/" [] (api mode)))
+         (POST "/" [] (api)))
        (GET "/open/:file-id" [] open)
        (POST "/upload" req (upload-handler req))
        (GET "/" [] (response/resource-response "public/index.html")))
@@ -77,7 +72,7 @@
 
 (def dev? (true? (-> (read-string (slurp "./config.edn")) :dev?)))
 
-(defn app [mode]
+(defn app []
   (fn [req]
     (let [pipeline (if dev? 
                      #(-> %
@@ -85,7 +80,7 @@
                      #(-> % 
                           (wrap-resource "public")
                           (wrap-file "./public" {:allow-symlinks? true})))] 
-      ((-> (routes mode) 
+      ((-> (routes) 
            wrap-env-defaults
            pipeline
            wrap-multipart-params)
@@ -94,29 +89,12 @@
 (mount/defstate ^{:on-reload :noop} http-server
   :start
   (do
-    (prn "config valid?" config/config)
+    (prn "config valid??" config/config)
     (when (and (not (:dev? config/config)) 
                (or (nil? (:private-addr config/config))
                    (not (string? (:private-addr config/config)))))
       (throw (Exception. "config invalid")))
-    (let [port (:port config/config)]
-        (future (j/run-jetty (app :private) (if (:dev? config/config)
-                                              {:port port}
-                                              {:port port}
-                                              #_{:ssl?     true
-                                               :http?    false
-                                               :keystore "keystore.jks"
-                                               :key-password (:key-password config/config)
-                                               :ssl-port port})))) 
-    (let [port (+ (:port config/config) 2)]
-        (future (j/run-jetty (app :public) (if (:dev? config/config)
-                                             {:port port}
-                                             {:port port}
-                                             #_{:ssl?     true
-                                              :http?    false
-                                              :keystore "keystore.jks"
-                                              :key-password (:key-password config/config)
-                                              :ssl-port port})))))
+    (future (j/run-jetty (app) {:port (:port config/config)})))
   :stop 0)
 
 (defn -main
