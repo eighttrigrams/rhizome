@@ -102,7 +102,8 @@
     (let [port (:port config/config)]
         (future (j/run-jetty (app :private) (if (:dev? config/config)
                                               {:port port}
-                                              {:ssl?     true
+                                              {:port port}
+                                              #_{:ssl?     true
                                                :http?    false
                                                :keystore "keystore.jks"
                                                :key-password (:key-password config/config)
@@ -110,7 +111,8 @@
     (let [port (+ (:port config/config) 2)]
         (future (j/run-jetty (app :public) (if (:dev? config/config)
                                              {:port port}
-                                             {:ssl?     true
+                                             {:port port}
+                                             #_{:ssl?     true
                                               :http?    false
                                               :keystore "keystore.jks"
                                               :key-password (:key-password config/config)
