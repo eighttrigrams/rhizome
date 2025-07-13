@@ -29,7 +29,8 @@
         *state issue idx {:allow-delete-on-right-click? true
                           :show-relation-annotation? true
                           :select-fn #(scroll-into-view %)
-                          :show-context-selector? true}]])
+                          :show-context-selector? true
+                          :show-added-date? true}]])
     (:issues @*state))])
 
 (defn component [_*state]

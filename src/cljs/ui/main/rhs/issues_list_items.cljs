@@ -93,7 +93,8 @@
 (defn regular-issues-list-item-component [*state issue idx {:keys [allow-delete-on-right-click?
                                                                    show-relation-annotation?
                                                                    select-fn
-                                                                   show-context-selector?]
+                                                                   show-context-selector?
+                                                                   show-added-date?]
                                                             :as   _opts}]
   [:li.issue-card
    (merge {:class          (str "card"
@@ -140,9 +141,11 @@
                                               (merge (when (and (:is_context issue) show-context-selector?) 
                                                        {0 {:context #(actions/select-context! *state issue)}})
                                                      (when (or (:date issue)
-                                                               (and (:selected-context @*state)
+                                                               (and show-added-date?
+                                                                    (:selected-context @*state)
                                                                     (= 5 (:search-mode (:current (:views (:data (:selected-context @*state))))))))
-                                                       {:date (if (and (:selected-context @*state)
+                                                       {:date (if (and show-added-date?
+                                                                       (:selected-context @*state)
                                                                        (= 5 (:search-mode (:current (:views (:data (:selected-context @*state))))))) 
                                                                 (when (and (:inserted_at issue) (instance? js/Date (:inserted_at issue)))
                                                                   (assoc issue :date (first (str/split (.toISOString (:inserted_at issue)) #"T")))) 
