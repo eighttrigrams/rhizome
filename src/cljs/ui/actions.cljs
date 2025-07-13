@@ -3,7 +3,8 @@
                                        fetch-and-reset-with-method!
                                        fetch-and-reset-with-method-2!]]
             api
-            [goog.async.Debouncer]))
+            [goog.async.Debouncer]
+            [ui.main.rhs.modifiers :as modifiers]))
 
 (defn fetch! [*state]
   (fetch-and-reset! *state @*state))
@@ -14,12 +15,14 @@
     (fetch-and-reset! *state (-> @*state
                                  (assoc :active-search :issues)
                                  (dissoc :preview-issue 
+                                         :search-globally? 
                                          :link-issue 
                                          :q))) 
     (= :issues (:active-search @*state))
     (fetch-and-reset! *state (-> @*state 
                                  (dissoc :preview-issue 
                                          :active-search
+                                         :search-globally?
                                          :link-issue 
                                          :q)))))
 
