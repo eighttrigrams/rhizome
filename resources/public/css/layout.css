@@ -1,6 +1,8 @@
-body {
+html, body {
     position: absolute !important;
     width: 100% !important;
+    height: 100% !important;
+    overflow: hidden !important;
     display: unset !important;
     flex-direction: unset !important;
     margin: 0;
