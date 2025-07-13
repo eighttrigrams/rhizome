@@ -43,10 +43,8 @@
              (set! (.-value (get-title-el)) ""))
            (and (= :issues active-search)
                 (not (:enter-pressed? @*state))
-                (not (:search-globally? @*state))
                 selected-context
-                (or shift-pressed?
-                    alt-pressed?
+                (or (and shift-pressed? (not alt-pressed?))
                     (= 0 (count (:issues @*state)))
                     in-notes-mode?)
                 (issue-creation-permitted? @*state))
