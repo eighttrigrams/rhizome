@@ -41,8 +41,7 @@
 (defn fetch-context [{:keys [db]}]
   (fn [old-state [arg fetch-as-issue?]]
     (let [selected-context (datastore/get-item db arg)
-          opts             {:search-globally? false
-                            :selected-context selected-context}]
+          opts             {:selected-context selected-context}]
       (log/info (str "fetch-context as " (if fetch-as-issue? "issue" "context") " from (" (:id (:old-selected-context old-state)) "):\"" (:title (:old-selected-context old-state)) "\" to (" (:id selected-context) "):\"" (:title selected-context) "\""))
       (if fetch-as-issue?
         (datastore/reprioritize-issue db arg)
@@ -123,11 +122,9 @@
        :selected-context context})))
 
 (defn make-search-issues
-  [{:keys [link-issue
-           search-globally?]
+  [{:keys [link-issue]
     :as   opts}]
-  (if (or (= :issue link-issue)
-          search-globally?)
+  (if (= :issue link-issue)
     (-> opts
         (cond-> :selected-context
           (update :selected-context (fn [a] (dissoc a :search_mode))))
@@ -279,10 +276,8 @@
   {:issues           (search/search-issues db (make-search-issues 
                                                (assoc opts
                                                       :link-issue :context
-                                                      :search-globally? true
                                                       :q "")))
    :active-search    :issues
-   :search-globally? true
    :link-issue       :context
    :q                ""})
 
@@ -299,8 +294,7 @@
         (datastore.relations/link-item-to-container! db selected-issue selected-context (not shift-pressed?)))
 
       (let [opts                (-> opts
-                                    (dissoc :search-globally? 
-                                            :q
+                                    (dissoc :q
                                             :link-issue
                                             :link-context)
                                     (assoc-in [:selected-context 
@@ -316,7 +310,6 @@
          :selected-context selected-context
          :link-issue          nil
          :link-context        nil
-         :search-globally?    false
          :q                   nil
          :aggregated-contexts aggregated-contexts}))))
 
@@ -325,10 +318,8 @@
     (log/info (str "repository/reprioritize-issue" (:id issue) (:title issue)))
     (datastore/reprioritize-issue db issue)
     {:issues           (search/search-issues db (dissoc state 
-                                                        :search-globally?
                                                         :q))
      :active-search    nil
-     :search-globally? false
      :q                nil}))
 
 (defn upgrade-issue-to-context [{:keys [db]}]
@@ -381,10 +372,8 @@
                         (make-search-issues
                          (assoc state
                                 :q ""
-                                :active-search    :issues
-                                :search-globally? true)))
+                                :active-search    :issues)))
      :active-search    :issues
-     :search-globally? true
      :link-context     false
      :link-issue       nil
      :q                ""}))
@@ -392,8 +381,7 @@
 (defn list-resources [{:keys [db privacy-mode]}]
   (fn [{:keys                                                             [cmd
                                                                            arg
-                                                                           active-search
-                                                                           selected-context]
+                                                                           active-search]
         :as                                                               opts}] 
     (log-opts opts) 
     ;; {:clj-kondo/ignore [:unresolved-var]} ;;;

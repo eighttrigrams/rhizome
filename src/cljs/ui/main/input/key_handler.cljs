@@ -43,7 +43,6 @@
              (set! (.-value (get-title-el)) ""))
            (and (= :issues active-search)
                 (not (:enter-pressed? @*state))
-                (not (:search-globally? @*state))
                 selected-context
                 (or shift-pressed?
                     alt-pressed?
@@ -108,7 +107,7 @@
          (actions/start-global-search! *state))
        (when (and (= "KeyC" code)
                   alt-pressed?)
-         (swap! *state dissoc :search-globally? :q :active-search)
+         (swap! *state dissoc :q :active-search)
          (actions/start-context-search *state))
        (when (and (= "KeyA" code)
                   (not (:selected-issue @*state))
@@ -126,8 +125,6 @@
          (cond (and alt-pressed? 
                     (common/something-to-deselect? *state))
                (actions/deselect-secondary-contexts! *state)
-               (or (and (:search-globally? @*state)
-                        selected-context)
-                   (not selected-context)
+               (or (not selected-context)
                    selected-context)
                (actions/quit-search! *state)))))))
