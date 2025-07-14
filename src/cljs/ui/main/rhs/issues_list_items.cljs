@@ -153,8 +153,8 @@
                                                      (when (and (:selected-context @*state)
                                                                 (or (= 2 (:search-mode (:current (:views (:data (:selected-context @*state))))))
                                                                     (= 3 (:search-mode (:current (:views (:data (:selected-context @*state)))))))
-                                                                (> (:short_title_ints issue) 0))
-                                                       {:number {:number (:short_title_ints issue)}})
+                                                                (> (:sort_idx issue) 0))
+                                                       {:number {:number (:sort_idx issue)}})
                                                      (when-let [file (:file (:resource-links (:data issue)))]
                                                        {:file {:file file}})
                                                      (:contexts (:data issue))))]]]])
