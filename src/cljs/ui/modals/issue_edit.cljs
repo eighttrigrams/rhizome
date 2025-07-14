@@ -11,6 +11,9 @@
 (defn- get-short-title-el []
   (.getElementById js/document "issue-short-title"))
 
+(defn- get-sort-idx-el []
+  (.getElementById js/document "issue-sort-idx"))
+
 (defn- get-tags-el []
   (.getElementById js/document "issue-tags"))
 
@@ -39,7 +42,11 @@
                       [:div
                        [:input#issue-short-title.line
                         {:autoComplete :off
-                         :defaultValue (:short_title issue)}]] ;; TODO work with short-title
+                         :defaultValue (:short_title issue)}]]
+                      [:div
+                       [:input#issue-sort-idx.line
+                        {:autoComplete :off
+                         :defaultValue (:sort_idx issue)}]]
                       [:div
                        [:input#issue-tags.line
                         {:autoComplete :off
@@ -81,19 +88,12 @@
          [:hr]
          [link-context-issue/component issue]])})))
 
-(defn get-values [id issue?]
-  #_{:context                {:id          id
-                              :title       (.-value (get-title-el))
-                              :short_title (.-value (get-short-title-el))
-                              :tags        (.-value (get-tags-el))
-                              :data        {:highlighted-secondary-contexts (str/split (.-value (get-highlighted-secondary-contexts-el)) #" ")}}
-     :secondary-contexts-ids '()}
-  {:context              {:id              id
-                        :title           (.-value (get-title-el))
-                        :short_title     (.-value (get-short-title-el))
-                        :tags            (.-value (get-tags-el))
-                        :has-event?      (.-checked (get-event-el))
-                        :date            (when (get-date-el) (.-value (get-date-el)))
-                        :data            {:highlighted-secondary-contexts (str/split (.-value (get-highlighted-secondary-contexts-el)) #" ")}}
-    ;;  :related-issues-ids (keys @*related-issues)
-   })
+(defn get-values [id _issue?]
+  {:context {:id          id
+             :title       (.-value (get-title-el))
+             :short_title (.-value (get-short-title-el))
+             :sort_idx    (.-value (get-sort-idx-el))
+             :tags        (.-value (get-tags-el))
+             :has-event?  (.-checked (get-event-el))
+             :date        (when (get-date-el) (.-value (get-date-el)))
+             :data        {:highlighted-secondary-contexts (str/split (.-value (get-highlighted-secondary-contexts-el)) #" ")}}})

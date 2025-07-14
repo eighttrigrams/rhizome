@@ -116,8 +116,8 @@
       (case (:search-mode (:current (:views (:data (:selected-context @*state)))))
         0 "Normal"
         1 "Reverse"
-        2 "A->Z,0->9"
-        3 "9->0,Z->A"
+        2 "0->9"
+        3 "9->0"
         4 "Events"
         5 "Added"
         nil "Normal")]
