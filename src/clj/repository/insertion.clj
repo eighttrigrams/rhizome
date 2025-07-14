@@ -1,6 +1,5 @@
 (ns repository.insertion
   (:require [cambium.core :as log]
-            [clojure.string :as str]
             [et.vp.ds :as datastore]
             [repository.insertion.substack :as substack]
             [repository.insertion.substack-note :as substack-note]
@@ -18,20 +17,11 @@
 (defn- normal-issue-insertion 
   [db 
    title 
-   context-ids-set
-   split-short-title?]
-  (let [parts           (if split-short-title? (str/split title #"\|") (list title))
-        title           (if (= 1 (count parts)) 
-                          (first parts) 
-                          (second parts))
-        short-title     (if (= 1 (count parts))
-                          ""
-                          (first parts))] 
-    (datastore/new-issue db 
-                         title
-                         short-title
-                         context-ids-set
-                         {:suppress-digit-check? true})))
+   context-ids-set]
+  (datastore/new-issue db 
+                       title
+                       ""
+                       context-ids-set))
 
 (defn insert-issue 
   [db 
@@ -67,4 +57,4 @@
           (takimag/match? title) 
           (takimag/ingest db title context-ids-set alternative-behaviour?) 
           :else 
-          (normal-issue-insertion db title context-ids-set alternative-behaviour?))))
+          (normal-issue-insertion db title context-ids-set #_alternative-behaviour?))))
