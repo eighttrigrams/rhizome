@@ -30,7 +30,7 @@
                           :show-relation-annotation? true
                           :select-fn #(scroll-into-view %)
                           :show-context-selector? true
-                          :show-added-date? true}]])
+                          :rhs? true}]])
     (:issues @*state))])
 
 (defn component [_*state]

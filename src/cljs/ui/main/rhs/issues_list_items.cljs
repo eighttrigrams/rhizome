@@ -94,7 +94,7 @@
                                                                    show-relation-annotation?
                                                                    select-fn
                                                                    show-context-selector?
-                                                                   show-added-date?]
+                                                                   rhs?]
                                                             :as   _opts}]
   [:li.issue-card
    (merge {:class          (str "card"
@@ -141,19 +141,18 @@
                                               (merge (when (and (:is_context issue) show-context-selector?) 
                                                        {0 {:context #(actions/select-context! *state issue)}})
                                                      (when (or (:date issue)
-                                                               (and show-added-date?
+                                                               (and rhs?
                                                                     (:selected-context @*state)
                                                                     (= 5 (:search-mode (:current (:views (:data (:selected-context @*state))))))))
-                                                       {:date (if (and show-added-date?
+                                                       {:date (if (and rhs?
                                                                        (:selected-context @*state)
                                                                        (= 5 (:search-mode (:current (:views (:data (:selected-context @*state))))))) 
                                                                 (when (and (:inserted_at issue) (instance? js/Date (:inserted_at issue)))
                                                                   (assoc issue :date (first (str/split (.toISOString (:inserted_at issue)) #"T")))) 
                                                                 issue)})
                                                      (when (and (:selected-context @*state)
-                                                                (or (= 2 (:search-mode (:current (:views (:data (:selected-context @*state))))))
-                                                                    (= 3 (:search-mode (:current (:views (:data (:selected-context @*state)))))))
-                                                                (> (:sort_idx issue) 0))
+                                                                rhs?
+                                                                (>= (:sort_idx issue) 0))
                                                        {:number {:number (:sort_idx issue)}})
                                                      (when-let [file (:file (:resource-links (:data issue)))]
                                                        {:file {:file file}})
