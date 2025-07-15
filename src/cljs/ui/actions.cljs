@@ -47,12 +47,11 @@
                                 api/store-current-view
                                 item))
 
-(defn new-issue! [*state issue alternative-behaviour?]
+(defn new-issue! [*state issue]
   (fetch-and-reset-with-method! *state
                                 (dissoc @*state :modal)
                                 api/insert-issue
-                                issue
-                                alternative-behaviour?))
+                                issue))
 
 (defn new-context! [*state context]
   (fetch-and-reset! *state (-> @*state

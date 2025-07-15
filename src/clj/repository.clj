@@ -204,8 +204,7 @@
 (defn insert-issue [{:keys [db]}]
   (fn [{:keys [selected-context]
         :as state} 
-       {:keys [title]}
-       _alternative-behaviour?]
+       {:keys [title]}]
     (log/info "insert-issue")
     (let [item (insertion/insert-issue db 
                                        title

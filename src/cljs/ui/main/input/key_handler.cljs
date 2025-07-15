@@ -50,9 +50,7 @@
                 (issue-creation-permitted? @*state))
            (do
              (swap! *state assoc :enter-pressed? true)
-             (actions/new-issue! *state {:title (.-value (get-title-el))}
-                                 (when-not in-notes-mode?
-                                   alt-pressed?))
+             (actions/new-issue! *state {:title (.-value (get-title-el))})
              (set! (.-value (get-title-el)) ""))
            #_(swap! *state dissoc nil)
            (= :contexts active-search)
