@@ -27,8 +27,7 @@
   [db 
    title 
    selected-context
-   selected-secondary-contexts-set
-   alternative-behaviour?]
+   selected-secondary-contexts-set]
   (log/info (str "Import for " title))
   (let [context-ids-set (into #{} (conj selected-secondary-contexts-set (:id selected-context)))]
     (cond (batch/match? title)
@@ -43,18 +42,18 @@
           (apple-pods/match? title) 
           (apple-pods/ingest db title context-ids-set nil)
           (substack/match? title)
-          ((substack/make:save-article false) db title context-ids-set alternative-behaviour?)
+          ((substack/make:save-article false) db title context-ids-set)
           (substack-external/match? title)
-          (substack-external/save-article db title context-ids-set alternative-behaviour?)
+          (substack-external/save-article db title context-ids-set)
           (substack-plain/match? title)
-          (substack-plain/save-article db title context-ids-set alternative-behaviour?)
+          (substack-plain/save-article db title context-ids-set)
           (substack-note/match? title)
-          (substack-note/ingest db title context-ids-set alternative-behaviour?)
+          (substack-note/ingest db title context-ids-set)
           (twitter-tweet/match? title)
-          (twitter-tweet/ingest db title context-ids-set alternative-behaviour?)
+          (twitter-tweet/ingest db title context-ids-set)
           (unz/match? title) 
-          (unz/ingest db title context-ids-set alternative-behaviour?) 
+          (unz/ingest db title context-ids-set) 
           (takimag/match? title) 
-          (takimag/ingest db title context-ids-set alternative-behaviour?) 
+          (takimag/ingest db title context-ids-set) 
           :else 
-          (normal-issue-insertion db title context-ids-set #_alternative-behaviour?))))
+          (normal-issue-insertion db title context-ids-set))))

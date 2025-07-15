@@ -29,7 +29,7 @@
                                                twitter-handles-id))]
     handle-id))
 
-(defn ingest [db url context-ids-set _]
+(defn ingest [db url context-ids-set]
   (let [twitter-platform-id (common/get-item-or-throw-error db "Twitter")
         twitter-handles-id (common/get-item-or-throw-error db "Twitter Handles")
         poasts-id          (common/get-item-or-throw-error db "Poasts")

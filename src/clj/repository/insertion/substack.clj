@@ -3,7 +3,6 @@
             [et.vp.ds :as datastore]
             [cambium.core :as log]
             [repository.insertion.common :as common]
-            [repository.chatgpt :as chatgpt]
             utils
             [utils.url :as url]
             [scrapers.substack :as substack]
@@ -60,18 +59,16 @@
     substack-id))
 
 (defn make:save-article [external?]
-  (fn save-article [db url context-ids-set should-capture-summary?]
+  (fn save-article [db url context-ids-set]
     (let [url                  (url/url-without-query-params url)
           substack-platform-id (common/get-item-or-throw-error db "Substack")
           substacks-id         (common/get-item-or-throw-error db "Substacks")
-          {:keys [title content date year image type]}
+          {:keys [title date year image type]}
           ,,(substack/get-post url substack/extract-content)
           articles-id          (common/get-item-or-throw-error db (if (= :podcast-episode type)
                                                                     "Podcast Episodes"
                                                                     "Articles"))
           year-id              (common/get-item-or-throw-error db year)
-          summary              (and should-capture-summary?
-                                    (chatgpt/get-summary content))
           substack-id          (create-or-take-substack-id 
                                 db 
                                 (if external?
@@ -91,16 +88,12 @@
       (if (:id existing-item)
         (assoc (datastore/get-item db existing-item) :previously-existing-item? true)
         (let [item  (common/insert-item db 
-                                                  title 
-                                                  "" 
-                                                  context-ids-set 
-                                                  {:substack-article url})]
+                                        title 
+                                        "" 
+                                        context-ids-set 
+                                        {:substack-article url})]
           (datastore/insert-date db (:id item) date)
           (log/info (str "created new item" item))
           (when image (try (upload/upload-preview-file db {:tempfile image} (:id item) "false")
                            (catch Exception e
-                             (log/error (str "problem while trying to create preview image for substack article. message" (.getMessage e))))))
-          (if (and item summary)
-            (datastore/update-item db (assoc item :description 
-                                             (utils/wrap-summary summary)))
-            item))))))
+                             (log/error (str "problem while trying to create preview image for substack article. message" (.getMessage e)))))))))))

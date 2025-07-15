@@ -30,7 +30,7 @@
 (defn match? [title]
   (re-matches #"https://substack.com\/@.*\/note/.*" title))
 
-(defn ingest [db url context-ids-set _]
+(defn ingest [db url context-ids-set]
   (let [substack-platform-id (common/get-item-or-throw-error db "Substack")
         poasts-id          (common/get-item-or-throw-error db "Poasts")
         author-url (subs url 0 (str/index-of url "/note/"))

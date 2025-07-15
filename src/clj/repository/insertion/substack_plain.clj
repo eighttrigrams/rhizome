@@ -1,9 +1,7 @@
 (ns repository.insertion.substack-plain
-  (:require [clojure.string :as str]
-            [et.vp.ds :as datastore]
+  (:require [et.vp.ds :as datastore]
             [cambium.core :as log]
             [repository.insertion.common :as common]
-            [repository.chatgpt :as chatgpt]
             utils
             [utils.url :as url]
             [scrapers.substack :as substack]
@@ -12,7 +10,7 @@
 (defn match? [title]
   (re-matches #"https://substack.com\/home\/post\/p-.*" title))
 
-(defn save-article [db url context-ids-set should-capture-summary?]
+(defn save-article [db url context-ids-set]
   (prn "save article url" url)
     (let [url                  (url/url-without-query-params url)
           substack-platform-id (common/get-item-or-throw-error db "Substack")
@@ -45,16 +43,12 @@
       (if (:id existing-item)
         (assoc (datastore/get-item db existing-item) :previously-existing-item? true)
         (let [item  (common/insert-item db 
-                                                  title 
-                                                  "" 
-                                                  context-ids-set 
-                                                  {:substack-article url})]
+                                        title 
+                                        "" 
+                                        context-ids-set 
+                                        {:substack-article url})]
           (datastore/insert-date db (:id item) date)
           (log/info (str "created new item" item))
           (when image (try (upload/upload-preview-file db {:tempfile image} (:id item) "false")
                            (catch Exception e
-                             (log/error (str "problem while trying to create preview image for substack article. message" (.getMessage e))))))
-          #_(if (and item summary)
-            (datastore/update-item db (assoc item :description 
-                                             (utils/wrap-summary summary)))
-            item)))))
+                             (log/error (str "problem while trying to create preview image for substack article. message" (.getMessage e))))))))))

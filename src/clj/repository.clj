@@ -205,13 +205,12 @@
   (fn [{:keys [selected-context]
         :as state} 
        {:keys [title]}
-       alternative-behaviour?]
+       _alternative-behaviour?]
     (log/info "insert-issue")
     (let [item (insertion/insert-issue db 
                                        title
                                        selected-context 
-                                       (get-selected-secondary-contexts-set state)
-                                       alternative-behaviour?)]
+                                       (get-selected-secondary-contexts-set state))]
       (merge
        {:active-search nil}
        (if (map? item)

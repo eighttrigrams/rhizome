@@ -13,6 +13,6 @@
                    :substack
                    :external-substacks))))
 
-(defn save-article [db url context-ids-set should-capture-summary?]
-  ((substack/make:save-article true) db url context-ids-set should-capture-summary?))
+(defn save-article [db url context-ids-set]
+  ((substack/make:save-article true) db url context-ids-set))
   
