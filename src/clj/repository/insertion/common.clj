@@ -13,7 +13,8 @@
   (let [item    (datastore/new-issue db 
                                       title
                                       short-title
-                                      context-ids-set)
+                                      context-ids-set
+                                     nil)
         contexts (doall (->> (jdbc/execute! db (sql/format {:select [:id :short_title :title]
                                                             :from   [:issues]
                                                             :where  [:in :issues.id 

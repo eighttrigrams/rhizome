@@ -21,7 +21,8 @@
   (datastore/new-issue db 
                        title
                        ""
-                       context-ids-set))
+                       context-ids-set
+                       nil))
 
 (defn insert-issue 
   [db 
