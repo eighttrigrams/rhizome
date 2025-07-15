@@ -33,7 +33,6 @@
    [:div.active-search-input-container [input-component *state]]
    (when (not (and (nil? (:selected-issue @*state))
                    (:selected-context @*state)
-                   (= :issues (:active-search @*state))
-                   (not (:search-globally? @*state))))
+                   (= :issues (:active-search @*state))))
      [:div.mask.search-active
       {:on-click #(actions/quit-search! *state)}])])

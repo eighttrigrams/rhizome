@@ -15,14 +15,12 @@
     (fetch-and-reset! *state (-> @*state
                                  (assoc :active-search :issues)
                                  (dissoc :preview-issue 
-                                         :search-globally? 
                                          :link-issue 
                                          :q))) 
     (= :issues (:active-search @*state))
     (fetch-and-reset! *state (-> @*state 
                                  (dissoc :preview-issue 
                                          :active-search
-                                         :search-globally?
                                          :link-issue 
                                          :q)))))
 

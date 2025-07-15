@@ -39,7 +39,7 @@
                     (= "KeyB" code))
                (actions/select-last-context! *state)
                (= "KeyI" code)
-               (swap! *state #(assoc % :active-search :issues :search-globally? false))
+               (swap! *state #(assoc % :active-search :issues))
                (and selected-context
                     (= "KeyA" code)
                     (not (-> @*state :selected-context :data :views :current :secondary-contexts-inverted)) 
