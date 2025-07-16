@@ -31,6 +31,7 @@
 
 (defn match? [title]
   (or (re-matches #"https://www.youtube.com/watch\?.*v=.*" title)
+      (re-matches #"https://youtu.be/watch\?.*v=.*" title)
       (re-matches #"https://www.youtube.com/shorts/.*" title)))
 
 (defn ingest
@@ -38,7 +39,8 @@
    url 
    context-ids-set
    _]
-  (let [[url store-url] 
+  (let [url (str/replace url "youtu.be" "www.youtube.com")
+        [url store-url] 
           (if (re-matches #"https://www.youtube.com/shorts/.*" url)
             (let [ytvidid (first (str/split (last (str/split url #"/")) #"\?"))]
               [(str "https://www.youtube.com/watch?v=" ytvidid)
