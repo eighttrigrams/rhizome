@@ -121,30 +121,6 @@
        :contexts                        (search/search-contexts db "")
        :selected-context context})))
 
-(defn make-search-issues
-  [{:keys [link-issue]
-    :as   opts}]
-  (if (= :issue link-issue)
-    (-> opts
-        (cond-> :selected-context
-          (update :selected-context (fn [a] (dissoc a :search_mode))))
-        (assoc-in [:selected-context
-                   :data
-                   :views
-                   :current
-                   :secondary-contexts-inverted] false)
-        (assoc-in [:selected-context
-                   :data
-                   :views
-                   :current
-                   :secondary-contexts-unassigned-selected] false)
-        (assoc-in [:selected-context
-                   :data
-                   :views
-                   :current
-                   :search-mode] 0))
-    opts))
-
 (defn store-current-view [{:keys [db]}]
   (fn [{:keys [selected-context]} item]
     (let [selected-context (datastore/store-current-view db selected-context item)]
@@ -195,7 +171,7 @@
   (fn [state]
     (when-not (:selected-context state) (throw (Exception. "fetch-aggregated-contexts called without selected-context")))
     (search/fetch-aggregated-contexts 
-     db (assoc (make-search-issues state) 
+     db (assoc state 
                :only-context-aggregation? true))))
 
 (defn insert-issue [{:keys [db]}]
@@ -271,12 +247,11 @@
    :active-search :contexts})
 
 (defn start-linking-issue-to-selected-context [db opts]
-  {:issues           (search/search-issues db (make-search-issues 
-                                               (assoc opts
-                                                      :link-issue :context
-                                                      :q "")))
+  {:issues           (search/search-issues db (assoc opts
+                                                     :link-issue true
+                                                     :q ""))
    :active-search    :issues
-   :link-issue       :context
+   :link-issue       true
    :q                ""})
 
 (defn finish-linking-issue [{:keys [db]}]
@@ -367,10 +342,9 @@
   (fn [state]
     {:issues           (search/search-issues
                         db
-                        (make-search-issues
-                         (assoc state
-                                :q ""
-                                :active-search    :issues)))
+                        (assoc state
+                               :q ""
+                               :active-search    :issues))
      :active-search    :issues
      :link-context     false
      :link-issue       nil
@@ -391,7 +365,7 @@
        nil
        (cond (= :issues active-search)
              {:issues (search/search-issues db 
-                                            (assoc (make-search-issues opts)
+                                            (assoc opts
                                                    :skip-context-aggregation? true))}
              (= :contexts active-search) (search-contexts db opts)
              :else
