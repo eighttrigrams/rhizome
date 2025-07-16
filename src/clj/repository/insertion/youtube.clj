@@ -30,14 +30,17 @@
     channel-id))
 
 (defn match? [title]
-  (re-matches #"https://www.youtube.com/watch\?.*v=.*" title))
+  (or (re-matches #"https://www.youtube.com/watch\?.*v=.*" title)
+      (re-matches #"https://www.youtube.com/shorts/.*" title)))
 
 (defn ingest
   [db 
    url 
    context-ids-set
    _]
-  (let [url (url/pick-query-params url ["v"])
+  (let [url (if (re-matches #"https://www.youtube.com/shorts/.*" url)
+              (str "https://www.youtube.com/watch?v=" (first (str/split (last (str/split url #"/")) #"\?")))
+              (url/pick-query-params url ["v"]))
         {:keys [title 
                 author_name
                 author_url] :as _response} (query url)
