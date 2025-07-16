@@ -39,7 +39,20 @@
              (:views
               (:data 
                (:selected-context @*state))))) 
-            {:font-weight :bold})
+            {:font-weight :bold
+             :text-decoration (if 
+                               (and 
+                                (not (:secondary-contexts-inverted (:current 
+                                                                    (:views
+                                                                     (:data 
+                                                                      (:selected-context @*state))))))
+                                (seq (:selected-secondary-contexts
+                                          (:current 
+                                           (:views
+                                            (:data 
+                                             (:selected-context @*state)))))))
+                                :line-through
+                                :initial)})
           :on-click (select-unassigned-secondary-contexts *state)}
    "No secondary contexts"])
 
