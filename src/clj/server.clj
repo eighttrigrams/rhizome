@@ -60,31 +60,27 @@
     (response/response "File uploaded successfully!")))
 
 (defn- routes []
-  (fn [req]
-    (
-     (context "/" []
-       (context "/api" []
-         (POST "/" [] (api)))
-       (GET "/open/:file-id" [] open)
-       (POST "/upload" req (upload-handler req))
-       (GET "/" [] (response/resource-response "public/index.html")))
-     req))) ;; TODO use route/resources (see cljsc-webstacks)
+  (context "/" []
+    (context "/api" []
+      (POST "/" [] (api)))
+    (GET "/open/:file-id" [] open)
+    (POST "/upload" req (upload-handler req))
+    (GET "/" [] (response/resource-response "public/index.html"))
+    (fn [req] {:status 404 :body "Not Found"})))
 
 (def dev? (true? (-> (read-string (slurp "./config.edn")) :dev?)))
 
 (defn app []
-  (fn [req]
-    (let [pipeline (if dev? 
-                     #(-> %
-                         (wrap-resource "public" {:allow-symlinks? true}))
-                     #(-> % 
-                          (wrap-resource "public")
-                          (wrap-file "./public" {:allow-symlinks? true})))] 
-      ((-> (routes) 
-           wrap-env-defaults
-           pipeline
-           wrap-multipart-params)
-       req))))
+  (let [pipeline (if dev? 
+                   #(-> %
+                       (wrap-resource "public" {:allow-symlinks? true}))
+                   #(-> % 
+                        (wrap-resource "public")
+                        (wrap-file "./public" {:allow-symlinks? true})))] 
+    (-> (routes) 
+        wrap-env-defaults
+        pipeline
+        wrap-multipart-params)))
 
 (mount/defstate ^{:on-reload :noop} http-server
   :start
