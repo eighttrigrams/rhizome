@@ -11,6 +11,9 @@
 (defn- get-short-title-el []
   (.getElementById js/document "issue-short-title"))
 
+(defn- get-annotation-el []
+  (.getElementById js/document "issue-annotation"))
+
 (defn- get-sort-idx-el []
   (.getElementById js/document "issue-sort-idx"))
 
@@ -43,6 +46,10 @@
                        [:input#issue-short-title.line
                         {:autoComplete :off
                          :defaultValue (:short_title issue)}]]
+                      [:div
+                       [:input#issue-annotation.line
+                        {:autoComplete :off
+                         :defaultValue (:annotation issue)}]]
                       [:div
                        [:input#issue-sort-idx.line
                         {:autoComplete :off
@@ -93,6 +100,7 @@
              :title       (.-value (get-title-el))
              :short_title (.-value (get-short-title-el))
              :sort_idx    (.-value (get-sort-idx-el))
+             :annotation  (.-value (get-annotation-el))
              :tags        (.-value (get-tags-el))
              :has-event?  (.-checked (get-event-el))
              :date        (when (get-date-el) (.-value (get-date-el)))
