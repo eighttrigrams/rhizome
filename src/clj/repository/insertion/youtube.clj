@@ -38,12 +38,17 @@
    url 
    context-ids-set
    _]
-  (let [url (if (re-matches #"https://www.youtube.com/shorts/.*" url)
-              (str "https://www.youtube.com/watch?v=" (first (str/split (last (str/split url #"/")) #"\?")))
-              (url/pick-query-params url ["v"]))
+  (let [[url store-url] 
+          (if (re-matches #"https://www.youtube.com/shorts/.*" url)
+            (let [ytvidid (first (str/split (last (str/split url #"/")) #"\?"))]
+              [(str "https://www.youtube.com/watch?v=" ytvidid)
+               (str "https://www.youtube.com/shorts/" ytvidid)])
+            (let [url (url/pick-query-params url ["v"])]
+              [url url]))
         {:keys [title 
                 author_name
-                author_url] :as _response} (query url)
+                author_url]
+         :as   _response} (query url)
         _ (when-not (and (seq title)
                          (seq author_name)
                          (seq author_url))
@@ -57,7 +62,7 @@
                                                     author_name
                                                     author_url
                                                     youtube-channels-id)
-        existing-item (datastore/get-item-by-path db "data->'resource-links'->>'youtube-video'" url)
+        existing-item (datastore/get-item-by-path db "data->'resource-links'->>'youtube-video'" store-url)
         image (:image (scrapers.youtube/get-video url))]
     (if (:id existing-item)
       (assoc (datastore/get-item db existing-item) :previously-existing-item? true)
@@ -65,7 +70,7 @@
                                         title
                                         ""
                                         (conj context-ids-set channel-id youtube-videos-id video-id) 
-                                        {:youtube-video url}))]
+                                        {:youtube-video store-url}))]
         (when image (try (upload/upload-preview-file db {:tempfile image} id "false")
                      (catch Exception e
                        (log/error (str "problem while trying to create preview image for youtube video. message" (.getMessage e))))))))))

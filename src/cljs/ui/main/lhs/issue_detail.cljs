@@ -8,7 +8,9 @@
    (when-let [youtube-link (:youtube-video (:resource-links data))]
      [:iframe {:width "420px" 
                :height "315px"
-               :src (str/replace (str/trim youtube-link) "watch?v=" "embed/")
+               :src (if-not (re-matches #"https://www.youtube.com/shorts/.*" youtube-link) 
+                      (str/replace (str/trim youtube-link) "watch?v=" "embed/")
+                      (str "https://www.youtube.com/embed/" (first (str/split (last (str/split youtube-link #"/")) #"\?"))))
                :allowFullScreen true}])
    (when (and description (str/includes? description "https://www.youtube.com/watch")) 
      (let [found (re-find #"https://www.youtube.com/watch.*?\s" description)
