@@ -66,7 +66,9 @@
     (GET "/open/:file-id" [] open)
     (POST "/upload" req (upload-handler req))
     (GET "/" [] (response/resource-response "public/index.html"))
-    (fn [_req] {:status 404 :body "Not Found"})))
+    (fn [req] 
+      (log/warn (str "File not found:" (:uri req)))
+      {:status 404 :body "Not Found"})))
 
 (def dev? (true? (-> (read-string (slurp "./config.edn")) :dev?)))
 
