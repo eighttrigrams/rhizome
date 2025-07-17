@@ -96,6 +96,9 @@
 
 ;; ----
 
+;; all of this is for fetch-item or fetch-last context, where aggregated-issues are fetched separately
+;; for quicker response times
+
 ;; TODO this is likely not necessary
 (def ^:private aggregated-contexts-sequence (atom 0))
 
@@ -145,4 +148,5 @@
                                               (= sequence-number @aggregated-contexts-sequence))
                                      (prn "swap!")
                                      (swap! *state assoc :aggregated-contexts %))))))))
+                   ;; TODO probably don't need any timeout
                    200)))
