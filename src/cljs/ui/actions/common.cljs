@@ -102,5 +102,6 @@
                                    (prn "%" % "seq:" sequence-number "current:" @aggregated-contexts-sequence)
                                    (when (and % 
                                               (= sequence-number @aggregated-contexts-sequence))
+                                     (prn "swap!")
                                      (swap! *state assoc :aggregated-contexts (second %)))))))))
                    200)))
