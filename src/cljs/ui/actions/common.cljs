@@ -87,18 +87,20 @@
             (reset-state! *state)
             (dissoc-loading *state)))))
 
+(def ^:private current-aggregated-context-request (atom nil))
+
 (defn fetch-and-reset-with-method-2!
   [*state state method & args]
-  (let [request-id (random-uuid)
-        state-with-id (assoc (if (map? state) state @state) :request-id request-id)]
-    (apply fetch-and-reset-with-method! *state state-with-id method args)
+  (let [request-id (random-uuid)]
+    (reset! current-aggregated-context-request request-id)
+    (apply fetch-and-reset-with-method! *state state method args)
     (js/setTimeout (fn []
                      (when (and (:selected-context @*state)
-                                (= request-id (:request-id @*state)))
+                                (= request-id @current-aggregated-context-request))
                        (go (-> (api/fetch-aggregated-contexts @*state)
                                <p!
                                (#(do 
                                    (prn "%" %)
-                                   (when (and % (= request-id (:request-id @*state)))
+                                   (when (and % (= request-id @current-aggregated-context-request))
                                      (swap! *state assoc :aggregated-contexts %))))))))
                    200)))
