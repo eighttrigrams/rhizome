@@ -35,9 +35,9 @@
            (and
             (not (:link-context @*state))
             (not (:selected-context @*state))
-            (and (= :contexts active-search)
-                 (or shift-pressed?
-                     (= 0 (count (:contexts @*state)))))
+            (= :contexts active-search)
+            (or shift-pressed?
+                (= 0 (count (:contexts @*state)))))
            (do
              (actions/new-context! *state {:title (.-value (get-title-el))})
              (set! (.-value (get-title-el)) ""))
