@@ -47,6 +47,7 @@
 
 (defn new-issue! [*state issue]
   (swap! *state dissoc :aggregated-contexts)
+  (swap! *state dissoc :issues)
   (fetch-and-reset-with-method! *state
                                 (dissoc @*state :modal)
                                 api/insert-issue
@@ -54,6 +55,7 @@
 
 (defn new-context! [*state context]
   (swap! *state dissoc :aggregated-contexts)
+  (swap! *state dissoc :issues)
   (fetch-and-reset! *state (-> @*state
                                (dissoc :modal)
                                (assoc :cmd :insert-context)
