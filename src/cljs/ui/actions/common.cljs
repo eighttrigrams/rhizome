@@ -121,6 +121,7 @@
          *state
          method 
          args)
+  ;; TODO probably the next step should be only done one the first step is done
   (js/setTimeout (fn []
                    (go (-> (api/fetch-aggregated-contexts @*state)
                            <p!
