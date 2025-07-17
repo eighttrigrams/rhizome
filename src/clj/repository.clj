@@ -228,7 +228,7 @@
                 :issues         (search/search-issues db (dissoc opts :q))
                 :q              nil}
                (when selected-context
-                 {:aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)}))))))
+                 {:aggregated-contexts (second ((fetch-aggregated-contexts {:db db}) opts))}))))))
 
 (defn search-contexts [db opts]
   {:contexts (search/search-contexts db opts)})
@@ -276,7 +276,7 @@
                                                :current 
                                                :selected-secondary-contexts] []))
             issues              (search/search-issues db opts)
-            aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)
+            aggregated-contexts (second ((fetch-aggregated-contexts {:db db}) opts))
             selected-context (datastore/get-item db selected-context)]
         {:issues              issues
          :active-search       nil
@@ -310,7 +310,7 @@
         (log/info (str "repository/unlink-selected-item-from-container - Removing now"))
         {:selected-context old-selected-context
          :issues (search/search-issues db (assoc state :selected-context old-selected-context))
-         :aggregated-contexts ((fetch-aggregated-contexts {:db db}) (assoc state :selected-context old-selected-context))
+         :aggregated-contexts (second ((fetch-aggregated-contexts {:db db}) (assoc state :selected-context old-selected-context)))
          :issue-view? false}))))
 
 (defn select-last-context [{:keys [db]}]
@@ -321,7 +321,7 @@
         (log/info (str "repository/select-last-context - " (:id old-selected-context) ":" (:title old-selected-context)))
         {:selected-context    old-selected-context
          :issues              (search/search-issues db (assoc state :selected-context old-selected-context))
-         :aggregated-contexts ((fetch-aggregated-contexts {:db db}) (assoc state :selected-context old-selected-context))
+         :aggregated-contexts (second ((fetch-aggregated-contexts {:db db}) (assoc state :selected-context old-selected-context)))
          :issue-view?         false}))))
 
 (defn update-item [{:keys [db]}]

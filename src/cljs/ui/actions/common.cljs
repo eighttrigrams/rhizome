@@ -101,8 +101,8 @@
                              (go (-> (api/fetch-aggregated-contexts @*state)
                                      <p!
                                      (#(do 
-                                         (prn "%" %)
-                                         (when %
+                                         (prn "%" % "-" (= (:id (:selected-context @*state)) (first %)))
+                                         (when (second %)
                                            (if (= (:id (:selected-context @*state)) (first %))
                                              (swap! *state assoc :aggregated-contexts (second %))
                                              (prn "nonononononon")))))))))
