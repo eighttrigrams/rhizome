@@ -105,8 +105,6 @@
       @*state
       state
       {:issues   (first issues)
-    ;;  :issue-view? false
-    ;;  :active-search :issues
        :selected-context selected-context
        :contexts (list selected-context)}))))
 
