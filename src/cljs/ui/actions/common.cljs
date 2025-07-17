@@ -1,5 +1,5 @@
 (ns ui.actions.common
-  (:require [cljs.core.async :refer [go timeout <!]]
+  (:require [cljs.core.async :refer [go]]
             [cljs.core.async.interop :refer-macros [<p!]]
             api
             utils))
@@ -87,21 +87,20 @@
             (reset-state! *state)
             (dissoc-loading *state)))))
 
-(def ^:private current-aggregated-context-go-block (atom nil))
+(def ^:private aggregated-contexts-sequence (atom 0))
 
 (defn fetch-and-reset-with-method-2!
   [*state state method & args]
   (apply fetch-and-reset-with-method! *state state method args)
-  (let [expected-context-id (:id (:selected-context (if (map? state) state @state)))]
-    (when-let [current-go @current-aggregated-context-go-block]
-      (cljs.core.async/close! current-go))
-    (reset! current-aggregated-context-go-block
-            (go 
-              (<! (timeout 200))
-              (when (and (:selected-context @*state)
-                         (= expected-context-id (:id (:selected-context @*state))))
-                (let [result (<p! (api/fetch-aggregated-contexts @*state))]
-                  (when (and result 
-                             (= expected-context-id (:id (:selected-context @*state)))
-                             (= expected-context-id (first result)))
-                    (swap! *state assoc :aggregated-contexts (second result)))))))))
+  (let [sequence-number (swap! aggregated-contexts-sequence inc)]
+    (js/setTimeout (fn []
+                     (when (and (:selected-context @*state)
+                                (= sequence-number @aggregated-contexts-sequence))
+                       (go (-> (api/fetch-aggregated-contexts @*state)
+                               <p!
+                               (#(do 
+                                   (prn "%" % "seq:" sequence-number "current:" @aggregated-contexts-sequence)
+                                   (when (and % 
+                                              (= sequence-number @aggregated-contexts-sequence))
+                                     (swap! *state assoc :aggregated-contexts (second %)))))))))
+                   200)))
