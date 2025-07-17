@@ -80,14 +80,19 @@
    *state 
    api/select-last-context))
 
+(defn delete-issue! [*state idx]
+  (when (js/window.confirm "Delete this issue?")
+    (fetch-and-reset-with-method-2! *state api/delete-issue idx)))
+
+(defn delete-context! [*state]
+  (when (js/window.confirm "Delete currently selected context?")
+    (fetch-and-reset-with-method! *state @*state api/delete-context (:selected-context @*state))))
+
 (defn select-context!
   ([*state context] (select-context! *state context false false))
   ([*state context shift-pressed? alt-pressed?]
    (if (true? (:link-context @*state))
-    ;; (fetch-and-reset! *state (assoc @*state :cmd :link-context :arg context))
-     (do 
-       (prn "here we are")
-       (fetch-and-reset-with-method! *state @*state api/link-selected-context-to-context context shift-pressed? alt-pressed?))
+     (fetch-and-reset-with-method! *state @*state api/link-selected-context-to-context context shift-pressed? alt-pressed?)
      (select-item! *state context false))))
 
 (defn select-issue!
@@ -215,14 +220,6 @@
 
 (defn flip-privacy! [*state]
   (fetch-and-reset-with-method! *state @*state api/flip-privacy))
-
-(defn delete-issue! [*state idx]
-  (when (js/window.confirm "Delete this issue?")
-    (fetch-and-reset-with-method! *state @*state api/delete-issue idx)))
-
-(defn delete-context! [*state]
-  (when (js/window.confirm "Delete currently selected context?")
-    (fetch-and-reset-with-method! *state @*state api/delete-context (:selected-context @*state))))
 
 (defn fetch-issue-description! [*state issue]
   (fetch-and-reset-with-method! *state @*state api/fetch-issue-description issue :dont-reset-preview-issue))
