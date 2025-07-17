@@ -96,14 +96,35 @@
 
 ;; ----
 
+(defn- update-state-2 [{:keys [issues selected-context] :as state} 
+                       *state]
+  (when selected-context
+    (reset! 
+     *state
+     (merge
+      @*state
+      state
+      {:issues   (first issues)
+    ;;  :issue-view? false
+    ;;  :active-search :issues
+       :selected-context selected-context
+       :contexts (list selected-context)}))))
+
+(defn- fetch-resources-with-method-2
+  [*state method & args]
+  (go (-> (apply method @*state args)
+          <p!
+          (update-state-2 *state))))
+
 (defn fetch-and-reset-with-method-2!'
   [*state state method & args]
-  #_(reset! *state state')
-  (go (-> (apply fetch-resources-with-method state
+  (reset! *state state)
+  (go (-> (apply fetch-resources-with-method-2 
+                 *state
                  method 
                  args) 
            <!
-           ((fn [x] (reset-state! (assoc x :aggregated-contexts (:aggregated-contexts @*state))
+           ((fn [x] #_(reset-state! (assoc x :aggregated-contexts (:aggregated-contexts @*state))
                                   *state))))
           #_(dissoc-loading *state)))
 

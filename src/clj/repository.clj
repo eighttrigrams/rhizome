@@ -321,7 +321,7 @@
         (log/info (str "repository/select-last-context - " (:id old-selected-context) ":" (:title old-selected-context)))
         {:selected-context    old-selected-context
          :issues              (search/search-issues db (assoc state :selected-context old-selected-context))
-         :aggregated-contexts (second ((fetch-aggregated-contexts {:db db}) (assoc state :selected-context old-selected-context)))
+        ;;  :aggregated-contexts (second ((fetch-aggregated-contexts {:db db}) (assoc state :selected-context old-selected-context)))
          :issue-view?         false}))))
 
 (defn update-item [{:keys [db]}]
