@@ -92,6 +92,7 @@
 (defn fetch-and-reset-with-method-2!
   [*state state method & args]
   (apply fetch-and-reset-with-method! *state state method args)
+  (prn "here!!!!" (:selected-context @*state))
   (when-let [timeout-id @current-timeout-id]
     (js/clearTimeout timeout-id))
   (reset! current-timeout-id
@@ -102,5 +103,7 @@
                                      (#(do 
                                          (prn "%" %)
                                          (when %
-                                           (swap! *state assoc :aggregated-contexts %))))))))
+                                           (if (= (:id (:selected-context @*state)) (first %))
+                                             (swap! *state assoc :aggregated-contexts (second %))
+                                             (prn "nonononononon")))))))))
                          200)))
