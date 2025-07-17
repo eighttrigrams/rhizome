@@ -94,13 +94,9 @@
 
 
 
-;; ----
-
+;; -------------------------
 ;; all of this is for fetch-item or fetch-last context, where aggregated-issues are fetched separately
 ;; for quicker response times
-
-;; TODO this is likely not necessary
-(def ^:private aggregated-contexts-sequence (atom 0))
 
 (defn- update-state-2 [{:keys [issues selected-context] :as state} 
                        *state]
@@ -110,8 +106,8 @@
      (merge
       @*state
       state
+      ;; TODO probably this can be simplified
       {:issues   (first issues)
-       :selected-context selected-context
        :contexts (list selected-context)}))))
 
 (defn- fetch-resources-with-method-2
@@ -120,33 +116,15 @@
           <p!
           (update-state-2 *state))))
 
-(defn fetch-and-reset-with-method-2!'
-  [*state state method & args]
-  (reset! *state state)
-  (go (-> (apply fetch-resources-with-method-2 
-                 *state
-                 method 
-                 args) 
-           <!
-           ((fn [x] #_(reset-state! (assoc x :aggregated-contexts (:aggregated-contexts @*state))
-                                  *state))))
-          #_(dissoc-loading *state)))
-
 (defn fetch-and-reset-with-method-2!
-  [*state state method & args]
-  #_(swap! *state assoc :aggregated-contexts nil)
-  (apply fetch-and-reset-with-method-2!' *state state method args)
-  (let [sequence-number (swap! aggregated-contexts-sequence inc)]
-    (js/setTimeout (fn []
-                     (when (and (:selected-context @*state)
-                                (= sequence-number @aggregated-contexts-sequence))
-                       (go (-> (api/fetch-aggregated-contexts @*state)
-                               <p!
-                               (#(do 
-                                   (prn "%" % "seq:" sequence-number "current:" @aggregated-contexts-sequence)
-                                   (when (and % 
-                                              (= sequence-number @aggregated-contexts-sequence))
-                                     (prn "swap!")
-                                     (swap! *state assoc :aggregated-contexts %))))))))
-                   ;; TODO probably don't need any timeout
-                   200)))
+  [*state method & args]
+  (apply fetch-resources-with-method-2 
+         *state
+         method 
+         args)
+  (js/setTimeout
+                 (go (-> (api/fetch-aggregated-contexts @*state)
+                         <p!
+                         (#(swap! *state assoc :aggregated-contexts %))))
+                   ;; TODO probably don't need any timeout at all
+                 80))

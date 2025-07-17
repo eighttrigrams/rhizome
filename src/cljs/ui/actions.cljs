@@ -58,23 +58,22 @@
                                (assoc :arg context))))
 
 (defn- select-item! [*state context select-as-issue?]
+  (reset! *state (assoc @*state
+                       :active-search (when-not select-as-issue? :issues)
+                       :issue-view? select-as-issue?
+                       :old-selected-context (:selected-context @*state)
+                       ;; For a snappy response in the UI, set :selected-issue immediately.
+                       ;; The subsequent call to fetch-and-reset! then
+                       ;; will fetch and replace it, thereby filling in the related issues.
+                       :selected-context context))
   (fetch-and-reset-with-method-2! 
-     *state 
-     (assoc @*state
-            :active-search (when-not select-as-issue? :issues)
-            :issue-view? select-as-issue?
-            :old-selected-context (:selected-context @*state)
-            ;; For a snappy response in the UI, set :selected-issue immediately.
-            ;; The subsequent call to fetch-and-reset! then
-            ;; will fetch and replace it, thereby filling in the related issues.
-            :selected-context context)
-     api/fetch-context
-     [context select-as-issue?]))
+   *state 
+   api/fetch-context
+   [context select-as-issue?]))
 
 (defn select-last-context! [*state]
   (fetch-and-reset-with-method-2! 
    *state 
-   @*state
    api/select-last-context))
 
 (defn select-context!
