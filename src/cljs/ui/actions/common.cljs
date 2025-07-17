@@ -122,9 +122,7 @@
                  method 
                  args)
           <!
-          ((fn [_] (js/setTimeout (fn []
-                           (go (-> (api/fetch-aggregated-contexts @*state)
-                                   <p!
-                                   (#(swap! *state assoc :aggregated-contexts %)))))
-                   ;; TODO probably don't need any timeout
-                         10))))))
+          ((fn [_]
+             (go (-> (api/fetch-aggregated-contexts @*state)
+                     <p!
+                     (#(swap! *state assoc :aggregated-contexts %)))))))))
