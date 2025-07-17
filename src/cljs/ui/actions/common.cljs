@@ -87,15 +87,20 @@
             (reset-state! *state)
             (dissoc-loading *state)))))
 
+(def ^:private current-timeout-id (atom nil))
+
 (defn fetch-and-reset-with-method-2!
   [*state state method & args]
   (apply fetch-and-reset-with-method! *state state method args)
-  (js/setTimeout (fn []
-                   (when (:selected-context @*state)
-                     (go (-> (api/fetch-aggregated-contexts @*state)
-                             <p!
-                             (#(do 
-                                 (prn "%" %)
-                                 (when %
-                                   (swap! *state assoc :aggregated-contexts %))))))))
-                 200))
+  (when-let [timeout-id @current-timeout-id]
+    (js/clearTimeout timeout-id))
+  (reset! current-timeout-id
+          (js/setTimeout (fn []
+                           (when (:selected-context @*state)
+                             (go (-> (api/fetch-aggregated-contexts @*state)
+                                     <p!
+                                     (#(do 
+                                         (prn "%" %)
+                                         (when %
+                                           (swap! *state assoc :aggregated-contexts %))))))))
+                         200)))
