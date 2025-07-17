@@ -90,10 +90,27 @@
 
 (def ^:private aggregated-contexts-sequence (atom 0))
 
+
+
+
+
+;; ----
+
+(defn fetch-and-reset-with-method-2!'
+  [*state state method & args]
+  #_(reset! *state state')
+  (go (-> (apply fetch-resources-with-method state
+                 method 
+                 args) 
+           <!
+           ((fn [x] (reset-state! (assoc x :aggregated-contexts (:aggregated-contexts @*state))
+                                  *state))))
+          #_(dissoc-loading *state)))
+
 (defn fetch-and-reset-with-method-2!
   [*state state method & args]
-  (swap! *state assoc :aggregated-contexts nil)
-  (apply fetch-and-reset-with-method! *state state method args)
+  #_(swap! *state assoc :aggregated-contexts nil)
+  (apply fetch-and-reset-with-method-2!' *state state method args)
   (let [sequence-number (swap! aggregated-contexts-sequence inc)]
     (js/setTimeout (fn []
                      (when (and (:selected-context @*state)
