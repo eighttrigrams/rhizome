@@ -144,5 +144,5 @@
                                    (when (and % 
                                               (= sequence-number @aggregated-contexts-sequence))
                                      (prn "swap!")
-                                     (swap! *state assoc :aggregated-contexts (second %)))))))))
+                                     (swap! *state assoc :aggregated-contexts %))))))))
                    200)))
