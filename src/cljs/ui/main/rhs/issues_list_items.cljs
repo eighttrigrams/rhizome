@@ -135,7 +135,13 @@
               (:image (:resource-links (:data issue)))) 
       [image-preview-component (:data issue)])
     [:div.issue-card-inner-right.issue-card-inner-child
-     [title-component (:title issue) (:data issue)]
+     [title-component 
+      (if-not (empty? (:title issue))
+        (:title issue)
+        (if-not (empty? (:date issue))
+          (:date issue)
+          "")) 
+      (:data issue)]
      [context-badges/component *state (remove #(= (:id (:selected-context @*state))
                                                   (first %)) 
                                               (merge (when (and (:is_context issue) show-context-selector?) 
