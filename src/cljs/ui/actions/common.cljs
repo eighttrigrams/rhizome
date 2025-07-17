@@ -88,13 +88,16 @@
             (reset-state! *state)
             (dissoc-loading *state)))))
 
-(def ^:private aggregated-contexts-sequence (atom 0))
+
 
 
 
 
 
 ;; ----
+
+;; TODO this is likely not necessary
+(def ^:private aggregated-contexts-sequence (atom 0))
 
 (defn- update-state-2 [{:keys [issues selected-context] :as state} 
                        *state]
