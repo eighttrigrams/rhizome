@@ -100,15 +100,14 @@
 
 (defn- update-state-2 [{:keys [issues selected-context] :as state} 
                        *state]
-  (when selected-context
-    (reset! 
-     *state
-     (merge
-      @*state
-      state
+  (reset! 
+   *state
+   (merge
+    @*state
+    state
       ;; TODO probably this can be simplified
-      {:issues   (first issues)
-       :contexts (list selected-context)}))))
+    {:issues   (first issues)
+     :contexts (list selected-context)})))
 
 (defn- fetch-resources-with-method-2
   [*state method & args]
