@@ -117,14 +117,14 @@
 
 (defn fetch-and-reset-with-method-2!
   [*state method & args]
-  (apply fetch-resources-with-method-2 
-         *state
-         method 
-         args)
-  ;; TODO probably the next step should be only done one the first step is done
-  (js/setTimeout (fn []
-                   (go (-> (api/fetch-aggregated-contexts @*state)
-                           <p!
-                           (#(swap! *state assoc :aggregated-contexts %)))))
+  (go (apply fetch-resources-with-method-2 
+             *state
+             method 
+             args)
+      <!
+      (js/setTimeout (fn []
+                       (go (-> (api/fetch-aggregated-contexts @*state)
+                               <p!
+                               (#(swap! *state assoc :aggregated-contexts %)))))
                    ;; TODO probably don't need any timeout
-                 80))
+                     10)))
