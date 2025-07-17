@@ -32,6 +32,7 @@
                       (:issues state))
           :contexts (or contexts (:contexts state))}
          (when aggregated-contexts
+           (prn "swapp!!")
            {:aggregated-contexts aggregated-contexts}))))
 
 (defn- list-resources [state]
