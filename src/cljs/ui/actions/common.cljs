@@ -1,5 +1,5 @@
 (ns ui.actions.common
-  (:require [cljs.core.async :refer [go]]
+  (:require [cljs.core.async :refer [go timeout <!]]
             [cljs.core.async.interop :refer-macros [<p!]]
             api
             utils))
@@ -87,23 +87,21 @@
             (reset-state! *state)
             (dissoc-loading *state)))))
 
-(def ^:private current-timeout-id (atom nil))
+(def ^:private current-aggregated-context-go-block (atom nil))
 
 (defn fetch-and-reset-with-method-2!
   [*state state method & args]
   (apply fetch-and-reset-with-method! *state state method args)
-  (prn "here!!!!" (:selected-context @*state))
-  (when-let [timeout-id @current-timeout-id]
-    (js/clearTimeout timeout-id))
-  (reset! current-timeout-id
-          (js/setTimeout (fn []
-                           (when (:selected-context @*state)
-                             (go (-> (api/fetch-aggregated-contexts @*state)
-                                     <p!
-                                     (#(do 
-                                         (prn "%" % "-" (= (:id (:selected-context @*state)) (first %)))
-                                         (when (second %)
-                                           (if (= (:id (:selected-context @*state)) (first %))
-                                             (swap! *state assoc :aggregated-contexts (second %))
-                                             (prn "nonononononon")))))))))
-                         200)))
+  (let [expected-context-id (:id (:selected-context (if (map? state) state @state)))]
+    (when-let [current-go @current-aggregated-context-go-block]
+      (cljs.core.async/close! current-go))
+    (reset! current-aggregated-context-go-block
+            (go 
+              (<! (timeout 200))
+              (when (and (:selected-context @*state)
+                         (= expected-context-id (:id (:selected-context @*state))))
+                (let [result (<p! (api/fetch-aggregated-contexts @*state))]
+                  (when (and result 
+                             (= expected-context-id (:id (:selected-context @*state)))
+                             (= expected-context-id (first result)))
+                    (swap! *state assoc :aggregated-contexts (second result)))))))))
