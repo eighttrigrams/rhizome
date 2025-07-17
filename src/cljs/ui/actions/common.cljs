@@ -89,13 +89,16 @@
 
 (defn fetch-and-reset-with-method-2!
   [*state state method & args]
-  (apply fetch-and-reset-with-method! *state state method args)
-  (js/setTimeout (fn []
-                   (when (:selected-context @*state)
-                     (go (-> (api/fetch-aggregated-contexts @*state)
-                             <p!
-                             (#(do 
-                                 (prn "%" %)
-                                 (when %
-                                   (swap! *state assoc :aggregated-contexts %))))))))
-                 200))
+  (let [request-id (random-uuid)
+        state-with-id (assoc (if (map? state) state @state) :request-id request-id)]
+    (apply fetch-and-reset-with-method! *state state-with-id method args)
+    (js/setTimeout (fn []
+                     (when (and (:selected-context @*state)
+                                (= request-id (:request-id @*state)))
+                       (go (-> (api/fetch-aggregated-contexts @*state)
+                               <p!
+                               (#(do 
+                                   (prn "%" %)
+                                   (when (and % (= request-id (:request-id @*state)))
+                                     (swap! *state assoc :aggregated-contexts %))))))))
+                   200)))
