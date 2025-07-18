@@ -39,6 +39,8 @@
 
 (defn-over-http fetch-context :return-value {})
 
+(defn-over-http deselect-context :return-value {})
+
 (defn-over-http update-item :return-value {})
 
 (defn-over-http upgrade-issue-to-context :return-value {})

@@ -46,6 +46,13 @@
               :unassigned-secondary-contexts-selected? false
               :q                                       nil}))))
 
+(defn deselect-context [{:keys [db]}]
+  (fn [opts]
+    {:issues           (search/search-issues db (dissoc opts :selected-context :q))
+     :contexts         (search/search-contexts db "")
+     :selected-context nil
+     :q                nil}))
+
 (defn the-future [arg]
   (future arg))
 
@@ -370,11 +377,6 @@
        :start-context-search (start-context-search db opts)
        :update-context-description
        {:selected-context (datastore/update-context-description db arg)}
-       :deselect-context
-       {:issues           (search/search-issues db (dissoc opts :selected-context :q))
-        :contexts         (search/search-contexts db "")
-        :selected-context nil
-        :q                nil}
 
          ;; TODO remove :else clause. fix where there are cases where this fires but there shoulnd't be
        :else {}))))

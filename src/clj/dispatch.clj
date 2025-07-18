@@ -22,6 +22,7 @@
                                 unlink-selected-item-from-container
                                 select-last-context
                                 fetch-context
+                                deselect-context
                                 fetch-aggregated-contexts
                                 delete-context
                                 fetch-issue-description]]))
@@ -53,5 +54,6 @@
   upgrade-issue-to-context
   link-selected-context-to-context
   fetch-context
+  deselect-context
   delete-context
   fetch-issue-description)

@@ -24,9 +24,6 @@
                                          :link-issue 
                                          :q)))))
 
-(defn deselect-context! [*state]
-  (fetch-and-reset! *state (assoc @*state :cmd :deselect-context)))
-
 (defn load-stored-context [*state idx]
   (fetch-and-reset-with-method! *state
                                 @*state
@@ -78,6 +75,9 @@
    *state 
    api/select-last-context))
 
+(defn deselect-context! [*state]
+  (fetch-and-reset-with-method-2! *state api/deselect-context))
+
 (defn delete-issue! [*state idx]
   (when (js/window.confirm "Delete this issue?")
     (fetch-and-reset-with-method-2! *state api/delete-issue idx)))
@@ -92,6 +92,11 @@
    (if (true? (:link-context @*state))
      (fetch-and-reset-with-method! *state @*state api/link-selected-context-to-context context shift-pressed? alt-pressed?)
      (select-item! *state context false))))
+
+(defn deselect-secondary-contexts! [*state]
+  (fetch-and-reset-with-method! *state
+                                @*state
+                                api/deselect-secondary-contexts))
 
 (defn select-issue!
   ([*state issue] (select-issue! *state issue false false))
@@ -186,11 +191,6 @@
 
 (defn search! [*state]
   (fetch-and-reset! *state @*state))
-
-(defn deselect-secondary-contexts! [*state]
-  (fetch-and-reset-with-method! *state
-                                @*state
-                                api/deselect-secondary-contexts))
 
 (defn change-secondary-contexts-selection! [*state]
   (fetch-and-reset-with-method! *state 
