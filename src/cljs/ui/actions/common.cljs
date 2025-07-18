@@ -105,7 +105,8 @@
     @*state
     state
       ;; TODO probably this can be simplified
-    {:contexts (or contexts (list selected-context))})))
+    {:contexts (or contexts (;; TODO this thing here is weird, is this necessary?
+                             list selected-context))})))
 
 (defn- fetch-resources-with-method-2
   [*state method & args]

@@ -48,20 +48,14 @@
 (defn new-issue! [*state issue]
   (swap! *state dissoc :aggregated-contexts)
   (swap! *state dissoc :issues)
-  (fetch-and-reset-with-method! *state
-                                (dissoc @*state :modal)
-                                api/insert-issue
-                                issue))
+  (swap! *state dissoc :modal)
+  (fetch-and-reset-with-method-2! *state api/insert-issue issue))
 
 (defn new-context! [*state context]
   (swap! *state dissoc :aggregated-contexts)
   (swap! *state dissoc :issues)
-  (fetch-and-reset-with-method-2! *state 
-                                  api/insert-context context
-                                  #_(-> @*state
-                               #_(dissoc :modal)
-                               #_(assoc :cmd :insert-context)
-                               #_(assoc :arg context))))
+  (swap! *state dissoc :modal)
+  (fetch-and-reset-with-method-2! *state api/insert-context context))
 
 (defn- select-item! [*state context select-as-issue?]
   (reset! *state (assoc @*state
