@@ -46,12 +46,14 @@
                                 item))
 
 (defn new-issue! [*state issue]
+  ;; TODO do next line in backend
   (swap! *state dissoc :aggregated-contexts)
   (swap! *state dissoc :issues)
   (swap! *state dissoc :modal)
   (fetch-and-reset-with-method-2! *state api/insert-issue issue))
 
 (defn new-context! [*state context]
+  ;; TODO do next line in backend
   (swap! *state dissoc :aggregated-contexts)
   (swap! *state dissoc :issues)
   (swap! *state dissoc :modal)
