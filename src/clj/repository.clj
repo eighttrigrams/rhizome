@@ -167,9 +167,7 @@
 (defn fetch-aggregated-contexts [{:keys [db]}]
   (fn [state]
     (when-not (:selected-context state) (throw (Exception. "fetch-aggregated-contexts called without selected-context")))
-    (search/fetch-aggregated-contexts 
-     db (assoc state 
-               :only-context-aggregation? true))))
+    (search/fetch-aggregated-contexts db state)))
 
 (defn insert-issue [{:keys [db]}]
   (fn [{:keys [selected-context]
