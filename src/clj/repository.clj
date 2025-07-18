@@ -48,11 +48,7 @@
         (datastore/reprioritize-context db arg))
       (merge opts
              {:selected-context                        selected-context
-                ;; :active-search                           :issues
-              :issues                                  (search/search-issues db 
-                                                                             (-> opts
-                                                                                 (dissoc :q)
-                                                                                 (assoc :skip-context-aggregation? true)))
+              :issues                                  (search/search-issues db  (dissoc opts :q))
               :context-to-fetch                        nil
               :unassigned-secondary-contexts-selected? false
               :q                                       nil}))))
@@ -64,7 +60,7 @@
   (fn [opts]
     (log/info (str "repository/change-secondary-contexts-operation" (:selected-context opts)))
     (let [_context (the-future (datastore/update-item db (:selected-context opts)))]
-      {:issues (search/search-issues db (assoc opts :skip-context-aggregation? true))})))
+      {:issues (search/search-issues db opts)})))
 
 (defn change-secondary-contexts-selection [{:keys [db]}]
   (change-secondary-contexts-operation db))
@@ -202,9 +198,7 @@
                  :selected-context    (datastore/get-item db item) ;; fetch again to have latest collections from two lines above
                  :q                   nil
                  :aggregated-contexts '()}))))
-         {:issues (search/search-issues db (-> state
-                                               (dissoc :q)
-                                               (assoc :skip-context-aggregation? true)))})))))
+         {:issues (search/search-issues db (dissoc state :q))})))))
 
 (defn fetch-issue-description [{:keys [db]}]
   (fn [state issue]
@@ -364,9 +358,7 @@
      (case cmd
        nil
        (cond (= :issues active-search)
-             {:issues (search/search-issues db 
-                                            (assoc opts
-                                                   :skip-context-aggregation? true))}
+             {:issues (search/search-issues db opts)}
              (= :contexts active-search) (search-contexts db opts)
              :else
              (merge {:issues   (search/search-issues db opts)
