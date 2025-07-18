@@ -2,7 +2,6 @@
   (:require [mount.core :as mount]
             [datastore.config :as config]
             [et.vp.ds :as datastore]
-            privacy
             [et.vp.ds.search :as search]
             [et.vp.ds.relations :as datastore.relations]
             [cambium.core :as log]
@@ -31,12 +30,6 @@
 (defn- log-opts [{:keys [cmd q active-search] :as _opts}]
   (log/debug (str "list-resources - "
                  (or cmd (str active-search "(" q ")")))))
-
-;; TODO move to other place
-(defn flip-privacy [{:keys [privacy-mode]}]
-  (fn [_opts]
-    (swap! privacy/*public? not)
-    {:public? (and @privacy/*public? (= :private privacy-mode))}))
 
 (defn fetch-context [{:keys [db]}]
   (fn [old-state [arg fetch-as-issue?]]
@@ -352,7 +345,7 @@
      :link-issue       nil
      :q                ""}))
 
-(defn list-resources [{:keys [db privacy-mode]}]
+(defn list-resources [{:keys [db]}]
   (fn [{:keys                                                             [cmd
                                                                            arg
                                                                            active-search
@@ -370,7 +363,6 @@
              (= :contexts active-search) (search-contexts db opts)
              :else
              (merge {:issues   (search/search-issues db opts)
-                     :public?  (and @privacy/*public? (= :private privacy-mode))
                      :contexts (search/search-contexts db "")}))
        :start-global-search ((start-global-search {:db db}) opts)
        :link-issue-to-selected-context (start-linking-issue-to-selected-context db opts)

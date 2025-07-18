@@ -216,8 +216,5 @@
 (defn exit-issue-view! [*state]
   (swap! *state assoc :issue-view? false))
 
-(defn flip-privacy! [*state]
-  (fetch-and-reset-with-method! *state @*state api/flip-privacy))
-
 (defn fetch-issue-description! [*state issue]
   (fetch-and-reset-with-method! *state @*state api/fetch-issue-description issue :dont-reset-preview-issue))

@@ -1,6 +1,5 @@
 (ns server
   (:require [ring.adapter.jetty :as j]
-            privacy
             upload
             [compojure.core :refer [context GET POST]]
             [ring.util.response :as response]
@@ -43,10 +42,7 @@
               (dispatch/handler (-> % 
                                     (assoc-in
                                      [:body :server-args :db]
-                                     (:db config/config))
-                                    (assoc-in
-                                     [:body :server-args :privacy-mode]
-                                     :private)))))
+                                     (:db config/config))))))
           json/wrap-json-response
           (json/wrap-json-body {:keywords? true})))
        req))))

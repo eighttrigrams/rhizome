@@ -24,7 +24,6 @@
                                 fetch-context
                                 fetch-aggregated-contexts
                                 delete-context
-                                flip-privacy
                                 fetch-issue-description]]))
 
 (defn- handle-error [e]
@@ -55,5 +54,4 @@
   link-selected-context-to-context
   fetch-context
   delete-context
-  flip-privacy
   fetch-issue-description)

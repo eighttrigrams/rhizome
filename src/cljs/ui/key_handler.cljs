@@ -18,9 +18,7 @@
                    (and (not alt-pressed?) selected-context)
                    (actions/deselect-context! *state))
              (not (:active-search @*state))
-             (cond 
-               (and (= "KeyG" code) ctrl-pressed? shift-pressed?)
-               (actions/flip-privacy! *state)
+             (cond
                (and selected-context (= "KeyE" code))
                (swap! *state #(assoc % :modal :edit-context :issue-view? false))
                (and selected-context (= "Delete" code))
