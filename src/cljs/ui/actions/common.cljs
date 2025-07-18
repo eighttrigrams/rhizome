@@ -97,7 +97,7 @@
 ;; all of this is for fetch-item or fetch-last context, where aggregated-issues are fetched separately
 ;; for quicker response times
 
-(defn- update-state-2 [{:keys [issues selected-context contexts] :as state} 
+(defn- update-state-2 [{:keys [selected-context contexts] :as state} 
                        *state]
   (reset! 
    *state
@@ -105,8 +105,7 @@
     @*state
     state
       ;; TODO probably this can be simplified
-    {:issues   issues
-     :contexts (or contexts (list selected-context))})))
+    {:contexts (or contexts (list selected-context))})))
 
 (defn- fetch-resources-with-method-2
   [*state method & args]
