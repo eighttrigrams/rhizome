@@ -27,12 +27,11 @@
         (merge 
          (if (map? state) state @state)
          i
-         {:issues   (if (and issues (first issues)) 
-                      (first issues)
+         {:issues   (if issues 
+                      issues
                       (:issues state))
           :contexts (or contexts (:contexts state))}
          (when aggregated-contexts
-           (prn "swapp!!")
            {:aggregated-contexts aggregated-contexts}))))
 
 (defn- list-resources [state]
@@ -106,7 +105,7 @@
     @*state
     state
       ;; TODO probably this can be simplified
-    {:issues   (first issues)
+    {:issues   issues
      :contexts (or contexts (list selected-context))})))
 
 (defn- fetch-resources-with-method-2
