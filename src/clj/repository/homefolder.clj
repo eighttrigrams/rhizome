@@ -47,6 +47,11 @@
          nil)
        "/Tracked/" file-name))
 
+(defn ren [file-name target]
+  (log/info (str "Will rename " file-name " to " target))
+  (.renameTo (io/file (str homefolder "Downloads/Tracked/" file-name))
+             (io/file (str homefolder "Downloads/Tracked/" target))))
+
 (defn move-file [file-name]
   (let [target (get-target file-name)]
     (log/info (str "Will move " file-name " to " (str/replace target file-name "")))

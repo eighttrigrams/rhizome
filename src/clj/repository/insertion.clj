@@ -32,10 +32,7 @@
   (log/info (str "Import for " title))
   (let [context-ids-set (into #{} (conj selected-secondary-contexts-set (:id selected-context)))]
     (cond (batch/match? title)
-          (batch/ingest db nil nil nil)
-          ;; not supporting that any longer, since that doesn't guarantee the file is imported properly
-          #_(file/match? title)
-          #_(file/ingest db title context-ids-set nil)
+          (batch/ingest db title nil nil)
           (youtube/match? title) 
           (youtube/ingest db title context-ids-set nil)
           (github/match? title) 
