@@ -13,6 +13,8 @@
 
 (defn-over-http insert-issue :return-value {})
 
+(defn-over-http insert-context :return-value {})
+
 (defn-over-http change-secondary-contexts-selection :return-value {})
 
 (defn-over-http change-secondary-contexts-unassigned-selected :return-value {})

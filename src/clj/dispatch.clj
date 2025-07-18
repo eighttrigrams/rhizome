@@ -4,6 +4,7 @@
             [datastore.config :as config]
             [repository :refer [list-resources 
                                 insert-issue
+                                insert-context
                                 change-secondary-contexts-selection
                                 change-secondary-contexts-unassigned-selected
                                 change-secondary-contexts-inverted
@@ -34,6 +35,7 @@
    :pass-server-args? true}
   list-resources 
   insert-issue
+  insert-context
   change-secondary-contexts-selection
   change-secondary-contexts-unassigned-selected
   change-secondary-contexts-inverted

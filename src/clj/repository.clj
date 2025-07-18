@@ -169,6 +169,16 @@
     (when-not (:selected-context state) (throw (Exception. "fetch-aggregated-contexts called without selected-context")))
     (search/fetch-aggregated-contexts db state)))
 
+(defn insert-context [{:keys [db]}]
+  (fn [_state arg]
+    (log/info "insert-context")
+    {:selected-context                        (datastore/new-context db arg)
+     :aggregated-contexts                     '()
+     :issues                                  []
+     :q                                       nil
+     :active-search                           :issues
+     :unassigned-secondary-contexts-selected? false}))
+
 (defn insert-issue [{:keys [db]}]
   (fn [{:keys [selected-context]
         :as state} 
@@ -366,13 +376,6 @@
        :link-issue-to-selected-context (start-linking-issue-to-selected-context db opts)
        :start-linking-selected-issue-to-context (start-linking-selected-issue-to-context-with-local-search db opts)
        :start-context-search (start-context-search db opts)
-       :insert-context
-       {:selected-context                        (datastore/new-context db arg)
-        :aggregated-contexts                     '()
-        :issues                                  []
-        :q                                       nil
-        :active-search                           :issues
-        :unassigned-secondary-contexts-selected? false}
        :update-context-description
        {:selected-context (datastore/update-context-description db arg)}
        :deselect-context
