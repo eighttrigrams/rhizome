@@ -49,14 +49,14 @@
         (datastore/reprioritize-context db arg))
       (merge opts
              {:selected-context                        selected-context
-              :issues                                  (search/search-issues db  (dissoc opts :q))
+              :issues                                  (search/search-issues-deprecated db  (dissoc opts :q))
               :context-to-fetch                        nil
               :unassigned-secondary-contexts-selected? false
               :q                                       nil}))))
 
 (defn deselect-context [{:keys [db]}]
   (fn [opts]
-    {:issues           (search/search-issues db (dissoc opts :selected-context :q))
+    {:issues           (search/search-issues-deprecated db (dissoc opts :selected-context :q))
      :contexts         (search-contexts' db "")
      :selected-context nil
      :q                nil}))
@@ -68,7 +68,7 @@
   (fn [opts]
     (log/info (str "repository/change-secondary-contexts-operation" (:selected-context opts)))
     (let [_context (the-future (datastore/update-item db (:selected-context opts)))]
-      {:issues (search/search-issues db opts)})))
+      {:issues (search/search-issues-deprecated db opts)})))
 
 (defn change-secondary-contexts-selection [{:keys [db]}]
   (change-secondary-contexts-operation db))
@@ -119,7 +119,7 @@
                                                    :notes-mode]
                                                   false)
                                                  )))]
-      {:issues                          (search/search-issues
+      {:issues                          (search/search-issues-deprecated
                                          db
                                          (assoc opts :selected-context context))
        :contexts                        (search-contexts' db "")
@@ -134,7 +134,7 @@
   (fn [{:keys [selected-context] :as opts} idx]
     (let [selected-context (datastore/load-stored-context db selected-context idx)]
       {:selected-context selected-context
-       :issues (search/search-issues db (assoc opts :selected-context selected-context))})))
+       :issues (search/search-issues-deprecated db (assoc opts :selected-context selected-context))})))
 
 (defn remove-stored-context [{:keys [db]}]
   (fn [{:keys [selected-context]} idx]
@@ -145,12 +145,12 @@
   (fn [{:keys [selected-context] :as opts}]
     (let [selected-context (datastore/cycle-search-mode db selected-context)]
       {:selected-context selected-context
-       :issues           (search/search-issues db (assoc opts :selected-context selected-context))})))
+       :issues           (search/search-issues-deprecated db (assoc opts :selected-context selected-context))})))
 
 (defn delete-issue [{:keys [db]}]
   (fn [opts issue]
     (deletion/delete-item db issue)
-    {:issues         (search/search-issues db opts)
+    {:issues         (search/search-issues-deprecated db opts)
      :issue-view? false}))
 
 (defn delete-context [{:keys [db]}]
@@ -161,7 +161,7 @@
              :issue-view? false)
       (let [m {:selected-context nil :issue-view? false}
             opts (merge opts m)]
-        (merge {:issues           (search/search-issues db opts)
+        (merge {:issues           (search/search-issues-deprecated db opts)
                 :contexts         (search-contexts' db "")}
                m)))))
 
@@ -214,7 +214,7 @@
                  :selected-context    (datastore/get-item db item) ;; fetch again to have latest collections from two lines above
                  :q                   nil
                  :aggregated-contexts '()}))))
-         {:issues (search/search-issues db (dissoc state :q))})))))
+         {:issues (search/search-issues-deprecated db (dissoc state :q))})))))
 
 (defn fetch-issue-description [{:keys [db]}]
   (fn [state issue]
@@ -236,7 +236,7 @@
         (merge {:link-context   nil
                 :active-search  nil
                 :selected-context fresh-selected-context
-                :issues         (search/search-issues db (dissoc opts :q))
+                :issues         (search/search-issues-deprecated db (dissoc opts :q))
                 :q              nil}
                (when selected-context
                  {:aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)}))))))
@@ -258,7 +258,7 @@
    :active-search :contexts})
 
 (defn start-linking-issue-to-selected-context [db opts]
-  {:issues           (search/search-issues db (assoc opts
+  {:issues           (search/search-issues-deprecated db (assoc opts
                                                      :link-issue true
                                                      :q ""))
    :active-search    :issues
@@ -286,7 +286,7 @@
                                                :views 
                                                :current 
                                                :selected-secondary-contexts] []))
-            issues              (search/search-issues db opts)
+            issues              (search/search-issues-deprecated db opts)
             aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)
             selected-context (datastore/get-item db selected-context)]
         {:issues              issues
@@ -301,7 +301,7 @@
   (fn [state issue]
     (log/info (str "repository/reprioritize-issue" (:id issue) (:title issue)))
     (datastore/reprioritize-issue db issue)
-    {:issues           (search/search-issues db (dissoc state 
+    {:issues           (search/search-issues-deprecated db (dissoc state 
                                                         :q))
      :active-search    nil
      :q                nil}))
@@ -320,7 +320,7 @@
       (do
         (log/info (str "repository/unlink-selected-item-from-container - Removing now"))
         {:selected-context old-selected-context
-         :issues (search/search-issues db (assoc state :selected-context old-selected-context))
+         :issues (search/search-issues-deprecated db (assoc state :selected-context old-selected-context))
          :aggregated-contexts ((fetch-aggregated-contexts {:db db}) (assoc state :selected-context old-selected-context))
          :issue-view? false}))))
 
@@ -331,7 +331,7 @@
       (do 
         (log/info (str "repository/select-last-context - " (:id old-selected-context) ":" (:title old-selected-context)))
         {:selected-context    old-selected-context
-         :issues              (search/search-issues db (assoc state :selected-context old-selected-context))
+         :issues              (search/search-issues-deprecated db (assoc state :selected-context old-selected-context))
          :issue-view?         false}))))
 
 (defn update-item [{:keys [db]}]
@@ -343,14 +343,14 @@
         (datastore.relations/set-the-containers-of-item! db context issue-contexts is_context))
       (let [selected-context (datastore/update-item db context)]
         (merge {:selected-context selected-context
-                :issues           (search/search-issues db (-> opts
+                :issues           (search/search-issues-deprecated db (-> opts
                                                                (dissoc :q)
                                                                (assoc :selected-context selected-context)))
                 :q                nil})))))
 
 (defn start-global-search [{:keys [db]}]
   (fn [state]
-    {:issues           (search/search-issues
+    {:issues           (search/search-issues-deprecated
                         db
                         (assoc state
                                :q ""
@@ -374,10 +374,10 @@
      (case cmd
        nil
        (cond (= :issues active-search)
-             {:issues (search/search-issues db opts)}
+             {:issues (search/search-issues-deprecated db opts)}
              (= :contexts active-search) (search-contexts db opts)
              :else
-             (merge {:issues   (search/search-issues db opts)
+             (merge {:issues   (search/search-issues-deprecated db opts)
                      :contexts (search-contexts' db "")}))
        :start-global-search ((start-global-search {:db db}) opts)
        :link-issue-to-selected-context (start-linking-issue-to-selected-context db opts)
