@@ -8,6 +8,24 @@
             [repository.insertion :as insertion]
             [repository.deletion :as deletion]))
 
+(defn- update-contexts [item]
+  (update-in item [:data :contexts] 
+             (fn [contexts]
+               (into {} 
+                     (map (fn [[k v]]
+                            [(Integer/parseInt (name k)) (if (map? v) v
+                                                             {:title       v
+                                                              :show-badge? true})])
+                          contexts)))))
+
+(defn- search-contexts' [db opts]
+  (map update-contexts (search/search-contexts db opts)))
+
+#_{:clj-kondo/ignore [:unresolved-var]}
+(defn get-contexts [q]
+  (let [db (:db config/config)]
+    (search-contexts' db q)))
+
 (mount/defstate repository
   :start (do
            (tap> [:resources :up 2])
@@ -21,11 +39,6 @@
   :stop (do 
           (tap> [:resources :down])
           nil))
-
-#_{:clj-kondo/ignore [:unresolved-var]}
-(defn get-contexts [q]
-  (let [db (:db config/config)]
-    (search/search-contexts db q)))
 
 (defn- log-opts [{:keys [cmd q active-search] :as _opts}]
   (log/debug (str "list-resources - "
@@ -49,7 +62,7 @@
 (defn deselect-context [{:keys [db]}]
   (fn [opts]
     {:issues           (search/search-issues db (dissoc opts :selected-context :q))
-     :contexts         (search/search-contexts db "")
+     :contexts         (search-contexts' db "")
      :selected-context nil
      :q                nil}))
 
@@ -114,7 +127,7 @@
       {:issues                          (search/search-issues
                                          db
                                          (assoc opts :selected-context context))
-       :contexts                        (search/search-contexts db "")
+       :contexts                        (search-contexts' db "")
        :selected-context context})))
 
 (defn store-current-view [{:keys [db]}]
@@ -154,7 +167,7 @@
       (let [m {:selected-context nil :issue-view? false}
             opts (merge opts m)]
         (merge {:issues           (search/search-issues db opts)
-                :contexts         (search/search-contexts db "")}
+                :contexts         (search-contexts' db "")}
                m)))))
 
 (defn- get-selected-secondary-contexts-set 
@@ -234,10 +247,10 @@
                  {:aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)}))))))
 
 (defn search-contexts [db opts]
-  {:contexts (search/search-contexts db opts)})
+  {:contexts (search-contexts' db opts)})
 
 (defn start-linking-selected-issue-to-context-with-local-search [db opts]
-  {:contexts (search/search-contexts db (assoc opts 
+  {:contexts (search-contexts' db (assoc opts 
                                                :q "" 
                                                :link-context true))
    :q ""
@@ -245,7 +258,7 @@
    :active-search :contexts})
 
 (defn- start-context-search [db opts]
-  {:contexts (search/search-contexts db (assoc opts :q ""))
+  {:contexts (search-contexts' db (assoc opts :q ""))
    :q ""
    :active-search :contexts})
 
@@ -370,7 +383,7 @@
              (= :contexts active-search) (search-contexts db opts)
              :else
              (merge {:issues   (search/search-issues db opts)
-                     :contexts (search/search-contexts db "")}))
+                     :contexts (search-contexts' db "")}))
        :start-global-search ((start-global-search {:db db}) opts)
        :link-issue-to-selected-context (start-linking-issue-to-selected-context db opts)
        :start-linking-selected-issue-to-context (start-linking-selected-issue-to-context-with-local-search db opts)
