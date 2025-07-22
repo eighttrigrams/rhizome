@@ -21,11 +21,6 @@
 (defn- search-contexts' [db opts]
   (map update-contexts (search/search-items db opts)))
 
-#_{:clj-kondo/ignore [:unresolved-var]}
-(defn get-contexts [q]
-  (let [db (:db config/config)]
-    (search-contexts' db q)))
-
 (mount/defstate repository
   :start (do
            (tap> [:resources :up 2])
