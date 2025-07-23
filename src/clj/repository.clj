@@ -19,9 +19,11 @@
                  (assoc :selected-context-id (:id selected-context)))]
     [selected-context-id opts]))
 
+(def limit 100)
+
 (defn- search'
   "Prefer calling search-items or search-related-items"
-  [db q selected-context-id {:keys [link-issue selected-context] :as opts} ctx]
+  [db q selected-context-id {:keys [link-issue selected-context] :as opts}]
   (log/info (str "search:" selected-context-id " link-issue:" link-issue))
   (when selected-context (throw (IllegalArgumentException. "'selected-context' not expected as an argument here")))
   (if selected-context-id
@@ -31,20 +33,20 @@
                    (assoc opts
                           :all-items? true
                           :selected-context-id selected-context-id)
-                   ctx)
+                   {:limit limit})
      (search/search-related-items db 
                            q
                            selected-context-id
                            opts
-                           ctx))
-    (search/search-items db q (assoc opts :all-items? true) ctx)))
+                           {}))
+    (search/search-items db q (assoc opts :all-items? true) {:limit limit})))
 
 (defn- search-items [db q opts]
-  (search/search-items db q (assoc opts :all-items? true) {:limit 100}))
+  (search/search-items db q (assoc opts :all-items? true) {:limit limit}))
 
 (defn- search [db {:keys [q] :as opts}]
   (let [[selected-context-id opts] (simplify-params opts)]
-    (search' db q selected-context-id opts {})))
+    (search' db q selected-context-id opts)))
 
 (defn- update-contexts [item]
   (update-in item [:data :contexts] 
@@ -58,7 +60,7 @@
 
 (defn- search-context-items [db q opts]
   (let [[_selected-context-id opts] (simplify-params opts)]
-    (map update-contexts (search/search-items db q opts {:limit 100}))))
+    (map update-contexts (search/search-items db q opts {:limit limit}))))
 
 (defn- search-related-items 
   ([db q selected-context]
