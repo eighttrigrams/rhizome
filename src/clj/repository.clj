@@ -7,6 +7,17 @@
             [repository.insertion :as insertion]
             [repository.deletion :as deletion]))
 
+(defn search-aggregated-contexts
+  [db {{{:keys [highlighted-secondary-contexts]} :data} :selected-context
+       :as opts}]
+  (let [issues (search/search-related-items
+                 db 
+                 "" 
+                 (:id (:selected-context opts))
+                 {}
+                 {})]
+    (search/get-aggregated-contexts db (map :id issues) highlighted-secondary-contexts)))
+
 (defn- simplify-params [{:keys [selected-context] :as opts}]
   (let [selected-context-id (:id selected-context)
         opts (-> opts 
@@ -91,6 +102,11 @@
 (defn- log-opts [{:keys [cmd q active-search] :as _opts}]
   (log/debug (str "list-resources - "
                  (or cmd (str active-search "(" q ")")))))
+
+(defn fetch-aggregated-contexts [{:keys [db]}]
+  (fn [state]
+    (when-not (:selected-context state) (throw (Exception. "fetch-aggregated-contexts called without selected-context")))
+    (search-aggregated-contexts db state)))
 
 (defn fetch-context [{:keys [db]}]
   (fn [old-state [arg fetch-as-issue?]]
@@ -228,11 +244,6 @@
   (into #{}  (when-not 
                secondary-contexts-inverted
                selected-secondary-contexts)))
-
-(defn fetch-aggregated-contexts [{:keys [db]}]
-  (fn [state]
-    (when-not (:selected-context state) (throw (Exception. "fetch-aggregated-contexts called without selected-context")))
-    (search/fetch-aggregated-contexts db state)))
 
 (defn insert-context [{:keys [db]}]
   (fn [_state arg]
