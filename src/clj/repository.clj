@@ -17,8 +17,21 @@
                                                               :show-badge? true})])
                           contexts)))))
 
+(defn- simplify-params [{:keys [selected-context] :as opts}]
+  (let [selected-context-id (:id selected-context)
+        opts (-> opts 
+                 (merge (select-keys (-> selected-context :data :views :current) 
+                                     [:secondary-contexts-inverted
+                                      :secondary-contexts-unassigned-selected
+                                      :selected-secondary-contexts
+                                      :search-mode]))
+                 (dissoc :selected-context)
+                 (assoc :selected-context-id (:id selected-context)))]
+    [selected-context-id opts]))
+
 (defn- search-context-items [db q opts]
-  (map update-contexts (search/search-items db q opts)))
+  (let [[_selected-context-id opts] (simplify-params opts)]
+    (map update-contexts (search/search-items db q opts))))
 
 (defn- search-items [db q opts]
   (search/search-items db q (assoc opts :all-items? true)))
@@ -27,27 +40,20 @@
   ([db q selected-context]
    (search-related-items db q selected-context {}))
   ([db q selected-context opts]
-   (search/search-related-items db 
-                                q 
-                                (:id selected-context)
-                                (select-keys (-> selected-context :data :views :current) 
-                                             [:secondary-contexts-inverted
-                                              :secondary-contexts-unassigned-selected
-                                              :selected-secondary-contexts
-                                              :search-mode]) 
-                                opts)))
+   (let [[selected-context-id opts] (simplify-params (assoc opts :selected-context selected-context))]
+         (search/search-related-items db 
+                                      q 
+                                      selected-context-id
+                                      opts 
+                                      {}))))
 
-(defn- search [db opts]
-  (if (:selected-context opts)
-    (if (:link-issue opts)
-      (search-items db 
-                    (:q opts) 
-                    (dissoc opts :q))
-      (search-related-items db 
-                            (:q opts)
-                            (:selected-context opts)
-                            (dissoc opts :q)))
-    (search-items db (:q opts) (dissoc opts :q))))
+(defn- search [db {:keys [q] :as opts}]
+  (let [[selected-context-id opts] (simplify-params opts)]
+    (search/search db 
+                   q 
+                   selected-context-id
+                   opts
+                   {})))
 
 (mount/defstate repository
   :start (do
@@ -276,10 +282,10 @@
 (defn search-contexts [db opts]
   {:contexts (search-context-items db (:q opts) (dissoc opts :q))})
 
-(defn start-linking-selected-issue-to-context-with-local-search [db opts]
-  {:contexts (search-context-items db (assoc opts 
-                                               :q "" 
-                                               :link-context true))
+(defn start-linking-selected-issue-to-context-with-local-search 
+  [db opts]
+  (log/info "start-linking-selected-issue-to-context-with-local-search ")
+  {:contexts (search-context-items db "" (assoc opts :link-context true))
    :q ""
    :link-context true
    :active-search :contexts})
@@ -289,7 +295,9 @@
    :q ""
    :active-search :contexts})
 
-(defn start-linking-issue-to-selected-context [db opts]
+(defn start-linking-issue-to-selected-context 
+  [db opts]
+  (log/info "start-linking-issue-to-selected-context")
   {:issues (search
             db 
             (merge opts
