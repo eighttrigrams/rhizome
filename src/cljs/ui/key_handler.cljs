@@ -23,8 +23,6 @@
                (swap! *state #(assoc % :modal :edit-context :issue-view? false))
                (and selected-context (= "Delete" code))
                (actions/delete-context! *state)
-               (and alt-pressed? (= "KeyI" code))
-               (actions/start-global-search! *state)
                (and alt-pressed?
                     (= "KeyU" code)
                     selected-context)

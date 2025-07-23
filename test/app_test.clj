@@ -94,7 +94,7 @@
           context-2 (create-context "context-2")
           _issue-1   (create-issue "issue-1" (:id context-1) [])
           _issue-2  (create-issue "issue-2" (:id context-2) [])
-          opts      ((repository/start-global-search {:db db}) {})] 
+          opts      {} #_((repository/start-global-search {:db db}) {})] 
       (is (= 4 (count (first (:issues opts)))))))
 
   (testing "select context and display"
