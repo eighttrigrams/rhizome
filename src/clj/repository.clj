@@ -74,8 +74,8 @@
               :q                                       nil}))))
 
 (defn deselect-context [{:keys [db]}]
-  (fn [opts]
-    {:issues           (search-items db "" opts)
+  (fn [_opts]
+    {:issues           (search-items db "" {})
      :contexts         (search-context-items db "")
      :selected-context nil
      :q                nil}))
