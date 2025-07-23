@@ -96,4 +96,5 @@
           (log/info (str "created new item" item))
           (when image (try (upload/upload-preview-file db {:tempfile image} (:id item) "false")
                            (catch Exception e
-                             (log/error (str "problem while trying to create preview image for substack article. message" (.getMessage e)))))))))))
+                             (log/error (str "problem while trying to create preview image for substack article. message" (.getMessage e))))))
+          item)))))
