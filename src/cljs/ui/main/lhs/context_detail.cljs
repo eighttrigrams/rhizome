@@ -67,7 +67,7 @@
     [:ul
      [:li [unassigned-secondary-contexts-component *state]]
      (map-indexed
-      (fn [idx [id [{:keys [title]} count highlighted?]]]
+      (fn [idx [id [title count highlighted?]]]
         [:li
          {:key      id
           :on-click (select-secondary-context *state id)} 
