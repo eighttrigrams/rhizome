@@ -7,16 +7,6 @@
             [repository.insertion :as insertion]
             [repository.deletion :as deletion]))
 
-(defn- update-contexts [item]
-  (update-in item [:data :contexts] 
-             (fn [contexts]
-               (into {} 
-                     (map (fn [[k v]]
-                            [(Integer/parseInt (name k)) (if (map? v) v
-                                                             {:title       v
-                                                              :show-badge? true})])
-                          contexts)))))
-
 (defn- simplify-params [{:keys [selected-context] :as opts}]
   (let [selected-context-id (:id selected-context)
         opts (-> opts 
@@ -29,12 +19,46 @@
                  (assoc :selected-context-id (:id selected-context)))]
     [selected-context-id opts]))
 
-(defn- search-context-items [db q opts]
-  (let [[_selected-context-id opts] (simplify-params opts)]
-    (map update-contexts (search/search-items db q opts))))
+(defn- search'
+  "Prefer calling search-items or search-related-items"
+  [db q selected-context-id {:keys [link-issue selected-context] :as opts} ctx]
+  (log/info (str "search:" selected-context-id " link-issue:" link-issue))
+  (when selected-context (throw (IllegalArgumentException. "'selected-context' not expected as an argument here")))
+  (if selected-context-id
+   (if link-issue
+     (search/search-items db 
+                   q
+                   (assoc opts
+                          :all-items? true
+                          :selected-context-id selected-context-id)
+                   ctx)
+     (search/search-related-items db 
+                           q
+                           selected-context-id
+                           opts
+                           ctx))
+    (search/search-items db q (assoc opts :all-items? true) ctx)))
 
 (defn- search-items [db q opts]
-  (search/search-items db q (assoc opts :all-items? true)))
+  (search/search-items db q (assoc opts :all-items? true) {:limit 100}))
+
+(defn- search [db {:keys [q] :as opts}]
+  (let [[selected-context-id opts] (simplify-params opts)]
+    (search' db q selected-context-id opts {})))
+
+(defn- update-contexts [item]
+  (update-in item [:data :contexts] 
+             (fn [contexts]
+               (into {} 
+                     (map (fn [[k v]]
+                            [(Integer/parseInt (name k)) (if (map? v) v
+                                                             {:title       v
+                                                              :show-badge? true})])
+                          contexts)))))
+
+(defn- search-context-items [db q opts]
+  (let [[_selected-context-id opts] (simplify-params opts)]
+    (map update-contexts (search/search-items db q opts {:limit 100}))))
 
 (defn- search-related-items 
   ([db q selected-context]
@@ -46,14 +70,6 @@
                                       selected-context-id
                                       opts 
                                       {}))))
-
-(defn- search [db {:keys [q] :as opts}]
-  (let [[selected-context-id opts] (simplify-params opts)]
-    (search/search db 
-                   q 
-                   selected-context-id
-                   opts
-                   {})))
 
 (mount/defstate repository
   :start (do
