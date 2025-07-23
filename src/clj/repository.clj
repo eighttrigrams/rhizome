@@ -271,7 +271,7 @@
                  :selected-context    (datastore/get-item db item) ;; fetch again to have latest collections from two lines above
                  :q                   nil
                  :aggregated-contexts '()}))))
-         {:issues (search-related-items db (:q state) {})})))))
+         {:issues (search-related-items db (:q state) selected-context)})))))
 
 (defn fetch-issue-description [{:keys [db]}]
   (fn [state issue]
