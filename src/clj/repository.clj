@@ -41,8 +41,8 @@
                            {}))
     (search/search-items db q (assoc opts :all-items? true) {:limit limit})))
 
-(defn- search-items [db q opts]
-  (search/search-items db q (assoc opts :all-items? true) {:limit limit}))
+(defn- search-items [db]
+  (search/search-items db "" {:all-items? true} {:limit limit}))
 
 (defn- search [db {:keys [q] :as opts}]
   (let [[selected-context-id opts] (simplify-params opts)]
@@ -109,7 +109,7 @@
 (defn deselect-context [{:keys [db]}]
   (fn [_opts]
     (log/info (str "deselect context"))
-    {:issues           (search-items db "" {})
+    {:issues           (search-items db)
      :contexts         (search-context-items db "" {})
      :selected-context nil
      :q                nil}))
@@ -217,7 +217,7 @@
       (assoc ((fetch-context {:db db}) opts [(:old-selected-context opts) false])
              :issue-view? false)
       (let [m {:selected-context nil :issue-view? false}]
-        (merge {:issues (search-items db "" {})
+        (merge {:issues (search-items db)
                 :contexts (search-context-items db "" {})}
                m)))))
 
