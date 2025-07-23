@@ -48,14 +48,15 @@
   (let [[selected-context-id opts] (simplify-params opts)]
     (search' db q selected-context-id opts)))
 
+;; TODO this seems to replicate what's done in ds namespace (see update-contexts fn there)
 (defn- update-contexts [item]
   (update-in item [:data :contexts] 
              (fn [contexts]
                (into {} 
                      (map (fn [[k v]]
-                            [(Integer/parseInt (name k)) (if (map? v) v
-                                                             {:title       v
-                                                              :show-badge? true})])
+                            [k (if (map? v) v
+                                   {:title       v
+                                    :show-badge? true})])
                           contexts)))))
 
 (defn- search-context-items [db q opts]
