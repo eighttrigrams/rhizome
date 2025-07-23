@@ -21,6 +21,20 @@
 (defn- search-contexts' [db opts]
   (map update-contexts (search/search-items db opts)))
 
+(defn- search-items [db opts]
+  (search/search-items db (assoc opts :all-items? true)))
+
+(defn- search-related-items [db q selected-context]
+  (search/search-related-items db 
+                               q 
+                               (:id selected-context)
+                               (select-keys (-> selected-context :data :views :current) 
+                                            [:secondary-contexts-inverted
+                                             :secondary-contexts-unassigned-selected
+                                             :selected-secondary-contexts
+                                             :search-mode]) 
+                               {}))
+
 (mount/defstate repository
   :start (do
            (tap> [:resources :up 2])
@@ -49,14 +63,14 @@
         (datastore/reprioritize-context db arg))
       (merge opts
              {:selected-context                        selected-context
-              :issues                                  (search/search-issues-deprecated db  (dissoc opts :q))
+              :issues (search-related-items db "" selected-context)
               :context-to-fetch                        nil
               :unassigned-secondary-contexts-selected? false
               :q                                       nil}))))
 
 (defn deselect-context [{:keys [db]}]
   (fn [opts]
-    {:issues           (search/search-issues-deprecated db (dissoc opts :selected-context :q))
+    {:issues           (search/search-items db (dissoc opts :q))
      :contexts         (search-contexts' db "")
      :selected-context nil
      :q                nil}))
