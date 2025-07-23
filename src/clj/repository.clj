@@ -290,11 +290,11 @@
    :active-search :contexts})
 
 (defn start-linking-issue-to-selected-context [db opts]
-  {:issues (search-related-items
-            db
-            ""
-            (:selected-context opts)
-            {:link-issue true})
+  {:issues (search
+            db 
+            (merge opts
+                   {:link-issue true
+                    :q ""}))
    :active-search    :issues
    :link-issue       true
    :q                ""})
