@@ -39,7 +39,14 @@
 
 (defn- search [db opts]
   (if (:selected-context opts)
-    (search-related-items db (:q opts) (:selected-context opts))
+    (if (:link-issue opts)
+      (search-items db 
+                    (:q opts) 
+                    (dissoc opts :q))
+      (search-related-items db 
+                            (:q opts)
+                            (:selected-context opts)
+                            (dissoc opts :q)))
     (search-items db (:q opts) (dissoc opts :q))))
 
 (mount/defstate repository
@@ -77,6 +84,7 @@
 
 (defn deselect-context [{:keys [db]}]
   (fn [_opts]
+    (log/info (str "deselect context"))
     {:issues           (search-items db "" {})
      :contexts         (search-context-items db "")
      :selected-context nil
