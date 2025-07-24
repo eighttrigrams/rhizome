@@ -16,7 +16,7 @@
                  (:id (:selected-context opts))
                  {}
                  {})]
-    (search/get-aggregated-contexts db (map :id issues) highlighted-secondary-contexts)))
+    (search/get-aggregated-contexts db issues highlighted-secondary-contexts)))
 
 (defn- simplify-params [{:keys [selected-context] :as opts}]
   (let [selected-context-id (:id selected-context)
