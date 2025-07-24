@@ -29,9 +29,9 @@
     (pg/execute-one! (db :prod) [(str "update issues set data = '" % "' where id = ?") id])))
 
 (defn insert-relation [id]
-  (pg/execute! (db :prod) ["insert into collections (container_id, item_id) select 30065, ? where not exists (select * from collections where container_id = 30065 and item_id = ?)" id id])
-  (pg/execute! (db :prod) ["insert into collections (container_id, item_id) select 14721, ? where not exists (select * from collections where container_id = 14721 and item_id = ?)" id id])
-  (pg/execute! (db :prod) ["insert into collections (container_id, item_id) select 10913, ? where not exists (select * from collections where container_id = 10919 and item_id = ?)" id id]))
+  (pg/execute! (db :prod) ["insert into relations (container_id, item_id) select 30065, ? where not exists (select * from relations where container_id = 30065 and item_id = ?)" id id])
+  (pg/execute! (db :prod) ["insert into relations (container_id, item_id) select 14721, ? where not exists (select * from relations where container_id = 14721 and item_id = ?)" id id])
+  (pg/execute! (db :prod) ["insert into relations (container_id, item_id) select 10913, ? where not exists (select * from relations where container_id = 10919 and item_id = ?)" id id]))
 
 (defn update-badge [id]
   (as-> id % 

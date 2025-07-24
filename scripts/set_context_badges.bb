@@ -28,8 +28,8 @@
 
 (->> (pg/execute! db ["select items.id,items.data,array_agg(contexts.id) context_ids \n
                   from issues items join \n
-                  collections on items.id = collections.item_id join issues contexts on contexts.id = collections.container_id \n
-                  where collections.show_badge = false \n
+                  relations on items.id = relations.item_id join issues contexts on contexts.id = relations.container_id \n
+                  where relations.show_badge = false \n
                 group by items.id"]) 
      (map (fn [{:keys [issues/id issues/data] :as item}]
             (let [stringy (-> (json/generate-string (assoc data :contexts (make-contexts data item)))

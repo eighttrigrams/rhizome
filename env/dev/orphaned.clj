@@ -26,7 +26,7 @@
                (let [item (get-item db {:id (:issues/id id)})]
                  (when (= 0 (count (:contexts item)))
                    (tap> (:id item))
-                   (jdbc/execute-one! db ["insert into collections
+                   (jdbc/execute-one! db ["insert into relations
                                            (container_id,item_id)
                                            values (?,?)"
                                           11701 (:id item)])))

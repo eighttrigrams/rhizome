@@ -12,7 +12,7 @@
          :hostname "127.0.0.1"})
 
 (defn reset-db []
-  (jdbc/execute-one! db ["delete from collections"])
+  (jdbc/execute-one! db ["delete from relations"])
   (jdbc/execute-one! db ["delete from issue_issue"])
   (jdbc/execute-one! db ["delete from issues"]))
 
@@ -29,9 +29,9 @@
           it1-id (create-item "it1" false)
           it2-id (create-item "it2" false)
           it3-id (create-item "it3" false)]
-      (jdbc/execute-one! db ["insert into collections(container_id,item_id) values (?,?),(?,?),(?,?),(?,?),(?,?),(?,?)" cont1-id it1-id cont1-id it2-id cont2-id it1-id cont2-id it2-id cont3-id it1-id cont3-id it2-id])
-      ;; (jdbc/execute-one! db ["insert into collections(container_id,item_id) values (?,?),(?,?),(?,?),(?,?),(?,?)" cont1-id it1-id cont1-id it2-id cont2-id it1-id cont2-id it2-id cont3-id it1-id])
-      ;; select ppg.id,ppg.title,array_agg(ppg.cid) from (select pp.id, pp.cid, pp.title, array_agg(pp.rel) from (SELECT issues.title, issues.id, 1 as rel, issue_issue.left_id cid FROM issues JOIN issue_issue ON issues.id = issue_issue.right_id WHERE issue_issue.left_id IN (16964,16965) UNION ALL SELECT issues.title, issues.id, 2 as rel, collections.container_id as cid FROM issues JOIN collections ON issues.id = collections.item_id WHERE collections.container_id IN (16964,16965)) as pp group by pp.id, pp.cid, pp.title) as ppg group by ppg.id,ppg.title having count(ppg.array_agg) = 2;
+      (jdbc/execute-one! db ["insert into relations(container_id,item_id) values (?,?),(?,?),(?,?),(?,?),(?,?),(?,?)" cont1-id it1-id cont1-id it2-id cont2-id it1-id cont2-id it2-id cont3-id it1-id cont3-id it2-id])
+      ;; (jdbc/execute-one! db ["insert into relations(container_id,item_id) values (?,?),(?,?),(?,?),(?,?),(?,?)" cont1-id it1-id cont1-id it2-id cont2-id it1-id cont2-id it2-id cont3-id it1-id])
+      ;; select ppg.id,ppg.title,array_agg(ppg.cid) from (select pp.id, pp.cid, pp.title, array_agg(pp.rel) from (SELECT issues.title, issues.id, 1 as rel, issue_issue.left_id cid FROM issues JOIN issue_issue ON issues.id = issue_issue.right_id WHERE issue_issue.left_id IN (16964,16965) UNION ALL SELECT issues.title, issues.id, 2 as rel, relations.container_id as cid FROM issues JOIN relations ON issues.id = relations.item_id WHERE relations.container_id IN (16964,16965)) as pp group by pp.id, pp.cid, pp.title) as ppg group by ppg.id,ppg.title having count(ppg.array_agg) = 2;
       (jdbc/execute-one! db ["insert into issue_issue(left_id,right_id) values (?,?),(?,?)" cont1-id it2-id cont1-id it3-id])
 
 

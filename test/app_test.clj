@@ -12,7 +12,7 @@
          :hostname "127.0.0.1"})
 
 (defn reset-db []
-  (jdbc/execute-one! db ["delete from collections"])
+  (jdbc/execute-one! db ["delete from relations"])
   (jdbc/execute-one! db ["delete from issue_issue"])
   (jdbc/execute-one! db ["delete from issues"]))
 

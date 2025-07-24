@@ -279,7 +279,7 @@
                 (log/info log-data "Inserted item")
                 (datastore.relations/set-collection-titles-of-new-issue db (:id item))
                 {:issues              '()
-                 :selected-context    (datastore/get-item db item) ;; fetch again to have latest collections from two lines above
+                 :selected-context    (datastore/get-item db item) ;; fetch again to have latest relations from two lines above
                  :q                   nil
                  :aggregated-contexts '()}))))
          {:issues (search-related-items db (:q state) selected-context)})))))
