@@ -31,26 +31,34 @@
 
 (defn match? [title]
   (or (re-matches #"https://www.youtube.com/watch\?.*v=.*" title)
-      (re-matches #"https://youtu.be/watch\?.*v=.*" title)
+      (re-matches #"https://youtu.be/.*" title)
       (re-matches #"https://www.youtube.com/shorts/.*" title)
       (re-matches #"https://youtube.com/shorts/.*" title)))
+
+(defn- calc-urls [url]
+  (if
+   (or (re-matches #"https://youtube.com/shorts/.*" url)
+       (re-matches #"https://www.youtube.com/shorts/.*" url))
+    (let [url     (-> url 
+                      (str/replace "https://youtube.com/shorts/"
+                                   "https://www.youtube.com/shorts/"))
+          ytvidid (first (str/split (last (str/split url #"/")) #"\?"))]
+      [(url/pick-query-params (str "https://www.youtube.com/watch?v=" ytvidid) ["v"])
+       (url/pick-query-params (str "https://www.youtube.com/shorts/" ytvidid) [])])
+    (let [url (if (str/includes? url "youtu.be")
+                (str/replace (url/pick-query-params url [])
+                             "youtu.be/" "www.youtube.com/watch?v=")
+                (url/pick-query-params url ["v"]))]
+      [url url])))
+
+(comment (calc-urls "https://www.youtube.com/watch?v=adkfslafj&m=13"))
 
 (defn ingest
   [db 
    url 
    context-ids-set
    _]
-  (let [url (-> url 
-                (str/replace "youtu.be" "www.youtube.com")
-                (str/replace "https://youtube.com/shorts/"
-                             "https://www.youtube.com/shorts/"))
-        [url store-url] 
-          (if (re-matches #"https://www.youtube.com/shorts/.*" url)
-            (let [ytvidid (first (str/split (last (str/split url #"/")) #"\?"))]
-              [(str "https://www.youtube.com/watch?v=" ytvidid)
-               (str "https://www.youtube.com/shorts/" ytvidid)])
-            (let [url (url/pick-query-params url ["v"])]
-              [url url]))
+  (let [[url store-url] (calc-urls url)
         {:keys [title 
                 author_name
                 author_url]

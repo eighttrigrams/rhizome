@@ -19,14 +19,18 @@
        (apply str)))
 
 (defn pick-query-params [url keys]
-  (let [query-params (parse-query-params url)
-        url-without-query-params (url-without-query-params url)
-        query-params (select-keys query-params keys)]
-    (str url-without-query-params
-         (when (seq query-params)
-           (str
-            "?"
-            (make-query-string query-params))))))
+  (if (not (str/includes? url "?"))
+    url
+    (let [query-params (parse-query-params url)
+          url-without-query-params (url-without-query-params url)
+          query-params (select-keys query-params keys)]
+      (str url-without-query-params
+           (when (seq query-params)
+             (str
+              "?"
+              (make-query-string query-params)))))))
+
+(comment (pick-query-params "https://youtube.com/shorts/abc?m=13" []))
 
 (defn get-subdomain [url-string]
   (let [url (java.net.URL. url-string)
