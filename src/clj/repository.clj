@@ -221,7 +221,7 @@
       {:selected-context selected-context
        :issues (search-related-items db (:q opts) selected-context)})))
 
-(defn delete-issue [{:keys [db]}]
+(defn delete-item [{:keys [db]}]
   (fn [opts issue]
     (deletion/delete-item db issue)
     {:issues (search db opts)
@@ -396,6 +396,16 @@
                   ""
                   old-selected-context)
          :aggregated-contexts ((fetch-aggregated-contexts {:db db}) (assoc state :selected-context old-selected-context))
+         :issue-view? false}))))
+
+(defn unlink-item [{:keys [db]}]
+  (fn [{:keys [selected-context] :as state} issue]
+    (log/info (str "unlink item " (:title issue) " from " (:title selected-context)))
+    (if-not selected-context
+      (throw (Exception. "unlink-item shouldn't have been called without 'selected-context'"))
+      (do
+        (datastore.relations/unlink-item-from-container! db issue selected-context)
+        {:issues (search db state)
          :issue-view? false}))))
 
 (defn select-last-context [{:keys [db]}]

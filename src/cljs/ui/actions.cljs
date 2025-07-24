@@ -78,9 +78,13 @@
 (defn deselect-context! [*state]
   (fetch-and-reset-with-method-2! *state api/deselect-context))
 
-(defn delete-issue! [*state idx]
-  (when (js/window.confirm "Delete this issue?")
-    (fetch-and-reset-with-method-2! *state api/delete-issue idx)))
+(defn delete-item! [*state idx]
+  (when (js/window.confirm "Delete this item?")
+    (fetch-and-reset-with-method-2! *state api/delete-item idx)))
+
+(defn unlink-item! [*state idx]
+  (when (js/window.confirm "Unlink this item?")
+    (fetch-and-reset-with-method-2! *state api/unlink-item idx)))
 
 (defn delete-context! [*state]
   (when (js/window.confirm "Delete currently selected context?")

@@ -16,10 +16,11 @@
                                 load-stored-context
                                 remove-stored-context
                                 update-item
-                                delete-issue
+                                unlink-item
+                                unlink-selected-item-from-container
+                                delete-item
                                 upgrade-issue-to-context
                                 link-selected-context-to-context
-                                unlink-selected-item-from-container
                                 select-last-context
                                 fetch-context
                                 deselect-context
@@ -46,10 +47,11 @@
   store-current-view
   load-stored-context
   remove-stored-context
-  delete-issue 
+  delete-item
+  unlink-item
+  unlink-selected-item-from-container
   update-item
   fetch-aggregated-contexts
-  unlink-selected-item-from-container
   select-last-context
   upgrade-issue-to-context
   link-selected-context-to-context

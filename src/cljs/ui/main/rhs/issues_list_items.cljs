@@ -90,12 +90,13 @@
                     ;; 300)
                           )))
 
-(defn regular-issues-list-item-component [*state issue idx {:keys [allow-delete-on-right-click?
-                                                                   show-relation-annotation?
-                                                                   select-fn
-                                                                   show-context-selector?
-                                                                   rhs?]
-                                                            :as   _opts}]
+(defn regular-issues-list-item-component
+  [*state issue idx {:keys [allow-delete-on-right-click?
+                            show-relation-annotation?
+                            select-fn
+                            show-context-selector?
+                            rhs?]
+                     :as   _opts}]
   [:li.issue-card
    (merge {:class          (str "card"
                                 (when (not (or (:preview-image-lowres (:data issue))
@@ -120,11 +121,16 @@
                                   (actions/select-issue! *state issue)))
            :on-mouse-enter (when idx (on-mouse-enter *state issue))
            :on-mouse-leave (when idx (on-mouse-leave *state))}
-          (when (and idx allow-delete-on-right-click?) 
-            {:id             (str "issue-card-" idx)
+          (when (and idx 
+                     allow-delete-on-right-click?
+                     (or @modifiers/*alt-pressed? 
+                         (:selected-context @*state)))
+            {:id (str "issue-card-" idx)
              :on-context-menu (fn [e]
                                 (.preventDefault e) 
-                                (actions/delete-issue! *state issue))}))
+                                (if @modifiers/*alt-pressed?
+                                  (actions/delete-item! *state issue)
+                                  (actions/unlink-item! *state issue)))}))
    (when (and show-relation-annotation?
               (not-empty (:annotation issue)))
      [:div {:class "relation-annotation"}
@@ -142,24 +148,26 @@
           (:date issue)
           "")) 
       (:data issue)]
-     [context-badges/component *state (remove #(= (:id (:selected-context @*state))
-                                                  (first %)) 
-                                              (merge (when (and (:is_context issue) show-context-selector?) 
-                                                       {0 {:context #(actions/select-context! *state issue)}})
-                                                     (when (or (:date issue)
-                                                               (and rhs?
-                                                                    (:selected-context @*state)
-                                                                    (= 5 (:search-mode (:current (:views (:data (:selected-context @*state))))))))
-                                                       {:date (if (and rhs?
-                                                                       (:selected-context @*state)
-                                                                       (= 5 (:search-mode (:current (:views (:data (:selected-context @*state))))))) 
-                                                                (when (and (:inserted_at issue) (instance? js/Date (:inserted_at issue)))
-                                                                  (assoc issue :date (first (str/split (.toISOString (:inserted_at issue)) #"T")))) 
-                                                                issue)})
-                                                     (when (and (:selected-context @*state)
-                                                                rhs?
-                                                                (>= (:sort_idx issue) 0))
-                                                       {:number {:number (:sort_idx issue)}})
-                                                     (when-let [file (:file (:resource-links (:data issue)))]
-                                                       {:file {:file file}})
-                                                     (:contexts (:data issue))))]]]])
+     [context-badges/component 
+      *state 
+      (remove #(= (:id (:selected-context @*state))
+                  (first %)) 
+              (merge (when (and (:is_context issue) show-context-selector?) 
+                       {0 {:context #(actions/select-context! *state issue)}})
+                     (when (or (:date issue)
+                               (and rhs?
+                                    (:selected-context @*state)
+                                    (= 5 (:search-mode (:current (:views (:data (:selected-context @*state))))))))
+                       {:date (if (and rhs?
+                                       (:selected-context @*state)
+                                       (= 5 (:search-mode (:current (:views (:data (:selected-context @*state))))))) 
+                                (when (and (:inserted_at issue) (instance? js/Date (:inserted_at issue)))
+                                  (assoc issue :date (first (str/split (.toISOString (:inserted_at issue)) #"T")))) 
+                                issue)})
+                     (when (and (:selected-context @*state)
+                                rhs?
+                                (>= (:sort_idx issue) 0))
+                       {:number {:number (:sort_idx issue)}})
+                     (when-let [file (:file (:resource-links (:data issue)))]
+                       {:file {:file file}})
+                     (:contexts (:data issue))))]]]])
