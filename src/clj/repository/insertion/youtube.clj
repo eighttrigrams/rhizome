@@ -80,11 +80,13 @@
         image (:image (scrapers.youtube/get-video url))]
     (if (:id existing-item)
       (assoc (datastore/get-item db existing-item) :previously-existing-item? true)
-      (let [id (:id (common/insert-item db 
+      (let [item (common/insert-item db 
                                         title
                                         ""
                                         (conj context-ids-set channel-id youtube-videos-id video-id) 
-                                        {:youtube-video store-url}))]
+                                        {:youtube-video store-url})
+            id (:id item)]
         (when image (try (upload/upload-preview-file db {:tempfile image} id "false")
                      (catch Exception e
-                       (log/error (str "problem while trying to create preview image for youtube video. message" (.getMessage e))))))))))
+                       (log/error (str "problem while trying to create preview image for youtube video. message" (.getMessage e))))))
+        item))))
