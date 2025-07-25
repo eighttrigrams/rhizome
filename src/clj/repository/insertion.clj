@@ -18,7 +18,7 @@
   [db 
    title 
    context-ids-set]
-  (datastore/new-issue db 
+  (datastore/new-item db 
                        title
                        ""
                        context-ids-set

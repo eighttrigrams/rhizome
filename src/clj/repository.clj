@@ -277,7 +277,6 @@
                 ((fetch-context {:db db}) state [item true]))
               (do
                 (log/info log-data "Inserted item")
-                (datastore.relations/set-collection-titles-of-new-issue db (:id item))
                 {:issues              '()
                  :selected-context    (datastore/get-item db item) ;; fetch again to have latest relations from two lines above
                  :q                   nil

@@ -10,11 +10,11 @@
 
 (defn insert-item 
   [db title short-title context-ids-set resource-links]
-  (let [item    (datastore/new-issue db 
-                                      title
-                                      short-title
-                                      context-ids-set
-                                     nil)
+  (let [item    (datastore/new-item db 
+                                    title
+                                    short-title
+                                    context-ids-set
+                                    nil)
         contexts (doall (->> (jdbc/execute! db (sql/format {:select [:id :short_title :title]
                                                             :from   [:issues]
                                                             :where  [:in :issues.id 
