@@ -5,7 +5,7 @@
 (defn component [*state contexts]
   [:span.contexts
    (doall
-    (map (fn [[idx {:keys [title date file number context show-badge?]}]]
+    (map (fn [[idx {:keys [title date file number context show-badge? is-context?]}]]
            (case idx
              :file
              [:span.badge.light 
@@ -28,7 +28,10 @@
              :number
              [:span.badge.light
               {:key :number} number] 
-             (when show-badge?
+             (when (if-not (boolean? is-context?)
+                      show-badge?
+                      (and is-context?
+                           show-badge?))
                [:span.badge {:key idx
                              :on-click (fn [e]
                                          (.stopPropagation e)

@@ -344,8 +344,8 @@
       
       (if (and shift-pressed? alt-pressed?)
         (do 
-          (datastore.relations/link-item-to-another-item! db selected-issue selected-context false)
-          (datastore.relations/link-item-to-another-item! db selected-context selected-issue false))
+          (datastore.relations/link-item-to-another-item! db selected-issue selected-context true)
+          (datastore.relations/link-item-to-another-item! db selected-context selected-issue true))
         (datastore.relations/link-item-to-another-item! db selected-issue selected-context (not shift-pressed?)))
 
       (let [opts                (-> opts
