@@ -12,7 +12,7 @@
          '[clojure.string :as str])
 
 
-;; insert into relations(container_id,item_id,show_badge) select left_id,right_id,false from issue_issue where not exists (select 1 from relations where container_id = left_id and item_id = right_id);
+;; insert into relations(owner_id,target_id,show_badge) select left_id,right_id,false from issue_issue where not exists (select 1 from relations where owner_id = left_id and target_id = right_id);
 
 
 (def db #_{:dbtype   "postgresql"
@@ -38,7 +38,7 @@
 
 (->> (pg/execute! db ["select items.id,items.data,array_agg(contexts.id) context_ids,array_agg(contexts.title) context_titles,array_agg(contexts.short_title) context_short_titles \n
                   from issues items join \n
-                  relations on items.id = relations.item_id join issues contexts on contexts.id = relations.container_id \n
+                  relations on items.id = relations.target_id join issues contexts on contexts.id = relations.owner_id \n
                 group by items.id"])
      (map (fn [{:keys [issues/id issues/data] :as item}]
             (let [stringy (-> (json/generate-string (assoc data 

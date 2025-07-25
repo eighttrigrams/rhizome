@@ -28,7 +28,7 @@
 
 (->> (pg/execute! db ["select items.id,items.data,array_agg(contexts.id) context_ids \n
                   from issues items join \n
-                  relations on items.id = relations.item_id join issues contexts on contexts.id = relations.container_id \n
+                  relations on items.id = relations.target_id join issues contexts on contexts.id = relations.owner_id \n
                   where relations.show_badge = false \n
                 group by items.id"]) 
      (map (fn [{:keys [issues/id issues/data] :as item}]

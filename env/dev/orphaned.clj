@@ -27,7 +27,7 @@
                  (when (= 0 (count (:contexts item)))
                    (tap> (:id item))
                    (jdbc/execute-one! db ["insert into relations
-                                           (container_id,item_id)
+                                           (owner_id,target_id)
                                            values (?,?)"
                                           11701 (:id item)])))
                (catch Exception e
