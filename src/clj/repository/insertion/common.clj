@@ -16,10 +16,10 @@
                                     context-ids-set
                                     nil)
         contexts (doall (->> (jdbc/execute! db (sql/format {:select [:id :short_title :title]
-                                                            :from   [:issues]
-                                                            :where  [:in :issues.id 
+                                                            :from   [:items]
+                                                            :where  [:in :items.id 
                                                                      [:inline (seq context-ids-set)]]}))
-                             (map (fn [{:issues/keys [id short_title title]}]
+                             (map (fn [{:items/keys [id short_title title]}]
                                     [id {:title (if (seq short_title) short_title title)
                                          :show-badge? true}]))
                              (into {})))

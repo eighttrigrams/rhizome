@@ -1,6 +1,6 @@
 # Tracker
 
-An issue tracking system.
+An item tracking system.
 
 ## Getting started
 

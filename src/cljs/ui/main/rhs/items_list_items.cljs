@@ -103,7 +103,8 @@
                                                (:preview-image (:data item))
                                                (:image (:resource-links (:data item)))))
                                   " simple-card")
-                                (when (= (:id (:selected-item @*state))
+                                ;; TODO is there some superfluous css now?
+                                #_(when (= (:id (:selected-item @*state))
                                          (:id item)) " selected"))
            :on-click       #(if idx 
                               (let [skip-select? (and (deref modifiers/*alt-pressed?)

@@ -27,15 +27,15 @@
           contexts context_ids))
 
 (->> (pg/execute! db ["select items.id,items.data,array_agg(contexts.id) context_ids \n
-                  from issues items join \n
-                  relations on items.id = relations.target_id join issues contexts on contexts.id = relations.owner_id \n
+                  from items items join \n
+                  relations on items.id = relations.target_id join items contexts on contexts.id = relations.owner_id \n
                   where relations.show_badge = false \n
                 group by items.id"]) 
-     (map (fn [{:keys [issues/id issues/data] :as item}]
+     (map (fn [{:keys [items/id items/data] :as item}]
             (let [stringy (-> (json/generate-string (assoc data :contexts (make-contexts data item)))
                               (str/replace "'" "''"))]
               (try (pg/execute! db 
-                                [(str "update issues set data = '" stringy "' where id = " id)])
+                                [(str "update items set data = '" stringy "' where id = " id)])
                    (catch Exception e
                      (prn "got an exception with " id "..." (.getMessage e) "..." stringy))))))
      count)

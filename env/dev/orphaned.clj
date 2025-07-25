@@ -17,13 +17,13 @@
          :password "abcdef"
          :port     5437
          :hostname "127.0.0.1"}
-        ids (jdbc/execute! db ["select id from issues 
+        ids (jdbc/execute! db ["select id from items 
                                 where is_context = 'f' 
                                 
                                 limit 15000"])]
     (doall (for [id ids]
              (try
-               (let [item (get-item db {:id (:issues/id id)})]
+               (let [item (get-item db {:id (:items/id id)})]
                  (when (= 0 (count (:contexts item)))
                    (tap> (:id item))
                    (jdbc/execute-one! db ["insert into relations

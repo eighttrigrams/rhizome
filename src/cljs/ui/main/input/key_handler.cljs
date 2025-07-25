@@ -102,7 +102,6 @@
          (swap! *state dissoc :q :active-search)
          (actions/start-context-search *state))
        (when (and (= "KeyA" code)
-                  (not (:selected-item @*state))
                   selected-context
                   alt-pressed?)
          (.preventDefault e)

@@ -233,9 +233,9 @@
               _         (is (= "issue-1" (:title (ffirst (:issues opts)))))
               ])))
 
-;; TODO on all display issues tests, demonstrate that it also works with a subsequent query with a modified search term (q)
+;; TODO on all display items tests, demonstrate that it also works with a subsequent query with a modified search term (q)
 
-(deftest link-issue-to-issue 
+(deftest link-item-to-issue 
   
   ;; TODO write test where i connect issue to issue in global view
   
@@ -356,7 +356,7 @@
                         :contexts)]
       (is (= 1 (count contexts))))))
 
-(deftest link-issue-to-selected-context
+(deftest link-item-to-selected-context
   (testing "display the correct issues - when NO secondary contexts selected"
     (reset-db)
     (let [context-1 (create-context "context-1")
