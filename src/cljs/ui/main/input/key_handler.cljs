@@ -8,7 +8,7 @@
 
 (defn- item-creation-permitted? 
   [{{{{{:keys [secondary-contexts-unassigned-selected
-               search-mode]} :current} :views} :data} :selected-context}]
+               search-mode]} :current} :views} :data} :selected-item}]
   (and (not secondary-contexts-unassigned-selected)
        (or (nil? search-mode)
            (= 0 search-mode))))
@@ -18,10 +18,10 @@
   (handle-keys*
    (fn [code ctrl-pressed? meta-pressed? alt-pressed? shift-pressed? e]
      (let [{:keys [active-search
-                   selected-context
+                   selected-item
                    link-item
                    link-context]} @*state
-           in-notes-mode? (-> *state deref :selected-context :data :views :current :notes-mode)]
+           in-notes-mode? (-> *state deref :selected-item :data :views :current :notes-mode)]
        (.stopPropagation e)
        (when (= code "Enter")
          (.preventDefault e)
@@ -30,11 +30,11 @@
                 meta-pressed? 
                 alt-pressed?
                 (= :items active-search)
-                selected-context)
+                selected-item)
            (actions/store-current-view! *state {:title (.-value (get-title-el))})
            (and
             (not (:link-context @*state))
-            (not (:selected-context @*state))
+            (not (:selected-item @*state))
             (= :contexts active-search)
             (or shift-pressed?
                 (= 0 (count (:contexts @*state)))))
@@ -43,7 +43,7 @@
              (set! (.-value (get-title-el)) ""))
            (and (= :items active-search)
                 (not (:enter-pressed? @*state))
-                selected-context
+                selected-item
                 (or (and shift-pressed? (not alt-pressed?))
                     (= 0 (count (:items @*state)))
                     in-notes-mode?)
@@ -102,12 +102,12 @@
          (swap! *state dissoc :q :active-search)
          (actions/start-context-search *state))
        (when (and (= "KeyA" code)
-                  selected-context
+                  selected-item
                   alt-pressed?)
          (.preventDefault e)
          (when-not in-notes-mode?
            (set! (.-value (get-title-el)) "")
-           (actions/link-item-to-selected-context! *state)))
+           (actions/link-item-to-selected-item! *state)))
        (when (and (= "KeyQ" code)
                   alt-pressed?)
          (swap! *state assoc :active-search :contexts)
@@ -116,6 +116,6 @@
          (cond (and alt-pressed? 
                     (common/something-to-deselect? *state))
                (actions/deselect-secondary-contexts! *state)
-               (or (not selected-context)
-                   selected-context)
+               (or (not selected-item)
+                   selected-item)
                (actions/quit-search! *state)))))))

@@ -17,7 +17,7 @@
   (jdbc/execute-one! db ["delete from issues"]))
 
 (defn- create-context [title]
-  (:selected-context 
+  (:selected-item 
    ((repository/list-resources {:db db}) 
     {:cmd :insert-context
      :arg {:title title}})))
@@ -32,7 +32,7 @@
                      context-id 
                      selected-secondary-contexts-ids]
   ((repository/insert-issue {:db db}) 
-   {:selected-context {:id   context-id
+   {:selected-item {:id   context-id
                        :data 
                        {:views 
                         {:current
@@ -51,7 +51,7 @@
     (let [context (create-context "abc")]
       (is (= 
            "abc"
-           (:title (:selected-context ((repository/fetch-context
+           (:title (:selected-item ((repository/fetch-context
                                         {:db db})
                                        {}
                                        [context false])))))))
@@ -65,7 +65,7 @@
           context (first (:contexts (repository/search-contexts db "")))]
       (is (=
            ["1" "2"]
-           (:a (:data (:selected-context ((repository/fetch-context {:db db}) {} [context false])))))))))
+           (:a (:data (:selected-item ((repository/fetch-context {:db db}) {} [context false])))))))))
 
 (deftest search 
   ;; TODO fix this
@@ -123,7 +123,7 @@
                       opts
                       (assoc :test/indentity-instead-future true)
                       (assoc-in
-                       [:selected-context :data :views :current :selected-secondary-contexts]
+                       [:selected-item :data :views :current :selected-secondary-contexts]
                        [(:id context-1) (:id context-2)])))
             ;; TODO review - a little odd that i have to fetch the context here again
           opts      ((repository/fetch-context {:db db}) {} [context-3 true]) 
@@ -136,7 +136,7 @@
                       opts
                       (assoc :test/indentity-instead-future true)
                       (assoc-in
-                       [:selected-context :data :views :current :secondary-contexts-inverted]
+                       [:selected-item :data :views :current :secondary-contexts-inverted]
                        true)))
             ;; TODO review - a little odd that i have to fetch the context here again
           opts      ((repository/fetch-context {:db db}) {} [context-3 true]) 
@@ -149,10 +149,10 @@
                       opts
                       (assoc :test/indentity-instead-future true)
                       (assoc-in
-                       [:selected-context :data :views :current :secondary-contexts-inverted]
+                       [:selected-item :data :views :current :secondary-contexts-inverted]
                        true)
                       (assoc-in
-                       [:selected-context :data :views :current :secondary-contexts-unassigned-selected]
+                       [:selected-item :data :views :current :secondary-contexts-unassigned-selected]
                        true))
                      )
             ;; TODO review - a little odd that i have to fetch the context here again
@@ -164,10 +164,10 @@
                       opts
                       (assoc :test/indentity-instead-future true)
                       (assoc-in
-                       [:selected-context :data :views :current :selected-secondary-contexts]
+                       [:selected-item :data :views :current :selected-secondary-contexts]
                        [])
                       (assoc-in
-                       [:selected-context :data :views :current :secondary-contexts-inverted]
+                       [:selected-item :data :views :current :secondary-contexts-inverted]
                        false))
                      )
             ;; TODO review - a little odd that i have to fetch the context here again
@@ -194,7 +194,7 @@
                           opts
                           (assoc :test/indentity-instead-future true)
                           (assoc-in
-                           [:selected-context :data :views :current :selected-secondary-contexts]
+                           [:selected-item :data :views :current :selected-secondary-contexts]
                            [(:id context-1)])))
             ;; TODO review - a little odd that i have to fetch the context here again
               opts      ((repository/fetch-context {:db db}) {} [context-3 true]) 
@@ -206,7 +206,7 @@
                           opts
                           (assoc :test/indentity-instead-future true)
                           (assoc-in
-                           [:selected-context :data :views :current :secondary-contexts-inverted]
+                           [:selected-item :data :views :current :secondary-contexts-inverted]
                            true)))
             ;; TODO review - a little odd that i have to fetch the context here again
               opts      ((repository/fetch-context {:db db}) {} [context-3 true]) 
@@ -219,13 +219,13 @@
                           opts
                           (assoc :test/indentity-instead-future true)
                           (assoc-in
-                           [:selected-context :data :views :current :secondary-contexts-inverted]
+                           [:selected-item :data :views :current :secondary-contexts-inverted]
                            true)
                           (assoc-in
-                           [:selected-context :data :views :current :selected-secondary-contexts]
+                           [:selected-item :data :views :current :selected-secondary-contexts]
                            [(:id context-2)])
                           (assoc-in
-                           [:selected-context :data :views :current :secondary-contexts-unassigned-selected]
+                           [:selected-item :data :views :current :secondary-contexts-unassigned-selected]
                            true)))
             ;; TODO review - a little odd that i have to fetch the context here again
               opts      ((repository/fetch-context {:db db}) {} [context-3 true]) 
@@ -356,7 +356,7 @@
                         :contexts)]
       (is (= 1 (count contexts))))))
 
-(deftest link-item-to-selected-context
+(deftest link-item-to-selected-item
   (testing "display the correct issues - when NO secondary contexts selected"
     (reset-db)
     (let [context-1 (create-context "context-1")
@@ -390,7 +390,7 @@
               opts
               (assoc :test/indentity-instead-future true)
               (assoc-in
-               [:selected-context :data :views :current :selected-secondary-contexts]
+               [:selected-item :data :views :current :selected-secondary-contexts]
                [(:id context-2) (:id context-3)])))
             ;; TODO review - a little odd that i have to fetch the context here again
             opts      ((repository/fetch-context {:db db}) {} [context-1 true])

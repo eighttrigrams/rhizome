@@ -28,9 +28,9 @@
       (:item-view? @*state)
       [:div.details-component.scrollable
        [item-detail/component *state]]
-      (:selected-context @*state)
+      (:selected-item @*state)
       [:<>
-       [:ul.cards [items-list-items/regular-items-list-item-component *state (:selected-context @*state) nil nil {}]]
+       [:ul.cards [items-list-items/regular-items-list-item-component *state (:selected-item @*state) nil nil {}]]
        [:div.scrollable.card-shown.details-component
         [context-detail/component *state]]]
       :else

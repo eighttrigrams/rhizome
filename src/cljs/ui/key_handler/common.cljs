@@ -5,27 +5,27 @@
             (:current
              (:views
               (:data
-               (:selected-context @*state))))))
+               (:selected-item @*state))))))
       (:secondary-contexts-unassigned-selected
        (:current
         (:views
          (:data
-          (:selected-context @*state)))))
+          (:selected-item @*state)))))
       (:secondary-contexts-inverted
        (:current
         (:views
          (:data
-          (:selected-context @*state)))))
+          (:selected-item @*state)))))
       (:search-mode
        (:current
         (:views
          (:data
-          (:selected-context @*state)))))
+          (:selected-item @*state)))))
       (:search-view
        (:current
         (:views
          (:data
-          (:selected-context @*state)))))))
+          (:selected-item @*state)))))))
 
 (defn handle-keys* [f]
   (fn [e]

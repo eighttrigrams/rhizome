@@ -125,7 +125,7 @@
           (when (and idx 
                      allow-delete-on-right-click?
                      (or @modifiers/*alt-pressed? 
-                         (:selected-context @*state)))
+                         (:selected-item @*state)))
             {:id (str "item-card-" idx)
              :on-context-menu (fn [e]
                                 (.preventDefault e) 
@@ -151,21 +151,21 @@
       (:data item)]
      [context-badges/component 
       *state 
-      (remove #(= (:id (:selected-context @*state))
+      (remove #(= (:id (:selected-item @*state))
                   (first %)) 
               (merge (when (and (:is_context item) show-context-selector?) 
                        {0 {:context #(actions/select-context! *state item)}})
                      (when (or (:date item)
                                (and rhs?
-                                    (:selected-context @*state)
-                                    (= 5 (:search-mode (:current (:views (:data (:selected-context @*state))))))))
+                                    (:selected-item @*state)
+                                    (= 5 (:search-mode (:current (:views (:data (:selected-item @*state))))))))
                        {:date (if (and rhs?
-                                       (:selected-context @*state)
-                                       (= 5 (:search-mode (:current (:views (:data (:selected-context @*state))))))) 
+                                       (:selected-item @*state)
+                                       (= 5 (:search-mode (:current (:views (:data (:selected-item @*state))))))) 
                                 (when (and (:inserted_at item) (instance? js/Date (:inserted_at item)))
                                   (assoc item :date (first (str/split (.toISOString (:inserted_at item)) #"T")))) 
                                 item)})
-                     (when (and (:selected-context @*state)
+                     (when (and (:selected-item @*state)
                                 rhs?
                                 (>= (:sort_idx item) 0))
                        {:number {:number (:sort_idx item)}})

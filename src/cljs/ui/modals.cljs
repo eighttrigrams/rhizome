@@ -24,7 +24,7 @@
     :edit-context
     (key-handler/handle-edit-keys *state
                                   #(item-edit/get-values (:id item) 
-                                                          (:selected-context @*state))
+                                                          (:selected-item @*state))
                                   #(link-context-item/get-values))
     :description
     (key-handler/handle-modal-keys *state 
@@ -34,7 +34,7 @@
 
 (defn component [*state]
   (fn [_*state]
-    (let [item (:selected-context @*state)]
+    (let [item (:selected-item @*state)]
       [:div
        {:on-key-down (handle-keys *state item)
         :on-click #(.stopPropagation %)}

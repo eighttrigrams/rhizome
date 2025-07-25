@@ -114,7 +114,7 @@
                  args)
           <!
           ((fn [_]
-             (when (:selected-context @*state)
+             (when (:selected-item @*state)
                (go (-> (api/fetch-aggregated-contexts @*state)
                        <p!
                        (#(swap! *state assoc :aggregated-contexts %))))))))))

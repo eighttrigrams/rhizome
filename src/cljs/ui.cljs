@@ -7,7 +7,7 @@
 
 (def original-state {:items                          []
                      :contexts                        []
-                     :selected-context                nil
+                     :selected-item                   nil
                      :active-search                   nil
                      :modal                           nil})
 

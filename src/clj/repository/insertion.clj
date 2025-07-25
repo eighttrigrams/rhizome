@@ -27,10 +27,10 @@
 (defn insert-item 
   [db 
    title 
-   selected-context
+   selected-item
    selected-secondary-contexts-set]
   (log/info (str "Import for " title))
-  (let [context-ids-set (into #{} (conj selected-secondary-contexts-set (:id selected-context)))]
+  (let [context-ids-set (into #{} (conj selected-secondary-contexts-set (:id selected-item)))]
     (cond (batch/match? title)
           (batch/ingest db title nil nil)
           (youtube/match? title) 

@@ -113,12 +113,12 @@
       "Lowres here"]]))
 
 (defn component [*state]
-  (let [{:keys [selected-context]} @*state]
+  (let [{:keys [selected-item]} @*state]
     [:<>
-     (when-not (or (-> selected-context :data :resource-links :image)
+     (when-not (or (-> selected-item :data :resource-links :image)
                    (= :description (:modal @*state)))
-       [drop-target (:id selected-context)])
-     [the-item-itself-component selected-context]]))
+       [drop-target (:id selected-item)])
+     [the-item-itself-component selected-item]]))
 
 (defn preview-component [item]
   (the-item-itself-component item))

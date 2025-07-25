@@ -60,11 +60,11 @@
   (reset! *state (assoc @*state
                        :active-search (when-not select-as-item? :items)
                        :item-view? select-as-item?
-                       :old-selected-context (:selected-context @*state)
+                       :old-selected-item (:selected-item @*state)
                        ;; For a snappy response in the UI, set :selected-item immediately.
                        ;; The subsequent call to fetch-and-reset! then
                        ;; will fetch and replace it, thereby filling in the related items.
-                       :selected-context context))
+                       :selected-item context))
   (fetch-and-reset-with-method-2! 
    *state 
    api/fetch-context
@@ -88,7 +88,7 @@
 
 (defn delete-context! [*state]
   (when (js/window.confirm "Delete currently selected context?")
-    (fetch-and-reset-with-method-2! *state api/delete-context (:selected-context @*state))))
+    (fetch-and-reset-with-method-2! *state api/delete-context (:selected-item @*state))))
 
 (defn select-context!
   ([*state context] (select-context! *state context false false))
@@ -187,8 +187,8 @@
 (defn upgrade-item-to-context! [*state]
   (fetch-and-reset-with-method! *state @*state api/upgrade-item-to-context))
 
-(defn link-item-to-selected-context! [*state]
-  (fetch-and-reset! *state (assoc @*state :cmd :link-item-to-selected-context)))
+(defn link-item-to-selected-item! [*state]
+  (fetch-and-reset! *state (assoc @*state :cmd :link-item-to-selected-item)))
 
 (defn search! [*state]
   (fetch-and-reset! *state @*state))

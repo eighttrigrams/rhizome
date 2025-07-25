@@ -9,10 +9,10 @@
 (defn- select-secondary-context [*state id]
   (fn [_]
     ;; TODO simplify
-    (swap! *state assoc-in [:selected-context :data :views :current]
-           (if-not (:current (:views (:data (:selected-context @*state))))
+    (swap! *state assoc-in [:selected-item :data :views :current]
+           (if-not (:current (:views (:data (:selected-item @*state))))
              {:selected-secondary-contexts [id]}
-             (update (:current (:views (:data (:selected-context @*state)))) 
+             (update (:current (:views (:data (:selected-item @*state)))) 
                      :selected-secondary-contexts
                      #(into [] ((if (contains? (into #{} %) id) disj conj) 
                                 (into #{} %) id)))))
@@ -22,10 +22,10 @@
 (defn- select-unassigned-secondary-contexts [*state]
   (fn [_]
     ;; TODO simplify
-    (swap! *state assoc-in [:selected-context :data :views :current]
-           (if-not (:current (:views (:data (:selected-context @*state))))
+    (swap! *state assoc-in [:selected-item :data :views :current]
+           (if-not (:current (:views (:data (:selected-item @*state))))
              {:secondary-contexts-unassigned-selected false}
-             (update (:current (:views (:data (:selected-context @*state))))
+             (update (:current (:views (:data (:selected-item @*state))))
                      :secondary-contexts-unassigned-selected
                      not)))
     (actions/change-secondary-contexts-unassigned-selected! *state)
@@ -38,19 +38,19 @@
             (:current 
              (:views
               (:data 
-               (:selected-context @*state))))) 
+               (:selected-item @*state))))) 
             {:font-weight :bold
              :text-decoration (if 
                                (and 
                                 (not (:secondary-contexts-inverted (:current 
                                                                     (:views
                                                                      (:data 
-                                                                      (:selected-context @*state))))))
+                                                                      (:selected-item @*state))))))
                                 (seq (:selected-secondary-contexts
                                           (:current 
                                            (:views
                                             (:data 
-                                             (:selected-context @*state)))))))
+                                             (:selected-item @*state)))))))
                                 :line-through
                                 :initial)})
           :on-click (select-unassigned-secondary-contexts *state)}
@@ -60,9 +60,9 @@
   (let [{:keys                        [aggregated-contexts]
          {{{{:keys [selected-secondary-contexts
                     secondary-contexts-unassigned-selected]} :current} :views} 
-          :data :as selected-context} :selected-context} @*state
+          :data :as selected-item} :selected-item} @*state
         secondary-contexts (remove (fn [[idx _v]]
-                                     (= idx (:id selected-context))) 
+                                     (= idx (:id selected-item))) 
                                    aggregated-contexts)]
     [:ul
      [:li [unassigned-secondary-contexts-component *state]]
@@ -88,10 +88,10 @@
 (defn- select-invert-contexts [*state]
   (fn [_]
     ;; TODO simplify
-    (swap! *state assoc-in [:selected-context :data :views :current]
-           (if-not (:current (:views (:data (:selected-context @*state))))
+    (swap! *state assoc-in [:selected-item :data :views :current]
+           (if-not (:current (:views (:data (:selected-item @*state))))
              {:secondary-contexts-inverted false}
-             (update (:current (:views (:data (:selected-context @*state))))
+             (update (:current (:views (:data (:selected-item @*state))))
                      :secondary-contexts-inverted
                      not)))
     (actions/change-secondary-contexts-inverted *state)
@@ -102,7 +102,7 @@
                         (:current
                          (:views
                           (:data
-                           (:selected-context @*state)))))
+                           (:selected-item @*state)))))
                    {:font-weight :bold})
           :on-click (select-invert-contexts *state)}
    "Invert"])
@@ -111,8 +111,8 @@
   [:ul (doall
         (map-indexed (fn [idx {:keys [title]}]
                        [:li {:key             idx
-                             :style           {:font-weight (if (= (-> *state deref :selected-context :data :views :current)
-                                                                   (-> *state deref :selected-context :data :views :stored (get idx) :view))
+                             :style           {:font-weight (if (= (-> *state deref :selected-item :data :views :current)
+                                                                   (-> *state deref :selected-item :data :views :stored (get idx) :view))
                                                               "bold"
                                                               "normal")}
                              :on-click        (fn [_] (actions/load-stored-context *state idx))
@@ -120,13 +120,13 @@
                                                 (.preventDefault e)
                                                 (actions/remove-stored-context *state idx))}
                         title]) 
-                     (:stored (:views (:data (:selected-context @*state))))))])
+                     (:stored (:views (:data (:selected-item @*state))))))])
 
 (defn component [_*state]
   (fn [*state]
     [:<>
      [:h4 "Search mode: "
-      (case (:search-mode (:current (:views (:data (:selected-context @*state)))))
+      (case (:search-mode (:current (:views (:data (:selected-item @*state)))))
         0 "Normal"
         1 "Reverse"
         2 "0->9"

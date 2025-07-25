@@ -15,7 +15,7 @@
     (r/create-class
      {:component-did-mount #(.focus (get-component-el))
       :reagent-render      ;
-      (fn [_selected-context _item]
+      (fn [_selected-item _item]
         #_(prn @*selectable-contexts)
         [:<>
          [:h4 "Related contexts"]

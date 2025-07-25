@@ -5,7 +5,7 @@
 (defn handle-keys [*state]
   (handle-keys* 
    (fn [code ctrl-pressed? meta-pressed? alt-pressed? shift-pressed? _e]
-     (let [{:keys [selected-context
+     (let [{:keys [selected-item
                    item-view?]} @*state]
        (cond (= "Escape" code)
              (cond (and (:active-search @*state)
@@ -15,32 +15,32 @@
                    (actions/exit-item-view! *state)
                    (and alt-pressed? (common/something-to-deselect? *state))
                    (actions/deselect-secondary-contexts! *state)
-                   (and (not alt-pressed?) selected-context)
+                   (and (not alt-pressed?) selected-item)
                    (actions/deselect-context! *state))
              (not (:active-search @*state))
              (cond
-               (and selected-context (= "KeyE" code))
+               (and selected-item (= "KeyE" code))
                (swap! *state #(assoc % :modal :edit-context :item-view? false))
-               (and selected-context (= "Delete" code))
+               (and selected-item (= "Delete" code))
                (actions/delete-context! *state)
                (and alt-pressed?
                     (= "KeyU" code)
-                    selected-context)
+                    selected-item)
                (actions/upgrade-item-to-context! *state)
                (and alt-pressed? 
                     (= "KeyT" code)
-                    selected-context)
+                    selected-item)
                (actions/unlink-selected-item-from-selected-context *state)
                (and alt-pressed? 
                     (= "KeyB" code))
                (actions/select-last-context! *state)
                (= "KeyI" code)
                (swap! *state #(assoc % :active-search :items))
-               (and selected-context
+               (and selected-item
                     (= "KeyA" code)
-                    (not (-> @*state :selected-context :data :views :current :secondary-contexts-inverted)) 
-                    (not (-> @*state :selected-context :data :views :current :secondary-contexts-unassigned-selected)))
-               (actions/link-item-to-selected-context! *state)
+                    (not (-> @*state :selected-item :data :views :current :secondary-contexts-inverted)) 
+                    (not (-> @*state :selected-item :data :views :current :secondary-contexts-unassigned-selected)))
+               (actions/link-item-to-selected-item! *state)
                (and (= "KeyC" code)
                     (not meta-pressed?)
                     (not ctrl-pressed?)
@@ -50,15 +50,15 @@
                     (not meta-pressed?)
                     (not ctrl-pressed?)
                     (not shift-pressed?)
-                    selected-context)
+                    selected-item)
                (actions/start-linking-context *state)
-               (and selected-context
+               (and selected-item
                     (= "KeyD" code))
                (swap! *state #(assoc % :modal :description :item-view? true))
-               (and selected-context
+               (and selected-item
                     (= "KeyS" code))
                (actions/cycle-search-mode! *state)
-               (and selected-context
+               (and selected-item
                     (not item-view?)
                     (= "KeyF" code))
                (actions/enter-item-view! *state)
