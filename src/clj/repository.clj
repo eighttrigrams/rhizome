@@ -298,7 +298,7 @@
                              (datastore/get-item db selected-context))]
       (log/info (str "repository/link-selected-context-to-context " selected-issue " - " shift-pressed?))
       (datastore/reprioritize-context db arg)
-      (datastore.relations/link-item-to-container! db selected-issue arg (not shift-pressed?))
+      (datastore.relations/link-item-to-another-item! db selected-issue arg (not shift-pressed?))
       (let [fresh-selected-context (datastore/get-item db selected-context)]
         (merge {:link-context   nil
                 :active-search  nil
@@ -344,9 +344,9 @@
       
       (if (and shift-pressed? alt-pressed?)
         (do 
-          (datastore.relations/link-item-to-container! db selected-issue selected-context false)
-          (datastore.relations/link-item-to-container! db selected-context selected-issue false))
-        (datastore.relations/link-item-to-container! db selected-issue selected-context (not shift-pressed?)))
+          (datastore.relations/link-item-to-another-item! db selected-issue selected-context false)
+          (datastore.relations/link-item-to-another-item! db selected-context selected-issue false))
+        (datastore.relations/link-item-to-another-item! db selected-issue selected-context (not shift-pressed?)))
 
       (let [opts                (-> opts
                                     (dissoc :q
@@ -384,7 +384,7 @@
 (defn unlink-selected-item-from-container [{:keys [db]}]
   (fn [{:keys [selected-context old-selected-context] :as state}]
     (log/info (str "repository/unlink-selected-item-from-container - Try removing " (:id selected-context) ":" (:title selected-context) " from " (:id old-selected-context) ":" (:title old-selected-context)))
-    (if (or (not (datastore.relations/unlink-item-from-container! db selected-context old-selected-context))
+    (if (or (not (datastore.relations/unlink-item-from-another-item! db selected-context old-selected-context))
             (not old-selected-context))
       state
       (do
@@ -403,7 +403,7 @@
     (if-not selected-context
       (throw (Exception. "unlink-item shouldn't have been called without 'selected-context'"))
       (do
-        (datastore.relations/unlink-item-from-container! db issue selected-context)
+        (datastore.relations/unlink-item-from-another-item! db issue selected-context)
         {:issues (search db state)
          :issue-view? false}))))
 
