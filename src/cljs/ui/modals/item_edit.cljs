@@ -1,27 +1,27 @@
-(ns ui.modals.issue-edit
+(ns ui.modals.item-edit
   (:require [reagent.core :as r]
             [net.eighttrigrams.cljs-text-editor.editor :as editor]
-            [ui.modals.link-context-issue :as link-context-issue]
+            [ui.modals.link-context-item :as link-context-item]
             [clojure.string :as str]
             api))
 
 (defn- get-title-el []
-  (.getElementById js/document "issue-title"))
+  (.getElementById js/document "item-title"))
 
 (defn- get-short-title-el []
-  (.getElementById js/document "issue-short-title"))
+  (.getElementById js/document "item-short-title"))
 
 (defn- get-annotation-el []
-  (.getElementById js/document "issue-annotation"))
+  (.getElementById js/document "item-annotation"))
 
 (defn- get-sort-idx-el []
-  (.getElementById js/document "issue-sort-idx"))
+  (.getElementById js/document "item-sort-idx"))
 
 (defn- get-tags-el []
-  (.getElementById js/document "issue-tags"))
+  (.getElementById js/document "item-tags"))
 
 (defn- get-highlighted-secondary-contexts-el []
-  (.getElementById js/document "issue-highlighted-secondary-contexts"))
+  (.getElementById js/document "item-highlighted-secondary-contexts"))
 
 (defn- get-event-el []
   (.getElementById js/document "has-date"))
@@ -29,43 +29,43 @@
 (defn- get-date-el []
   (.getElementById js/document "date-picker"))
 
-(def *related-issues (r/atom {}))
+(def *related-items (r/atom {}))
 
-(defn basic-elements-component [issue]
+(defn basic-elements-component [item]
   (r/create-class {:component-did-mount #(do (editor/create (get-title-el) {:input-field-mode? true})
                                              (editor/create (get-short-title-el) {:input-field-mode? true})
                                              (editor/create (get-tags-el) {:input-field-mode? true}))
                    :reagent-render ;
-                   (fn [_issue]
+                   (fn [_item]
                      [:<>
                       [:div
-                       [:input#issue-title.line
+                       [:input#item-title.line
                         {:autoComplete :off
-                         :defaultValue (:title issue)}]]
+                         :defaultValue (:title item)}]]
                       [:div
-                       [:input#issue-short-title.line
+                       [:input#item-short-title.line
                         {:autoComplete :off
-                         :defaultValue (:short_title issue)}]]
+                         :defaultValue (:short_title item)}]]
                       [:div
-                       [:input#issue-annotation.line
+                       [:input#item-annotation.line
                         {:autoComplete :off
-                         :defaultValue (:annotation issue)}]]
+                         :defaultValue (:annotation item)}]]
                       [:div
-                       [:input#issue-sort-idx.line
+                       [:input#item-sort-idx.line
                         {:autoComplete :off
-                         :defaultValue (:sort_idx issue)}]]
+                         :defaultValue (:sort_idx item)}]]
                       [:div
-                       [:input#issue-tags.line
+                       [:input#item-tags.line
                         {:autoComplete :off
-                         :defaultValue (:tags issue)}]]
+                         :defaultValue (:tags item)}]]
                       [:div
-                       [:input#issue-highlighted-secondary-contexts.line
+                       [:input#item-highlighted-secondary-contexts.line
                         {:autoComplete :off
                          :defaultValue (str/join " " (:highlighted-secondary-contexts
-                                                      (:data issue)))}]]
-                      "id:" (:id issue)])}))
+                                                      (:data item)))}]]
+                      "id:" (:id item)])}))
 
-(defn event-component [issue *date-visible?]
+(defn event-component [item *date-visible?]
   [:<>
    [:div
     [:p "Has event?"]
@@ -78,24 +78,24 @@
       [:p "Event"]
       [:input#date-picker
        {:type         :date
-        :defaultValue (:date issue)}]])])
+        :defaultValue (:date item)}]])])
 
-(defn component [issue]
-  (let [*date-visible?  (r/atom (boolean (:date issue)))]
-    (reset! *related-issues (into {} (map (fn [{:keys [id title]}] [id title]) (:related_issues issue))))
+(defn component [item]
+  (let [*date-visible?  (r/atom (boolean (:date item)))]
+    (reset! *related-items (into {} (map (fn [{:keys [id title]}] [id title]) (:related_items item))))
     (r/create-class
      {:component-did-mount #(.focus (get-title-el))
       :reagent-render      ;
       (fn [_item]
         [:<>
-         [basic-elements-component issue]
+         [basic-elements-component item]
          [:hr]
          [:h4 "Event"]
-         [event-component issue *date-visible?]
+         [event-component item *date-visible?]
          [:hr]
-         [link-context-issue/component issue]])})))
+         [link-context-item/component item]])})))
 
-(defn get-values [id _issue?]
+(defn get-values [id _item?]
   {:context {:id          id
              :title       (.-value (get-title-el))
              :short_title (.-value (get-short-title-el))

@@ -1,4 +1,4 @@
-(ns ui.main.rhs.issues-list-items
+(ns ui.main.rhs.items-list-items
   (:require [clojure.string :as str]
             ["react-markdown$default" :as ReactMarkdown]
             [ui.actions :as actions]
@@ -76,98 +76,98 @@
      (swap! *state assoc :mouse :leave)
      (js/setTimeout (fn [_]
                       (when (= :leave (:mouse @*state))
-                        (swap! *state dissoc :preview-issue)))
+                        (swap! *state dissoc :preview-item)))
                     300)))
 
-(defn- on-mouse-enter [*state issue]
+(defn- on-mouse-enter [*state item]
   #(do (when-not (:loading @*state)
          (swap! *state assoc
-                :preview-issue issue
+                :preview-item item
                 :mouse :enter)
          (when-not (:active-search @*state)
           ;;  (js/setTimeout (fn [_]
-                      (actions/fetch-issue-description! *state issue))
+                      (actions/fetch-item-description! *state item))
                     ;; 300)
                           )))
 
-(defn regular-issues-list-item-component
-  [*state issue idx {:keys [allow-delete-on-right-click?
+(defn regular-items-list-item-component
+  [*state item idx {:keys [allow-delete-on-right-click?
                             show-relation-annotation?
                             select-fn
                             show-context-selector?
                             rhs?]
                      :as   _opts}]
-  [:li.issue-card
+  [:li.item-card
    (merge {:class          (str "card"
-                                (when (not (or (:preview-image-lowres (:data issue))
-                                               (:preview-image (:data issue))
-                                               (:image (:resource-links (:data issue)))))
+                                (when (not (or (:preview-image-lowres (:data item))
+                                               (:preview-image (:data item))
+                                               (:image (:resource-links (:data item)))))
                                   " simple-card")
-                                (when (= (:id (:selected-issue @*state))
-                                         (:id issue)) " selected"))
+                                (when (= (:id (:selected-item @*state))
+                                         (:id item)) " selected"))
            :on-click       #(if idx 
                               (let [skip-select? (and (deref modifiers/*alt-pressed?)
-                                                      (not= :issues (:active-search @*state)))]
-                                (swap! *state (fn [state] (dissoc state :preview-issue))) 
+                                                      (not= :items (:active-search @*state)))]
+                                (swap! *state (fn [state] (dissoc state :preview-item))) 
                                 
                                 (if skip-select?
                                   (do 
-                                    (actions/reprioritize-issue *state issue)
+                                    (actions/reprioritize-item *state item)
                                     (select-fn idx))
-                                  (actions/select-issue! *state issue)))
+                                  (actions/select-item! *state item)))
                               (do (swap! *state (fn [state]
                                                   (-> state
-                                                      (dissoc :preview-issue))))
-                                  (actions/select-issue! *state issue)))
-           :on-mouse-enter (when idx (on-mouse-enter *state issue))
+                                                      (dissoc :preview-item))))
+                                  (actions/select-item! *state item)))
+           :on-mouse-enter (when idx (on-mouse-enter *state item))
            :on-mouse-leave (when idx (on-mouse-leave *state))}
           (when (and idx 
                      allow-delete-on-right-click?
                      (or @modifiers/*alt-pressed? 
                          (:selected-context @*state)))
-            {:id (str "issue-card-" idx)
+            {:id (str "item-card-" idx)
              :on-context-menu (fn [e]
                                 (.preventDefault e) 
                                 (if @modifiers/*alt-pressed?
-                                  (actions/delete-item! *state issue)
-                                  (actions/unlink-item! *state issue)))}))
+                                  (actions/delete-item! *state item)
+                                  (actions/unlink-item! *state item)))}))
    (when (and show-relation-annotation?
-              (not-empty (:annotation issue)))
+              (not-empty (:annotation item)))
      [:div {:class "relation-annotation"}
-      (:annotation issue)])
-   [:div.issue-card-inner
-    (when (or (:preview-image-lowres (:data issue))
-              (:preview-image (:data issue))
-              (:image (:resource-links (:data issue)))) 
-      [image-preview-component (:data issue)])
-    [:div.issue-card-inner-right.issue-card-inner-child
+      (:annotation item)])
+   [:div.item-card-inner
+    (when (or (:preview-image-lowres (:data item))
+              (:preview-image (:data item))
+              (:image (:resource-links (:data item)))) 
+      [image-preview-component (:data item)])
+    [:div.item-card-inner-right.item-card-inner-child
      [title-component 
-      (if-not (empty? (:title issue))
-        (:title issue)
-        (if-not (empty? (:date issue))
-          (:date issue)
+      (if-not (empty? (:title item))
+        (:title item)
+        (if-not (empty? (:date item))
+          (:date item)
           "")) 
-      (:data issue)]
+      (:data item)]
      [context-badges/component 
       *state 
       (remove #(= (:id (:selected-context @*state))
                   (first %)) 
-              (merge (when (and (:is_context issue) show-context-selector?) 
-                       {0 {:context #(actions/select-context! *state issue)}})
-                     (when (or (:date issue)
+              (merge (when (and (:is_context item) show-context-selector?) 
+                       {0 {:context #(actions/select-context! *state item)}})
+                     (when (or (:date item)
                                (and rhs?
                                     (:selected-context @*state)
                                     (= 5 (:search-mode (:current (:views (:data (:selected-context @*state))))))))
                        {:date (if (and rhs?
                                        (:selected-context @*state)
                                        (= 5 (:search-mode (:current (:views (:data (:selected-context @*state))))))) 
-                                (when (and (:inserted_at issue) (instance? js/Date (:inserted_at issue)))
-                                  (assoc issue :date (first (str/split (.toISOString (:inserted_at issue)) #"T")))) 
-                                issue)})
+                                (when (and (:inserted_at item) (instance? js/Date (:inserted_at item)))
+                                  (assoc item :date (first (str/split (.toISOString (:inserted_at item)) #"T")))) 
+                                item)})
                      (when (and (:selected-context @*state)
                                 rhs?
-                                (>= (:sort_idx issue) 0))
-                       {:number {:number (:sort_idx issue)}})
-                     (when-let [file (:file (:resource-links (:data issue)))]
+                                (>= (:sort_idx item) 0))
+                       {:number {:number (:sort_idx item)}})
+                     (when-let [file (:file (:resource-links (:data item)))]
                        {:file {:file file}})
-                     (:contexts (:data issue))))]]]])
+                     (:contexts (:data item))))]]]])

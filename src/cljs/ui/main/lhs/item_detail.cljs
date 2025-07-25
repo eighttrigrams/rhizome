@@ -1,4 +1,4 @@
-(ns ui.main.lhs.issue-detail
+(ns ui.main.lhs.item-detail
   (:require ["react-markdown$default" :as ReactMarkdown]
             [clojure.string :as str]
             [ajax.core :as ajax]))
@@ -48,7 +48,7 @@
                 (str/ends-with? title ".jpeg")))
        [image-itself title])]))
 
-(defn- the-issue-itself-component [{:keys [title description date data]}]
+(defn- the-item-itself-component [{:keys [title description date data]}]
   [:<>
    (when date [:b date])
    [:span
@@ -118,7 +118,7 @@
      (when-not (or (-> selected-context :data :resource-links :image)
                    (= :description (:modal @*state)))
        [drop-target (:id selected-context)])
-     [the-issue-itself-component selected-context]]))
+     [the-item-itself-component selected-context]]))
 
-(defn preview-component [issue]
-  (the-issue-itself-component issue))
+(defn preview-component [item]
+  (the-item-itself-component item))

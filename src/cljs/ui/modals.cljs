@@ -2,8 +2,8 @@
   (:require [reagent.core :as r]
             [net.eighttrigrams.cljs-text-editor.editor :as editor]
             [ui.modals.key-handler :as key-handler]
-            [ui.modals.issue-edit :as issue-edit]
-            [ui.modals.link-context-issue :as link-context-issue]))
+            [ui.modals.item-edit :as item-edit]
+            [ui.modals.link-context-item :as link-context-item]))
 
 (defn- get-description-el []
   (.getElementById js/document "description-editor"))
@@ -23,9 +23,9 @@
   (case (:modal @*state)
     :edit-context
     (key-handler/handle-edit-keys *state
-                                  #(issue-edit/get-values (:id item) 
+                                  #(item-edit/get-values (:id item) 
                                                           (:selected-context @*state))
-                                  #(link-context-issue/get-values))
+                                  #(link-context-item/get-values))
     :description
     (key-handler/handle-modal-keys *state 
                                    #(do {:id          (:id item) 
@@ -42,5 +42,5 @@
          :description
          [textarea-component item]
          :edit-context
-         [:div#modal-component [issue-edit/component item]]
+         [:div#modal-component [item-edit/component item]]
          nil)])))

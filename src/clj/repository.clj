@@ -10,13 +10,13 @@
 (defn search-aggregated-contexts
   [db {{{:keys [highlighted-secondary-contexts]} :data} :selected-context
        :as opts}]
-  (let [issues (search/search-related-items
+  (let [items (search/search-related-items
                  db 
                  "" 
                  (:id (:selected-context opts))
                  {}
                  {})]
-    (search/get-aggregated-contexts db issues highlighted-secondary-contexts)))
+    (search/get-aggregated-contexts db items highlighted-secondary-contexts)))
 
 (defn- simplify-params [{:keys [selected-context] :as opts}]
   (let [selected-context-id (:id selected-context)
@@ -34,11 +34,11 @@
 
 (defn- search'
   "Prefer calling search-items or search-related-items"
-  [db q selected-context-id {:keys [link-issue selected-context] :as opts}]
-  (log/info (str "search:" selected-context-id " link-issue:" link-issue))
+  [db q selected-context-id {:keys [link-item selected-context] :as opts}]
+  (log/info (str "search:" selected-context-id " link-item:" link-item))
   (when selected-context (throw (IllegalArgumentException. "'selected-context' not expected as an argument here")))
   (if selected-context-id
-   (if link-issue
+   (if link-item
      (search/search-items db 
                    q
                    (assoc opts
@@ -109,16 +109,16 @@
     (search-aggregated-contexts db state)))
 
 (defn fetch-context [{:keys [db]}]
-  (fn [old-state [arg fetch-as-issue?]]
+  (fn [old-state [arg fetch-as-item?]]
     (let [selected-context (datastore/get-item db arg)
           opts             {:selected-context selected-context}]
-      (log/info (str "fetch-context as " (if fetch-as-issue? "issue" "context") " from (" (:id (:old-selected-context old-state)) "):\"" (:title (:old-selected-context old-state)) "\" to (" (:id selected-context) "):\"" (:title selected-context) "\""))
-      (if fetch-as-issue?
-        (datastore/reprioritize-issue db arg)
+      (log/info (str "fetch-context as " (if fetch-as-item? "item" "context") " from (" (:id (:old-selected-context old-state)) "):\"" (:title (:old-selected-context old-state)) "\" to (" (:id selected-context) "):\"" (:title selected-context) "\""))
+      (if fetch-as-item?
+        (datastore/reprioritize-item db arg)
         (datastore/reprioritize-context db arg))
       (merge opts
              {:selected-context                        selected-context
-              :issues (search-related-items db "" selected-context)
+              :items (search-related-items db "" selected-context)
               :context-to-fetch                        nil
               :unassigned-secondary-contexts-selected? false
               :q                                       nil}))))
@@ -126,7 +126,7 @@
 (defn deselect-context [{:keys [db]}]
   (fn [_opts]
     (log/info (str "deselect context"))
-    {:issues           (search-items db)
+    {:items           (search-items db)
      :contexts         (search-context-items db "" {})
      :selected-context nil
      :q                nil}))
@@ -141,7 +141,7 @@
                    "-"
                    (:title (:selected-context opts))))
     (let [_context (the-future (datastore/update-item db (:selected-context opts)))]
-      {:issues (search-related-items db (:q opts) (:selected-context opts))})))
+      {:items (search-related-items db (:q opts) (:selected-context opts))})))
 
 (defn change-secondary-contexts-selection [{:keys [db]}]
   (change-secondary-contexts-operation db))
@@ -192,7 +192,7 @@
                                                    :notes-mode]
                                                   false)
                                                  )))]
-      {:issues                          (search-related-items
+      {:items                          (search-related-items
                                          db
                                          (:q opts)
                                          context)
@@ -208,7 +208,7 @@
   (fn [{:keys [selected-context] :as opts} idx]
     (let [selected-context (datastore/load-stored-context db selected-context idx)]
       {:selected-context selected-context
-       :issues (search-related-items db (:q opts) selected-context)})))
+       :items (search-related-items db (:q opts) selected-context)})))
 
 (defn remove-stored-context [{:keys [db]}]
   (fn [{:keys [selected-context]} idx]
@@ -219,22 +219,22 @@
   (fn [{:keys [selected-context] :as opts}]
     (let [selected-context (datastore/cycle-search-mode db selected-context)]
       {:selected-context selected-context
-       :issues (search-related-items db (:q opts) selected-context)})))
+       :items (search-related-items db (:q opts) selected-context)})))
 
 (defn delete-item [{:keys [db]}]
-  (fn [opts issue]
-    (deletion/delete-item db issue)
-    {:issues (search db opts)
-     :issue-view? false}))
+  (fn [opts item]
+    (deletion/delete-item db item)
+    {:items (search db opts)
+     :item-view? false}))
 
 (defn delete-context [{:keys [db]}]
   (fn [opts arg]
     (deletion/delete-item db arg)
     (if (:old-selected-context opts)
       (assoc ((fetch-context {:db db}) opts [(:old-selected-context opts) false])
-             :issue-view? false)
-      (let [m {:selected-context nil :issue-view? false}]
-        (merge {:issues (search-items db)
+             :item-view? false)
+      (let [m {:selected-context nil :item-view? false}]
+        (merge {:items (search-items db)
                 :contexts (search-context-items db "" {})}
                m)))))
 
@@ -250,17 +250,17 @@
     (log/info "insert-context")
     {:selected-context                        (datastore/new-context db arg)
      :aggregated-contexts                     '()
-     :issues                                  []
+     :items                                  []
      :q                                       nil
-     :active-search                           :issues
+     :active-search                           :items
      :unassigned-secondary-contexts-selected? false}))
 
-(defn insert-issue [{:keys [db]}]
+(defn insert-item [{:keys [db]}]
   (fn [{:keys [selected-context]
         :as state} 
        {:keys [title]}]
-    (log/info "insert-issue")
-    (let [item (insertion/insert-issue db 
+    (log/info "insert-item")
+    (let [item (insertion/insert-item db 
                                        title
                                        selected-context 
                                        (get-selected-secondary-contexts-set state))]
@@ -268,7 +268,7 @@
        {:active-search nil}
        (if (map? item)
          (merge 
-          {:issue-view? true
+          {:item-view? true
            :old-selected-context selected-context}
           (let [log-data {:item (select-keys item [:id :title])}]
             (if (:previously-existing-item? item)
@@ -277,33 +277,33 @@
                 ((fetch-context {:db db}) state [item true]))
               (do
                 (log/info log-data "Inserted item")
-                {:issues              '()
+                {:items              '()
                  :selected-context    (datastore/get-item db item) ;; fetch again to have latest relations from two lines above
                  :q                   nil
                  :aggregated-contexts '()}))))
-         {:issues (search-related-items db (:q state) selected-context)})))))
+         {:items (search-related-items db (:q state) selected-context)})))))
 
-(defn fetch-issue-description [{:keys [db]}]
-  (fn [state issue]
-    (let [item (datastore/get-item db issue)]
+(defn fetch-item-description [{:keys [db]}]
+  (fn [state item-ref]
+    (let [item (datastore/get-item db item-ref)]
      (assoc state 
-            :issue-description (:description item)
-            :ignore-issue-description (or (nil? (:description item)) (not (seq (:description item))))))))
+            :item-description (:description item)
+            :ignore-item-description (or (nil? (:description item)) (not (seq (:description item))))))))
 
 (defn link-selected-context-to-context "link selected context as an item to a container"
   [{:keys [db]}]
   (fn 
-    [{:keys [selected-issue selected-context] :as opts} arg shift-pressed? _alt-pressed?]
-    (let [selected-issue (or selected-issue
+    [{:keys [selected-item selected-context] :as opts} arg shift-pressed? _alt-pressed?]
+    (let [selected-item (or selected-item
                              (datastore/get-item db selected-context))]
-      (log/info (str "repository/link-selected-context-to-context " selected-issue " - " shift-pressed?))
+      (log/info (str "repository/link-selected-context-to-context " selected-item " - " shift-pressed?))
       (datastore/reprioritize-context db arg)
-      (datastore.relations/link-item-to-another-item! db selected-issue arg (not shift-pressed?))
+      (datastore.relations/link-item-to-another-item! db selected-item arg (not shift-pressed?))
       (let [fresh-selected-context (datastore/get-item db selected-context)]
         (merge {:link-context   nil
                 :active-search  nil
                 :selected-context fresh-selected-context
-                :issues         (search-related-items db "" fresh-selected-context)
+                :items         (search-related-items db "" fresh-selected-context)
                 :q              nil}
                (when selected-context
                  {:aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)}))))))
@@ -311,9 +311,9 @@
 (defn search-contexts [db opts]
   {:contexts (search-context-items db (:q opts) (dissoc opts :q))})
 
-(defn start-linking-selected-issue-to-context-with-local-search 
+(defn start-linking-selected-item-to-context-with-local-search 
   [db opts]
-  (log/info "start-linking-selected-issue-to-context-with-local-search ")
+  (log/info "start-linking-selected-item-to-context-with-local-search ")
   {:contexts (search-context-items db "" (assoc opts :link-context true))
    :q ""
    :link-context true
@@ -324,62 +324,62 @@
    :q ""
    :active-search :contexts})
 
-(defn start-linking-issue-to-selected-context 
+(defn start-linking-item-to-selected-context 
   [db opts]
-  (log/info "start-linking-issue-to-selected-context")
-  {:issues (search
+  (log/info "start-linking-item-to-selected-context")
+  {:items (search
             db 
             (merge opts
-                   {:link-issue true
+                   {:link-item true
                     :q ""}))
-   :active-search    :issues
-   :link-issue       true
+   :active-search    :items
+   :link-item       true
    :q                ""})
 
-(defn finish-linking-issue [{:keys [db]}]
-  (fn [{:keys [selected-context] :as opts} issue-id shift-pressed? alt-pressed?]
-    (log/info (str "finish-linking-issue " shift-pressed? " - " alt-pressed?))
-    (datastore/reprioritize-issue db {:id issue-id})
-    (let [selected-issue (datastore/get-item db {:id issue-id})] 
+(defn finish-linking-item [{:keys [db]}]
+  (fn [{:keys [selected-context] :as opts} item-id shift-pressed? alt-pressed?]
+    (log/info (str "finish-linking-item " shift-pressed? " - " alt-pressed?))
+    (datastore/reprioritize-item db {:id item-id})
+    (let [selected-item (datastore/get-item db {:id item-id})] 
       
       (if (and shift-pressed? alt-pressed?)
         (do 
-          (datastore.relations/link-item-to-another-item! db selected-issue selected-context true)
-          (datastore.relations/link-item-to-another-item! db selected-context selected-issue true))
-        (datastore.relations/link-item-to-another-item! db selected-issue selected-context (not shift-pressed?)))
+          (datastore.relations/link-item-to-another-item! db selected-item selected-context true)
+          (datastore.relations/link-item-to-another-item! db selected-context selected-item true))
+        (datastore.relations/link-item-to-another-item! db selected-item selected-context (not shift-pressed?)))
 
       (let [opts                (-> opts
                                     (dissoc :q
-                                            :link-issue
+                                            :link-item
                                             :link-context)
                                     (assoc-in [:selected-context 
                                                :data 
                                                :views 
                                                :current 
                                                :selected-secondary-contexts] []))
-            issues (search-related-items db "" (:selected-context opts))
+            items (search-related-items db "" (:selected-context opts))
             aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)
             selected-context (datastore/get-item db selected-context)]
-        {:issues              issues
+        {:items              items
          :active-search       nil
          :selected-context selected-context
-         :link-issue          nil
+         :link-item          nil
          :link-context        nil
          :q                   nil
          :aggregated-contexts aggregated-contexts}))))
 
-(defn reprioritize-issue [{:keys [db]}]
-  (fn [state issue]
-    (log/info (str "repository/reprioritize-issue" (:id issue) (:title issue)))
-    (datastore/reprioritize-issue db issue)
-    {:issues           (search db (dissoc state :q))
+(defn reprioritize-item [{:keys [db]}]
+  (fn [state item]
+    (log/info (str "repository/reprioritize-item" (:id item) (:title item)))
+    (datastore/reprioritize-item db item)
+    {:items           (search db (dissoc state :q))
      :active-search    nil
      :q                nil}))
 
-(defn upgrade-issue-to-context [{:keys [db]}]
+(defn upgrade-item-to-context [{:keys [db]}]
   (fn [{:keys [selected-context]}]
-    (log/info (str "repository/upgrade-issue-to-context" (:id selected-context)))
-    {:selected-context (datastore/switch-between-issue-and-context! db selected-context)}))
+    (log/info (str "repository/upgrade-item-to-context" (:id selected-context)))
+    {:selected-context (datastore/switch-between-item-and-context! db selected-context)}))
 
 (defn unlink-selected-item-from-container [{:keys [db]}]
   (fn [{:keys [selected-context old-selected-context] :as state}]
@@ -390,22 +390,22 @@
       (do
         (log/info (str "repository/unlink-selected-item-from-container - Removing now"))
         {:selected-context old-selected-context
-         :issues (search-related-items 
+         :items (search-related-items 
                   db 
                   ""
                   old-selected-context)
          :aggregated-contexts ((fetch-aggregated-contexts {:db db}) (assoc state :selected-context old-selected-context))
-         :issue-view? false}))))
+         :item-view? false}))))
 
 (defn unlink-item [{:keys [db]}]
-  (fn [{:keys [selected-context] :as state} issue]
-    (log/info (str "unlink item " (:title issue) " from " (:title selected-context)))
+  (fn [{:keys [selected-context] :as state} item]
+    (log/info (str "unlink item " (:title item) " from " (:title selected-context)))
     (if-not selected-context
       (throw (Exception. "unlink-item shouldn't have been called without 'selected-context'"))
       (do
-        (datastore.relations/unlink-item-from-another-item! db issue selected-context)
-        {:issues (search db state)
-         :issue-view? false}))))
+        (datastore.relations/unlink-item-from-another-item! db item selected-context)
+        {:items (search db state)
+         :item-view? false}))))
 
 (defn select-last-context [{:keys [db]}]
   (fn [{:keys [old-selected-context]}]
@@ -414,22 +414,22 @@
       (do 
         (log/info (str "repository/select-last-context - " (:id old-selected-context) ":" (:title old-selected-context)))
         {:selected-context    old-selected-context
-         :issues              (search-related-items 
+         :items              (search-related-items 
                                db
                                ""
                                old-selected-context)
-         :issue-view?         false}))))
+         :item-view?         false}))))
 
 (defn update-item [{:keys [db]}]
   (fn [_opts arg]
     (let [context (or (:context (:context arg)) (:context arg))
-          issue-contexts (:issue-contexts arg)]
+          item-contexts (:item-contexts arg)]
       (log/info (str "repository/update-item" (:id context) "-" (:title context) "-" arg))
       (let [is_context (:is_context (datastore/get-item db context))]
-        (datastore.relations/set-the-containers-of-item! db context issue-contexts is_context))
+        (datastore.relations/set-the-containers-of-item! db context item-contexts is_context))
       (let [selected-context (datastore/update-item db context)]
         (merge {:selected-context selected-context
-                :issues           (search-related-items db "" selected-context)
+                :items           (search-related-items db "" selected-context)
                 :q                nil})))))
 
 (defn list-resources [{:keys [db]}]
@@ -445,14 +445,14 @@
       :arg                             nil}
      (case cmd
        nil
-       (cond (= :issues active-search)
-             {:issues (search db opts)}
+       (cond (= :items active-search)
+             {:items (search db opts)}
              (= :contexts active-search) (search-contexts db opts)
              :else
-             (merge {:issues   (search db opts)
+             (merge {:items   (search db opts)
                      :contexts (search-context-items db "" {})}))
-       :link-issue-to-selected-context (start-linking-issue-to-selected-context db opts)
-       :start-linking-selected-issue-to-context (start-linking-selected-issue-to-context-with-local-search db opts)
+       :link-item-to-selected-context (start-linking-item-to-selected-context db opts)
+       :start-linking-selected-item-to-context (start-linking-selected-item-to-context-with-local-search db opts)
        :start-context-search (start-context-search db opts)
        :update-context-description
        {:selected-context (datastore/update-context-description db arg)}

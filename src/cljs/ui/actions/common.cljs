@@ -11,31 +11,31 @@
   (utils/debounce save-input! 500))
 
 (defn reset-state! [new-state *state]
-  (when new-state ;; could be because ignore-issue-description
+  (when new-state ;; could be because ignore-item-description
     (reset! *state (dissoc new-state :enter-pressed?))))
 
-(defn- update-state [{:keys [issues contexts aggregated-contexts issue-description ignore-issue-description] :as i} 
+(defn- update-state [{:keys [items contexts aggregated-contexts item-description ignore-item-description] :as i} 
                      state]
-  (cond ignore-issue-description
+  (cond ignore-item-description
         nil
-        issue-description 
+        item-description 
         (let [state (if (map? state) state @state)
               state (assoc-in
-                     state [:preview-issue :description] issue-description)]
+                     state [:preview-item :description] item-description)]
           state)
         :else
         (merge 
          (if (map? state) state @state)
          i
-         {:issues   (if issues 
-                      issues
-                      (:issues state))
+         {:items   (if items 
+                      items
+                      (:items state))
           :contexts (or contexts (:contexts state))}
          (when aggregated-contexts
            {:aggregated-contexts aggregated-contexts}))))
 
 (defn- list-resources [state]
-  (api/list-resources (dissoc state :issues :contexts)))
+  (api/list-resources (dissoc state :items :contexts)))
 
 (defn- fetch-resources
   [state]
@@ -49,7 +49,7 @@
 
 (defn fetch-and-reset!
   [*state state]
-  (let [state (assoc state :loading true :preview-issue nil)]
+  (let [state (assoc state :loading true :preview-item nil)]
     (reset! *state state)
     (go (-> state
             fetch-resources
@@ -69,18 +69,18 @@
                         state
                         @state)
         state' (assoc state'''
-                :loading (if (= :dont-reset-preview-issue (last args))
+                :loading (if (= :dont-reset-preview-item (last args))
                            (:loading state''')
                            true)
-                :preview-issue (if (= :dont-reset-preview-issue (last args))
-                                 (:preview-issue state''')
+                :preview-item (if (= :dont-reset-preview-item (last args))
+                                 (:preview-item state''')
                                  nil))]
     (reset! *state state')
     (go (-> (apply fetch-resources-with-method (if (map? state) 
                                                  state'
                                                  state)
                    method 
-                   (if (= :dont-reset-preview-issue (last args))
+                   (if (= :dont-reset-preview-item (last args))
                      (drop-last args)
                      args))
             <!
@@ -94,7 +94,7 @@
 
 
 ;; -------------------------
-;; all of this is for fetch-item or fetch-last context, where aggregated-issues are fetched separately
+;; all of this is for fetch-item or fetch-last context, where aggregated-items are fetched separately
 ;; for quicker response times
 
 (defn- update-state-2 [new-state *state]

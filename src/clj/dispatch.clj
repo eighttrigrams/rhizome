@@ -3,14 +3,14 @@
             [cambium.core :as log]
             [datastore.config :as config]
             [repository :refer [list-resources 
-                                insert-issue
+                                insert-item
                                 insert-context
                                 change-secondary-contexts-selection
                                 change-secondary-contexts-unassigned-selected
                                 change-secondary-contexts-inverted
                                 deselect-secondary-contexts
-                                finish-linking-issue
-                                reprioritize-issue
+                                finish-linking-item
+                                reprioritize-item
                                 cycle-search-mode
                                 store-current-view
                                 load-stored-context
@@ -19,14 +19,14 @@
                                 unlink-item
                                 unlink-selected-item-from-container
                                 delete-item
-                                upgrade-issue-to-context
+                                upgrade-item-to-context
                                 link-selected-context-to-context
                                 select-last-context
                                 fetch-context
                                 deselect-context
                                 fetch-aggregated-contexts
                                 delete-context
-                                fetch-issue-description]]))
+                                fetch-item-description]]))
 
 (defn- handle-error [e]
   (log/error {:error-handler :handle-error} e "an error occured"))
@@ -35,14 +35,14 @@
   {:error-handler handle-error
    :pass-server-args? true}
   list-resources 
-  insert-issue
+  insert-item
   insert-context
   change-secondary-contexts-selection
   change-secondary-contexts-unassigned-selected
   change-secondary-contexts-inverted
   deselect-secondary-contexts
-  finish-linking-issue
-  reprioritize-issue
+  finish-linking-item
+  reprioritize-item
   cycle-search-mode
   store-current-view
   load-stored-context
@@ -53,9 +53,9 @@
   update-item
   fetch-aggregated-contexts
   select-last-context
-  upgrade-issue-to-context
+  upgrade-item-to-context
   link-selected-context-to-context
   fetch-context
   deselect-context
   delete-context
-  fetch-issue-description)
+  fetch-item-description)

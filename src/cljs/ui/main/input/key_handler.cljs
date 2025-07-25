@@ -6,7 +6,7 @@
 (defn get-title-el []
   (.getElementById js/document "search-input"))
 
-(defn- issue-creation-permitted? 
+(defn- item-creation-permitted? 
   [{{{{{:keys [secondary-contexts-unassigned-selected
                search-mode]} :current} :views} :data} :selected-context}]
   (and (not secondary-contexts-unassigned-selected)
@@ -19,7 +19,7 @@
    (fn [code ctrl-pressed? meta-pressed? alt-pressed? shift-pressed? e]
      (let [{:keys [active-search
                    selected-context
-                   link-issue
+                   link-item
                    link-context]} @*state
            in-notes-mode? (-> *state deref :selected-context :data :views :current :notes-mode)]
        (.stopPropagation e)
@@ -29,7 +29,7 @@
            (and ctrl-pressed? 
                 meta-pressed? 
                 alt-pressed?
-                (= :issues active-search)
+                (= :items active-search)
                 selected-context)
            (actions/store-current-view! *state {:title (.-value (get-title-el))})
            (and
@@ -41,22 +41,22 @@
            (do
              (actions/new-context! *state {:title (.-value (get-title-el))})
              (set! (.-value (get-title-el)) ""))
-           (and (= :issues active-search)
+           (and (= :items active-search)
                 (not (:enter-pressed? @*state))
                 selected-context
                 (or (and shift-pressed? (not alt-pressed?))
-                    (= 0 (count (:issues @*state)))
+                    (= 0 (count (:items @*state)))
                     in-notes-mode?)
-                (issue-creation-permitted? @*state))
+                (item-creation-permitted? @*state))
            (do
              (swap! *state assoc :enter-pressed? true)
-             (actions/new-issue! *state {:title (.-value (get-title-el))})
+             (actions/new-item! *state {:title (.-value (get-title-el))})
              (set! (.-value (get-title-el)) ""))
            #_(swap! *state dissoc nil)
            (= :contexts active-search)
            (actions/select-first-context! *state shift-pressed? alt-pressed?)
-           (= :issues active-search)
-           (actions/select-first-issue! *state shift-pressed? alt-pressed?)))
+           (= :items active-search)
+           (actions/select-first-item! *state shift-pressed? alt-pressed?)))
        (when (and (or alt-pressed? (and shift-pressed? link-context))
                   (= "Digit2" code)
                   (= :contexts active-search))
@@ -77,38 +77,38 @@
                   (= :contexts active-search))
          (.preventDefault e)
          (actions/select-fifth-context! *state shift-pressed? alt-pressed?))
-       (when (and (or alt-pressed? (and shift-pressed? link-issue))
+       (when (and (or alt-pressed? (and shift-pressed? link-item))
                   (= "Digit2" code)
-                  (= :issues active-search))
+                  (= :items active-search))
          (.preventDefault e)
-         (actions/select-second-issue! *state shift-pressed? alt-pressed?))
-       (when (and (or alt-pressed? (and shift-pressed? link-issue))
+         (actions/select-second-item! *state shift-pressed? alt-pressed?))
+       (when (and (or alt-pressed? (and shift-pressed? link-item))
                   (= "Digit3" code)
-                  (= :issues active-search))
+                  (= :items active-search))
          (.preventDefault e)
-         (actions/select-third-issue! *state shift-pressed? alt-pressed?))
-       (when (and (or alt-pressed? (and shift-pressed? link-issue))
+         (actions/select-third-item! *state shift-pressed? alt-pressed?))
+       (when (and (or alt-pressed? (and shift-pressed? link-item))
                   (= "Digit4" code)
-                  (= :issues active-search))
+                  (= :items active-search))
          (.preventDefault e)
-         (actions/select-fourth-issue! *state shift-pressed? alt-pressed?))
-       (when (and (or alt-pressed? (and shift-pressed? link-issue))
+         (actions/select-fourth-item! *state shift-pressed? alt-pressed?))
+       (when (and (or alt-pressed? (and shift-pressed? link-item))
                   (= "Digit5" code)
-                  (= :issues active-search))
+                  (= :items active-search))
          (.preventDefault e)
-         (actions/select-fifth-issue! *state shift-pressed? alt-pressed?))
+         (actions/select-fifth-item! *state shift-pressed? alt-pressed?))
        (when (and (= "KeyC" code)
                   alt-pressed?)
          (swap! *state dissoc :q :active-search)
          (actions/start-context-search *state))
        (when (and (= "KeyA" code)
-                  (not (:selected-issue @*state))
+                  (not (:selected-item @*state))
                   selected-context
                   alt-pressed?)
          (.preventDefault e)
          (when-not in-notes-mode?
            (set! (.-value (get-title-el)) "")
-           (actions/link-issue-to-selected-context! *state)))
+           (actions/link-item-to-selected-context! *state)))
        (when (and (= "KeyQ" code)
                   alt-pressed?)
          (swap! *state assoc :active-search :contexts)

@@ -36,6 +36,6 @@
                              :on-click (fn [e]
                                          (.stopPropagation e)
                                          (when-not (or (:link-context @*state)
-                                                       (:link-issue @*state))
+                                                       (:link-item @*state))
                                            (actions/select-context! *state {:id idx})))} title]))) 
          contexts))])

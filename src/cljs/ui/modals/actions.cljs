@@ -15,9 +15,9 @@
                                (assoc :cmd :update-context-description)
                                (assoc :arg item))))
 
-(defn update-context! [*state context issue-contexts]
+(defn update-context! [*state context item-contexts]
   (fetch-and-reset-with-method! *state 
                                (dissoc @*state :modal)
                                api/update-item
                                {:context        context
-                                :issue-contexts issue-contexts}))
+                                :item-contexts item-contexts}))

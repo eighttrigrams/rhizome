@@ -13,15 +13,15 @@
   (cond
     (= :contexts (:active-search @*state))
     (fetch-and-reset! *state (-> @*state
-                                 (assoc :active-search :issues)
-                                 (dissoc :preview-issue 
-                                         :link-issue 
+                                 (assoc :active-search :items)
+                                 (dissoc :preview-item 
+                                         :link-item 
                                          :q))) 
-    (= :issues (:active-search @*state))
+    (= :items (:active-search @*state))
     (fetch-and-reset! *state (-> @*state 
-                                 (dissoc :preview-issue 
+                                 (dissoc :preview-item 
                                          :active-search
-                                         :link-issue 
+                                         :link-item 
                                          :q)))))
 
 (defn load-stored-context [*state idx]
@@ -42,33 +42,33 @@
                                 api/store-current-view
                                 item))
 
-(defn new-issue! [*state issue]
+(defn new-item! [*state item]
   ;; TODO do next line in backend
   (swap! *state dissoc :aggregated-contexts)
-  (swap! *state dissoc :issues)
+  (swap! *state dissoc :items)
   (swap! *state dissoc :modal)
-  (fetch-and-reset-with-method-2! *state api/insert-issue issue))
+  (fetch-and-reset-with-method-2! *state api/insert-item item))
 
 (defn new-context! [*state context]
   ;; TODO do next line in backend
   (swap! *state dissoc :aggregated-contexts)
-  (swap! *state dissoc :issues)
+  (swap! *state dissoc :items)
   (swap! *state dissoc :modal)
   (fetch-and-reset-with-method-2! *state api/insert-context context))
 
-(defn- select-item! [*state context select-as-issue?]
+(defn- select-context-or-item! [*state context select-as-item?]
   (reset! *state (assoc @*state
-                       :active-search (when-not select-as-issue? :issues)
-                       :issue-view? select-as-issue?
+                       :active-search (when-not select-as-item? :items)
+                       :item-view? select-as-item?
                        :old-selected-context (:selected-context @*state)
-                       ;; For a snappy response in the UI, set :selected-issue immediately.
+                       ;; For a snappy response in the UI, set :selected-item immediately.
                        ;; The subsequent call to fetch-and-reset! then
-                       ;; will fetch and replace it, thereby filling in the related issues.
+                       ;; will fetch and replace it, thereby filling in the related items.
                        :selected-context context))
   (fetch-and-reset-with-method-2! 
    *state 
    api/fetch-context
-   [context select-as-issue?]))
+   [context select-as-item?]))
 
 (defn select-last-context! [*state]
   (fetch-and-reset-with-method-2! 
@@ -95,24 +95,24 @@
   ([*state context shift-pressed? alt-pressed?]
    (if (true? (:link-context @*state))
      (fetch-and-reset-with-method! *state @*state api/link-selected-context-to-context context shift-pressed? alt-pressed?)
-     (select-item! *state context false))))
+     (select-context-or-item! *state context false))))
 
 (defn deselect-secondary-contexts! [*state]
   (fetch-and-reset-with-method! *state
                                 @*state
                                 api/deselect-secondary-contexts))
 
-(defn select-issue!
-  ([*state issue] (select-issue! *state issue false false))
-  ([*state issue shift-pressed? alt-pressed?]
-   (if (:link-issue @*state)
+(defn select-item!
+  ([*state item] (select-item! *state item false false))
+  ([*state item shift-pressed? alt-pressed?]
+   (if (:link-item @*state)
      (fetch-and-reset-with-method! *state
                                    @*state
-                                   api/finish-linking-issue 
-                                   (:id issue)
+                                   api/finish-linking-item 
+                                   (:id item)
                                    shift-pressed? 
                                    alt-pressed?)
-     (select-item! *state issue true))))
+     (select-context-or-item! *state item true))))
 
 (defn select-first-context! [*state shift-pressed? alt-pressed?]
   (when (seq (:contexts @*state))
@@ -138,32 +138,32 @@
 (defn select-fifth-context! [*state shift-pressed? alt-pressed?]
   (select-nth-context! *state 4 shift-pressed? alt-pressed?))
 
-(defn reprioritize-issue [*state issue]
+(defn reprioritize-item [*state item]
   (fetch-and-reset-with-method! *state
                                 @*state 
-                                api/reprioritize-issue 
-                                issue))
+                                api/reprioritize-item 
+                                item))
 
-(defn select-first-issue! [*state shift-pressed? alt-pressed?]
-  (when (seq (:issues @*state))
-    (select-issue! *state (first (:issues @*state)) shift-pressed? alt-pressed?)))
+(defn select-first-item! [*state shift-pressed? alt-pressed?]
+  (when (seq (:items @*state))
+    (select-item! *state (first (:items @*state)) shift-pressed? alt-pressed?)))
 
-(defn- select-nth-issue! [*state n shift-pressed? alt-pressed?]
-  (when (and (seq (:issues @*state))
-             (> (count (:issues @*state)) n))
-    (select-issue! *state (nth (:issues @*state) n) shift-pressed? alt-pressed?)))
+(defn- select-nth-item! [*state n shift-pressed? alt-pressed?]
+  (when (and (seq (:items @*state))
+             (> (count (:items @*state)) n))
+    (select-item! *state (nth (:items @*state) n) shift-pressed? alt-pressed?)))
 
-(defn select-second-issue! [*state shift-pressed? alt-pressed?]
-  (select-nth-issue! *state 1 shift-pressed? alt-pressed?))
+(defn select-second-item! [*state shift-pressed? alt-pressed?]
+  (select-nth-item! *state 1 shift-pressed? alt-pressed?))
 
-(defn select-third-issue! [*state shift-pressed? alt-pressed?]
-  (select-nth-issue! *state 2 shift-pressed? alt-pressed?))
+(defn select-third-item! [*state shift-pressed? alt-pressed?]
+  (select-nth-item! *state 2 shift-pressed? alt-pressed?))
 
-(defn select-fourth-issue! [*state shift-pressed? alt-pressed?]
-  (select-nth-issue! *state 3 shift-pressed? alt-pressed?))
+(defn select-fourth-item! [*state shift-pressed? alt-pressed?]
+  (select-nth-item! *state 3 shift-pressed? alt-pressed?))
 
-(defn select-fifth-issue! [*state shift-pressed? alt-pressed?]
-  (select-nth-issue! *state 4 shift-pressed? alt-pressed?))
+(defn select-fifth-item! [*state shift-pressed? alt-pressed?]
+  (select-nth-item! *state 4 shift-pressed? alt-pressed?))
 
 (defn start-context-search [*state]
   (fetch-and-reset! *state 
@@ -171,24 +171,24 @@
                            :cmd :start-context-search
                            :active-search :contexts
                            ;; TODO maybe move those into repository; also add this to for example 'i' and other modes
-                           :link-issue false
+                           :link-item false
                            :link-context false)))
 
 (defn start-linking-context [*state]
   (fetch-and-reset! *state
                     (assoc @*state
-                           :cmd :start-linking-selected-issue-to-context
+                           :cmd :start-linking-selected-item-to-context
                            :active-search :contexts
                            :link-context true)))
 
-(defn unlink-selected-issue-from-selected-context [*state]
+(defn unlink-selected-item-from-selected-context [*state]
   (fetch-and-reset-with-method! *state @*state api/unlink-selected-item-from-container))
 
-(defn upgrade-issue-to-context! [*state]
-  (fetch-and-reset-with-method! *state @*state api/upgrade-issue-to-context))
+(defn upgrade-item-to-context! [*state]
+  (fetch-and-reset-with-method! *state @*state api/upgrade-item-to-context))
 
-(defn link-issue-to-selected-context! [*state]
-  (fetch-and-reset! *state (assoc @*state :cmd :link-issue-to-selected-context)))
+(defn link-item-to-selected-context! [*state]
+  (fetch-and-reset! *state (assoc @*state :cmd :link-item-to-selected-context)))
 
 (defn search! [*state]
   (fetch-and-reset! *state @*state))
@@ -211,11 +211,11 @@
 (defn cycle-search-mode! [*state]
   (fetch-and-reset-with-method! *state @*state api/cycle-search-mode))
 
-(defn enter-issue-view! [*state]
-  (swap! *state assoc :issue-view? true))
+(defn enter-item-view! [*state]
+  (swap! *state assoc :item-view? true))
 
-(defn exit-issue-view! [*state]
-  (swap! *state assoc :issue-view? false))
+(defn exit-item-view! [*state]
+  (swap! *state assoc :item-view? false))
 
-(defn fetch-issue-description! [*state issue]
-  (fetch-and-reset-with-method! *state @*state api/fetch-issue-description issue :dont-reset-preview-issue))
+(defn fetch-item-description! [*state item]
+  (fetch-and-reset-with-method! *state @*state api/fetch-item-description item :dont-reset-preview-item))

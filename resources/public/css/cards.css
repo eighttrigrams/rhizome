@@ -40,14 +40,14 @@ li.card img {
     top: 10px;
 }
 
-.issue-card-inner-right {
+.item-card-inner-right {
     display: inline-block;
     position: absolute;
     width: 75%;
     top: 17px;
 }
 
-li.card.simple-card .issue-card-inner-right {
+li.card.simple-card .item-card-inner-right {
     width: 98%;
 }
 
@@ -70,7 +70,7 @@ li.card span.title {
     
 }
 
-li.card.issue-card span.title {
+li.card.item-card span.title {
     position: absolute;
     top: -15px;
     font-size: 20px;
@@ -85,22 +85,22 @@ li.card.issue-card span.title {
     -webkit-box-orient: vertical;
 }
 
-li.card.issue-card span.title1 {
+li.card.item-card span.title1 {
     position: absolute;
     top: 5px;
 }
 
-li.card.issue-card span.contexts {
+li.card.item-card span.contexts {
     position: absolute;
     top: 117px;
     font-size: 12px;
 }
 
-li.card.issue-card.simple-card span.contexts {
+li.card.item-card.simple-card span.contexts {
     top: 62px;
 }
 
-li.card.issue-card span.info {
+li.card.item-card span.info {
     position: absolute;
     top: 64px;
 }

@@ -1,25 +1,25 @@
-(ns ui.modals.link-context-issue
+(ns ui.modals.link-context-item
   (:require [reagent.core :as r]
             api))
 
 (defn- get-component-el []
-  (.getElementById js/document "link-context-issue-component"))
+  (.getElementById js/document "link-context-item-component"))
 
 (def *selectable-contexts (r/atom {}))
 
-(defn component [issue]
+(defn component [item]
   (let [remove-context (fn [idx] #(swap! *selectable-contexts dissoc idx))] 
     
-    (reset! *selectable-contexts (:contexts (:data issue)))
+    (reset! *selectable-contexts (:contexts (:data item)))
     
     (r/create-class
      {:component-did-mount #(.focus (get-component-el))
       :reagent-render      ;
-      (fn [_selected-context _issue]
+      (fn [_selected-context _item]
         #_(prn @*selectable-contexts)
         [:<>
          [:h4 "Related contexts"]
-         [:div#link-context-issue-component
+         [:div#link-context-item-component
           {:tabIndex 0}
           (map 
            (fn [[idx {:keys [title annotation show-badge?]}]]

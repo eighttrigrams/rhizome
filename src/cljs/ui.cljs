@@ -5,7 +5,7 @@
             [ui.modals :as modals]
             [ui.main.rhs.modifiers :as modifiers]))
 
-(def original-state {:issues                          []
+(def original-state {:items                          []
                      :contexts                        []
                      :selected-context                nil
                      :active-search                   nil

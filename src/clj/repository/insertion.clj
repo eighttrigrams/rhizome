@@ -14,7 +14,7 @@
             [repository.insertion.takimag :as takimag]
             [repository.insertion.batch :as batch]))
 
-(defn- normal-issue-insertion 
+(defn- normal-item-insertion 
   [db 
    title 
    context-ids-set]
@@ -24,7 +24,7 @@
                        context-ids-set
                        nil))
 
-(defn insert-issue 
+(defn insert-item 
   [db 
    title 
    selected-context
@@ -54,4 +54,4 @@
           (takimag/match? title) 
           (takimag/ingest db title context-ids-set) 
           :else 
-          (normal-issue-insertion db title context-ids-set))))
+          (normal-item-insertion db title context-ids-set))))

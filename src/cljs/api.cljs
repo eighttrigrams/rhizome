@@ -9,9 +9,9 @@
 #_{:clj-kondo/ignore [:unresolved-symbol]}
 (defn-over-http list-resources :return-value {})
 
-(declare insert-issue)
+(declare insert-item)
 
-(defn-over-http insert-issue :return-value {})
+(defn-over-http insert-item :return-value {})
 
 (defn-over-http insert-context :return-value {})
 
@@ -23,9 +23,9 @@
 
 (defn-over-http deselect-secondary-contexts :return-value {})
 
-(defn-over-http finish-linking-issue :return-value {})
+(defn-over-http finish-linking-item :return-value {})
 
-(defn-over-http reprioritize-issue :return-value {})
+(defn-over-http reprioritize-item :return-value {})
 
 (defn-over-http cycle-search-mode :return-value {})
 
@@ -45,7 +45,7 @@
 
 (defn-over-http unlink-item :return-value {})
 
-(defn-over-http upgrade-issue-to-context :return-value {})
+(defn-over-http upgrade-item-to-context :return-value {})
 
 (defn-over-http link-selected-context-to-context :return-value {})
 
@@ -57,4 +57,4 @@
 
 (defn-over-http fetch-aggregated-contexts :return-value {})
 
-(defn-over-http fetch-issue-description :return-value {})
+(defn-over-http fetch-item-description :return-value {})

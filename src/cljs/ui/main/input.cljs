@@ -31,8 +31,8 @@
 (defn component [*state]
   [:<>
    [:div.active-search-input-container [input-component *state]]
-   (when (not (and (nil? (:selected-issue @*state))
+   (when (not (and (nil? (:selected-item @*state))
                    (:selected-context @*state)
-                   (= :issues (:active-search @*state))))
+                   (= :items (:active-search @*state))))
      [:div.mask.search-active
       {:on-click #(actions/quit-search! *state)}])])
