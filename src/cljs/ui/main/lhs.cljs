@@ -13,9 +13,10 @@
       [items-list-items/regular-items-list-item-component *state context nil nil {}]))])
 
 (defn- backlinks-component [*state {{:keys [contexts]} :data}]
-  (let [simple-items (filter 
-                      (fn [[_id data]]
-                        (not (:is-context? data)))
+  (let [simple-items (filter
+                      (fn [[id data]]
+                        (and (not (:is-context? data))
+                             (not ((set (map :id (:items @*state))) id))))
                       contexts)]
     (when (pos? (count simple-items))
      [:<>
