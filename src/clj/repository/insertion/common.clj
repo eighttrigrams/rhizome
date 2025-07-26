@@ -19,8 +19,9 @@
                                                             :from   [:items]
                                                             :where  [:in :items.id 
                                                                      [:inline (seq context-ids-set)]]}))
-                             (map (fn [{:items/keys [id short_title title]}]
+                             (map (fn [{:items/keys [id short_title title is_context]}]
                                     [id {:title (if (seq short_title) short_title title)
+                                         :is-context? is_context
                                          :show-badge? true}]))
                              (into {})))
         item    (datastore/update-item db 
