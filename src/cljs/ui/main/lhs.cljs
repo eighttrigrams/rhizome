@@ -18,7 +18,7 @@
                         (and (not (:is-context? data))
                              (not ((set (map :id (:items @*state))) id))))
                       contexts)]
-    (when (pos? (count simple-items))
+    (when (and (pos? (count simple-items)) (empty? (:q @*state)))
      [:<>
       [:h3 "Backlinks"]
       [:ul
@@ -56,7 +56,7 @@
           [context-detail/component *state]
           [:<>
            [backlinks-component *state (:selected-item @*state)]
-           [item-detail/preview-component (:selected-item @*state)]])]]
+           [item-detail/preview-component (dissoc (:selected-item @*state) :date)]])]]
       :else
       [:div.scrollable
        [contexts-list *state]])))
