@@ -32,7 +32,9 @@
       [:<>
        [:ul.cards [items-list-items/regular-items-list-item-component *state (:selected-item @*state) nil nil {}]]
        [:div.scrollable.card-shown.details-component
-        [context-detail/component *state]]]
+        (if (:is_context (:selected-item @*state))
+          [context-detail/component *state]
+          [item-detail/preview-component (:selected-item @*state)])]]
       :else
       [:div.scrollable
        [contexts-list *state]])))
