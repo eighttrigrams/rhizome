@@ -28,11 +28,8 @@
              :number
              [:span.badge.light
               {:key :number} number] 
-             (when (if-not (boolean? is-context?)
-                      show-badge?
-                      (and is-context?
-                           show-badge?))
-               [:span.badge {:key idx
+             (when (and is-context? show-badge?)
+               [:span.badge {:key      idx
                              :on-click (fn [e]
                                          (.stopPropagation e)
                                          (when-not (or (:link-context @*state)
