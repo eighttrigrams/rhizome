@@ -15,7 +15,8 @@
 (defn- backlinks-component [*state {{:keys [contexts]} :data}]
   (let [simple-items (filter
                       (fn [[id data]]
-                        (and (not (:is-context? data))
+                        (and (or (not (:is-context? data))
+                                 (not (:show-badge? data)))
                              (not ((set (map :id (:items @*state))) id))))
                       contexts)]
     (when (and (pos? (count simple-items)) (empty? (:q @*state)))
