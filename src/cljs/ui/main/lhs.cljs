@@ -12,14 +12,22 @@
       ^{:key (:id context)}
       [items-list-items/regular-items-list-item-component *state context nil nil {}]))])
 
-(defn- backlinks-component [*state {{:keys [contexts]} :data}]
+(defn- backlinks-component [*state {{:keys [contexts]
+                                     {current :current} :views} :data}]
   (let [simple-items (filter
                       (fn [[id data]]
                         (and (or (not (:is-context? data))
                                  (not (:show-badge? data)))
                              (not ((set (map :id (:items @*state))) id))))
                       contexts)]
-    (when (and (pos? (count simple-items)) (empty? (:q @*state)))
+    (when (and (pos? (count simple-items)) 
+               (empty? (:q @*state))
+               ;;
+               (empty? (:selected-secondary-contexts current))
+               (not (:secondary-contexts-inverted current))
+               (not (:secondary-contexts-unassigned-selected current))
+               (or (nil? (:search-mode current))
+                   (= 0 (:search-mode current))))
      [:<>
       [:h3 "Backlinks"]
       [:ul
@@ -53,11 +61,12 @@
       [:<>
        [:ul.cards [items-list-items/regular-items-list-item-component *state (:selected-item @*state) nil nil {}]]
        [:div.scrollable.card-shown.details-component
-        (if (:is_context (:selected-item @*state))
-          [context-detail/component *state]
-          [:<>
-           [backlinks-component *state (:selected-item @*state)]
-           [item-detail/preview-component (dissoc (:selected-item @*state) :date)]])]]
+        [:<>
+         [backlinks-component *state (:selected-item @*state)]
+         (if (:is_context (:selected-item @*state))
+           [context-detail/component *state]
+           [:<>
+            [item-detail/preview-component (dissoc (:selected-item @*state) :date)]])]]]
       :else
       [:div.scrollable
        [contexts-list *state]])))
