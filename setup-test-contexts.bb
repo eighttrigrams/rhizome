@@ -50,15 +50,18 @@
     
     (println (str "Created " (count all-contexts) " contexts successfully!"))))
 
-(defn main []
+(defn main [& args]
   (try
     (clear-database)
-    (setup-contexts)
-    (println "Test database setup complete!")
+    (if (and (seq args) (= (first args) "0"))
+      (println "Database cleared. No contexts created.")
+      (do
+        (setup-contexts)
+        (println "Test database setup complete!")))
     (catch Exception e
       (println "Error setting up test database:")
       (println (.getMessage e))
       (System/exit 1))))
 
 (when (= *file* (System/getProperty "babashka.file"))
-  (main))
+  (apply main *command-line-args*))
