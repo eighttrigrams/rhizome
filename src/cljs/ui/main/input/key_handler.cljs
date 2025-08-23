@@ -44,9 +44,9 @@
            (and (= :items active-search)
                 (not (:enter-pressed? @*state))
                 selected-item
+                (not link-item)
                 (or (and shift-pressed? (not alt-pressed?))
-                    (= 0 (count (:items @*state)))
-                    in-notes-mode?)
+                    (= 0 (count (:items @*state))))
                 (item-creation-permitted? @*state))
            (do
              (swap! *state assoc :enter-pressed? true)
