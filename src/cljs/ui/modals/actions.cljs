@@ -21,3 +21,15 @@
                                api/update-item
                                {:context        context
                                 :item-contexts item-contexts}))
+
+(defn discard-obsidian-and-close! [*state]
+  (fetch-and-reset-with-method! *state 
+                                (dissoc @*state :modal)
+                                api/discard-obsidian-changes))
+
+(defn sync-obsidian-and-close!
+  [*state item]
+  (fetch-and-reset-with-method! *state
+                               (dissoc @*state :modal)
+                               api/sync-obsidian-changes
+                               item))

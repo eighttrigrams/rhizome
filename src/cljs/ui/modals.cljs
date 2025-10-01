@@ -30,6 +30,8 @@
     (key-handler/handle-modal-keys *state 
                                    #(do {:id          (:id item) 
                                          :description (.-value (get-description-el))}))
+    :external-edit
+    (key-handler/handle-modal-keys *state #(do {:id (:id item)}))
     #()))
 
 (defn component [*state]
@@ -43,4 +45,11 @@
          [textarea-component item]
          :edit-context
          [:div#modal-component [item-edit/component item]]
+         :external-edit
+         [:div#modal-component
+          {:tabIndex 0
+           :autoFocus true}
+          [:h3 "Editing in Obsidian"]
+          [:p (str "Editing \"" (:title (:selected-item @*state)) "\" in Obsidian")]
+          [:p "Press ESC to discard changes, or Alt+9 to sync changes back"]]
          nil)])))

@@ -5,7 +5,8 @@
             [et.vp.ds.relations :as datastore.relations]
             [cambium.core :as log]
             [repository.insertion :as insertion]
-            [repository.deletion :as deletion]))
+            [repository.deletion :as deletion]
+            [opener]))
 
 (defn search-aggregated-contexts
   [db {{{:keys [highlighted-secondary-contexts]} :data} :selected-item
@@ -289,6 +290,48 @@
      (assoc state 
             :item-description (:description item)
             :ignore-item-description (or (nil? (:description item)) (not (seq (:description item))))))))
+
+(defn edit-item-in-obsidian [{:keys [db]}]
+  (fn [state item-ref]
+    (let [item (datastore/get-item db item-ref)
+          result (opener/create-obsidian-temp-file item)]
+      (if (:error result)
+        (assoc state :error (:error result))
+        (if (:file-already-exists? result)
+          ;; If file existed, don't show modal - just return current state
+          state
+          ;; If file didn't exist, show modal as usual
+          (assoc state :modal :external-edit))))))
+
+(defn- sync-from-obsidian [{:keys [db]} item-id]
+  (try
+    (when-let [description (opener/parse-obsidian-temp-file)]
+      (let [item (datastore/get-item db {:id item-id})]
+        (when item
+          (log/info (str "Synced changes from Obsidian for item" item-id "- saved:" (pr-str description)))
+          ;; Use the same update method as regular description updates
+          (datastore/update-context-description db {:id item-id :description description}))))
+    (catch Exception e
+      (log/error {:error-context :obsidian-sync} e "Failed to sync from Obsidian")
+      nil)))
+
+(defn sync-obsidian-changes [{:keys [db]}]
+  (fn [state arg] 
+    (log/info (str "Sync obsidian changes back" 1))
+    (let [item-id (:id arg)]
+      (sync-from-obsidian {:db db} item-id)
+      (opener/delete-obsidian-temp-file)
+      (let [fresh-item (datastore/get-item db {:id item-id})
+            new-state (-> state
+                          (dissoc :modal)
+                          (assoc :selected-item fresh-item))]
+        (log/info (str "Updated selected-item with:" (pr-str (:description fresh-item))))
+        new-state))))
+
+(defn discard-obsidian-changes [{:keys [_db]}]
+  (fn [state]
+    (opener/delete-obsidian-temp-file)
+    (dissoc state :modal)))
 
 (defn link-selected-context-to-context "link selected context as an item to a container"
   [{:keys [db]}]

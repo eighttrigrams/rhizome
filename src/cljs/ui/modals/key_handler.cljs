@@ -7,12 +7,20 @@
    (fn [code _ctrl-pressed? meta-pressed? alt-pressed? _shift-pressed? e]
      (let [{:keys [modal]} @*state]
        (cond (= "Escape" code)
-             (actions/cancel-modal! *state)
+             (cond (= :external-edit modal)
+                   (actions/discard-obsidian-and-close! *state)
+                   :else
+                   (actions/cancel-modal! *state))
              (and (= "Digit9" code) 
                   (or meta-pressed? alt-pressed?)
                   (= :description modal))
              (do (.preventDefault e)
-                 (actions/save-description-and-leave-open! *state (value-fn))))))))
+                 (actions/save-description-and-leave-open! *state (value-fn)))
+             (and (= "Digit9" code) 
+                  (or meta-pressed? alt-pressed?)
+                  (= :external-edit modal))
+             (do (.preventDefault e)
+                 (actions/sync-obsidian-and-close! *state (value-fn))))))))
 
 (defn handle-edit-keys [*state value-fn value-fn-2]
   (handle-keys*

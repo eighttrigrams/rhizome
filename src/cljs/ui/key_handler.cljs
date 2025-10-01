@@ -8,7 +8,8 @@
      (let [{:keys [selected-item
                    item-view?]} @*state]
        (cond (= "Escape" code)
-             (cond (and (:active-search @*state)
+             (cond
+                   (and (:active-search @*state)
                         (not alt-pressed?))
                    (actions/quit-search! *state)
                    (and (not alt-pressed?) item-view?)
@@ -53,7 +54,12 @@
                     selected-item)
                (actions/start-linking-context *state)
                (and selected-item
-                    (= "KeyD" code))
+                    (= "KeyD" code)
+                    alt-pressed?)
+               (actions/edit-item-in-obsidian! *state)
+               (and selected-item
+                    (= "KeyD" code)
+                    (not alt-pressed?))
                (swap! *state #(assoc % :modal :description :item-view? true))
                (and selected-item
                     (= "KeyS" code))

@@ -26,7 +26,11 @@
                                 deselect-context
                                 fetch-aggregated-contexts
                                 delete-context
-                                fetch-item-description]]))
+                                fetch-item-description
+                                edit-item-in-obsidian
+                                sync-obsidian-changes
+                                discard-obsidian-changes
+]]))
 
 (defn- handle-error [e]
   (log/error {:error-handler :handle-error} e "an error occured"))
@@ -58,4 +62,7 @@
   fetch-context
   deselect-context
   delete-context
-  fetch-item-description)
+  fetch-item-description
+  edit-item-in-obsidian
+  sync-obsidian-changes
+  discard-obsidian-changes)

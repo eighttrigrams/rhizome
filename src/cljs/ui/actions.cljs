@@ -219,3 +219,8 @@
 
 (defn fetch-item-description! [*state item]
   (fetch-and-reset-with-method! *state @*state api/fetch-item-description item :dont-reset-preview-item))
+
+(defn edit-item-in-obsidian! [*state]
+  (let [selected-item (:selected-item @*state)]
+    (when selected-item
+      (fetch-and-reset-with-method! *state @*state api/edit-item-in-obsidian selected-item))))
