@@ -6,6 +6,7 @@
 (defn get-title-el []
   (.getElementById js/document "search-input"))
 
+
 (defn- item-creation-permitted? 
   [{{{{{:keys [secondary-contexts-unassigned-selected
                search-mode]} :current} :views} :data} :selected-item}]

@@ -1,6 +1,6 @@
 (ns ui.modals
   (:require [reagent.core :as r]
-            [net.eighttrigrams.cljs-text-editor.editor :as editor]
+            [ui.codemirror :as codemirror]
             [ui.modals.key-handler :as key-handler]
             [ui.modals.item-edit :as item-edit]
             [ui.modals.link-context-item :as link-context-item]))
@@ -8,16 +8,20 @@
 (defn- get-description-el []
   (.getElementById js/document "description-editor"))
 
-(defn- textarea-component [_item]
-  (r/create-class
-   {:component-did-mount ;
-    #(let [el (get-description-el)]
-       (editor/create el {})
-       (.focus el))
-    :reagent-render (fn [item]
-                      [:textarea#description-editor
-                       {:defaultValue (:description item)
-                        :spellCheck false}])}))
+(defn- codemirror-component [item]
+  (let [*editor (r/atom nil)]
+    (r/create-class
+     {:component-did-mount
+      (fn []
+        (let [element (.getElementById js/document "description-editor")
+              editor (codemirror/create-editor element {:doc (:description item)
+                                                       :markdown? true
+                                                       :focus? true})]
+          (reset! *editor editor)))
+      
+      :reagent-render
+      (fn [_item]
+        [:div#description-editor])})))
 
 (defn- handle-keys [*state item]
   (case (:modal @*state)
@@ -29,7 +33,11 @@
     :description
     (key-handler/handle-modal-keys *state 
                                    #(do {:id          (:id item) 
-                                         :description (.-value (get-description-el))}))
+                                         :description (let [el (.getElementById js/document "description-editor")
+                                                           codemirror-view (.-__codemirror el)]
+                                                       (if codemirror-view
+                                                         (codemirror/get-editor-value codemirror-view)
+                                                         ""))}))
     :external-edit
     (key-handler/handle-modal-keys *state #(do {:id (:id item)}))
     #()))
@@ -42,7 +50,7 @@
         :on-click #(.stopPropagation %)}
        (case (:modal @*state)
          :description
-         [textarea-component item]
+         [codemirror-component item]
          :edit-context
          [:div#modal-component [item-edit/component item]]
          :external-edit
