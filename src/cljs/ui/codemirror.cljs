@@ -32,7 +32,7 @@
    #{"KeyL" #{:ctrl :shift}} commands/selectLineEnd
    
    ;; Delete operations
-   #{"Quote" #{:alt}}        commands/deleteGroupForward
+   #{"Equal" #{:alt}}        commands/deleteGroupForward
    #{"Equal" #{:meta}}       commands/deleteCharForward
    #{"Backspace" #{:ctrl}}   commands/deleteToLineStart
    #{"Equal" #{:ctrl}}       commands/deleteToLineEnd
@@ -84,32 +84,32 @@
                                                      :insert ""}})]
           (.dispatch view transaction))))))
 
-(defn custom-new-line-below [view]
-  "Insert a new line below current line and move cursor to it"
+(defn custom-new-line-below "Insert a new line below current line and move cursor to it"
+  [view]
   (let [state (.-state view)
         cursor (.. state -selection -main -head)
         line-info (.lineAt (.-doc state) cursor)
         line-end (.-to line-info)
         transaction (.update state
                              #js {:changes #js {:from line-end
-                                               :to line-end
-                                               :insert "\n"}
+                                                :to line-end
+                                                :insert "\n"}
                                   :selection #js {:anchor (inc line-end)
-                                                 :head (inc line-end)}})]
+                                                  :head (inc line-end)}})]
     (.dispatch view transaction)))
 
-(defn custom-new-line-above [view]
-  "Insert a new line above current line and move cursor to it"
+(defn custom-new-line-above "Insert a new line above current line and move cursor to it"
+  [view]
   (let [state (.-state view)
         cursor (.. state -selection -main -head)
         line-info (.lineAt (.-doc state) cursor)
         line-start (.-from line-info)
         transaction (.update state
                              #js {:changes #js {:from line-start
-                                               :to line-start
-                                               :insert "\n"}
+                                                :to line-start
+                                                :insert "\n"}
                                   :selection #js {:anchor line-start
-                                                 :head line-start}})]
+                                                  :head line-start}})]
     (.dispatch view transaction)))
 
 (defn get-modifiers "Extract modifier keys from event"
