@@ -88,7 +88,8 @@
   [view]
   (let [state (.-state view)
         cursor (.. state -selection -main -head)
-        line-info (.lineAt (.-doc state) cursor)
+        doc (.-doc state)
+        line-info (.lineAt ^js doc cursor)
         line-end (.-to line-info)
         transaction (.update state
                              #js {:changes #js {:from line-end
@@ -102,7 +103,8 @@
   [view]
   (let [state (.-state view)
         cursor (.. state -selection -main -head)
-        line-info (.lineAt (.-doc state) cursor)
+        doc (.-doc state)
+        line-info (.lineAt ^js doc cursor)
         line-start (.-from line-info)
         transaction (.update state
                              #js {:changes #js {:from line-start
@@ -148,7 +150,8 @@
                        :parent element})]
     
     ;; Store reference for later access
-    (aset element "__codemirror" view)
+    (aset 
+     element "__codemirror" view)
     
     ;; Add cljs-text-editor-style keydown handler that prevents ALL defaults
     (.addEventListener element "keydown" 
@@ -161,6 +164,7 @@
                           ;; Only prevent default for our custom commands
                           (if command
                             (do
+                              
                               (.preventDefault e)
                               (.stopPropagation e)
                               (js/console.log "Executing command for key:" (str key))
@@ -176,6 +180,7 @@
                             ;; For non-custom keys, allow normal behavior
                             true)))
                       true)
+    
     
     ;; Focus if requested
     (when (:focus? config)
