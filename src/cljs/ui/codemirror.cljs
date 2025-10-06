@@ -7,7 +7,8 @@
 
 ;; Direct key to command mapping
 (def key-commands
-  {#{"KeyJ" #{:meta}}        commands/cursorCharLeft
+  {;; Basic movement
+   #{"KeyJ" #{:meta}}        commands/cursorCharLeft
    #{"KeyL" #{:meta}}        commands/cursorCharRight
    #{"KeyI" #{:meta}}        commands/cursorLineUp
    #{"KeyK" #{:meta}}        commands/cursorLineDown
@@ -17,6 +18,8 @@
    #{"KeyK" #{:alt}}         commands/cursorLineDown
    #{"KeyJ" #{:ctrl}}        commands/cursorLineStart
    #{"KeyL" #{:ctrl}}        commands/cursorLineEnd
+   
+   ;; Selection variants
    #{"KeyJ" #{:meta :shift}} commands/selectCharLeft
    #{"KeyL" #{:meta :shift}} commands/selectCharRight
    #{"KeyI" #{:meta :shift}} commands/selectLineUp
@@ -26,7 +29,88 @@
    #{"KeyI" #{:alt :shift}}  commands/selectLineUp
    #{"KeyK" #{:alt :shift}}  commands/selectLineDown
    #{"KeyJ" #{:ctrl :shift}} commands/selectLineStart
-   #{"KeyL" #{:ctrl :shift}} commands/selectLineEnd})
+   #{"KeyL" #{:ctrl :shift}} commands/selectLineEnd
+   
+   ;; Delete operations
+   #{"Quote" #{:alt}}        commands/deleteGroupForward
+   #{"Equal" #{:meta}}       commands/deleteCharForward
+   #{"Backspace" #{:ctrl}}   commands/deleteToLineStart
+   #{"Equal" #{:ctrl}}       commands/deleteToLineEnd
+   #{"Equal" #{:ctrl :meta}} commands/deleteLine
+   
+   ;; Line operations  
+   #{"Enter" #{:shift}}      :custom-new-line-below
+   #{"Enter" #{:meta}}       :custom-new-line-above
+   #{"KeyI" #{:ctrl :meta}}  commands/moveLineUp
+   #{"KeyK" #{:ctrl :meta}}  commands/moveLineDown
+   
+   ;; Select all
+   #{"KeyA" #{:alt}}         commands/selectAll
+   
+   ;; Undo/Redo
+   #{"Backquote" #{:alt}}    commands/undo
+   #{"Backquote" #{:shift}}  commands/redo
+   
+   ;; Clipboard operations (custom implementations)
+   #{"KeyC" #{:alt}}         :custom-copy
+   #{"KeyV" #{:alt}}         :custom-paste
+   #{"KeyX" #{:alt}}         :custom-cut})
+
+;; Custom clipboard operations
+(defn custom-copy [view]
+  (let [selection (.. view -state -selection -main)]
+    (when-not (= (.-from selection) (.-to selection))
+      (let [text (.. view -state -doc (slice (.-from selection) (.-to selection)))]
+        (.writeText js/navigator.clipboard text)))))
+
+(defn custom-paste [view]
+  (.then (.readText js/navigator.clipboard)
+         (fn [text]
+           (let [selection (.. view -state -selection -main)
+                 transaction (.update (.-state view)
+                                     #js {:changes #js {:from (.-from selection)
+                                                       :to (.-to selection)
+                                                       :insert text}})]
+             (.dispatch view transaction)))))
+
+(defn custom-cut [view]
+  (let [selection (.. view -state -selection -main)]
+    (when-not (= (.-from selection) (.-to selection))
+      (let [text (.. view -state -doc (slice (.-from selection) (.-to selection)))]
+        (.writeText js/navigator.clipboard text)
+        (let [transaction (.update (.-state view)
+                                   #js {:changes #js {:from (.-from selection)
+                                                     :to (.-to selection)
+                                                     :insert ""}})]
+          (.dispatch view transaction))))))
+
+(defn custom-new-line-below [view]
+  "Insert a new line below current line and move cursor to it"
+  (let [state (.-state view)
+        cursor (.. state -selection -main -head)
+        line-info (.lineAt (.-doc state) cursor)
+        line-end (.-to line-info)
+        transaction (.update state
+                             #js {:changes #js {:from line-end
+                                               :to line-end
+                                               :insert "\n"}
+                                  :selection #js {:anchor (inc line-end)
+                                                 :head (inc line-end)}})]
+    (.dispatch view transaction)))
+
+(defn custom-new-line-above [view]
+  "Insert a new line above current line and move cursor to it"
+  (let [state (.-state view)
+        cursor (.. state -selection -main -head)
+        line-info (.lineAt (.-doc state) cursor)
+        line-start (.-from line-info)
+        transaction (.update state
+                             #js {:changes #js {:from line-start
+                                               :to line-start
+                                               :insert "\n"}
+                                  :selection #js {:anchor line-start
+                                                 :head line-start}})]
+    (.dispatch view transaction)))
 
 (defn get-modifiers "Extract modifier keys from event"
   [e]
@@ -80,7 +164,15 @@
                               (.preventDefault e)
                               (.stopPropagation e)
                               (js/console.log "Executing command for key:" (str key))
-                              (command view))
+                              ;; Handle both function commands and custom keywords
+                              (cond
+                                (= command :custom-copy) (custom-copy view)
+                                (= command :custom-paste) (custom-paste view)
+                                (= command :custom-cut) (custom-cut view)
+                                (= command :custom-new-line-below) (custom-new-line-below view)
+                                (= command :custom-new-line-above) (custom-new-line-above view)
+                                (fn? command) (command view)
+                                :else (js/console.warn "Unknown command:" command)))
                             ;; For non-custom keys, allow normal behavior
                             true)))
                       true)
