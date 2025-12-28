@@ -14,6 +14,12 @@ $2 npx shadow-cljs watch app # Frontend
 
 Visit `localhost:8020`
 
+## Tests
+
+```clojure
+$ clj -X:test
+```
+
 ## REPL Workflow (Server)
 
 Instead of starting the server with `./dev.sh`, begin with

@@ -40,3 +40,4 @@ hooks.log
 !.clj-kondo/config.edn
 !.clj-kondo/hooks/
 !.clj-kondo/hooks/*
+test_config.edn
