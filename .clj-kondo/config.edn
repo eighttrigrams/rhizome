@@ -1,0 +1,6 @@
+{:lint-as {mount.core/defstate clojure.core/def
+            net.eighttrigrams.defn-over-http.core/defdispatch clojure.core/def
+            cambium.core/deflevel clojure.core/defmacro}
+ :linters {:unresolved-symbol {:exclude [(server http-server)]}
+           :unused-private-var {:exclude [server/http-server]}}
+ :hooks {:analyze-call {cambium.core/deflevel hooks.cambium/deflevel}}}

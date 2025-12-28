@@ -1,0 +1,26 @@
+<configuration>
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <!-- encoders are assigned the type
+         ch.qos.logback.classic.encoder.PatternLayoutEncoder by default -->
+    <encoder>
+      <pattern>%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg - MDC{ %mdc } %n</pattern>
+      <!-- <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg { %mdc }%n</pattern> -->
+    </encoder>
+  </appender>
+  <appender name="ROLLING" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>tracker.log</file>
+    <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+      <fileNamePattern>tracker-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+       <maxFileSize>1MB</maxFileSize>    
+       <maxHistory>1</maxHistory>
+       <totalSizeCap>2MB</totalSizeCap>
+    </rollingPolicy>
+    <encoder>
+      <pattern>%msg%n</pattern>
+    </encoder>
+  </appender>
+  <root level="info">
+    <appender-ref ref="STDOUT" />
+    <appender-ref ref="ROLLING" />
+  </root>
+</configuration>

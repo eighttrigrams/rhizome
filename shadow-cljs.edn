@@ -1,0 +1,25 @@
+{:source-paths
+ ["src/cljs"
+  "src/cljs"]
+
+ :dependencies
+ [[cljs-ajax "0.7.5"]
+  [cheshire "5.11.0"]
+  [reagent "1.1.1"]
+  [net.eighttrigrams/defn-over-http "0.1.15"]
+  [net.eighttrigrams/cljs-text-editor "0.0.16"]]
+ 
+ :dev-http
+ {8020 {:root      "resources/public"
+        :proxy-url "http://localhost:3006"}}
+
+ :builds
+ {:app
+  {:target :browser
+   :output-dir "resources/public/js"
+   :asset-path "/js"
+
+   :modules
+   {:main ; becomes resources/public/js/main.js
+    {:init-fn browser/init}}}}}
+

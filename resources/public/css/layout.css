@@ -1,0 +1,47 @@
+html, body {
+    position: absolute !important;
+    width: 100% !important;
+    height: 100% !important;
+    overflow: hidden !important;
+    display: unset !important;
+    flex-direction: unset !important;
+    margin: 0;
+}
+
+#app {
+    background-color: rgb(30, 28, 28);
+    width: 100%;
+    height: 100vh;
+    position: absolute;
+}
+
+#sides-container {
+    position: relative;
+    width: 1440px;
+    margin: auto;
+    height: 100vh;
+    /* background-color:rgb(61, 14, 14); */
+    /* background-color: rgb(69, 56, 56); */
+    background-color: rgb(136, 131, 131);
+    color: #cbc9b5;
+}
+
+#lhs-component {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 720px;
+    height: 100vh;
+}
+
+#rhs-component {
+    position: absolute;
+    left: 720px;
+    top: 0;
+    height: 100vh;
+    width: 720px;
+}
+
+#search-input {
+    width: 720px;
+}

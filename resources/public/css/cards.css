@@ -1,0 +1,121 @@
+li.card {
+    position: relative;
+    /* background-color: rgb(102, 15, 69); */
+    background-color: rgb(54, 34, 46);
+    height: 151px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    padding: 15px;
+    padding-left: 10px;
+}
+
+li.card.simple-card {
+    height: 92px;
+}
+
+li.card .relation-annotation {
+    position: absolute;
+    color: brown;
+    top: 1px;
+}
+
+li.card .img-container {
+    position: relative;
+    width: 148px;
+    height: 132px;
+    display: inline-block;
+}
+
+li.card img {
+    border-radius: 3px;
+    max-width: 132px;
+    background-color: rgb(28, 16, 23);
+    max-height: 132px;
+    width: auto;
+    height: auto !important;
+    display: inline-block;
+    margin-right: 10px;
+    position: relative;
+    left: 1px;
+    top: 10px;
+}
+
+.item-card-inner-right {
+    display: inline-block;
+    position: absolute;
+    width: 75%;
+    top: 17px;
+}
+
+li.card.simple-card .item-card-inner-right {
+    width: 98%;
+}
+
+.scrollable.search-active li.card {
+    z-index: 1005;
+}
+
+li.card.selected {
+    background-color:rgb(148, 76, 123);
+}
+
+.important {
+    font-weight: bold;
+    color: #d1aabc;
+}
+
+li.card span.title {
+    position: relative;
+    top: -20px;
+    
+}
+
+li.card.item-card span.title {
+    position: absolute;
+    top: -15px;
+    font-size: 20px;
+    line-height: 1.1;
+    
+    /* https://stackoverflow.com/a/13924997 */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2; /* number of lines to show */
+            line-clamp: 2; 
+    -webkit-box-orient: vertical;
+}
+
+li.card.item-card span.title1 {
+    position: absolute;
+    top: 5px;
+}
+
+li.card.item-card span.contexts {
+    position: absolute;
+    top: 117px;
+    font-size: 12px;
+}
+
+li.card.item-card.simple-card span.contexts {
+    top: 62px;
+}
+
+li.card.item-card span.info {
+    position: absolute;
+    top: 64px;
+}
+
+span.badge {
+    background-color: wheat;
+    color: #4c2e3c;
+    border-radius: 3px;
+    padding: 3px;
+    line-height: 1.8;
+    margin-right: 3px;
+    position: relative;
+    top: -4px;
+}
+
+span.badge.light {
+    background-color: #d4f6b9;
+}
