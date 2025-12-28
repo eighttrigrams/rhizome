@@ -1,4 +1,4 @@
-# Tracker
+# Rhizome
 
 An item tracking system.
 
