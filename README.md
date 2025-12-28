@@ -1,6 +1,6 @@
 # Rhizome
 
-An item tracking system.
+For the whitepaper, see here: [*Rhizome - A "total recall" note-taking and content-management and -archival system for Superhuman Memory [Whitepaper]*](https://eighttrigrams.substack.com/p/superhuman-memory)
 
 ## Getting started
 
