@@ -1,6 +1,5 @@
 (ns et.vp.ds.search.core
-  (:require [et.vp.ds.search.core :as core]
-            [honey.sql :as sql]
+  (:require [honey.sql :as sql]
             [clojure.string :as str]))
 
 (def select
@@ -107,7 +106,7 @@
    {:keys [selected-item-id join-ids search-mode unassigned-mode? inverted-mode? description-filter]
     :as _opts} {:keys [limit] :as _ctx}]
   (let [or-mode? (when join-ids inverted-mode?)]
-    (-> (merge {:select (vec (concat core/select [:relations.annotation]))
+    (-> (merge {:select (vec (concat select [:relations.annotation]))
                 :from :items
                 :where [:and
                         (when (or join-ids unassigned-mode?)

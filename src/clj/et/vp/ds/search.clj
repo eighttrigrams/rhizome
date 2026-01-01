@@ -3,8 +3,7 @@
             [next.jdbc :as jdbc]
             [honey.sql :as sql]
             [et.vp.ds.search.core :as core]
-            [et.vp.ds.helpers :refer [un-namespace-keys post-process-base] :as helpers]
-            [et.vp.ds.search :as search]))
+            [et.vp.ds.helpers :refer [un-namespace-keys post-process-base] :as helpers]))
 
 (defn- post-process
   [result]
