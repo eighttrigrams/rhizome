@@ -1,6 +1,7 @@
 (ns et.vp.ds.search.core
   (:require [honey.sql :as sql]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [datastore.dialect :as dialect]))
 
 (def select
   [:items.title :items.short_title :items.sort_idx :items.id :items.data
@@ -35,7 +36,11 @@
 (defn get-search-clause
   [q]
   (when-not (= "" (or q ""))
-    [:raw (format "searchable @@ to_tsquery('simple', '%s')" (convert-q-to-query-string q))]))
+    (if (dialect/sqlite?)
+      (let [pattern (str "%" (str/replace (or q "") #"[%_]" "") "%")]
+        [:or [:like :items.title [:inline pattern]] [:like :items.short_title [:inline pattern]]
+         [:like :items.tags [:inline pattern]]])
+      [:raw (format "searchable @@ to_tsquery('simple', '%s')" (convert-q-to-query-string q))])))
 
 (defn search-items
   [q {:keys [selected-item-id all-items? link-context link-item] :as _opts}

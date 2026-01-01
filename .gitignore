@@ -11,6 +11,7 @@ resources/public/js/manifest.edn
 target
 server.jar
 config.edn
+config.edn.bkp
 tracker.log
 tracker-*.log*
 *.jks
@@ -41,3 +42,4 @@ hooks.log
 !.clj-kondo/hooks/
 !.clj-kondo/hooks/*
 test_config.edn
+rhizome.db

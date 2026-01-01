@@ -2,7 +2,8 @@
   (:require [next.jdbc :as jdbc]
             [honey.sql :as sql]
             [cambium.core :as log]
-            [cheshire.core :as json]))
+            [cheshire.core :as json]
+            [datastore.dialect :as dialect]))
 
 (defn- get-title
   [container]
@@ -17,7 +18,7 @@
                                                           :where [:= :id [:inline item-id]]})
                                              {:return-keys true}))
         data (cond (nil? data) {}
-                   :else (json/parse-string (.getValue data)))
+                   :else (json/parse-string (dialect/parse-json-value data)))
         data (if (get data "contexts") data (assoc data "contexts" {}))
         contexts (dissoc (into {}
                                (map (fn [{:items/keys [id title short_title is_context]}]
@@ -53,7 +54,7 @@
                                                           :where [:= :id [:inline item-id]]})
                                              {:return-keys true}))
         data (cond (nil? data) {}
-                   :else (json/parse-string (.getValue data)))
+                   :else (json/parse-string (dialect/parse-json-value data)))
         data (if (get data "contexts") data (assoc data "contexts" {}))
         data (update data
                      "contexts"

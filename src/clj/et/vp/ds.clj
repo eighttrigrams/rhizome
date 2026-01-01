@@ -4,7 +4,8 @@
             [cheshire.core :as json]
             [cambium.core :as log]
             [et.vp.ds.relations :as datastore.relations]
-            [et.vp.ds.helpers :refer [un-namespace-keys post-process-base] :as helpers]))
+            [et.vp.ds.helpers :refer [un-namespace-keys post-process-base] :as helpers]
+            [datastore.dialect :as dialect]))
 
 (defn delete-date
   [db item-id]
@@ -21,7 +22,8 @@
 (defn- update-contexts
   [item]
   (let [m (if (:relations_id item)
-            (zipmap (.getArray (:relations_id item)) (.getArray (:relations_annotation item)))
+            (zipmap (dialect/parse-array-result (:relations_id item))
+                    (dialect/parse-array-result (:relations_annotation item)))
             {})]
     (-> item
         (update-in [:data :contexts]
@@ -62,8 +64,8 @@
                              (sql/format {:update [:items]
                                           :where [:= :id [:inline id]]
                                           :set {:is_context (not is_context)
-                                                :updated_at_ctx [:raw "NOW()"]
-                                                :updated_at [:raw "NOW()"]}})
+                                                :updated_at_ctx (dialect/now-sql)
+                                                :updated_at (dialect/now-sql)}})
                              {:return-keys true})
           (log/info "Update all items that have this item in their contexts")
           (let [related-items (jdbc/execute! db
@@ -100,8 +102,13 @@
 
 (defn- basic-items-query
   [id]
-  {:select [:items.* [[:array_agg :relations.owner_id] :relations_id]
-            [[:array_agg :relations.annotation] :relations_annotation]]
+  {:select (vec (concat [:items.*]
+                        [(if (dialect/sqlite?)
+                           [[:raw "GROUP_CONCAT(relations.owner_id)"] :relations_id]
+                           [[:array_agg :relations.owner_id] :relations_id])]
+                        [(if (dialect/sqlite?)
+                           [[:raw "GROUP_CONCAT(relations.annotation)"] :relations_annotation]
+                           [[:array_agg :relations.annotation] :relations_annotation])]))
    :from [:items]
    :join [:relations [:= :items.id :relations.target_id]]
    :where [:= :items.id [:inline id]]
@@ -294,7 +301,7 @@
     (jdbc/execute-one! db
                        (sql/format {:update [:items]
                                     :set {:description [:inline description]
-                                          :updated_at_ctx [:raw "NOW()"]}
+                                          :updated_at_ctx (dialect/now-sql)}
                                     :where [:= :id [:inline id]]})
                        {:return-keys true})
     (get-item db {:id id})))
@@ -356,14 +363,15 @@
   [db {:keys [id]}]
   (jdbc/execute! db
                  (sql/format {:update [:items]
-                              :set {:updated_at_ctx [:raw "NOW()"]}
+                              :set {:updated_at_ctx (dialect/now-sql)}
                               :where [:= :id [:inline id]]})))
 
 (defn reprioritize-item
   [db {:keys [id]}]
-  (jdbc/execute!
-    db
-    (sql/format {:update [:items] :set {:updated_at [:raw "NOW()"]} :where [:= :id [:inline id]]})))
+  (jdbc/execute! db
+                 (sql/format {:update [:items]
+                              :set {:updated_at (dialect/now-sql)}
+                              :where [:= :id [:inline id]]})))
 
 (defn- create-new-item!
   ([db title short_title] (create-new-item! db title short_title nil))

@@ -1,65 +1,92 @@
 #!/usr/bin/env bb
 
-(require '[babashka.pods :as pods])
-(pods/load-pod 'org.babashka/postgresql "0.1.0")
-(require '[pod.babashka.postgresql :as pg])
+(require '[babashka.pods :as pods]
+         '[babashka.process :refer [shell]]
+         '[clojure.edn :as edn])
 
-(def db {:dbtype   "postgresql"
-         :dbname   "cometoid_dev"
-         :user     "daniel"
-         :password "abcdef"
-         :port     5437
-         :hostname "127.0.0.1"})
+(def config (edn/read-string (slurp "./config.edn")))
+(def db-config (:db config))
+(def sqlite? (= "sqlite" (:dbtype db-config)))
+
+(when-not sqlite?
+  (pods/load-pod 'org.babashka/postgresql "0.1.0")
+  (require '[pod.babashka.postgresql :as pg]))
+
+(def pg-db
+  {:dbtype   "postgresql"
+   :dbname   (:dbname db-config)
+   :user     (:user db-config)
+   :password (:password db-config)
+   :port     (:port db-config)
+   :hostname (:hostname db-config)})
+
+(defn sqlite-exec! [sql & params]
+  (let [full-sql (if (seq params)
+                   (reduce (fn [s p] (clojure.string/replace-first s "?" (str "'" p "'"))) sql params)
+                   sql)]
+    (shell {:out :string :err :string} "sqlite3" (:dbname db-config) full-sql)))
+
+(defn pg-execute! [sql]
+  ((resolve 'pod.babashka.postgresql/execute!) pg-db sql))
+
+(defn pg-execute-one! [sql]
+  ((resolve 'pod.babashka.postgresql/execute-one!) pg-db sql))
 
 (defn clear-database []
-  (println "Clearing test database...")
-  (pg/execute! db ["DELETE FROM relations WHERE target_id > 0 OR owner_id > 0"])
-  (pg/execute! db ["DELETE FROM items WHERE id > 0"]))
+  (println "Clearing database...")
+  (if sqlite?
+    (do
+      (sqlite-exec! "DELETE FROM relations WHERE target_id > 0 OR owner_id > 0;")
+      (sqlite-exec! "DELETE FROM items WHERE id > 0;"))
+    (do
+      (pg-execute! ["DELETE FROM relations WHERE target_id > 0 OR owner_id > 0"])
+      (pg-execute! ["DELETE FROM items WHERE id > 0"]))))
 
 (defn create-context [title]
-  (let [result (pg/execute-one! db 
-                                ["INSERT INTO items (title, short_title, data, is_context, inserted_at, updated_at, updated_at_ctx) VALUES (?, '', '{}', true, NOW(), NOW(), NOW()) RETURNING id, title"
-                                 title])]
-    (println "Created context:" title "with id" (:items/id result))
-    (:items/id result)))
+  (if sqlite?
+    (do
+      (sqlite-exec! (str "INSERT INTO items (title, short_title, data, is_context, inserted_at, updated_at, updated_at_ctx) "
+                         "VALUES (?, '', '{}', 1, datetime('now'), datetime('now'), datetime('now'));")
+                    title)
+      (let [result (sqlite-exec! "SELECT last_insert_rowid();")
+            id (-> (:out result) clojure.string/trim Integer/parseInt)]
+        (println "Created context:" title "with id" id)
+        id))
+    (let [result (pg-execute-one! [(str "INSERT INTO items (title, short_title, data, is_context, inserted_at, updated_at, updated_at_ctx) "
+                                        "VALUES (?, '', '{}', true, NOW(), NOW(), NOW()) RETURNING id, title")
+                                   title])
+          id (:items/id result)]
+      (println "Created context:" title "with id" id)
+      id)))
+
+(def all-contexts
+  ["Imports"
+   "Files" "Documents" "Audio" "Video" "Image"
+   "MP3s" "OGGs" "M4As" "WAVs" "MP4s" "FLVs" "MOVs"
+   "PDFs" "TIFFs" "JPEGs" "PNGs" "WEBPs"
+   "YouTube" "Substack" "GitHub" "Apple Podcasts" "Twitter"
+   "YouTube Videos" "YouTube Channels" "Substacks" "Articles"
+   "Podcast Episodes" "Podcasts" "GitHub Repo" "GitHub User"
+   "Twitter Handles" "Poasts" "Library" "Video"
+   "2020" "2021" "2022" "2023" "2024" "2025"])
 
 (defn setup-contexts []
   (println "Setting up required contexts...")
-  (let [;; Basic file type contexts
-        files-contexts ["Files" "Documents" "Audio" "Video" "Image" 
-                       "MP3s" "OGGs" "M4As" "WAVs" "MP4s" "FLVs" "MOVs"
-                       "PDFs" "TIFFs" "JPEGs" "PNGs" "WEBPs"]
-        
-        ;; Platform contexts
-        platform-contexts ["YouTube" "Substack" "GitHub" "Apple Podcasts" "Twitter"]
-        
-        ;; Content type contexts  
-        content-contexts ["YouTube Videos" "YouTube Channels" "Substacks" "Articles" 
-                         "Podcast Episodes" "Podcasts" "GitHub Repo" "GitHub User"
-                         "Twitter Handles" "Poasts" "Library" "Video"]
-        
-        ;; Year contexts (common years)
-        year-contexts ["2020" "2021" "2022" "2023" "2024" "2025"]
-        
-        ;; All contexts to create
-        all-contexts (concat ["Imports"]
-                             files-contexts platform-contexts content-contexts year-contexts)]
-    
-    (doseq [context all-contexts]
-      (create-context context))
-    
-    (println (str "Created " (count all-contexts) " contexts successfully!"))))
+  (doseq [context all-contexts]
+    (create-context context))
+  (println (str "Created " (count all-contexts) " contexts successfully!")))
 
 (defn main [& args]
   (try
+    (println (str "Using " (if sqlite? "SQLite" "PostgreSQL") " database: " (:dbname db-config)))
     (clear-database)
     (if (and (seq args) (= (first args) "0"))
       (println "Database cleared. No contexts created.")
       (do
         (setup-contexts)
-        (println "Test database setup complete!")))
+        (println "Database setup complete!")))
     (catch Exception e
-      (println "Error setting up test database:")
+      (println "Error setting up database:")
       (println (.getMessage e))
       (System/exit 1))))
 

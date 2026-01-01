@@ -1,6 +1,7 @@
 (ns et.vp.ds.helpers
   (:require [cheshire.core :as json]
-            [tick.core :as t]))
+            [tick.core :as t]
+            [datastore.dialect :as dialect]))
 
 (defn namespace-keys
   [ns-str m]
@@ -20,7 +21,9 @@
 
 (defn- parse-data
   [context]
-  (if (:data context) (update context :data #(json/parse-string (.toString %) true)) context))
+  (if (:data context)
+    (update context :data #(json/parse-string (dialect/parse-json-value %) true))
+    context))
 
 (defn post-process-base
   [query-result]
