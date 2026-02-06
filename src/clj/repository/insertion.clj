@@ -27,7 +27,7 @@
           (apple-pods/match? title) (apple-pods/ingest db title context-ids-set nil)
           (substack/match? title) ((substack/make:save-article false) db title context-ids-set)
           (substack-external/match? title)
-            (substack-external/save-article db title context-ids-set nil)
+            (substack-external/save-article db title context-ids-set)
           (substack-plain/match? title) (substack-plain/save-article db title context-ids-set)
           (substack-note/match? title) (substack-note/ingest db title context-ids-set)
           (twitter-tweet/match? title) (twitter-tweet/ingest db title context-ids-set nil)
