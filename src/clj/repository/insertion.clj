@@ -30,6 +30,6 @@
             (substack-external/save-article db title context-ids-set)
           (substack-plain/match? title) (substack-plain/save-article db title context-ids-set)
           (substack-note/match? title) (substack-note/ingest db title context-ids-set)
-          (twitter-tweet/match? title) (twitter-tweet/ingest db title context-ids-set nil)
+          (twitter-tweet/match? title) (twitter-tweet/ingest db title context-ids-set)
           (website/match? title) (website/ingest db title context-ids-set nil)
           :else (normal-item-insertion db title context-ids-set))))
