@@ -236,13 +236,13 @@
                         (if (:previously-existing-item? item)
                           (do (log/info log-data "Item already exists - no insertion.")
                               ((fetch-context {:db db}) state [item true]))
-                          (let [new-selected-item (datastore/get-item db item)]
-                            (log/info log-data "Inserted item")
-                            {:items (search-related-items db "" new-selected-item)
-                             :selected-item new-selected-item
-                             :q nil
-                             :aggregated-contexts '()
-                             :item-descriptions nil}))))
+                          (do (log/info log-data "Inserted item")
+                              {:items (search-related-items db "" selected-item)
+                               :selected-item selected-item
+                               :item-view? false
+                               :q nil
+                               :aggregated-contexts '()
+                               :item-descriptions nil}))))
                {:items (search-related-items db (:q state) selected-item)})))))
 
 (defn fetch-item-description
