@@ -51,4 +51,5 @@
                (log/error
                  (str "problem while trying to create preview image for substack note. message"
                       (.getMessage e))))))
-      (datastore/insert-date db (:id item) date))))
+      (datastore/insert-date db (:id item) date)
+      item)))

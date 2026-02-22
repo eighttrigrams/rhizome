@@ -43,4 +43,5 @@
                (catch Exception e
                  (log/error
                    (str "problem while trying to create preview image for substack article. message"
-                        (.getMessage e))))))))))
+                        (.getMessage e))))))
+        item))))
