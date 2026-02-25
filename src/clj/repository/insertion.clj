@@ -11,6 +11,7 @@
             [repository.insertion.github :as github]
             #_[repository.insertion.file :as file]
             [repository.insertion.batch :as batch]
+            [repository.insertion.simonwillison :as simonwillison]
             [repository.insertion.website :as website]))
 
 (defn- normal-item-insertion
@@ -31,5 +32,6 @@
           (substack-plain/match? title) (substack-plain/save-article db title context-ids-set)
           (substack-note/match? title) (substack-note/ingest db title context-ids-set)
           (twitter-tweet/match? title) (twitter-tweet/ingest db title context-ids-set)
+          (simonwillison/match? title) (simonwillison/ingest db title context-ids-set nil)
           (website/match? title) (website/ingest db title context-ids-set nil)
           :else (normal-item-insertion db title context-ids-set))))
