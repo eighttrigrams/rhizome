@@ -20,8 +20,7 @@
 
 (defn ingest
   [db url context-ids-set _]
-  (let [existing-item
-          (datastore/get-item-by-path db "data->'resource-links'->>'simonwillison-article'" url)]
+  (let [existing-item (datastore/get-item-by-path db "data->'resource-links'->>'webpage-url'" url)]
     (if (:id existing-item)
       (assoc (datastore/get-item db existing-item) :previously-existing-item? true)
       (let [{:keys [title date year image]} (scraper/get-post url)
@@ -31,11 +30,7 @@
             websites-id (common/get-item-or-throw-error db "Websites")
             website-id (get-or-create-website db websites-id)
             context-ids-set (conj context-ids-set articles-id year-id website-id)
-            item (common/insert-item db
-                                     (or title url)
-                                     ""
-                                     context-ids-set
-                                     {:simonwillison-article url})]
+            item (common/insert-item db (or title url) "" context-ids-set {:webpage-url url})]
         (when date
           (try (datastore/insert-date db (:id item) date)
                (catch Exception e
