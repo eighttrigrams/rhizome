@@ -5,7 +5,18 @@
             [scrapers.simonwillison :as scraper]
             upload))
 
+(def ^:private domain-url "https://simonwillison.net")
+
 (defn match? [title] (re-matches #"https://simonwillison\.net/.*" title))
+
+(defn- get-or-create-website
+  [db websites-id]
+  (let [website-id
+          (:id (datastore/get-item-by-path db "data->'resource-links'->>'website-url'" domain-url))]
+    (or
+      website-id
+      (:id
+        (common/insert-item db "simonwillison.net" "" #{websites-id} {:website-url domain-url})))))
 
 (defn ingest
   [db url context-ids-set _]
@@ -17,7 +28,9 @@
             year (or year (str (.getValue (java.time.Year/now))))
             articles-id (common/get-item-or-throw-error db "Articles")
             year-id (common/get-item-or-throw-error db year)
-            context-ids-set (conj context-ids-set articles-id year-id)
+            websites-id (common/get-item-or-throw-error db "Websites")
+            website-id (get-or-create-website db websites-id)
+            context-ids-set (conj context-ids-set articles-id year-id website-id)
             item (common/insert-item db
                                      (or title url)
                                      ""
