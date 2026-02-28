@@ -4,6 +4,7 @@
             [hickory.select :as select]
             [hickory.core :as html]
             [clj-http.client :as http]
+            [cheshire.core :as json]
             scrapers.common
             scrapers.substack.common))
 
@@ -39,6 +40,24 @@
                 (filter (fn [item] (re-matches #"[A-Z][a-z]{2,4}\s\d\d,\s\d\d\d\d" item)))
                 first))))
 
+(defn- extract-date-from-json-ld
+  [tree]
+  (try (let [scripts (select/select (select/and (select/tag "script")
+                                                (select/attr "type" #(= % "application/ld+json")))
+                                    tree)
+             json-str (->> scripts
+                           (map #(first (:content %)))
+                           (filter some?)
+                           first)]
+         (when json-str
+           (let [data (json/parse-string json-str true)
+                 date-published (:datePublished data)]
+             (when date-published
+               (let [[date-part] (str/split date-published #"T")
+                     [year month day] (str/split date-part #"-")]
+                 {:date (str year "-" month "-" day) :year year})))))
+       (catch Exception _ nil)))
+
 (defn podcast-episode?
   [tree]
   (and (extract-date-for-pods tree)
@@ -51,8 +70,10 @@
         title (scrapers.common/get-property tree "og:title")
         subtitle (scrapers.common/get-property tree "og:description")
         image (scrapers.common/get-property tree "og:image")
-        date (or (extract-date tree) (extract-date-for-pods tree))
-        [date year] (if date (convert-date date) [nil nil])]
+        html-date (or (extract-date tree) (extract-date-for-pods tree))
+        [date year] (if html-date
+                      (convert-date html-date)
+                      (let [{:keys [date year]} (extract-date-from-json-ld tree)] [date year]))]
     {:title (subs (str title " - " subtitle) 0 (min 255 (count (str title " - " subtitle))))
      :date date
      :year year

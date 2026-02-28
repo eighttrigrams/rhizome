@@ -57,23 +57,23 @@
           articles-id (common/get-item-or-throw-error
                         db
                         (if (= :podcast-episode type) "Podcast Episodes" "Articles"))
-          year-id (common/get-item-or-throw-error db year)
+          year-id (when year (common/get-item-or-throw-error db year))
           substack-id (create-or-take-substack-id
                         db
                         (if external? (convert-external url) (convert url))
                         substack-platform-id
                         substacks-id)
-          context-ids-set (conj context-ids-set
-                                (or substack-id articles-id) ;; hack
-                                articles-id
-                                substack-platform-id
-                                year-id)
+          context-ids-set (cond-> (conj context-ids-set
+                                        (or substack-id articles-id) ;; hack
+                                        articles-id
+                                        substack-platform-id)
+                            year-id (conj year-id))
           existing-item
             (datastore/get-item-by-path db "data->'resource-links'->>'substack-article'" url)]
       (if (:id existing-item)
         (assoc (datastore/get-item db existing-item) :previously-existing-item? true)
         (let [item (common/insert-item db title "" context-ids-set {:substack-article url})]
-          (datastore/insert-date db (:id item) date)
+          (when date (datastore/insert-date db (:id item) date))
           (log/info (str "created new item" item))
           (when image
             (try (upload/upload-preview-file db {:tempfile image} (:id item) "false")
