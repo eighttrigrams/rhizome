@@ -13,11 +13,11 @@
                                                  *state
                                                  (-> @*state
                                                      (assoc :active-search :items)
-                                                     (dissoc :preview-item :link-item :q)))
+                                                     (dissoc :preview-item :link-item :link-context :q)))
         (= :items (:active-search @*state))
           (fetch-and-reset! *state
                             (-> @*state
-                                (dissoc :preview-item :active-search :link-item :q)))))
+                                (dissoc :preview-item :active-search :link-item :link-context :q)))))
 
 (defn load-stored-context
   [*state idx]
