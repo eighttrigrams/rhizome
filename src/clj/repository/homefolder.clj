@@ -67,6 +67,11 @@
 
 (defn list-files
   []
-  (->> (vec (file-seq (io/file (str homefolder "Downloads/Tracked/"))))
-       (filter #(not (.isDirectory %)))
-       (map #(.getName %))))
+  (let [dir (str homefolder "Downloads/Tracked/")]
+    (log/info (str "list-files: homefolder=" homefolder " dir=" dir))
+    (log/info (str "list-files: dir exists?=" (.exists (io/file dir))))
+    (let [files (->> (vec (file-seq (io/file dir)))
+                     (filter #(not (.isDirectory %)))
+                     (map #(.getName %)))]
+      (log/info (str "list-files: found " (count files) " files"))
+      files)))

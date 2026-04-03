@@ -11,10 +11,15 @@
   [db title _ _]
   (log/info "Starting batch insertion ...")
   (let [extra (str/trim (or (get (str/split title #"IMPORT") 1) ""))
-        import-id (common/get-item-or-throw-error db "Imports")]
-    (doall (for [file-name (home/list-files)]
+        _ (log/info (str "batch extra=" (pr-str extra)))
+        import-id (common/get-item-or-throw-error db "Imports")
+        _ (log/info (str "batch import-id=" import-id))
+        files (home/list-files)
+        _ (log/info (str "batch files count=" (count files) " files=" (pr-str (take 3 files))))]
+    (doall (for [file-name files]
              (let [orig-file-name file-name
                    file-name (if-not (empty? extra) (str extra " " orig-file-name) orig-file-name)]
+               (log/info (str "batch considering: " file-name " supported?=" (home/supported-file-type? file-name)))
                (when (home/supported-file-type? file-name)
                  (when-not (empty? extra) (home/ren orig-file-name file-name))
                  (log/info (str "Importing " file-name " ... "))
