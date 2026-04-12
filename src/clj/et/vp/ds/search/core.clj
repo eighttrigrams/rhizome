@@ -121,7 +121,7 @@
                         (get-search-clause q) (get-events-exist-clause search-mode)
                         (get-description-filter-clause description-filter)
                         [:= :relations.owner_id [:raw selected-item-id]]
-                        (when (or (= 2 search-mode) (= 3 search-mode)) [:> :sort_idx 0])]}
+                        (when (or (= 2 search-mode) (= 3 search-mode)) [:<> :sort_idx -1])]}
                {:order-by (order-by search-mode)}
                (when limit {:limit limit})
                {:join [:relations [:= :items.id :relations.target_id]]})

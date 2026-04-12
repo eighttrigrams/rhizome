@@ -3,6 +3,7 @@
             [net.eighttrigrams.cljs-text-editor.editor :as editor]
             [ui.modals.link-context-item :as link-context-item]
             [clojure.string :as str]
+            [utils :as utils]
             api))
 
 (defn- get-title-el [] (.getElementById js/document "item-title"))
@@ -80,7 +81,9 @@
             {:autoComplete :off :defaultValue (:annotation item) :placeholder "Annotation"}]]
           [:div
            [:input#item-sort-idx.line
-            {:autoComplete :off :defaultValue (:sort_idx item) :placeholder "Sort index"}]]
+            {:autoComplete :off
+             :defaultValue (utils/sort-idx->display (:sort_idx item))
+             :placeholder "Sort index (number or roman numeral)"}]]
           [:div
            [:input#item-tags.line
             {:autoComplete :off :defaultValue (:tags item) :placeholder "Tags"}]]
@@ -119,7 +122,7 @@
   {:context {:id id
              :title (.-value (get-title-el))
              :short_title (.-value (get-short-title-el))
-             :sort_idx (.-value (get-sort-idx-el))
+             :sort_idx (utils/display->sort-idx (.-value (get-sort-idx-el)))
              :annotation (.-value (get-annotation-el))
              :tags (.-value (get-tags-el))
              :has-event? (.-checked (get-event-el))

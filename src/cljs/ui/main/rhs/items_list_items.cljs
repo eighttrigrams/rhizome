@@ -3,7 +3,8 @@
             ["react-markdown$default" :as ReactMarkdown]
             [ui.actions :as actions]
             [ui.main.context-badges :as context-badges]
-            [ui.main.rhs.modifiers :as modifiers]))
+            [ui.main.rhs.modifiers :as modifiers]
+            [utils :as utils]))
 
 (defn title-component
   [title data]
@@ -175,7 +176,7 @@
                  (when (and (:inserted_at item) (instance? js/Date (:inserted_at item)))
                    (assoc item :date (first (str/split (.toISOString (:inserted_at item)) #"T"))))
                  item)})
-          (when (and (:selected-item @*state) rhs? (>= (:sort_idx item) 0))
-            {:number {:number (:sort_idx item)}})
+          (when (and (:selected-item @*state) rhs? (not= (:sort_idx item) -1))
+            {:number {:number (utils/sort-idx->display (:sort_idx item))}})
           (when-let [file (:file (:resource-links (:data item)))] {:file {:file file}})
           (:contexts (:data item))))]]]])

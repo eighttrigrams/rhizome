@@ -261,19 +261,16 @@
                :annotation [:inline annotation]
                :tags [:inline tags]
                :data [:inline (json/generate-string data)]}
-              (when sort_idx
+              (when (some? sort_idx)
                 {:sort_idx
                    [:inline
-                    (when sort_idx
-                      (if
-                        ;; i think this is for when we are in tests or something
-                        (integer? sort_idx)
-                        sort_idx
-                        (try (Integer/parseInt sort_idx)
-                             (catch Exception e
-                               (log/error (str "This is bad ----- conversion failed" (.getMessage e)
-                                               "-" (:sort_idx old-item)))
-                               (if (integer? (:sort_idx old-item)) (:sort_idx old-item) -1)))))]}))
+                    (if (integer? sort_idx)
+                      sort_idx
+                      (try (Integer/parseInt sort_idx)
+                           (catch Exception e
+                             (log/error (str "This is bad ----- conversion failed" (.getMessage e)
+                                             "-" (:sort_idx old-item)))
+                             (if (integer? (:sort_idx old-item)) (:sort_idx old-item) -1))))]}))
         formatted-sql (sql/format {:update [:items] :where [:= :id [:inline id]] :set set})
         _result (jdbc/execute-one! db formatted-sql {:return-keys true})]
     (or (not= (:title old-item) title) (not= (:short_title old-item) short_title))))

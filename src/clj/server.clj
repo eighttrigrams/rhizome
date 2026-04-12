@@ -11,6 +11,7 @@
             [et.vp.ds :as datastore]
             opener
             dispatch
+            rest-api
             [cambium.core :as log]
             [ring.middleware.resource :refer [wrap-resource]]
             [ring.middleware.file :refer [wrap-file]]
@@ -90,6 +91,14 @@
     "/"
     []
     (context "/api" [] (POST "/" [] (api)))
+    (context "/rest"
+             []
+             (GET "/contexts" [q] (if q
+                                    (rest-api/search-contexts (:db config/config) q)
+                                    (rest-api/list-contexts (:db config/config))))
+             (POST "/contexts" req (rest-api/create-context (:db config/config) req))
+             (GET "/items/:id" [id] (rest-api/get-item (:db config/config) id))
+             (POST "/items" req (rest-api/create-item (:db config/config) req)))
     (GET "/open/:file-id" [] open)
     (GET "/img-by-id/:item-id" [] img-by-id-handler)
     (POST "/upload" req (upload-handler req))
