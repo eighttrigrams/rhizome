@@ -1,7 +1,8 @@
 (ns server
   (:require [ring.adapter.jetty :as j]
             upload
-            [compojure.core :refer [context GET POST]]
+            [clojure.string :as str]
+            [compojure.core :refer [context GET POST PUT]]
             [ring.util.response :as response]
             [ring.middleware.json :as json]
             [env :refer [wrap-env-defaults]]
@@ -16,6 +17,7 @@
             [ring.middleware.resource :refer [wrap-resource]]
             [ring.middleware.file :refer [wrap-file]]
             [ring.middleware.multipart-params :refer [wrap-multipart-params]]
+            [ring.middleware.params :refer [wrap-params]]
             [clojure.java.io :as io])
   (:gen-class))
 
@@ -97,7 +99,15 @@
                                     (rest-api/search-contexts (:db config/config) q)
                                     (rest-api/list-contexts (:db config/config))))
              (POST "/contexts" req (rest-api/create-context (:db config/config) req))
+             (GET "/items/by-sort-idx" req
+                  (let [qs (:query-string req)
+                        params (into {} (map #(str/split % #"=" 2)
+                                             (str/split (or qs "") #"&")))]
+                    (rest-api/find-by-sort-idx (:db config/config)
+                                               (get params "sort_idx")
+                                               (get params "context_ids"))))
              (GET "/items/:id" [id] (rest-api/get-item (:db config/config) id))
+             (PUT "/items/:id" [id :as req] (rest-api/update-item-description (:db config/config) id req))
              (POST "/items" req (rest-api/create-item (:db config/config) req)))
     (GET "/open/:file-id" [] open)
     (GET "/img-by-id/:item-id" [] img-by-id-handler)
@@ -120,6 +130,7 @@
     (-> (routes)
         wrap-env-defaults
         pipeline
+        wrap-params
         wrap-multipart-params)))
 
 (mount/defstate ^{:on-reload :noop} http-server

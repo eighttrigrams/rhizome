@@ -99,12 +99,59 @@
                               db
                               {:id (:id item) :description (:description body)})
                             item)]
+                 (log/info (str "REST INSERT item id=" (:id item)
+                                " title=\"" (:title body) "\""
+                                " contexts=" context-ids
+                                (when (:sort-idx body) (str " sort-idx=" (:sort-idx body)))))
                  (if (map? item)
                    (json-response 201 (item->api item))
                    (json-response 201 {:created true})))
                (catch Exception e
                  (log/error e "REST API: create-item failed")
                  (json-response 500 {:error (.getMessage e)}))))))))
+
+(defn find-by-sort-idx
+  [db sort-idx context-ids-str]
+  (try (let [sort-idx (Integer/parseInt sort-idx)
+             context-ids (mapv #(Integer/parseInt (clojure.string/trim %))
+                               (clojure.string/split context-ids-str #","))
+             base-query {:select [:items.id :items.title :items.sort_idx]
+                         :from [:items]
+                         :where [:and
+                                 [:= :items.sort_idx [:inline sort-idx]]
+                                 (into [:and]
+                                       (map (fn [cid]
+                                              [:in :items.id
+                                               {:select [:target_id]
+                                                :from [:relations]
+                                                :where [:= :owner_id [:inline cid]]}])
+                                            context-ids))]
+                         :limit 1}
+             rows (jdbc/execute! db (sql/format base-query))]
+         (if (seq rows)
+           (let [r (first rows)]
+             (json-response {:id (:items/id r) :title (:items/title r) :sort-idx (:items/sort_idx r)}))
+           (json-response 404 {:error "Not found"})))
+       (catch NumberFormatException _ (json-response 400 {:error "Invalid parameters"}))))
+
+(defn update-item-description
+  [db id req]
+  (try (let [id (Integer/parseInt id)
+             body (parse-json-body req)]
+         (if-not (:description body)
+           (json-response 400 {:error "description is required"})
+           (let [item (datastore/get-item db {:id id})]
+             (if-not item
+               (json-response 404 {:error "Item not found"})
+               (do (log/info (str "REST UPDATE item id=" id
+                                  " title=\"" (:title item) "\""
+                                  " description-length=" (count (:description body))))
+                   (let [updated (datastore/update-context-description db {:id id :description (:description body)})]
+                     (json-response (item->api updated))))))))
+       (catch NumberFormatException _ (json-response 400 {:error "Invalid item ID"}))
+       (catch Exception e
+         (log/error e "REST API: update-item-description failed")
+         (json-response 500 {:error (.getMessage e)}))))
 
 (defn create-context
   [db req]
