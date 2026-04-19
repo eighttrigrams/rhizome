@@ -1,10 +1,13 @@
 (ns rest-api
   (:require [next.jdbc :as jdbc]
             [honey.sql :as sql]
+            [clojure.string :as str]
             [cheshire.core :as json]
             [cambium.core :as log]
             [et.vp.ds :as datastore]
+            [et.vp.ds.search :as search]
             [et.vp.ds.helpers :refer [post-process-base]]
+            [recording-mode :as rec]
             [repository.insertion :as insertion]))
 
 (defn- json-response
@@ -79,58 +82,65 @@
 (defn create-item
   [db req]
   (let [body (parse-json-body req)]
-    (if-not (:title body)
-      (json-response 400 {:error "title is required"})
-      (let [context-ids (set (or (:context-ids body) []))]
-        (if (empty? context-ids)
-          (json-response 400 {:error "context-ids is required (at least one context)"})
-          (try (let [primary-id (first context-ids)
-                     rest-ids (disj context-ids primary-id)
-                     item (insertion/insert-item db (:title body) {:id primary-id} rest-ids)
-                     item (if (and (map? item) (:sort-idx body))
-                            (do (jdbc/execute! db
-                                               (sql/format {:update [:items]
-                                                            :set {:sort_idx [:inline (:sort-idx body)]}
-                                                            :where [:= :id [:inline (:id item)]]}))
-                                (datastore/get-item db {:id (:id item)}))
-                            item)
-                     item (if (and (map? item) (:description body))
-                            (datastore/update-context-description
-                              db
-                              {:id (:id item) :description (:description body)})
-                            item)]
-                 (log/info (str "REST INSERT item id=" (:id item)
-                                " title=\"" (:title body) "\""
-                                " contexts=" context-ids
-                                (when (:sort-idx body) (str " sort-idx=" (:sort-idx body)))))
-                 (if (map? item)
-                   (json-response 201 (item->api item))
-                   (json-response 201 {:created true})))
-               (catch Exception e
-                 (log/error e "REST API: create-item failed")
-                 (json-response 500 {:error (.getMessage e)}))))))))
+    (cond
+      (not (:title body))
+        (json-response 400 {:error "title is required"})
+      (empty? (set (or (:context-ids body) [])))
+        (json-response 400 {:error "context-ids is required (at least one context)"})
+      :else
+        (rec/log-and-guard
+          "create-item"
+          {:title (:title body)
+           :context-ids (:context-ids body)
+           :sort-idx (:sort-idx body)
+           :description-length (count (or (:description body) ""))}
+          (json-response 201 {:created true})
+          (fn []
+            (try (let [context-ids (set (:context-ids body))
+                       primary-id (first context-ids)
+                       rest-ids (disj context-ids primary-id)
+                       item (insertion/insert-item db (:title body) {:id primary-id} rest-ids)
+                       item (if (and (map? item) (:sort-idx body))
+                              (do (jdbc/execute! db
+                                                 (sql/format {:update [:items]
+                                                              :set {:sort_idx [:inline
+                                                                               (:sort-idx body)]}
+                                                              :where [:= :id
+                                                                      [:inline (:id item)]]}))
+                                  (datastore/get-item db {:id (:id item)}))
+                              item)
+                       item (if (and (map? item) (:description body))
+                              (datastore/update-context-description
+                                db
+                                {:id (:id item) :description (:description body)})
+                              item)]
+                   (if (map? item)
+                     (json-response 201 (item->api item))
+                     (json-response 201 {:created true})))
+                 (catch Exception e
+                   (log/error e "REST API: create-item failed")
+                   (json-response 500 {:error (.getMessage e)}))))))))
 
 (defn find-by-sort-idx
   [db sort-idx context-ids-str]
   (try (let [sort-idx (Integer/parseInt sort-idx)
              context-ids (mapv #(Integer/parseInt (clojure.string/trim %))
-                               (clojure.string/split context-ids-str #","))
+                           (clojure.string/split context-ids-str #","))
              base-query {:select [:items.id :items.title :items.sort_idx]
                          :from [:items]
-                         :where [:and
-                                 [:= :items.sort_idx [:inline sort-idx]]
+                         :where [:and [:= :items.sort_idx [:inline sort-idx]]
                                  (into [:and]
-                                       (map (fn [cid]
-                                              [:in :items.id
-                                               {:select [:target_id]
-                                                :from [:relations]
-                                                :where [:= :owner_id [:inline cid]]}])
-                                            context-ids))]
+                                       (map (fn [cid] [:in :items.id
+                                                       {:select [:target_id]
+                                                        :from [:relations]
+                                                        :where [:= :owner_id [:inline cid]]}])
+                                         context-ids))]
                          :limit 1}
              rows (jdbc/execute! db (sql/format base-query))]
          (if (seq rows)
            (let [r (first rows)]
-             (json-response {:id (:items/id r) :title (:items/title r) :sort-idx (:items/sort_idx r)}))
+             (json-response
+               {:id (:items/id r) :title (:items/title r) :sort-idx (:items/sort_idx r)}))
            (json-response 404 {:error "Not found"})))
        (catch NumberFormatException _ (json-response 400 {:error "Invalid parameters"}))))
 
@@ -138,28 +148,108 @@
   [db id req]
   (try (let [id (Integer/parseInt id)
              body (parse-json-body req)]
-         (if-not (:description body)
-           (json-response 400 {:error "description is required"})
-           (let [item (datastore/get-item db {:id id})]
-             (if-not item
-               (json-response 404 {:error "Item not found"})
-               (do (log/info (str "REST UPDATE item id=" id
-                                  " title=\"" (:title item) "\""
-                                  " description-length=" (count (:description body))))
-                   (let [updated (datastore/update-context-description db {:id id :description (:description body)})]
-                     (json-response (item->api updated))))))))
-       (catch NumberFormatException _ (json-response 400 {:error "Invalid item ID"}))
-       (catch Exception e
-         (log/error e "REST API: update-item-description failed")
-         (json-response 500 {:error (.getMessage e)}))))
+         (cond
+           (not (:description body))
+             (json-response 400 {:error "description is required"})
+           :else
+             (let [item (datastore/get-item db {:id id})]
+               (if-not item
+                 (json-response 404 {:error "Item not found"})
+                 (rec/log-and-guard
+                   "update-item-description"
+                   {:id id
+                    :title (:title item)
+                    :description-length (count (:description body))}
+                   (json-response (item->api (assoc item :description (:description body))))
+                   (fn []
+                     (try (let [updated (datastore/update-context-description
+                                          db
+                                          {:id id :description (:description body)})]
+                            (json-response (item->api updated)))
+                          (catch Exception e
+                            (log/error e "REST API: update-item-description failed")
+                            (json-response 500 {:error (.getMessage e)})))))))))
+       (catch NumberFormatException _ (json-response 400 {:error "Invalid item ID"}))))
 
 (defn create-context
   [db req]
   (let [body (parse-json-body req)]
     (if-not (:title body)
       (json-response 400 {:error "title is required"})
-      (try (let [ctx (datastore/new-context db {:title (:title body)})]
-             (json-response 201 {:id (:id ctx) :title (:title ctx)}))
-           (catch Exception e
-             (log/error e "REST API: create-context failed")
-             (json-response 500 {:error (.getMessage e)}))))))
+      (rec/log-and-guard
+        "create-context"
+        {:title (:title body)}
+        (json-response 201 {:id nil :title (:title body)})
+        (fn []
+          (try (let [ctx (datastore/new-context db {:title (:title body)})]
+                 (json-response 201 {:id (:id ctx) :title (:title ctx)}))
+               (catch Exception e
+                 (log/error e "REST API: create-context failed")
+                 (json-response 500 {:error (.getMessage e)}))))))))
+
+(defn get-recording-mode
+  []
+  (json-response {:recording (rec/enabled?)}))
+
+(defn toggle-recording-mode
+  []
+  (let [now (rec/toggle!)]
+    (log/info {:recording now} (str "RECORDING MODE " (if now "ON" "OFF")))
+    (json-response {:recording now})))
+
+(defn- parse-int-opt
+  [s]
+  (when (and s (not (str/blank? s)))
+    (try (Integer/parseInt (str/trim s)) (catch NumberFormatException _ nil))))
+
+(defn- parse-ids-csv
+  [s]
+  (when (and s (not (str/blank? s))) (into [] (keep parse-int-opt) (str/split s #","))))
+
+(defn search-items
+  [db q]
+  (try (let [items (search/search-items db (or q "") {:all-items? true} {:limit 10})]
+         (json-response (map item->api items)))
+       (catch Exception e
+         (log/error e "REST API: search-items failed")
+         (json-response 500 {:error (.getMessage e)}))))
+
+(defn get-related-items
+  [db id-str {:keys [q secondary-ids search-mode]}]
+  (try (let [selected-id (Integer/parseInt id-str)
+             mode (parse-int-opt search-mode)
+             secondary (parse-ids-csv secondary-ids)
+             limit (cond (= 2 mode) 5000
+                         (seq secondary) 100
+                         :else 10)
+             items (search/search-related-items db
+                                                (or q "")
+                                                selected-id
+                                                {:selected-secondary-contexts secondary
+                                                 :search-mode mode}
+                                                {:limit limit})]
+         (json-response (map item->api items)))
+       (catch NumberFormatException _ (json-response 400 {:error "Invalid item ID"}))
+       (catch Exception e
+         (log/error e "REST API: get-related-items failed")
+         (json-response 500 {:error (.getMessage e)}))))
+
+(defn get-item-with-related
+  [db id-str {:keys [search-mode]}]
+  (try (let [id (Integer/parseInt id-str)
+             mode (parse-int-opt search-mode)
+             item (datastore/get-item db {:id id})]
+         (cond (nil? item) (json-response 404 {:error "Item not found"})
+               (:is_context item)
+                 (json-response 400 {:error "with-related is only for non-context items"})
+               :else (let [related (search/search-related-items db
+                                                                ""
+                                                                id
+                                                                {:selected-secondary-contexts []
+                                                                 :search-mode mode}
+                                                                {})]
+                       (json-response {:item (item->api item) :related (map item->api related)}))))
+       (catch NumberFormatException _ (json-response 400 {:error "Invalid item ID"}))
+       (catch Exception e
+         (log/error e "REST API: get-item-with-related failed")
+         (json-response 500 {:error (.getMessage e)}))))

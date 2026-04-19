@@ -4,6 +4,7 @@
             [ui.main :as main]
             [ui.modals :as modals]
             [ui.modals.actions :as modal-actions]
+            [ui.recording-mode :as recording-mode]
             [ui.main.rhs.modifiers :as modifiers]))
 
 (def original-state {:items [] :contexts [] :selected-item nil :active-search nil :modal nil})
@@ -50,11 +51,12 @@
   (let [*state (r/atom original-state)]
     (add-state-watch *state)
     (r/create-class
-      {:component-did-mount re-focus
+      {:component-did-mount (fn [] (recording-mode/fetch-state! *state) (re-focus))
        :render ;
          (fn [] [:div#ui
                  {:on-mouse-leave #(reset! modifiers/*alt-pressed? false)
                   :on-mouse-enter #(reset! modifiers/*alt-pressed? false)}
+                 [recording-mode/indicator *state]
                  [:div#main-layer
                   {;; TODO document recipe to make the div able to listen to key events,
                    ;; https://stackoverflow.com/a/3149416

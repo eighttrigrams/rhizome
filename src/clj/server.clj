@@ -95,6 +95,8 @@
     (context "/api" [] (POST "/" [] (api)))
     (context "/rest"
              []
+             (GET "/recording-mode" [] (rest-api/get-recording-mode))
+             (POST "/recording-mode/toggle" [] (rest-api/toggle-recording-mode))
              (GET "/contexts" [q] (if q
                                     (rest-api/search-contexts (:db config/config) q)
                                     (rest-api/list-contexts (:db config/config))))
@@ -106,6 +108,15 @@
                     (rest-api/find-by-sort-idx (:db config/config)
                                                (get params "sort_idx")
                                                (get params "context_ids"))))
+             (GET "/items" [q] (rest-api/search-items (:db config/config) q))
+             (GET "/items/:id/related" [id q secondary_ids search_mode]
+                  (rest-api/get-related-items (:db config/config) id
+                                              {:q q
+                                               :secondary-ids secondary_ids
+                                               :search-mode search_mode}))
+             (GET "/items/:id/with-related" [id search_mode]
+                  (rest-api/get-item-with-related (:db config/config) id
+                                                  {:search-mode search_mode}))
              (GET "/items/:id" [id] (rest-api/get-item (:db config/config) id))
              (PUT "/items/:id" [id :as req] (rest-api/update-item-description (:db config/config) id req))
              (POST "/items" req (rest-api/create-item (:db config/config) req)))

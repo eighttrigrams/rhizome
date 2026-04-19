@@ -1,5 +1,6 @@
 (ns ui.key-handler
   (:require [ui.actions :as actions]
+            [ui.recording-mode :as recording-mode]
             [ui.key-handler.common :refer [handle-keys*] :as common]))
 
 (defn handle-keys
@@ -7,7 +8,9 @@
   (handle-keys*
     (fn [code ctrl-pressed? meta-pressed? alt-pressed? shift-pressed? _e]
       (let [{:keys [selected-item item-view?]} @*state]
-        (cond (= "Escape" code)
+        (cond (and alt-pressed? shift-pressed? (= "KeyW" code))
+                (recording-mode/toggle! *state)
+              (= "Escape" code)
                 (cond (and (:active-search @*state) (not alt-pressed?)) (actions/quit-search!
                                                                           *state)
                       (and (not alt-pressed?) item-view?) (actions/exit-item-view! *state)
