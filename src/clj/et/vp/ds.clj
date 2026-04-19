@@ -414,4 +414,4 @@
                                                   [:raw now] [:raw now] [:inline title] true]]})
                            {:return-keys true})
         un-namespace-keys
-        (dissoc :searchable))))
+        (dissoc :searchable :embedding))))

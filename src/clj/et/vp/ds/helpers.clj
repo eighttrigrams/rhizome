@@ -31,4 +31,4 @@
       un-namespace-keys
       simplify-date
       parse-data
-      (dissoc :searchable)))
+      (dissoc :searchable :embedding)))
