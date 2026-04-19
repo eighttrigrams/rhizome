@@ -10,6 +10,7 @@
   (context "/rest" []
            (GET "/describe" [] (queries/describe))
            (POST "/recording-mode/toggle" [] (mutations/toggle-recording-mode))
+           (POST "/backfill/embeddings" [] (mutations/backfill-embeddings (:db config/config)))
            (GET "/contexts" [q] (if q
                                   (queries/search-contexts (:db config/config) q)
                                   (queries/list-contexts (:db config/config))))
@@ -22,11 +23,12 @@
                                             (get params "sort_idx")
                                             (get params "context_ids"))))
            (GET "/items" [q] (queries/search-items (:db config/config) q))
-           (GET "/items/:id/related" [id q secondary_ids search_mode]
+           (GET "/items/:id/related" [id q secondary_ids search_mode vector]
                 (queries/get-related-items (:db config/config) id
                                            {:q q
                                             :secondary-ids secondary_ids
-                                            :search-mode search_mode}))
+                                            :search-mode search_mode
+                                            :vector? (= "true" vector)}))
            (GET "/items/:id/with-related" [id search_mode]
                 (queries/get-item-with-related (:db config/config) id
                                                {:search-mode search_mode}))

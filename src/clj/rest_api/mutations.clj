@@ -5,7 +5,17 @@
             [et.vp.ds :as datastore]
             [rest-api.middleware :as mw]
             [repository.insertion :as insertion]
+            [semsearch.backfill :as backfill]
             [rest-api.util :refer [json-response parse-json-body item->api]]))
+
+(defn- embed-item-best-effort!
+  "Embed title + description for an item and store in items.embedding. Logs and
+  swallows errors — the caller's write succeeds even if Ollama is unreachable."
+  [db {:keys [id] :as item}]
+  (when id
+    (try (backfill/embed-and-store! db item)
+         (catch Exception e
+           (log/error e (str "embed-item-best-effort! failed for id " id))))))
 
 (defn create-item
   "POST /rest/items — create a new item. JSON body: {\"title\" (required),
@@ -46,6 +56,8 @@
                                 db
                                 {:id (:id item) :description (:description body)})
                               item)]
+                   (when (map? item)
+                     (embed-item-best-effort! db item))
                    (if (map? item)
                      (json-response 201 (item->api item))
                      (json-response 201 {:created true})))
@@ -76,6 +88,7 @@
                      (try (let [updated (datastore/update-context-description
                                           db
                                           {:id id :description (:description body)})]
+                            (embed-item-best-effort! db updated)
                             (json-response (item->api updated)))
                           (catch Exception e
                             (log/error e "REST API: update-item-description failed")
@@ -99,6 +112,25 @@
                (catch Exception e
                  (log/error e "REST API: create-context failed")
                  (json-response 500 {:error (.getMessage e)}))))))))
+
+(defn backfill-embeddings
+  "POST /rest/backfill/embeddings — embed every item that has a non-empty
+  description and a NULL embedding. Idempotent: items that already have an
+  embedding are skipped, so it's safe to re-run (e.g. after Ollama was down
+  during writes, or after UI-created items bypassed the ingestion hook).
+  Synchronous — the request blocks until completion, so long runs tie up the
+  connection. Gated by recording mode. Returns {:embedded N}."
+  [db]
+  (mw/log-and-guard
+    "backfill-embeddings"
+    {}
+    (json-response {:embedded 0 :dry-run true})
+    (fn []
+      (try (let [n (backfill/backfill-missing! db)]
+             (json-response {:embedded n}))
+           (catch Exception e
+             (log/error e "REST API: backfill-embeddings failed")
+             (json-response 500 {:error (.getMessage e)}))))))
 
 (defn toggle-recording-mode
   "POST /rest/recording-mode/toggle — toggle the write-gate. While ON, mutating

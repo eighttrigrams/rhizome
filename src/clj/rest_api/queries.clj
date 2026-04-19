@@ -6,6 +6,7 @@
             [et.vp.ds :as datastore]
             [et.vp.ds.search :as search]
             [et.vp.ds.helpers :refer [post-process-base]]
+            [semsearch.query :as semsearch]
             [rest-api.util :refer [json-response item->api parse-int-opt parse-ids-csv]]))
 
 (defn list-contexts
@@ -90,26 +91,36 @@
          (json-response 500 {:error (.getMessage e)}))))
 
 (defn get-related-items
-  "GET /rest/items/:id/related?q=&secondary_ids=&search_mode= — list items
-  related to the context :id. Optional free-text q; CSV secondary_ids enables
-  intersection search (raises limit from 10 to 100). search_mode: 0 = most
-  recently touched first (default), 2 = ordered by sort_idx (limit 5000),
-  5 = most recently added first."
-  [db id-str {:keys [q secondary-ids search-mode]}]
+  "GET /rest/items/:id/related?q=&secondary_ids=&search_mode=&vector= — list
+  items related to the context :id. Optional free-text q; CSV secondary_ids
+  enables intersection search (raises limit from 10 to 100). search_mode:
+  0 = most recently touched first (default), 2 = ordered by sort_idx (limit
+  5000), 5 = most recently added first.
+
+  vector=true switches to semantic search: q is embedded via Ollama
+  (nomic-embed-text) and items are ranked by cosine similarity. Requires a
+  non-empty q. Only items with a non-empty description are embedded — both
+  on ingestion (POST /rest/items, PUT /rest/items/:id) and by the REPL
+  backfill — so title-only items never appear in vector results."
+  [db id-str {:keys [q secondary-ids search-mode vector?]}]
   (try (let [selected-id (Integer/parseInt id-str)
-             mode (parse-int-opt search-mode)
-             secondary (parse-ids-csv secondary-ids)
-             limit (cond (= 2 mode) 5000
-                         (seq secondary) 100
-                         :else 10)
-             items (search/search-related-items db
-                                                (or q "")
-                                                selected-id
-                                                {:selected-secondary-contexts secondary
-                                                 :search-mode mode}
-                                                {:limit limit})]
-         (json-response (map item->api items)))
+             secondary (parse-ids-csv secondary-ids)]
+         (if vector?
+           (let [items (semsearch/search-related-items-vector
+                         db q selected-id
+                         {:secondary-context-ids secondary :limit 20})]
+             (json-response (map item->api items)))
+           (let [mode (parse-int-opt search-mode)
+                 limit (cond (= 2 mode) 5000
+                             (seq secondary) 100
+                             :else 10)
+                 items (search/search-related-items
+                         db (or q "") selected-id
+                         {:selected-secondary-contexts secondary :search-mode mode}
+                         {:limit limit})]
+             (json-response (map item->api items)))))
        (catch NumberFormatException _ (json-response 400 {:error "Invalid item ID"}))
+       (catch IllegalArgumentException e (json-response 400 {:error (.getMessage e)}))
        (catch Exception e
          (log/error e "REST API: get-related-items failed")
          (json-response 500 {:error (.getMessage e)}))))
