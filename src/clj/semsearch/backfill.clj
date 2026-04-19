@@ -18,18 +18,28 @@
 
 (defn backfill-missing!
   "Embed every item that currently has NULL embedding AND a non-empty
-  description. Intended for REPL use. Returns the number of items embedded."
+  description. Logs per-item progress (success as info, failure as warn —
+  no stack traces). Returns {:embedded N :failed M}."
   [db]
   (let [rows (jdbc/execute! db
-               [(str "SELECT id, title, description FROM items "
+               [(str "SELECT id, description FROM items "
                      "WHERE embedding IS NULL "
                      "AND description IS NOT NULL "
-                     "AND length(trim(description)) > 0")])]
-    (log/info {:backfill {:candidates (count rows)}})
-    (loop [rows rows done 0]
-      (if-let [{id :items/id title :items/title description :items/description} (first rows)]
-        (do (try (embed-and-store! db {:id id :title title :description description})
-                 (catch Exception e
-                   (log/error e (str "backfill failed for id " id))))
-            (recur (rest rows) (inc done)))
-        (do (log/info {:backfill {:completed done}}) done)))))
+                     "AND length(trim(description)) > 0")])
+        total (count rows)]
+    (log/info {:backfill {:candidates total}})
+    (loop [rows rows ok 0 fail 0]
+      (if-let [{id :items/id description :items/description} (first rows)]
+        (let [n (inc (+ ok fail))
+              success? (try (embed-and-store! db {:id id :description description})
+                            (log/info (str "[" n "/" total "] embedded id " id))
+                            true
+                            (catch Exception e
+                              (log/warn (str "[" n "/" total "] embed failed for id "
+                                             id ": " (.getMessage e)))
+                              false))]
+          (if success?
+            (recur (rest rows) (inc ok) fail)
+            (recur (rest rows) ok (inc fail))))
+        (do (log/info {:backfill {:embedded ok :failed fail}})
+            {:embedded ok :failed fail})))))

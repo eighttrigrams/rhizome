@@ -119,15 +119,15 @@
   embedding are skipped, so it's safe to re-run (e.g. after Ollama was down
   during writes, or after UI-created items bypassed the ingestion hook).
   Synchronous — the request blocks until completion, so long runs tie up the
-  connection. Gated by recording mode. Returns {:embedded N}."
+  connection. Gated by recording mode. Returns {:embedded N :failed M}. Per-
+  item progress is logged server-side (tail dev.out)."
   [db]
   (mw/log-and-guard
     "backfill-embeddings"
     {}
-    (json-response {:embedded 0 :dry-run true})
+    (json-response {:embedded 0 :failed 0 :dry-run true})
     (fn []
-      (try (let [n (backfill/backfill-missing! db)]
-             (json-response {:embedded n}))
+      (try (json-response (backfill/backfill-missing! db))
            (catch Exception e
              (log/error e "REST API: backfill-embeddings failed")
              (json-response 500 {:error (.getMessage e)}))))))
