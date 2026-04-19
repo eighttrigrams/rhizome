@@ -51,7 +51,7 @@
   (let [*state (r/atom original-state)]
     (add-state-watch *state)
     (r/create-class
-      {:component-did-mount (fn [] (recording-mode/fetch-state! *state) (re-focus))
+      {:component-did-mount (fn [] (re-focus))
        :render ;
          (fn [] [:div#ui
                  {:on-mouse-leave #(reset! modifiers/*alt-pressed? false)

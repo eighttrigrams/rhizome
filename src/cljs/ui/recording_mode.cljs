@@ -8,11 +8,6 @@
         (.then (fn [^js data]
                  (swap! *state assoc :recording-mode? (boolean (.-recording data))))))))
 
-(defn fetch-state!
-  [*state]
-  (-> (js/fetch "/rest/recording-mode")
-      (.then (json-handler *state))))
-
 (defn toggle!
   [*state]
   (-> (js/fetch "/rest/recording-mode/toggle" #js {:method "POST"})

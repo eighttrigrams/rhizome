@@ -187,10 +187,6 @@
                  (log/error e "REST API: create-context failed")
                  (json-response 500 {:error (.getMessage e)}))))))))
 
-(defn get-recording-mode
-  []
-  (json-response {:recording (mw/enabled?)}))
-
 (defn toggle-recording-mode
   []
   (let [now (mw/toggle!)]

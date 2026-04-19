@@ -7,7 +7,6 @@
 (defn rest-routes
   []
   (context "/rest" []
-           (GET "/recording-mode" [] (handlers/get-recording-mode))
            (POST "/recording-mode/toggle" [] (handlers/toggle-recording-mode))
            (GET "/contexts" [q] (if q
                                   (handlers/search-contexts (:db config/config) q)
