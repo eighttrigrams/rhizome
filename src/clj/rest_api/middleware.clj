@@ -1,4 +1,4 @@
-(ns recording-mode
+(ns rest-api.middleware
   (:require [cambium.core :as log]))
 
 (defonce ^:private *recording? (atom false))
