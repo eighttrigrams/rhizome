@@ -205,19 +205,6 @@
       {:danger-preview-items []}
       {:danger-preview-items (search-related-items db "" selected-item)})))
 
-(defn delete-related-items
-  [{:keys [db]}]
-  (fn [{:keys [selected-item] :as opts}]
-    (if-not selected-item
-      {}
-      (let [items (search-related-items db "" selected-item)]
-        (log/info (str "delete-related-items - deleting " (count items)
-                       " items related to " (:id selected-item) ":" (:title selected-item)))
-        (doseq [item items]
-          (deletion/delete-item db item))
-        {:items (search db (assoc opts :q nil))
-         :q nil
-         :item-view? false}))))
 
 (defn delete-context
   [{:keys [db]}]

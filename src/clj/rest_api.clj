@@ -38,4 +38,6 @@
            (PUT "/items/:id" [id :as req]
                 (mutations/update-item-description (:db config/config) id req))
            (POST "/items" req (mutations/create-item (:db config/config) req))
+           (POST "/items/:id/related/delete" [id :as req]
+                 (mutations/delete-related-items (:db config/config) id req))
            (PUT "/relations" req (mutations/upsert-relation (:db config/config) req)))))

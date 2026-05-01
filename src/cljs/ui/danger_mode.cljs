@@ -2,7 +2,7 @@
   (:require [reagent.core :as r]
             [cljs.core.async :refer [go]]
             [cljs.core.async.interop :refer-macros [<p!]]
-            [ui.actions.common :refer [fetch-and-reset-with-method-2!]]
+            [ui.actions.common :refer [fetch-and-reset!]]
             api))
 
 (defn toggle!
@@ -32,11 +32,24 @@
 
 (defn- confirm-delete!
   [*state]
-  (let [s (-> @*state
-              (dissoc :modal)
-              (dissoc :danger-preview-items))]
-    (reset! *state s)
-    (fetch-and-reset-with-method-2! *state api/delete-related-items)))
+  (let [parent-id (:id (:selected-item @*state))
+        ids (mapv :id (:danger-preview-items @*state))
+        body (js/JSON.stringify (clj->js {:item-ids ids}))]
+    (swap! *state #(-> %
+                       (dissoc :modal)
+                       (dissoc :danger-preview-items)))
+    (-> (js/fetch (str "/rest/items/" parent-id "/related/delete")
+                  #js {:method "POST"
+                       :headers #js {"Content-Type" "application/json"}
+                       :body body})
+        (.then (fn [^js resp]
+                 (-> resp
+                     (.json)
+                     (.then (fn [^js data]
+                              (when (.-dropped data)
+                                (js/window.alert
+                                  "Recording mode is OFF — deletion was dropped."))
+                              (fetch-and-reset! *state (assoc @*state :q nil))))))))))
 
 (defn indicator
   [*state]

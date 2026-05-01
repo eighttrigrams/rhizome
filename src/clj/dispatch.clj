@@ -9,7 +9,7 @@
               deselect-secondary-contexts finish-linking-item reprioritize-item cycle-search-mode
               store-current-view load-stored-context remove-stored-context update-item unlink-item
               unlink-selected-item-from-container delete-item preview-deletion-of-related-items
-              delete-related-items upgrade-item-to-context
+              upgrade-item-to-context
               link-selected-context-to-context select-last-context fetch-context deselect-context
               fetch-aggregated-contexts delete-context fetch-item-description edit-item-in-obsidian
               sync-obsidian-changes discard-obsidian-changes get-obsidian-file-content update-annotations]]))
@@ -34,7 +34,6 @@
              remove-stored-context
              delete-item
              preview-deletion-of-related-items
-             delete-related-items
              unlink-item
              unlink-selected-item-from-container
              update-item
