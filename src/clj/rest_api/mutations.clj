@@ -2,6 +2,7 @@
   (:require [next.jdbc :as jdbc]
             [honey.sql :as sql]
             [cambium.core :as log]
+            [cheshire.core :as json]
             [et.vp.ds :as datastore]
             [rest-api.middleware :as mw]
             [repository.insertion :as insertion]
@@ -16,6 +17,44 @@
     (try (backfill/embed-and-store! db item)
          (catch Exception e
            (log/error e (str "embed-item-best-effort! failed for id " id))))))
+
+(defn- patch-item!
+  "Run an UPDATE on items SET <set-map> WHERE id=<id> and re-fetch."
+  [db id set-map]
+  (jdbc/execute! db
+                 (sql/format {:update [:items]
+                              :set set-map
+                              :where [:= :id [:inline id]]}))
+  (datastore/get-item db {:id id}))
+
+(defn- apply-sort-idx
+  [db item sort-idx]
+  (if (and (map? item) sort-idx)
+    (patch-item! db (:id item) {:sort_idx [:inline sort-idx]})
+    item))
+
+(defn- apply-description
+  [db item description]
+  (if (and (map? item) description)
+    (datastore/update-context-description db {:id (:id item) :description description})
+    item))
+
+(defn- create-item-impl
+  [db {:keys [title context-ids sort-idx description] :as _body}]
+  (try (let [context-ids (set context-ids)
+             primary-id (first context-ids)
+             rest-ids (disj context-ids primary-id)
+             item (insertion/insert-item db title {:id primary-id} rest-ids)
+             item (apply-sort-idx db item sort-idx)
+             item (apply-description db item description)]
+         (when (map? item)
+           (embed-item-best-effort! db item))
+         (if (map? item)
+           (json-response 201 (item->api item))
+           (json-response 201 {:created true})))
+       (catch Exception e
+         (log/error e "REST API: create-item failed")
+         (json-response 500 {:error (.getMessage e)}))))
 
 (defn create-item
   "POST /rest/items — create a new item. JSON body: {\"title\" (required),
@@ -37,42 +76,27 @@
            :sort-idx (:sort-idx body)
            :description-length (count (or (:description body) ""))}
           (json-response 201 {:created true})
-          (fn []
-            (try (let [context-ids (set (:context-ids body))
-                       primary-id (first context-ids)
-                       rest-ids (disj context-ids primary-id)
-                       item (insertion/insert-item db (:title body) {:id primary-id} rest-ids)
-                       item (if (and (map? item) (:sort-idx body))
-                              (do (jdbc/execute! db
-                                                 (sql/format {:update [:items]
-                                                              :set {:sort_idx [:inline
-                                                                               (:sort-idx body)]}
-                                                              :where [:= :id
-                                                                      [:inline (:id item)]]}))
-                                  (datastore/get-item db {:id (:id item)}))
-                              item)
-                       item (if (and (map? item) (:description body))
-                              (datastore/update-context-description
-                                db
-                                {:id (:id item) :description (:description body)})
-                              item)]
-                   (when (map? item)
-                     (embed-item-best-effort! db item))
-                   (if (map? item)
-                     (json-response 201 (item->api item))
-                     (json-response 201 {:created true})))
-                 (catch Exception e
-                   (log/error e "REST API: create-item failed")
-                   (json-response 500 {:error (.getMessage e)}))))))))
+          (fn [] (create-item-impl db body))))))
+
+(defn- update-item-description-impl
+  [db id description]
+  (try (let [updated (datastore/update-context-description
+                       db
+                       {:id id :description description})]
+         (embed-item-best-effort! db updated)
+         (json-response (item->api updated)))
+       (catch Exception e
+         (log/error e "REST API: update-item-description failed")
+         (json-response 500 {:error (.getMessage e)}))))
 
 (defn update-item-description
   "PUT /rest/items/:id — replace an item's description. JSON body: {\"description\"}.
   Gated by recording mode. 404 if the item does not exist."
   [db id req]
   (try (let [id (Integer/parseInt id)
-             body (parse-json-body req)]
+             {:keys [description]} (parse-json-body req)]
          (cond
-           (not (:description body))
+           (not description)
              (json-response 400 {:error "description is required"})
            :else
              (let [item (datastore/get-item db {:id id})]
@@ -80,38 +104,46 @@
                  (json-response 404 {:error "Item not found"})
                  (mw/log-and-guard
                    "update-item-description"
-                   {:id id
-                    :title (:title item)
-                    :description-length (count (:description body))}
-                   (json-response (item->api (assoc item :description (:description body))))
-                   (fn []
-                     (try (let [updated (datastore/update-context-description
-                                          db
-                                          {:id id :description (:description body)})]
-                            (embed-item-best-effort! db updated)
-                            (json-response (item->api updated)))
-                          (catch Exception e
-                            (log/error e "REST API: update-item-description failed")
-                            (json-response 500 {:error (.getMessage e)})))))))))
+                   {:id id :title (:title item) :description-length (count description)}
+                   (json-response (item->api (assoc item :description description)))
+                   (fn [] (update-item-description-impl db id description)))))))
        (catch NumberFormatException _ (json-response 400 {:error "Invalid item ID"}))))
+
+(defn- context-extras-set
+  [{:keys [short-title sort-idx hide-in-global-search]}]
+  (cond-> {}
+    short-title
+      (assoc :short_title [:inline short-title])
+    sort-idx
+      (assoc :sort_idx [:inline sort-idx])
+    (true? hide-in-global-search)
+      (assoc :data [:inline (json/generate-string {:hide-in-global-search true})])))
+
+(defn- create-context-impl
+  [db {:keys [title] :as body}]
+  (try (let [ctx (datastore/new-context db {:title title})
+             context-extras-set (context-extras-set body)
+             ctx (if (seq context-extras-set) (patch-item! db (:id ctx) context-extras-set) ctx)]
+         (json-response 201 (item->api ctx)))
+       (catch Exception e
+         (log/error e "REST API: create-context failed")
+         (json-response 500 {:error (.getMessage e)}))))
 
 (defn create-context
   "POST /rest/contexts — create a new context (item with is_context=true).
-  JSON body: {\"title\"}. Gated by recording mode."
+  JSON body: {\"title\" (required), \"short-title\" (optional),
+  \"sort-idx\" (optional int), \"hide-in-global-search\" (optional bool — when
+  true, the context is excluded from global contexts search). Gated by
+  recording mode."
   [db req]
   (let [body (parse-json-body req)]
     (if-not (:title body)
       (json-response 400 {:error "title is required"})
       (mw/log-and-guard
         "create-context"
-        {:title (:title body)}
+        (select-keys body [:title :short-title :sort-idx :hide-in-global-search])
         (json-response 201 {:id nil :title (:title body)})
-        (fn []
-          (try (let [ctx (datastore/new-context db {:title (:title body)})]
-                 (json-response 201 {:id (:id ctx) :title (:title ctx)}))
-               (catch Exception e
-                 (log/error e "REST API: create-context failed")
-                 (json-response 500 {:error (.getMessage e)}))))))))
+        (fn [] (create-context-impl db body))))))
 
 (defn backfill-embeddings
   "POST /rest/backfill/embeddings — embed every item that has a non-empty
