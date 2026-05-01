@@ -20,6 +20,10 @@
   []
   (.getElementById js/document "item-highlighted-secondary-contexts"))
 
+(defn- get-hide-in-global-search-el
+  []
+  (.getElementById js/document "item-hide-in-global-search"))
+
 (defn- get-event-el [] (.getElementById js/document "has-date"))
 
 (defn- get-date-el [] (.getElementById js/document "date-picker"))
@@ -91,7 +95,14 @@
            [:input#item-highlighted-secondary-contexts.line
             {:autoComplete :off
              :defaultValue (str/join " " (:highlighted-secondary-contexts (:data item)))
-             :placeholder "Highlighted secondary contexts"}]]])}))
+             :placeholder "Highlighted secondary contexts"}]]
+          (when (:is_context item)
+            [:div {:style {:margin-top "10px"}}
+             [:label
+              [:input#item-hide-in-global-search
+               {:type :checkbox
+                :defaultChecked (boolean (:hide-in-global-search (:data item)))}]
+              " Hide in global search"]])])}))
 
 (defn event-component
   [item *date-visible?]
@@ -127,10 +138,12 @@
              :tags (.-value (get-tags-el))
              :has-event? (.-checked (get-event-el))
              :date (when (get-date-el) (.-value (get-date-el)))
-             :data {:highlighted-secondary-contexts
-                      (str/split (.-value (get-highlighted-secondary-contexts-el)) #" ")
-                    :resource-links (into {}
-                                          (keep (fn [{:keys [k v]}]
-                                                  (when (and (not-empty k) (not-empty v))
-                                                    [(keyword k) v]))
-                                                @*resource-links))}}})
+             :data (cond-> {:highlighted-secondary-contexts
+                              (str/split (.-value (get-highlighted-secondary-contexts-el)) #" ")
+                            :resource-links (into {}
+                                                  (keep (fn [{:keys [k v]}]
+                                                          (when (and (not-empty k) (not-empty v))
+                                                            [(keyword k) v]))
+                                                        @*resource-links))}
+                     (get-hide-in-global-search-el)
+                     (assoc :hide-in-global-search (.-checked (get-hide-in-global-search-el))))}})
