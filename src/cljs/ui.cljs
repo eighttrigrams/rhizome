@@ -5,6 +5,7 @@
             [ui.modals :as modals]
             [ui.modals.actions :as modal-actions]
             [ui.recording-mode :as recording-mode]
+            [ui.danger-mode :as danger-mode]
             [ui.main.rhs.modifiers :as modifiers]))
 
 (def original-state {:items [] :contexts [] :selected-item nil :active-search nil :modal nil})
@@ -57,6 +58,8 @@
                  {:on-mouse-leave #(reset! modifiers/*alt-pressed? false)
                   :on-mouse-enter #(reset! modifiers/*alt-pressed? false)}
                  [recording-mode/indicator *state]
+                 [danger-mode/indicator *state]
+                 [danger-mode/confirm-modal *state]
                  [:div#main-layer
                   {;; TODO document recipe to make the div able to listen to key events,
                    ;; https://stackoverflow.com/a/3149416
