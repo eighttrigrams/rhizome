@@ -158,9 +158,10 @@
          (mapcat (fn [ns-sym] (when-let [n (find-ns ns-sym)] (ns-publics n))))
          (keep (fn [[sym v]]
                  (when-let [doc (:doc (meta v))]
-                   {:name (str sym)
-                    :ns (str (ns-name (.ns ^clojure.lang.Var v)))
-                    :arglists (pr-str (:arglists (meta v)))
-                    :doc doc})))
+                   (when-not (:no-describe (meta v))
+                     {:name (str sym)
+                      :ns (str (ns-name (.ns ^clojure.lang.Var v)))
+                      :arglists (pr-str (:arglists (meta v)))
+                      :doc doc}))))
          (sort-by (juxt :ns :name))
          vec)))

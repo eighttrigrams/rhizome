@@ -239,7 +239,7 @@
     {:versions all-versions :total (count all-versions)}))
 
 (defn- update-item'
-  [db {:keys [id title short_title annotation sort_idx tags data] :as item}]
+  [db {:keys [id title short_title annotation sort_idx tags data hide_in_global_search] :as item}]
   (log/info (str "update-item!!!!!!!!!" title ":" sort_idx "<-" (integer? sort_idx)))
   (let [old-item (get-item db item)
         old-data (:data old-item)
@@ -260,7 +260,8 @@
                :short_title [:inline short_title]
                :annotation [:inline annotation]
                :tags [:inline tags]
-               :data [:inline (json/generate-string data)]}
+               :data [:inline (json/generate-string data)]
+               :hide_in_global_search [:inline (boolean hide_in_global_search)]}
               (when (some? sort_idx)
                 {:sort_idx
                    [:inline

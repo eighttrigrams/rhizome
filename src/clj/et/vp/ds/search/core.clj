@@ -7,7 +7,7 @@
   [:items.title :items.short_title :items.sort_idx :items.id :items.data
    ;; TODO make tags optional; i need it only in tracker-mcp
    :items.tags [:items.annotation :item_annotation] :items.is_context :items.inserted_at
-   :items.updated_at :items.date])
+   :items.updated_at :items.date :items.hide_in_global_search])
 
 (defn exclusion-clause
   [selected-item-id mode]
@@ -43,7 +43,7 @@
       [:raw (format "searchable @@ to_tsquery('simple', '%s')" (convert-q-to-query-string q))])))
 
 (defn search-items
-  [q {:keys [selected-item-id all-items? link-context link-item] :as _opts}
+  [q {:keys [selected-item-id all-items? link-context link-item exclude-hidden?] :as _opts}
    {:keys [limit] :as _ctx}]
   (let [exclusion-clause (when (or link-context link-item)
                            (exclusion-clause selected-item-id (if link-item :items :contexts)))]
@@ -52,7 +52,9 @@
                         :where [:and (get-search-clause q)
                                 (when-not all-items? [:= :items.is_context true])
                                 (when selected-item-id [:not [:= :items.id selected-item-id]])
-                                (when selected-item-id exclusion-clause)]
+                                (when selected-item-id exclusion-clause)
+                                (when exclude-hidden?
+                                  [:= :items.hide_in_global_search false])]
                         :order-by [[(if all-items? :items.updated_at :items.updated_at_ctx) :desc]]}
                        (when limit {:limit limit})))))
 

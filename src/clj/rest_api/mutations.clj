@@ -118,7 +118,7 @@
     sort-idx
       (assoc :sort_idx [:inline sort-idx])
     (true? hide-in-global-search)
-      (assoc :data [:inline (json/generate-string {:hide-in-global-search true})])))
+      (assoc :hide_in_global_search [:inline true])))
 
 (defn- create-context-impl
   [db {:keys [title] :as body}]
@@ -216,7 +216,7 @@
              (log/error e "REST API: backfill-embeddings failed")
              (json-response 500 {:error (.getMessage e)}))))))
 
-(defn toggle-recording-mode
+(defn ^:no-describe toggle-recording-mode
   "POST /rest/recording-mode/toggle — toggle the write-gate. While ON, mutating
   endpoints execute; while OFF they log intent and return 403 {:dropped true}.
   Prefer the in-app shortcut Option+Shift+W for day-to-day toggling."

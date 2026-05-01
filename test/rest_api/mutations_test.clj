@@ -59,7 +59,7 @@
       (let [stored (ds/get-item db {:id (:id body)})]
         (is (true? (:is_context stored)))
         (is (nil? (:short_title stored)))
-        (is (not (true? (:hide-in-global-search (:data stored)))))))))
+        (is (false? (:hide_in_global_search stored)))))))
 
 (deftest create-context-with-short-title-test
   (test-with-fresh-db "stores :short-title when provided"
@@ -71,12 +71,13 @@
       (is (= "WW2" (:short_title stored))))))
 
 (deftest create-context-with-hide-in-global-search-test
-  (test-with-fresh-db "stores :hide-in-global-search flag in data"
+  (test-with-fresh-db "stores :hide-in-global-search as a top-level column"
     (let [resp (POST* "/rest/contexts" {:title "Hidden" :hide-in-global-search true})
           body (body-json resp)
           stored (ds/get-item db {:id (:id body)})]
       (is (= 201 (:status resp)))
-      (is (true? (:hide-in-global-search (:data stored)))))))
+      (is (true? (:hide-in-global-search body)))
+      (is (true? (:hide_in_global_search stored))))))
 
 (deftest create-context-with-both-extras-test
   (test-with-fresh-db "applies short-title and hide-in-global-search together"
@@ -88,7 +89,7 @@
           stored (ds/get-item db {:id (:id body)})]
       (is (= 201 (:status resp)))
       (is (= "PN" (:short_title stored)))
-      (is (true? (:hide-in-global-search (:data stored)))))))
+      (is (true? (:hide_in_global_search stored))))))
 
 (deftest create-context-with-sort-idx-test
   (test-with-fresh-db "stores :sort-idx when provided"
@@ -99,12 +100,13 @@
       (is (= 3 (:sort_idx stored))))))
 
 (deftest create-context-hide-false-noop-test
-  (test-with-fresh-db ":hide-in-global-search=false does not write the flag"
+  (test-with-fresh-db ":hide-in-global-search=false leaves column at its default"
     (let [resp (POST* "/rest/contexts" {:title "Public" :hide-in-global-search false})
           body (body-json resp)
           stored (ds/get-item db {:id (:id body)})]
       (is (= 201 (:status resp)))
-      (is (not (contains? (:data stored) :hide-in-global-search))))))
+      (is (false? (:hide_in_global_search stored)))
+      (is (not (contains? body :hide-in-global-search))))))
 
 (deftest create-context-missing-title-test
   (test-with-fresh-db "rejects requests without :title"

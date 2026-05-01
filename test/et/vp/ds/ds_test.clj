@@ -242,3 +242,12 @@
         (is (= true (get-in updated-rel1 [:data :contexts (:id target-item) :is-context?])))
         (is (= true (get-in updated-rel2 [:data :contexts (:id target-item) :is-context?])))
         (is (= true (get-in updated-rel3 [:data :contexts (:id target-item) :is-context?])))))))
+
+(deftest hide-in-global-search-test
+  (test-with-reset-db-and-time "update-item persists :hide_in_global_search round-trip"
+    (let [ctx (ds/new-context db {:title "Hidden context"})]
+      (is (false? (:hide_in_global_search (ds/get-item db {:id (:id ctx)}))))
+      (ds/update-item db (assoc ctx :hide_in_global_search true))
+      (is (true? (:hide_in_global_search (ds/get-item db {:id (:id ctx)}))))
+      (ds/update-item db (assoc ctx :hide_in_global_search false))
+      (is (false? (:hide_in_global_search (ds/get-item db {:id (:id ctx)})))))))

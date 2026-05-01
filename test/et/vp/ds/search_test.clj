@@ -161,6 +161,17 @@
                               :context-ids-set #{(:id item-1)}})]
     [item-1 item-2]))
 
+(deftest exclude-hidden
+  (test-with-reset-db-and-time
+   "context flagged with hide_in_global_search is omitted when :exclude-hidden? is set"
+   (let [_visible (new-item db {:title "visible-context"})
+         hidden   (new-item db {:title "hidden-context"})]
+     (ds/update-item db (assoc hidden :hide_in_global_search true))
+     (is (= #{"visible-context" "hidden-context"}
+            (set (items-q-titles "" {}))))
+     (is (= #{"visible-context"}
+            (set (items-q-titles "" {:exclude-hidden? true})))))))
+
 (deftest link-item
   (test-with-reset-db-and-time
    "link-item"

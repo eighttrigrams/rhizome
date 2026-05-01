@@ -17,7 +17,7 @@
 
 (defn item->api
   [{:keys [id title short_title description is_context data inserted_at updated_at date
-           annotation]}]
+           annotation hide_in_global_search]}]
   (cond-> {:id id
            :title title
            :short-title short_title
@@ -27,6 +27,7 @@
     description (assoc :description description)
     date (assoc :date date)
     annotation (assoc :annotation annotation)
+    (true? hide_in_global_search) (assoc :hide-in-global-search true)
     (-> data
         :contexts)
       (assoc :contexts

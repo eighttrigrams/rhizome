@@ -11,7 +11,8 @@ CREATE TABLE IF NOT EXISTS items (
     is_context INTEGER NOT NULL DEFAULT 0,
     date TEXT,
     sort_idx INTEGER NOT NULL DEFAULT -1,
-    annotation TEXT
+    annotation TEXT,
+    hide_in_global_search INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS relations (

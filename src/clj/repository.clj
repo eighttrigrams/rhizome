@@ -65,9 +65,9 @@
 (defn- search-context-items
   [db q opts]
   (let [[selected-item-id opts] (simplify-params opts)
-        global? (and (nil? selected-item-id) (not (:link-context opts)))]
-    (cond->> (map update-contexts (search/search-items db q opts {:limit limit}))
-      global? (remove (fn [item] (true? (get-in item [:data :hide-in-global-search])))))))
+        global? (and (nil? selected-item-id) (not (:link-context opts)))
+        opts (cond-> opts global? (assoc :exclude-hidden? true))]
+    (map update-contexts (search/search-items db q opts {:limit limit}))))
 
 (defn- search-related-items
   ([db q selected-item] (search-related-items db q selected-item {}))

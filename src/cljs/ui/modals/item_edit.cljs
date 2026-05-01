@@ -101,7 +101,7 @@
              [:label
               [:input#item-hide-in-global-search
                {:type :checkbox
-                :defaultChecked (boolean (:hide-in-global-search (:data item)))}]
+                :defaultChecked (boolean (:hide_in_global_search item))}]
               " Hide in global search"]])])}))
 
 (defn event-component
@@ -130,20 +130,21 @@
 
 (defn get-values
   [id _item?]
-  {:context {:id id
-             :title (.-value (get-title-el))
-             :short_title (.-value (get-short-title-el))
-             :sort_idx (utils/display->sort-idx (.-value (get-sort-idx-el)))
-             :annotation (.-value (get-annotation-el))
-             :tags (.-value (get-tags-el))
-             :has-event? (.-checked (get-event-el))
-             :date (when (get-date-el) (.-value (get-date-el)))
-             :data (cond-> {:highlighted-secondary-contexts
+  {:context (cond-> {:id id
+                     :title (.-value (get-title-el))
+                     :short_title (.-value (get-short-title-el))
+                     :sort_idx (utils/display->sort-idx (.-value (get-sort-idx-el)))
+                     :annotation (.-value (get-annotation-el))
+                     :tags (.-value (get-tags-el))
+                     :has-event? (.-checked (get-event-el))
+                     :date (when (get-date-el) (.-value (get-date-el)))
+                     :data {:highlighted-secondary-contexts
                               (str/split (.-value (get-highlighted-secondary-contexts-el)) #" ")
                             :resource-links (into {}
                                                   (keep (fn [{:keys [k v]}]
                                                           (when (and (not-empty k) (not-empty v))
                                                             [(keyword k) v]))
-                                                        @*resource-links))}
-                     (get-hide-in-global-search-el)
-                     (assoc :hide-in-global-search (.-checked (get-hide-in-global-search-el))))}})
+                                                        @*resource-links))}}
+              (get-hide-in-global-search-el)
+              (assoc :hide_in_global_search
+                (.-checked (get-hide-in-global-search-el))))})
