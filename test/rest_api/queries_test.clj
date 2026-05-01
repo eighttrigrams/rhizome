@@ -54,27 +54,18 @@
   (test-with-fresh-db "lists every handler in queries and mutations with its docstring"
     (let [resp (GET* "/rest/describe")
           body (body-json resp)
-          nss (set (map :ns body))
           names (set (map :name body))]
       (is (= 200 (:status resp)))
       (is (sequential? body))
-      (is (contains? nss "rest-api.queries"))
-      (is (contains? nss "rest-api.mutations"))
-      (is (contains? names "describe"))
       (is (contains? names "create-item"))
-      (is (every? (fn [h] (and (seq (:doc h)) (seq (:arglists h)))) body)))))
-
-(deftest list-contexts-test
-  (test-with-fresh-db "returns baseline contexts plus anything newly created"
-    (ds/new-context db {:title "Books"})
-    (ds/new-context db {:title "People"})
-    (let [resp (GET* "/rest/contexts")
-          titles (set (map :title (body-json resp)))]
-      (is (= 200 (:status resp)))
-      (is (contains? titles "Books"))
-      (is (contains? titles "People"))
-      (is (contains? titles "YouTube"))
-      (is (contains? titles "GitHub")))))
+      (is (contains? names "search-contexts"))
+      (is (contains? names "find-contexts"))
+      (is (not (contains? names "describe"))
+          "describe itself is marked :no-describe and excluded")
+      (is (every? (fn [h] (seq (:doc h))) body))
+      (is (every? (fn [h] (and (not (contains? h :ns)) (not (contains? h :arglists))))
+                  body)
+          "ns and arglists are not exposed to API callers"))))
 
 (deftest search-contexts-test
   (test-with-fresh-db "filters contexts by title substring (case-sensitive LIKE)"
@@ -86,7 +77,99 @@
       (is (= 200 (:status resp)))
       (is (contains? titles "Books"))
       (is (not (contains? titles "Blogposts")))
-      (is (not (contains? titles "People"))))))
+      (is (not (contains? titles "People")))))
+
+  (test-with-fresh-db "limit query param caps results"
+    (ds/new-context db {:title "BookA"})
+    (ds/new-context db {:title "BookB"})
+    (ds/new-context db {:title "BookC"})
+    (let [resp (GET* "/rest/contexts?q=Book&limit=2")
+          body (body-json resp)]
+      (is (= 200 (:status resp)))
+      (is (= 2 (count body)))))
+
+  (test-with-fresh-db "hidden-in-global-search contexts are excluded"
+    (ds/new-context db {:title "Zebra Visible"})
+    (let [hidden (ds/new-context db {:title "Zebra Hidden"})]
+      (jdbc/execute-one! db ["UPDATE items SET hide_in_global_search = true WHERE id = ?"
+                             (:id hidden)]))
+    (let [resp (GET* "/rest/contexts?q=Zebra")
+          titles (set (map :title (body-json resp)))]
+      (is (= 200 (:status resp)))
+      (is (contains? titles "Zebra Visible"))
+      (is (not (contains? titles "Zebra Hidden"))))))
+
+(deftest find-contexts-test
+  (test-with-fresh-db "exact-match returns matching contexts in 1-to-1 correspondence"
+    (ds/new-context db {:title "Books"})
+    (ds/new-context db {:title "People"})
+    (let [resp (GET* "/rest/contexts?by-exact=title&q=Books&q=People")
+          titles (set (map :title (body-json resp)))]
+      (is (= 200 (:status resp)))
+      (is (= #{"Books" "People"} titles))))
+
+  (test-with-fresh-db "single q value also works"
+    (ds/new-context db {:title "Books"})
+    (let [resp (GET* "/rest/contexts?by-exact=title&q=Books")
+          body (body-json resp)]
+      (is (= 200 (:status resp)))
+      (is (= ["Books"] (mapv :title body)))))
+
+  (test-with-fresh-db "URL-encoded titles with whitespace and emoji match exactly"
+    (ds/new-context db {:title "Hello World"})
+    (ds/new-context db {:title "🎉 Party"})
+    (let [resp (GET* "/rest/contexts?by-exact=title&q=Hello%20World&q=%F0%9F%8E%89%20Party")
+          titles (set (map :title (body-json resp)))]
+      (is (= 200 (:status resp)))
+      (is (= #{"Hello World" "🎉 Party"} titles))))
+
+  (test-with-fresh-db "substring match does NOT count as exact match"
+    (ds/new-context db {:title "Books"})
+    (let [resp (GET* "/rest/contexts?by-exact=title&q=Book")
+          body (body-json resp)]
+      (is (= 404 (:status resp)))
+      (is (= ["Book"] (:missing body)))))
+
+  (test-with-fresh-db "400 when by-exact is not 'title'"
+    (let [resp (GET* "/rest/contexts?by-exact=short-title&q=Books")]
+      (is (= 400 (:status resp)))))
+
+  (test-with-fresh-db "400 when q is missing"
+    (let [resp (GET* "/rest/contexts?by-exact=title")]
+      (is (= 400 (:status resp)))))
+
+  (test-with-fresh-db "400 when caller repeats the same title"
+    (ds/new-context db {:title "Books"})
+    (let [resp (GET* "/rest/contexts?by-exact=title&q=Books&q=Books")
+          body (body-json resp)]
+      (is (= 400 (:status resp)))
+      (is (= ["Books"] (:repeated body)))))
+
+  (test-with-fresh-db "404 when a requested title has no matching context"
+    (ds/new-context db {:title "Books"})
+    (let [resp (GET* "/rest/contexts?by-exact=title&q=Books&q=Missing")
+          body (body-json resp)]
+      (is (= 404 (:status resp)))
+      (is (= ["Missing"] (:missing body)))
+      (is (= [] (:duplicates body)))))
+
+  (test-with-fresh-db "404 when a title matches more than one context"
+    (ds/new-context db {:title "Books"})
+    (ds/new-context db {:title "Books"})
+    (let [resp (GET* "/rest/contexts?by-exact=title&q=Books")
+          body (body-json resp)]
+      (is (= 404 (:status resp)))
+      (is (= [] (:missing body)))
+      (is (= ["Books"] (:duplicates body)))))
+
+  (test-with-fresh-db "hidden-in-global-search contexts are excluded from exact match"
+    (let [hidden (ds/new-context db {:title "Hidden"})]
+      (jdbc/execute-one! db ["UPDATE items SET hide_in_global_search = true WHERE id = ?"
+                             (:id hidden)]))
+    (let [resp (GET* "/rest/contexts?by-exact=title&q=Hidden")
+          body (body-json resp)]
+      (is (= 404 (:status resp)))
+      (is (= ["Hidden"] (:missing body))))))
 
 (deftest get-item-test
   (test-with-fresh-db "returns a leaf item by id"

@@ -51,6 +51,23 @@
          (log/error (str "error in search/search-items: " e " - param was: " q))
          (throw e))))
 
+(defn find-items-by-exact-titles
+  [db titles {:keys [exclude-hidden?] :as _opts}]
+  (try (->> (sql/format {:select core/select
+                         :from [:items]
+                         :where [:and [:= :items.is_context true]
+                                 (when exclude-hidden?
+                                   [:= :items.hide_in_global_search false])
+                                 [:in :items.title titles]]
+                         :order-by [[:items.updated_at_ctx :desc]]})
+            (jdbc/execute! db)
+            (map post-process)
+            (map post-process-contexts))
+       (catch Exception e
+         (log/error (str "error in search/find-items-by-exact-titles: " e
+                         " - titles were: " titles))
+         (throw e))))
+
 (defn- do-query
   [db formatted-query]
   #_(prn "???" formatted-query)

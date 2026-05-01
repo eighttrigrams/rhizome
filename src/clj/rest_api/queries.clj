@@ -5,43 +5,64 @@
             [cambium.core :as log]
             [et.vp.ds :as datastore]
             [et.vp.ds.search :as search]
-            [et.vp.ds.helpers :refer [post-process-base]]
             [semsearch.query :as semsearch]
             [rest-api.util :refer [json-response item->api parse-int-opt parse-ids-csv]]))
 
-(defn list-contexts
-  "GET /rest/contexts — list the 200 most recently touched contexts (items with
-  is_context=true). Returns {:id :title :short-title} tuples."
-  [db]
-  (let [rows (jdbc/execute! db
-                            (sql/format {:select [:id :title :short_title :is_context :inserted_at
-                                                  :updated_at]
-                                         :from [:items]
-                                         :where [:= :is_context true]
-                                         :order-by [[:updated_at_ctx :desc]]
-                                         :limit 200}))]
-    (json-response (map (fn [row]
-                          (let [r (post-process-base row)]
-                            {:id (:id r) :title (:title r) :short-title (:short_title r)}))
-                     rows))))
-
 (defn search-contexts
-  "GET /rest/contexts?q=<query> — search contexts by title/short-title using SQL
-  LIKE. Returns up to 50 matches, most recently touched first."
-  [db q]
-  (let [pattern (str "%" q "%")
-        rows (jdbc/execute! db
-                            (sql/format {:select [:id :title :short_title]
-                                         :from [:items]
-                                         :where [:and [:= :is_context true]
-                                                 [:or [:like :title [:inline pattern]]
-                                                  [:like :short_title [:inline pattern]]]]
-                                         :order-by [[:updated_at_ctx :desc]]
-                                         :limit 50}))]
-    (json-response (map (fn [row]
-                          (let [r (post-process-base row)]
-                            {:id (:id r) :title (:title r) :short-title (:short_title r)}))
-                     rows))))
+  "GET /rest/contexts?q=<query>[&limit=N] — searches **global** contexts
+  (that is, those which have is_context true and hide-in-global-search false)
+  by title, short-title & tags, prefix search. Limit defaults to 10, most
+  recently touched first."
+  [db q limit]
+  (try (let [n (or (parse-int-opt limit) 10)
+             items (search/search-items db (or q "") {:exclude-hidden? true} {:limit n})]
+         (json-response (map item->api items)))
+       (catch Exception e
+         (log/error e "REST API: search-contexts failed")
+         (json-response 500 {:error (.getMessage e)}))))
+
+(defn find-contexts
+  "GET /rest/contexts?by-exact=title&q=Foo&q=Bar%20Baz — exact-match lookup of
+  global contexts (is_context true, hide-in-global-search false) by title.
+  The q param may be repeated to match any of several titles. URL-encode each
+  value; emojis and whitespace work when properly encoded.
+
+  Returns 400 if q is missing or contains duplicates. Returns 404 if any
+  requested title is missing from the result, or if any title matches more
+  than one item — the response body lists :missing and :duplicates so callers
+  can repair the input."
+  [db q by-exact]
+  (try (if-not (= by-exact "title")
+         (json-response 400 {:error "only by-exact=title is supported"})
+         (let [titles (cond (nil? q) [] (sequential? q) (vec q) :else [q])
+               distinct-titles (vec (distinct titles))
+               repeated-in-request (vec (distinct (for [[t xs] (group-by identity titles)
+                                                        :when (> (count xs) 1)]
+                                                    t)))]
+           (cond (empty? titles)
+                   (json-response 400 {:error "by-exact=title requires at least one q"})
+                 (seq repeated-in-request)
+                   (json-response 400
+                                  {:error "duplicate titles in request"
+                                   :repeated repeated-in-request})
+                 :else
+                   (let [items (search/find-items-by-exact-titles
+                                 db distinct-titles {:exclude-hidden? true})
+                         by-title (group-by :title items)
+                         missing (vec (remove by-title distinct-titles))
+                         duplicates (vec (keep (fn [[t xs]] (when (> (count xs) 1) t))
+                                           by-title))]
+                     (if (or (seq missing) (seq duplicates))
+                       (json-response 404
+                                      {:error "titles do not correspond 1-to-1 with items"
+                                       :requested-count (count distinct-titles)
+                                       :found-count (count items)
+                                       :missing missing
+                                       :duplicates duplicates})
+                       (json-response (map item->api items)))))))
+       (catch Exception e
+         (log/error e "REST API: find-contexts failed")
+         (json-response 500 {:error (.getMessage e)}))))
 
 (defn get-item
   "GET /rest/items/:id — fetch a single item (context or leaf) by numeric id,
@@ -147,11 +168,11 @@
          (log/error e "REST API: get-item-with-related failed")
          (json-response 500 {:error (.getMessage e)}))))
 
-(defn describe
+(defn ^:no-describe describe
   "GET /rest/describe — self-description of the REST API. Returns one entry per
   public handler in rest-api.queries and rest-api.mutations that carries a
-  docstring: {:name :ns :arglists :doc}. Reads Clojure var metadata at runtime,
-  so it stays accurate in AOT builds as long as :doc is not elided."
+  docstring: {:name :doc}. Reads Clojure var metadata at runtime, so it stays
+  accurate in AOT builds as long as :doc is not elided."
   []
   (json-response
     (->> ['rest-api.queries 'rest-api.mutations]
@@ -160,8 +181,6 @@
                  (when-let [doc (:doc (meta v))]
                    (when-not (:no-describe (meta v))
                      {:name (str sym)
-                      :ns (str (ns-name (.ns ^clojure.lang.Var v)))
-                      :arglists (pr-str (:arglists (meta v)))
                       :doc doc}))))
-         (sort-by (juxt :ns :name))
+         (sort-by :name)
          vec)))
