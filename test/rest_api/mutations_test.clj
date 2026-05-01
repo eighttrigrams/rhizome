@@ -35,6 +35,13 @@
                   (mock/content-type "application/json")
                   (mock/body (json/generate-string body))))))
 
+(defn- PUT*
+  [path body]
+  (with-redefs [config/config {:db db}]
+    (@handler (-> (mock/request :put path)
+                  (mock/content-type "application/json")
+                  (mock/body (json/generate-string body))))))
+
 (defn- body-json [resp] (json/parse-string (:body resp) true))
 
 (defmacro test-with-fresh-db
@@ -104,6 +111,64 @@
     (let [resp (POST* "/rest/contexts" {:short-title "x"})]
       (is (= 400 (:status resp)))
       (is (= "title is required" (:error (body-json resp)))))))
+
+(deftest upsert-relation-default-show-badge-test
+  (test-with-fresh-db "links source to target with show-badge defaulting to true"
+    (let [ctx (ds/new-context db {:title "Books"})
+          src (ds/new-item db "Source item" "src" #{(:id ctx)} 1)
+          tgt (ds/new-item db "Target item" "tgt" #{(:id ctx)} 2)
+          resp (PUT* "/rest/relations" {:source-id (:id src) :target-id (:id tgt)})
+          stored (ds/get-item db {:id (:id src)})]
+      (is (= 200 (:status resp)))
+      (is (contains? (get-in stored [:data :contexts]) (:id tgt)))
+      (is (true? (get-in stored [:data :contexts (:id tgt) :show-badge?]))))))
+
+(deftest upsert-relation-show-badge-false-test
+  (test-with-fresh-db "honours show-badge=false"
+    (let [ctx (ds/new-context db {:title "Books"})
+          src (ds/new-item db "Source" "src" #{(:id ctx)} 1)
+          tgt (ds/new-item db "Target" "tgt" #{(:id ctx)} 2)
+          resp (PUT* "/rest/relations"
+                     {:source-id (:id src) :target-id (:id tgt) :show-badge false})
+          stored (ds/get-item db {:id (:id src)})]
+      (is (= 200 (:status resp)))
+      (is (false? (get-in stored [:data :contexts (:id tgt) :show-badge?]))))))
+
+(deftest upsert-relation-idempotent-test
+  (test-with-fresh-db "second PUT updates show-badge for the same pair"
+    (let [ctx (ds/new-context db {:title "Books"})
+          src (ds/new-item db "Source" "src" #{(:id ctx)} 1)
+          tgt (ds/new-item db "Target" "tgt" #{(:id ctx)} 2)]
+      (PUT* "/rest/relations" {:source-id (:id src) :target-id (:id tgt) :show-badge true})
+      (PUT* "/rest/relations" {:source-id (:id src) :target-id (:id tgt) :show-badge false})
+      (let [stored (ds/get-item db {:id (:id src)})]
+        (is (false? (get-in stored [:data :contexts (:id tgt) :show-badge?])))))))
+
+(deftest upsert-relation-missing-ids-test
+  (test-with-fresh-db "rejects missing/non-integer ids"
+    (let [resp (PUT* "/rest/relations" {:source-id 1})]
+      (is (= 400 (:status resp)))
+      (is (= "source-id and target-id are required integers" (:error (body-json resp)))))))
+
+(deftest upsert-relation-same-id-test
+  (test-with-fresh-db "rejects source-id == target-id"
+    (let [ctx (ds/new-context db {:title "Books"})
+          item (ds/new-item db "X" "x" #{(:id ctx)} 1)
+          resp (PUT* "/rest/relations" {:source-id (:id item) :target-id (:id item)})]
+      (is (= 400 (:status resp)))
+      (is (= "source-id and target-id must differ" (:error (body-json resp)))))))
+
+(deftest upsert-relation-not-found-test
+  (test-with-fresh-db "404s when source or target item does not exist"
+    (let [ctx (ds/new-context db {:title "Books"})
+          item (ds/new-item db "X" "x" #{(:id ctx)} 1)
+          missing 9999999
+          resp1 (PUT* "/rest/relations" {:source-id missing :target-id (:id item)})
+          resp2 (PUT* "/rest/relations" {:source-id (:id item) :target-id missing})]
+      (is (= 404 (:status resp1)))
+      (is (= "source item not found" (:error (body-json resp1))))
+      (is (= 404 (:status resp2)))
+      (is (= "target item not found" (:error (body-json resp2)))))))
 
 (deftest create-context-recording-off-test
   (testing "with recording off, the write is dropped and no row is created"

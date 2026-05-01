@@ -14,6 +14,8 @@ config.edn
 config.edn.bkp
 tracker.log
 tracker-*.log*
+rest-api.log
+rest-api-*.log*
 *.jks
 *.pkcs12
 *.pem

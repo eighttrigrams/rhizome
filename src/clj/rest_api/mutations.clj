@@ -4,6 +4,7 @@
             [cambium.core :as log]
             [cheshire.core :as json]
             [et.vp.ds :as datastore]
+            [et.vp.ds.relations :as relations]
             [rest-api.middleware :as mw]
             [repository.insertion :as insertion]
             [semsearch.backfill :as backfill]
@@ -144,6 +145,57 @@
         (select-keys body [:title :short-title :sort-idx :hide-in-global-search])
         (json-response 201 {:id nil :title (:title body)})
         (fn [] (create-context-impl db body))))))
+
+(defn- force-show-badge!
+  "link-item-to-another-item! preserves :show-badge? on existing entries; this
+  patches :data.contexts.<target>.show-badge? to the requested value so the
+  upsert reflects the caller's intent."
+  [db source-id target-id show-badge?]
+  (let [item (datastore/get-item db {:id source-id})
+        data (assoc-in (or (:data item) {})
+                       [:contexts target-id :show-badge?] show-badge?)]
+    (jdbc/execute! db
+                   (sql/format {:update [:items]
+                                :set {:data [:inline (json/generate-string data)]}
+                                :where [:= :id [:inline source-id]]}))))
+
+(defn- upsert-relation-impl
+  [db source-item target-item show-badge?]
+  (try (relations/link-item-to-another-item! db source-item target-item show-badge?)
+       (force-show-badge! db (:id source-item) (:id target-item) show-badge?)
+       (json-response (item->api (datastore/get-item db {:id (:id source-item)})))
+       (catch Exception e
+         (log/error e "REST API: upsert-relation failed")
+         (json-response 500 {:error (.getMessage e)}))))
+
+(defn upsert-relation
+  "PUT /rest/relations — upsert a relation between two items. JSON body:
+  {\"source-id\" (required int), \"target-id\" (required int),
+  \"show-badge\" (optional bool, default true — controls whether the badge for
+  this relation is shown in the source item's context list)}. The relation is
+  added to source-item's :data.contexts, with target-item as the owner. Idempotent.
+  Returns 400 on missing/invalid ids, 404 if either item does not exist, 500
+  otherwise. Gated by recording mode."
+  [db req]
+  (let [{:keys [source-id target-id show-badge]} (parse-json-body req)
+        show-badge? (if (nil? show-badge) true (boolean show-badge))]
+    (cond
+      (not (and (integer? source-id) (integer? target-id)))
+        (json-response 400 {:error "source-id and target-id are required integers"})
+      (= source-id target-id)
+        (json-response 400 {:error "source-id and target-id must differ"})
+      :else
+        (let [source-item (datastore/get-item db {:id source-id})
+              target-item (datastore/get-item db {:id target-id})]
+          (cond
+            (nil? (:id source-item)) (json-response 404 {:error "source item not found"})
+            (nil? (:id target-item)) (json-response 404 {:error "target item not found"})
+            :else
+              (mw/log-and-guard
+                "upsert-relation"
+                {:source-id source-id :target-id target-id :show-badge? show-badge?}
+                (json-response (item->api source-item))
+                (fn [] (upsert-relation-impl db source-item target-item show-badge?))))))))
 
 (defn backfill-embeddings
   "POST /rest/backfill/embeddings — embed every item that has a non-empty

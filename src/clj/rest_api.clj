@@ -2,12 +2,14 @@
   (:require [clojure.string :as str]
             [compojure.core :refer [context GET POST PUT]]
             [datastore.config :as config]
+            [rest-api.middleware :as mw]
             [rest-api.mutations :as mutations]
             [rest-api.queries :as queries]))
 
 (defn rest-routes
   []
-  (context "/rest" []
+  (mw/wrap-logging
+   (context "/rest" []
            (GET "/describe" [] (queries/describe))
            (POST "/recording-mode/toggle" [] (mutations/toggle-recording-mode))
            (POST "/backfill/embeddings" [] (mutations/backfill-embeddings (:db config/config)))
@@ -35,4 +37,5 @@
            (GET "/items/:id" [id] (queries/get-item (:db config/config) id))
            (PUT "/items/:id" [id :as req]
                 (mutations/update-item-description (:db config/config) id req))
-           (POST "/items" req (mutations/create-item (:db config/config) req))))
+           (POST "/items" req (mutations/create-item (:db config/config) req))
+           (PUT "/relations" req (mutations/upsert-relation (:db config/config) req)))))
