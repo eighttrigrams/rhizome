@@ -195,6 +195,16 @@
 
 (defn search! [*state] (fetch-and-reset! *state @*state))
 
+(defn vector-search! [*state]
+  (fetch-and-reset-with-method! *state @*state api/vector-search-related-items))
+
+(defn toggle-vector-search-mode!
+  [*state]
+  (swap! *state update :vector-search-mode? not)
+  (if (:vector-search-mode? @*state)
+    (vector-search! *state)
+    (search! *state)))
+
 (defn change-secondary-contexts-selection!
   [*state]
   (fetch-and-reset-with-method! *state @*state api/change-secondary-contexts-selection))

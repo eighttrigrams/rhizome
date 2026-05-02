@@ -45,3 +45,8 @@ html, body {
 #search-input {
     width: 720px;
 }
+
+#search-input.vector-search-mode {
+    outline: 2px solid #2ecc71;
+    outline-offset: -2px;
+}

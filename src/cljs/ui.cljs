@@ -45,7 +45,9 @@
                          (and (:modal old-state) ;; TODO extract duplicate pattern
                               (not (:modal new-state))))
                  (re-focus)
-                 (swap! *state dissoc :q)))))
+                 (swap! *state dissoc :q))
+               (when (and (:active-search old-state) (not (:active-search new-state)))
+                 (swap! *state dissoc :vector-search-mode?)))))
 
 (defn component
   []

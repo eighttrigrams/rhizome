@@ -8,7 +8,9 @@
 (defn save-input!
   [[*state evt]]
   (swap! *state assoc :q (.-value (or (.-target evt) evt)))
-  (actions/search! *state))
+  (if (:vector-search-mode? @*state)
+    (actions/vector-search! *state)
+    (actions/search! *state)))
 
 (def save-input-debounced! (utils/debounce save-input! 180))
 
@@ -20,6 +22,7 @@
                              (.focus (key-handler/get-title-el)))
      :render (fn [] [:input#search-input
                      {:autoComplete :off
+                      :class (when (:vector-search-mode? @*state) "vector-search-mode")
                       :spellCheck false
                       :on-change #(save-input-debounced! [*state %])
                       :on-paste #(save-input-debounced! [*state %])

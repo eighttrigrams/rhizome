@@ -69,3 +69,5 @@
 (defn-over-http get-obsidian-file-content :return-value {})
 
 (defn-over-http update-annotations :return-value {})
+
+(defn-over-http vector-search-related-items :return-value {})

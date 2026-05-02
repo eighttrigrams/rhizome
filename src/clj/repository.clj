@@ -1,11 +1,13 @@
 (ns repository
-  (:require [mount.core :as mount]
+  (:require [clojure.string :as str]
+            [mount.core :as mount]
             [et.vp.ds :as datastore]
             [et.vp.ds.search :as search]
             [et.vp.ds.relations :as datastore.relations]
             [cambium.core :as log]
             [repository.insertion :as insertion]
             [repository.deletion :as deletion]
+            [semsearch.query :as semsearch]
             [opener]))
 
 (defn search-aggregated-contexts
@@ -330,6 +332,18 @@
                  {:aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)}))))))
 
 (defn search-contexts [db opts] {:contexts (search-context-items db (:q opts) (dissoc opts :q))})
+
+(defn vector-search-related-items
+  [{:keys [db]}]
+  (fn [{:keys [selected-item q]}]
+    (let [{:keys [selected-secondary-contexts secondary-contexts-inverted]}
+            (-> selected-item :data :views :current)
+          secondary-ids (when-not secondary-contexts-inverted (vec selected-secondary-contexts))]
+      (if (or (nil? q) (str/blank? q))
+        {:items []}
+        {:items (semsearch/search-related-items-vector
+                  db q (:id selected-item)
+                  {:secondary-context-ids secondary-ids :limit 100})}))))
 
 (defn start-linking-selected-item-to-context-with-local-search
   [db opts]
