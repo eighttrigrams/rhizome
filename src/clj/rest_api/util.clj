@@ -1,6 +1,7 @@
 (ns rest-api.util
   (:require [clojure.string :as str]
-            [cheshire.core :as json]))
+            [cheshire.core :as json]
+            [et.vp.ds.helpers :as helpers]))
 
 (defn json-response
   ([body] (json-response 200 body))
@@ -22,13 +23,13 @@
   (cond-> {:id id
            :title title
            :short-title short_title
-           :is-context (boolean is_context)
+           :is-context (helpers/int->bool is_context)
            :inserted-at inserted_at
            :updated-at updated_at}
     description (assoc :description description)
     date (assoc :date date)
     annotation (assoc :annotation annotation)
-    (true? hide_in_global_search) (assoc :hide-in-global-search true)
+    (helpers/int->bool hide_in_global_search) (assoc :hide-in-global-search true)
     (-> data
         :contexts)
       (assoc :contexts

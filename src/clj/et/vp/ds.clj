@@ -103,12 +103,8 @@
 (defn- basic-items-query
   [id]
   {:select (vec (concat [:items.*]
-                        [(if (dialect/sqlite?)
-                           [[:raw "GROUP_CONCAT(relations.owner_id)"] :relations_id]
-                           [[:array_agg :relations.owner_id] :relations_id])]
-                        [(if (dialect/sqlite?)
-                           [[:raw "GROUP_CONCAT(relations.annotation)"] :relations_annotation]
-                           [[:array_agg :relations.annotation] :relations_annotation])]))
+                        [[[:raw "GROUP_CONCAT(relations.owner_id)"]   :relations_id]]
+                        [[[:raw "GROUP_CONCAT(relations.annotation)"] :relations_annotation]]))
    :from [:items]
    :join [:relations [:= :items.id :relations.target_id]]
    :where [:= :items.id [:inline id]]
@@ -375,16 +371,15 @@
   ([db title short_title] (create-new-item! db title short_title nil))
   ([db title short_title sort_idx]
    (let [now (helpers/gen-date)
-         id (:items/id (jdbc/execute-one! db
-                                          (sql/format
-                                            {:insert-into [:items]
-                                             :columns (concat [:inserted_at :updated_at
-                                                               :updated_at_ctx :title :short_title]
-                                                              (if sort_idx [:sort_idx] []))
-                                             :values [(concat [[:raw now] [:raw now] [:raw now]
-                                                               title short_title]
-                                                              (if sort_idx [sort_idx] []))]})
-                                          {:return-keys true}))]
+         id (helpers/insert-and-get-id! db
+              (sql/format
+                {:insert-into [:items]
+                 :columns (concat [:inserted_at :updated_at
+                                   :updated_at_ctx :title :short_title]
+                                  (if sort_idx [:sort_idx] []))
+                 :values [(concat [[:raw now] [:raw now] [:raw now]
+                                   title short_title]
+                                  (if sort_idx [sort_idx] []))]}))]
      (when (empty? title) (insert-date db id (helpers/gen-iso-simple-date-str)))
      id)))
 
@@ -406,13 +401,13 @@
 
 (defn new-context
   [db {title :title}]
-  (let [now (helpers/gen-date)]
+  (let [now (helpers/gen-date)
+        id (helpers/insert-and-get-id! db
+             (sql/format {:insert-into [:items]
+                          :columns [:inserted_at :updated_at :updated_at_ctx :title
+                                    :is_context]
+                          :values [[[:raw now]
+                                    [:raw now] [:raw now] [:inline title] true]]}))]
     (-> (jdbc/execute-one! db
-                           (sql/format {:insert-into [:items]
-                                        :columns [:inserted_at :updated_at :updated_at_ctx :title
-                                                  :is_context]
-                                        :values [[[:raw now] ;; before, it was just "NOW()"
-                                                  [:raw now] [:raw now] [:inline title] true]]})
-                           {:return-keys true})
-        un-namespace-keys
-        (dissoc :searchable :embedding))))
+          (sql/format {:select [:*] :from [:items] :where [:= :id [:inline id]]}))
+        post-process-base)))

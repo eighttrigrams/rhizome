@@ -14,12 +14,17 @@ $2 npx shadow-cljs watch app # Frontend
 
 Visit `localhost:8020`
 
+> Storage is **SQLite** (single file, no server). If you're upgrading from a
+> Postgres-backed checkout, see [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) for
+> the one-shot `clj -M:migrate` data import.
+
 ## Tests
 
-Unit + API tests (Clojure, against the `cometoid_test` Postgres DB configured in `test_config.edn`):
+Unit + API tests (Clojure, against a local SQLite file at `./rhizome-test.db`,
+schema applied automatically on test load):
 
 ```bash
-$ clj -X:test
+$ clj -X:test       # or `make test`
 ```
 
 The `test/api/` suite uses `ring.mock` + the same JSON+transit envelope the
@@ -29,7 +34,7 @@ frontend sends, so it covers the wire format end-to-end. The harness in
 ### End-to-end (Playwright)
 
 Headless browser tests live under `e2e/`. They drive the real UI against a
-server bound to a separate port (`:3005`) using the `cometoid_test` DB, with
+server bound to a separate port (`:3005`) using `./rhizome-e2e.db`, with
 state reset between scenarios via `POST /test/reset`.
 
 ```bash

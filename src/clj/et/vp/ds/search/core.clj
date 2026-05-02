@@ -1,7 +1,6 @@
 (ns et.vp.ds.search.core
   (:require [honey.sql :as sql]
-            [clojure.string :as str]
-            [datastore.dialect :as dialect]))
+            [clojure.string :as str]))
 
 (def select
   [:items.title :items.short_title :items.sort_idx :items.id :items.data
@@ -21,26 +20,33 @@
        :from :relations
        :where [:= :relations.target_id selected-item-id]})]])
 
-(defn- remove-some-chars
+(defn- sanitize-fts-token
+  "FTS5 is fussy about its query syntax. Strip everything that isn't a
+   word-character or whitespace, collapse runs of whitespace, then trim."
   [q]
-  (-> q
-      (str/replace #"[\[\]()|!&':{}]+" " ")
-      (str/replace "  " " ")
-      (str/trim)))
+  (-> (or q "")
+      (str/replace #"[\"\[\]()|!&':{}*+\-,;]+" " ")
+      (str/replace #"\s+" " ")
+      str/trim))
 
-(defn convert-q-to-query-string
+(defn convert-q-to-fts-query
+  "Turn a free-text query into an FTS5 MATCH expression: every token is
+   ANDed and prefix-matched. Empty input → nil (caller should skip)."
   [q]
-  (let [qs (str/join " & " (map #(str % ":*") (str/split (remove-some-chars (or q "")) #" ")))]
-    (if (= ":*" qs) "*" qs)))
+  (let [tokens (->> (str/split (sanitize-fts-token q) #" ")
+                    (remove str/blank?))]
+    (when (seq tokens)
+      (str/join " AND " (map #(str \" % \" "*") tokens)))))
 
 (defn get-search-clause
+  "Returns a HoneySQL fragment that constrains items.id to the FTS index
+   match, or nil when q is empty."
   [q]
-  (when-not (= "" (or q ""))
-    (if (dialect/sqlite?)
-      (let [pattern (str "%" (str/replace (or q "") #"[%_]" "") "%")]
-        [:or [:like :items.title [:inline pattern]] [:like :items.short_title [:inline pattern]]
-         [:like :items.tags [:inline pattern]]])
-      [:raw (format "searchable @@ to_tsquery('simple', '%s')" (convert-q-to-query-string q))])))
+  (when-let [match (convert-q-to-fts-query q)]
+    [:in :items.id
+     [:raw (str "(SELECT rowid FROM items_fts WHERE items_fts MATCH '"
+                (str/replace match "'" "''")
+                "')")]]))
 
 (defn search-items
   [q {:keys [selected-item-id all-items? link-context link-item exclude-hidden?] :as _opts}

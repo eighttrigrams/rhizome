@@ -1,24 +1,15 @@
 #!/usr/bin/env bb
 
-(require '[babashka.pods :as pods]
-         '[babashka.process :refer [shell]]
+(require '[babashka.process :refer [shell]]
          '[clojure.edn :as edn])
 
 (def config (edn/read-string (slurp "./config.edn")))
 (def db-config (:db config))
-(def sqlite? (= "sqlite" (:dbtype db-config)))
 
-(when-not sqlite?
-  (pods/load-pod 'org.babashka/postgresql "0.1.0")
-  (require '[pod.babashka.postgresql :as pg]))
-
-(def pg-db
-  {:dbtype   "postgresql"
-   :dbname   (:dbname db-config)
-   :user     (:user db-config)
-   :password (:password db-config)
-   :port     (:port db-config)
-   :hostname (:hostname db-config)})
+(when-not (= "sqlite" (:dbtype db-config))
+  (binding [*out* *err*]
+    (println "config.edn :db must be SQLite — rhizome no longer supports Postgres."))
+  (System/exit 1))
 
 (defn sqlite-exec! [sql & params]
   (let [full-sql (if (seq params)
@@ -26,38 +17,19 @@
                    sql)]
     (shell {:out :string :err :string} "sqlite3" (:dbname db-config) full-sql)))
 
-(defn pg-execute! [sql]
-  ((resolve 'pod.babashka.postgresql/execute!) pg-db sql))
-
-(defn pg-execute-one! [sql]
-  ((resolve 'pod.babashka.postgresql/execute-one!) pg-db sql))
-
 (defn clear-database []
   (println "Clearing database...")
-  (if sqlite?
-    (do
-      (sqlite-exec! "DELETE FROM relations WHERE target_id > 0 OR owner_id > 0;")
-      (sqlite-exec! "DELETE FROM items WHERE id > 0;"))
-    (do
-      (pg-execute! ["DELETE FROM relations WHERE target_id > 0 OR owner_id > 0"])
-      (pg-execute! ["DELETE FROM items WHERE id > 0"]))))
+  (sqlite-exec! "DELETE FROM relations WHERE target_id > 0 OR owner_id > 0;")
+  (sqlite-exec! "DELETE FROM items WHERE id > 0;"))
 
 (defn create-context [title]
-  (if sqlite?
-    (do
-      (sqlite-exec! (str "INSERT INTO items (title, short_title, data, is_context, inserted_at, updated_at, updated_at_ctx) "
-                         "VALUES (?, '', '{}', 1, datetime('now'), datetime('now'), datetime('now'));")
-                    title)
-      (let [result (sqlite-exec! "SELECT last_insert_rowid();")
-            id (-> (:out result) clojure.string/trim Integer/parseInt)]
-        (println "Created context:" title "with id" id)
-        id))
-    (let [result (pg-execute-one! [(str "INSERT INTO items (title, short_title, data, is_context, inserted_at, updated_at, updated_at_ctx) "
-                                        "VALUES (?, '', '{}', true, NOW(), NOW(), NOW()) RETURNING id, title")
-                                   title])
-          id (:items/id result)]
-      (println "Created context:" title "with id" id)
-      id)))
+  (sqlite-exec! (str "INSERT INTO items (title, short_title, data, is_context, inserted_at, updated_at, updated_at_ctx) "
+                     "VALUES (?, '', '{}', 1, datetime('now'), datetime('now'), datetime('now'));")
+                title)
+  (let [result (sqlite-exec! "SELECT last_insert_rowid();")
+        id (-> (:out result) clojure.string/trim Integer/parseInt)]
+    (println "Created context:" title "with id" id)
+    id))
 
 (def all-contexts
   ["Imports"
@@ -78,7 +50,7 @@
 
 (defn main [& args]
   (try
-    (println (str "Using " (if sqlite? "SQLite" "PostgreSQL") " database: " (:dbname db-config)))
+    (println (str "Using SQLite database: " (:dbname db-config)))
     (clear-database)
     (if (and (seq args) (= (first args) "0"))
       (println "Database cleared. No contexts created.")

@@ -3,7 +3,8 @@
             [honey.sql :as sql]
             [cambium.core :as log]
             [cheshire.core :as json]
-            [datastore.dialect :as dialect]))
+            [datastore.dialect :as dialect]
+            [et.vp.ds.helpers :as helpers]))
 
 (defn- get-title
   [container]
@@ -25,7 +26,7 @@
                                       [id
                                        {:title (if (seq short_title) short_title title)
                                         :show-badge? true
-                                        :is-context? (boolean is_context)}])
+                                        :is-context? (helpers/int->bool is_context)}])
                                  (jdbc/execute!
                                    db
                                    (sql/format {:select [:items.id :title :short_title :is_context]
@@ -128,7 +129,7 @@
   (let [contexts (merge (:contexts (:data item))
                         {(:id another-item) {:title (get-title another-item)
                                              :show-badge? show-badge?
-                                             :is-context? (boolean (:is_context another-item))}})]
+                                             :is-context? (helpers/int->bool (:is_context another-item))}})]
     (set-containers-of-item! db item contexts)
     (update-collection-title-in-collection-items db
                                                  (:id item)

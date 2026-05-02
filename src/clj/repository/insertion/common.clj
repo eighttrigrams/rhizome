@@ -1,5 +1,6 @@
 (ns repository.insertion.common
   (:require [et.vp.ds :as datastore]
+            [et.vp.ds.helpers :as helpers]
             [next.jdbc :as jdbc]
             [honey.sql :as sql]))
 
@@ -21,7 +22,7 @@
                              (map (fn [{:items/keys [id short_title title is_context]}]
                                     [id
                                      {:title (if (seq short_title) short_title title)
-                                      :is-context? (boolean is_context)
+                                      :is-context? (helpers/int->bool is_context)
                                       :show-badge? true}]))
                              (into {})))
         item (datastore/update-item db

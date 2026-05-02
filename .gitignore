@@ -46,3 +46,8 @@ test-results
 playwright-report
 docker-rhizome/token
 .playwright-mcp
+rhizome-test.db
+rhizome-e2e.db
+*.db-journal
+*.db-wal
+*.db-shm

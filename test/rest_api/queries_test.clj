@@ -1,23 +1,13 @@
 (ns rest-api.queries-test
-  (:require [clojure.test :refer [deftest is testing use-fixtures]]
+  (:require [clojure.test :refer [deftest is testing]]
             [cheshire.core :as json]
             [next.jdbc :as jdbc]
             [ring.mock.request :as mock]
             [ring.middleware.params :refer [wrap-params]]
             [datastore.config :as config]
             [rest-api :as rest-api]
-            [semsearch.embedder :as embedder]
-            [semsearch.backfill :as backfill]
             [et.vp.ds :as ds]
             [et.vp.ds.search-test :refer [reset-db with-time db]]))
-
-(defn- ensure-embedding-column!
-  "Idempotent: ensures pgvector + items.embedding exist in the test DB."
-  []
-  (jdbc/execute-one! db ["CREATE EXTENSION IF NOT EXISTS vector"])
-  (jdbc/execute-one! db ["ALTER TABLE items ADD COLUMN IF NOT EXISTS embedding vector(768)"]))
-
-(use-fixtures :once (fn [f] (ensure-embedding-column!) (f)))
 
 (def baseline-contexts
   ["Imports"
@@ -257,70 +247,6 @@
         (is (= 200 (:status resp)))
         (is (some #(= "The Prize" (:title %)) body))))))
 
-(defn- unit-vec
-  "Returns a 768-dim vector that is 1.0 at position `i` and 0 elsewhere.
-  Each i gives an axis orthogonal to the others, so cosine distance is 0
-  only for the same i and 1 for any other."
-  [i]
-  (into [] (for [k (range 768)] (if (= k i) 1.0 0.0))))
-
-(defn- set-embedding!
-  "Write a vector directly to items.embedding. Bypasses the ingestion helper
-  (which requires a description) — tests want full control over what gets
-  embedded."
-  [item-id v]
-  (jdbc/execute-one! db
-    ["UPDATE items SET embedding = ?::vector WHERE id = ?"
-     (embedder/vec->pg-literal v) item-id]))
-
-(deftest get-related-items-vector-test
-  (test-with-fresh-db "ranks items by cosine distance to the embedded query"
-    (let [texts-to-vecs {"The Prize"        (unit-vec 0)
-                         "Sapiens"          (unit-vec 1)
-                         "Cartesian Linguistics" (unit-vec 2)
-                         "history of oil"   (unit-vec 0)}
-          stub-embed (fn [text]
-                       (or (get texts-to-vecs text)
-                           (throw (ex-info "unexpected embed input" {:text text}))))]
-      (with-redefs [embedder/embed-text stub-embed]
-        (let [ctx (ds/new-context db {:title "Books"})
-              a (ds/new-item db "The Prize" "p" #{(:id ctx)} 1)
-              b (ds/new-item db "Sapiens" "s" #{(:id ctx)} 2)
-              c (ds/new-item db "Cartesian Linguistics" "c" #{(:id ctx)} 3)]
-          (set-embedding! (:id a) (texts-to-vecs "The Prize"))
-          (set-embedding! (:id b) (texts-to-vecs "Sapiens"))
-          (set-embedding! (:id c) (texts-to-vecs "Cartesian Linguistics"))
-          (let [resp (GET* (str "/rest/items/" (:id ctx) "/related?vector=true&q=history%20of%20oil"))
-                body (body-json resp)]
-            (is (= 200 (:status resp)))
-            (is (= "The Prize" (-> body first :title))
-                "exact-match vector ranks first")
-            (is (= #{"The Prize" "Sapiens" "Cartesian Linguistics"}
-                   (set (map :title body)))
-                "all three embedded items come back (un-embedded items would be skipped)"))))))
-
-  (test-with-fresh-db "ignores items without an embedding"
-    (with-redefs [embedder/embed-text (fn [_] (unit-vec 0))]
-      (let [ctx (ds/new-context db {:title "Books"})
-            a (ds/new-item db "Embedded" "e" #{(:id ctx)} 1)]
-        (ds/new-item db "Not embedded" "n" #{(:id ctx)} 2)
-        (set-embedding! (:id a) (unit-vec 0))
-        (let [resp (GET* (str "/rest/items/" (:id ctx) "/related?vector=true&q=anything"))
-              body (body-json resp)]
-          (is (= 200 (:status resp)))
-          (is (= ["Embedded"] (mapv :title body)))))))
-
-  (test-with-fresh-db "400 when vector=true and q is empty"
-    (with-redefs [embedder/embed-text (fn [_] (unit-vec 0))]
-      (let [ctx (ds/new-context db {:title "Books"})
-            resp (GET* (str "/rest/items/" (:id ctx) "/related?vector=true"))]
-        (is (= 400 (:status resp))))))
-
-  (test-with-fresh-db "falls back to normal search when vector param is absent"
-    (with-redefs [embedder/embed-text (fn [_] (throw (ex-info "must not be called" {})))]
-      (let [ctx (ds/new-context db {:title "Books"})]
-        (ds/new-item db "The Prize" "p" #{(:id ctx)} 1)
-        (let [resp (GET* (str "/rest/items/" (:id ctx) "/related"))
-              body (body-json resp)]
-          (is (= 200 (:status resp)))
-          (is (= ["The Prize"] (mapv :title body))))))))
+;; Vector-search tests removed during the SQLite migration; the feature is
+;; currently a no-op. See MIGRATION_GUIDE.md > "Vector search" for the plan
+;; to reintroduce it (sqlite-vec or in-Clojure cosine).

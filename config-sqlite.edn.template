@@ -1,5 +1,0 @@
-{:port 3006
- :dev? true
- :db {:dbtype "sqlite"
-      :dbname "./rhizome.db"}
- :folders {:homefolder "./files/"}}

@@ -10,11 +10,6 @@
             [et.vp.ds :as ds]
             [et.vp.ds.search-test :refer [reset-db with-time db]]))
 
-(defn- ensure-embedding-column!
-  []
-  (jdbc/execute-one! db ["CREATE EXTENSION IF NOT EXISTS vector"])
-  (jdbc/execute-one! db ["ALTER TABLE items ADD COLUMN IF NOT EXISTS embedding vector(768)"]))
-
 (defn- with-recording-on
   [f]
   (let [was-on? (mw/enabled?)]
@@ -22,9 +17,7 @@
     (try (f) (finally (when-not was-on? (mw/toggle!))))))
 
 (use-fixtures :once
-  (fn [f]
-    (ensure-embedding-column!)
-    (with-recording-on f)))
+  (fn [f] (with-recording-on f)))
 
 (def ^:private handler (delay (wrap-params (rest-api/rest-routes))))
 

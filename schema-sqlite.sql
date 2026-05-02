@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS items (
     date TEXT,
     sort_idx INTEGER NOT NULL DEFAULT -1,
     annotation TEXT,
-    hide_in_global_search INTEGER NOT NULL DEFAULT 0
+    hide_in_global_search INTEGER NOT NULL DEFAULT 0,
+    embedding TEXT
 );
 
 CREATE TABLE IF NOT EXISTS relations (
@@ -38,3 +39,26 @@ CREATE INDEX IF NOT EXISTS idx_items_title ON items(title);
 CREATE INDEX IF NOT EXISTS idx_items_is_context ON items(is_context);
 CREATE INDEX IF NOT EXISTS idx_relations_owner_id ON relations(owner_id);
 CREATE INDEX IF NOT EXISTS idx_relations_target_id ON relations(target_id);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
+    title, short_title, tags,
+    content='items', content_rowid='id',
+    tokenize='unicode61 remove_diacritics 2'
+);
+
+CREATE TRIGGER IF NOT EXISTS items_ai AFTER INSERT ON items BEGIN
+    INSERT INTO items_fts(rowid, title, short_title, tags)
+    VALUES (new.id, new.title, new.short_title, new.tags);
+END;
+
+CREATE TRIGGER IF NOT EXISTS items_ad AFTER DELETE ON items BEGIN
+    INSERT INTO items_fts(items_fts, rowid, title, short_title, tags)
+    VALUES('delete', old.id, old.title, old.short_title, old.tags);
+END;
+
+CREATE TRIGGER IF NOT EXISTS items_au AFTER UPDATE ON items BEGIN
+    INSERT INTO items_fts(items_fts, rowid, title, short_title, tags)
+    VALUES('delete', old.id, old.title, old.short_title, old.tags);
+    INSERT INTO items_fts(rowid, title, short_title, tags)
+    VALUES (new.id, new.title, new.short_title, new.tags);
+END;
