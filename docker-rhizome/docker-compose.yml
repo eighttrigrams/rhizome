@@ -19,6 +19,7 @@ services:
     environment:
       - CLAUDE_CODE_OAUTH_TOKEN
       - PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
+      - SQLITE_VEC_PATH=/usr/local/lib/sqlite-vec/vec0
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:

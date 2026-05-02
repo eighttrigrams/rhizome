@@ -2,9 +2,12 @@ PORT ?= 3006
 E2E_PORT ?= 3005
 SHADOW_PORT ?= 8020
 
-.PHONY: start stop restart test e2e deploy
+.PHONY: start stop restart test e2e deploy install-sqlite-vec
 
-start:
+install-sqlite-vec:
+	@./bin/install-sqlite-vec.sh
+
+start: install-sqlite-vec
 	@if lsof -nP -iTCP:$(E2E_PORT) -sTCP:LISTEN >/dev/null 2>&1; then \
 	  echo "e2e server is running on :$(E2E_PORT) (pid $$(lsof -nP -iTCP:$(E2E_PORT) -sTCP:LISTEN -t)). Wait for it to finish, or stop it, before starting dev."; \
 	  exit 1; \

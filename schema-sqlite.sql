@@ -62,3 +62,8 @@ CREATE TRIGGER IF NOT EXISTS items_au AFTER UPDATE ON items BEGIN
     INSERT INTO items_fts(rowid, title, short_title, tags)
     VALUES (new.id, new.title, new.short_title, new.tags);
 END;
+
+CREATE VIRTUAL TABLE IF NOT EXISTS items_vec USING vec0(
+    item_id INTEGER PRIMARY KEY,
+    embedding FLOAT[768]
+);

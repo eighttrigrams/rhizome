@@ -142,7 +142,8 @@
     (when (and (.exists dest-file) force)
       (println "removing existing" dest)
       (.delete dest-file))
-    (let [db {:dbtype "sqlite" :dbname dest}]
+    (require 'datastore.connection)
+    (let [db ((resolve 'datastore.connection/make-datasource) {:dbname dest})]
       (println "creating SQLite schema in" dest)
       (jdbc/execute! db ["PRAGMA foreign_keys = OFF"])
       (jdbc/execute! db ["PRAGMA journal_mode = MEMORY"])

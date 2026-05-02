@@ -143,7 +143,9 @@
       (throw (ex-info "src config :db is not postgresql" {:db db})))
     db))
 
-(defn- sqlite-spec [path] {:dbtype "sqlite" :dbname path})
+(defn- sqlite-spec [path]
+  (require 'datastore.connection)
+  ((resolve 'datastore.connection/make-datasource) {:dbname path}))
 
 (defn run-migration!
   [{:keys [src dest force]}]

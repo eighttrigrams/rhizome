@@ -69,17 +69,36 @@ mappable, with one real friction point: **vector search**. See section 5.
   stores dates as ISO TEXT).
 
 ### Vector search (semsearch.*)
-Vector / semantic search is **disabled** during the migration. The three
-namespaces are kept as harmless stubs so the rest of the codebase keeps
-compiling:
+Vector / semantic search runs on `sqlite-vec`. Embeddings live in the
+`items_vec` virtual table (`vec0`, FLOAT[768]). Each connection opens with
+`enable_load_extension=true` and runs `SELECT load_extension(<vec0>)` —
+see `datastore.connection/make-datasource`. The legacy `items.embedding`
+TEXT column from the migration is no longer read at runtime; it remains in
+the schema only as a checkpoint of pgvector data.
 
-- `semsearch.embedder/embed-text` — returns `nil`
-- `semsearch.backfill/embed-and-store!` — no-op
-- `semsearch.backfill/backfill-missing!` — returns `{:embedded 0 :failed 0 :skipped true}`
-- `semsearch.query/search-related-items-vector` — returns `[]`
+- `semsearch.embedder/embed-text` — Ollama HTTP (URL via `OLLAMA_URL` env)
+- `semsearch.backfill/embed-and-store!` — writes to `items_vec`
+- `semsearch.backfill/backfill-missing!` — embeds every item missing
+   from `items_vec`
+- `semsearch.query/search-related-items-vector` — KNN over `items_vec`,
+   filtered by relations
 
-The `embedding` column is preserved on the `items` table (TEXT) so the
-existing data survives a re-enable. See section 5 for the plan.
+Embeddings are generated **on the host only** (Ollama is not reached from
+inside the Docker container). The container ships sqlite-vec so the app
+boots and `items_vec` is queryable, but any endpoint that calls
+`embed-text` (vector search, ingestion-time embedding, the backfill REST
+endpoint) will fail at the HTTP step inside the container.
+
+### Installing sqlite-vec
+
+- **macOS host:** `make install-sqlite-vec` — downloads `vec0.dylib` to
+  `./.sqlite-vec/`. `make start` runs this as a prereq.
+- **Container:** baked into the image at build time
+  (`/usr/local/lib/sqlite-vec/vec0.so`); `SQLITE_VEC_PATH` is set in
+  `docker-compose.yml`.
+
+The connection layer (`datastore.connection/make-datasource`) resolves
+`SQLITE_VEC_PATH` first, then falls back to a per-OS default.
 
 ### Configuration
 - `config.edn`, `config.edn.template`, `e2e_config.edn`, `test_config.edn` all

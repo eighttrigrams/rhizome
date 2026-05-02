@@ -31,6 +31,14 @@ RUN curl -sLO https://raw.githubusercontent.com/babashka/babashka/master/install
  && ./install --dir /usr/local/bin --static \
  && rm install
 
+ARG SQLITE_VEC_VERSION=0.1.6
+RUN mkdir -p /usr/local/lib/sqlite-vec \
+ && curl -fsSL "https://github.com/asg017/sqlite-vec/releases/download/v${SQLITE_VEC_VERSION}/sqlite-vec-${SQLITE_VEC_VERSION}-loadable-linux-x86_64.tar.gz" \
+    | tar -xz -C /tmp \
+ && cp /tmp/vec0.so /usr/local/lib/sqlite-vec/vec0.so \
+ && rm -f /tmp/vec0.so
+ENV SQLITE_VEC_PATH=/usr/local/lib/sqlite-vec/vec0
+
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
 ENV PATH="/opt/java/openjdk/bin:${PATH}"

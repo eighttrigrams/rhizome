@@ -6,6 +6,8 @@
             [ring.middleware.params :refer [wrap-params]]
             [datastore.config :as config]
             [rest-api :as rest-api]
+            [semsearch.embedder :as embedder]
+            [semsearch.backfill :as backfill]
             [et.vp.ds :as ds]
             [et.vp.ds.search-test :refer [reset-db with-time db]]))
 
@@ -247,6 +249,51 @@
         (is (= 200 (:status resp)))
         (is (some #(= "The Prize" (:title %)) body))))))
 
-;; Vector-search tests removed during the SQLite migration; the feature is
-;; currently a no-op. See MIGRATION_GUIDE.md > "Vector search" for the plan
-;; to reintroduce it (sqlite-vec or in-Clojure cosine).
+(defn- unit-vec
+  "Returns a 768-dim vector that is 1.0 at position `i` and 0 elsewhere.
+   Each i gives an axis orthogonal to the others."
+  [i]
+  (into [] (for [k (range 768)] (if (= k i) 1.0 0.0))))
+
+(deftest get-related-items-vector-test
+  (test-with-fresh-db "ranks items by cosine distance to the embedded query"
+    (let [texts-to-vecs {"The Prize"             (unit-vec 0)
+                         "Sapiens"               (unit-vec 1)
+                         "Cartesian Linguistics" (unit-vec 2)
+                         "history of oil"        (unit-vec 0)}
+          stub-embed (fn [text]
+                       (or (get texts-to-vecs text)
+                           (throw (ex-info "unexpected embed input" {:text text}))))]
+      (with-redefs [embedder/embed-text stub-embed]
+        (let [ctx (ds/new-context db {:title "Books"})
+              a (ds/new-item db "The Prize" "p" #{(:id ctx)} 1)
+              b (ds/new-item db "Sapiens" "s" #{(:id ctx)} 2)
+              c (ds/new-item db "Cartesian Linguistics" "c" #{(:id ctx)} 3)]
+          (backfill/store-embedding! db (:id a) (texts-to-vecs "The Prize"))
+          (backfill/store-embedding! db (:id b) (texts-to-vecs "Sapiens"))
+          (backfill/store-embedding! db (:id c) (texts-to-vecs "Cartesian Linguistics"))
+          (let [resp (GET* (str "/rest/items/" (:id ctx) "/related?vector=true&q=history%20of%20oil"))
+                body (body-json resp)]
+            (is (= 200 (:status resp)))
+            (is (= "The Prize" (-> body first :title))
+                "exact-match vector ranks first")
+            (is (= #{"The Prize" "Sapiens" "Cartesian Linguistics"}
+                   (set (map :title body)))
+                "all three embedded items come back"))))))
+
+  (test-with-fresh-db "ignores items without an embedding"
+    (with-redefs [embedder/embed-text (fn [_] (unit-vec 0))]
+      (let [ctx (ds/new-context db {:title "Books"})
+            a (ds/new-item db "Embedded" "e" #{(:id ctx)} 1)]
+        (ds/new-item db "Not embedded" "n" #{(:id ctx)} 2)
+        (backfill/store-embedding! db (:id a) (unit-vec 0))
+        (let [resp (GET* (str "/rest/items/" (:id ctx) "/related?vector=true&q=anything"))
+              body (body-json resp)]
+          (is (= 200 (:status resp)))
+          (is (= ["Embedded"] (mapv :title body)))))))
+
+  (test-with-fresh-db "400 when vector=true and q is empty"
+    (with-redefs [embedder/embed-text (fn [_] (unit-vec 0))]
+      (let [ctx (ds/new-context db {:title "Books"})
+            resp (GET* (str "/rest/items/" (:id ctx) "/related?vector=true&q="))]
+        (is (= 400 (:status resp)))))))

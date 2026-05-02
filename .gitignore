@@ -51,3 +51,4 @@ rhizome-e2e.db
 *.db-journal
 *.db-wal
 *.db-shm
+.sqlite-vec
