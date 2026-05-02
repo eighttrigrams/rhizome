@@ -168,19 +168,26 @@
          (log/error e "REST API: get-item-with-related failed")
          (json-response 500 {:error (.getMessage e)}))))
 
+(def ^:private global-conventions
+  ["Every mutation (POST/PUT/PATCH/DELETE) MUST include a non-blank \"reason\" field in its JSON body explaining why the change is being made. Requests without one are rejected with 400. The reason is recorded in server logs and is not repeated in individual endpoint docstrings."
+   "Mutations are gated by recording mode: while OFF they are logged as intent and dropped (a stub response is returned). Toggle with POST /rest/recording-mode/toggle, or in-app with Option+Shift+W."])
+
 (defn ^:no-describe describe
-  "GET /rest/describe — self-description of the REST API. Returns one entry per
-  public handler in rest-api.queries and rest-api.mutations that carries a
-  docstring: {:name :doc}. Reads Clojure var metadata at runtime, so it stays
-  accurate in AOT builds as long as :doc is not elided."
+  "GET /rest/describe — self-description of the REST API. Returns
+  {:conventions [...]  :endpoints [{:name :doc} ...]}. The :conventions
+  list captures rules that apply to every mutation so individual endpoint
+  docstrings don't have to repeat them. Endpoints come from public vars
+  in rest-api.queries and rest-api.mutations that carry a docstring; vars
+  marked ^:no-describe are excluded."
   []
   (json-response
-    (->> ['rest-api.queries 'rest-api.mutations]
-         (mapcat (fn [ns-sym] (when-let [n (find-ns ns-sym)] (ns-publics n))))
-         (keep (fn [[sym v]]
-                 (when-let [doc (:doc (meta v))]
-                   (when-not (:no-describe (meta v))
-                     {:name (str sym)
-                      :doc doc}))))
-         (sort-by :name)
-         vec)))
+    {:conventions global-conventions
+     :endpoints (->> ['rest-api.queries 'rest-api.mutations]
+                     (mapcat (fn [ns-sym] (when-let [n (find-ns ns-sym)] (ns-publics n))))
+                     (keep (fn [[sym v]]
+                             (when-let [doc (:doc (meta v))]
+                               (when-not (:no-describe (meta v))
+                                 {:name (str sym)
+                                  :doc doc}))))
+                     (sort-by :name)
+                     vec)}))

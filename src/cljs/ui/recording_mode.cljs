@@ -10,7 +10,11 @@
 
 (defn toggle!
   [*state]
-  (-> (js/fetch "/rest/recording-mode/toggle" #js {:method "POST"})
+  (-> (js/fetch "/rest/recording-mode/toggle"
+                #js {:method "POST"
+                     :headers #js {"Content-Type" "application/json"}
+                     :body (js/JSON.stringify
+                             #js {:reason "in-app keyboard shortcut Option+Shift+W"})})
       (.then (json-handler *state))))
 
 (defn indicator

@@ -9,7 +9,8 @@
 (defn rest-routes
   []
   (mw/wrap-logging
-   (context "/rest" []
+   (mw/wrap-require-reason
+    (context "/rest" []
            (GET "/describe" [] (queries/describe))
            (POST "/recording-mode/toggle" [] (mutations/toggle-recording-mode))
            (POST "/backfill/embeddings" [] (mutations/backfill-embeddings (:db config/config)))
@@ -42,4 +43,4 @@
                 (mutations/deletion-preview-related-items (:db config/config) id))
            (POST "/items/:id/related/delete" [id]
                  (mutations/delete-related-items (:db config/config) id))
-           (PUT "/relations" req (mutations/upsert-relation (:db config/config) req)))))
+           (PUT "/relations" req (mutations/upsert-relation (:db config/config) req))))))

@@ -51,20 +51,25 @@
 (defn- body-json [resp] (json/parse-string (:body resp) true))
 
 (deftest describe-test
-  (test-with-fresh-db "lists every handler in queries and mutations with its docstring"
+  (test-with-fresh-db "returns conventions + endpoint docs"
     (let [resp (GET* "/rest/describe")
           body (body-json resp)
-          names (set (map :name body))]
+          endpoints (:endpoints body)
+          names (set (map :name endpoints))
+          conventions (:conventions body)]
       (is (= 200 (:status resp)))
-      (is (sequential? body))
+      (is (sequential? endpoints))
+      (is (sequential? conventions))
+      (is (some #(re-find #"reason" %) conventions)
+          "the reason-required rule is documented in :conventions")
       (is (contains? names "create-item"))
       (is (contains? names "search-contexts"))
       (is (contains? names "find-contexts"))
       (is (not (contains? names "describe"))
           "describe itself is marked :no-describe and excluded")
-      (is (every? (fn [h] (seq (:doc h))) body))
+      (is (every? (fn [h] (seq (:doc h))) endpoints))
       (is (every? (fn [h] (and (not (contains? h :ns)) (not (contains? h :arglists))))
-                  body)
+                  endpoints)
           "ns and arglists are not exposed to API callers"))))
 
 (deftest search-contexts-test

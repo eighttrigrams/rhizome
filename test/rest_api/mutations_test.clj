@@ -28,17 +28,33 @@
 
 (def ^:private handler (delay (wrap-params (rest-api/rest-routes))))
 
+(defn- with-default-reason
+  "All mutations in tests get a default :reason injected (the
+  wrap-require-reason middleware would otherwise reject them with 400).
+  Individual tests that need to exercise the missing-reason path use
+  POST-raw* / PUT-raw* below."
+  [body]
+  (if (and (map? body) (contains? body :reason)) body (assoc body :reason "test")))
+
 (defn- POST*
   [path body]
   (with-redefs [config/config {:db db}]
     (@handler (-> (mock/request :post path)
                   (mock/content-type "application/json")
-                  (mock/body (json/generate-string body))))))
+                  (mock/body (json/generate-string (with-default-reason body)))))))
 
 (defn- PUT*
   [path body]
   (with-redefs [config/config {:db db}]
     (@handler (-> (mock/request :put path)
+                  (mock/content-type "application/json")
+                  (mock/body (json/generate-string (with-default-reason body)))))))
+
+(defn- POST-raw*
+  "POST without auto-injecting :reason — for testing the missing-reason path."
+  [path body]
+  (with-redefs [config/config {:db db}]
+    (@handler (-> (mock/request :post path)
                   (mock/content-type "application/json")
                   (mock/body (json/generate-string body))))))
 
@@ -185,10 +201,28 @@
           (is (= "ShouldNotPersist" (:title body))))
         (finally (mw/toggle!))))))
 
+(deftest reason-required-on-mutations-test
+  (test-with-fresh-db "POST/PUT without a reason in the JSON body is rejected with 400"
+    (let [r1 (POST-raw* "/rest/contexts" {:title "X"})
+          r2 (POST-raw* "/rest/contexts" {:title "X" :reason ""})
+          r3 (POST-raw* "/rest/contexts" {:title "X" :reason "  "})
+          r4 (POST-raw* "/rest/items/1/related/delete" nil)]
+      (is (= 400 (:status r1)))
+      (is (= 400 (:status r2)))
+      (is (= 400 (:status r3)))
+      (is (= 400 (:status r4)))
+      (is (re-find #"reason" (:error (body-json r1))))
+      (is (re-find #"reason" (:error (body-json r4)))))))
+
+(deftest reason-not-required-on-reads-test
+  (test-with-fresh-db "GETs (read-only) are unaffected by the reason rule"
+    (let [resp (with-redefs [config/config {:db db}]
+                 (@handler (mock/request :get "/rest/describe")))]
+      (is (= 200 (:status resp))))))
+
 (defn- POST-empty*
   [path]
-  (with-redefs [config/config {:db db}]
-    (@handler (mock/request :post path))))
+  (POST* path {}))
 
 (defn- GET*
   [path]
@@ -317,6 +351,7 @@
   (testing "delete-related-items + deletion-preview are unlisted in /rest/describe"
     (let [resp (with-redefs [config/config {:db db}]
                  (@handler (mock/request :get "/rest/describe")))
-          names (set (map :name (body-json resp)))]
+          endpoints (:endpoints (body-json resp))
+          names (set (map :name endpoints))]
       (is (not (contains? names "delete-related-items")))
       (is (not (contains? names "deletion-preview-related-items"))))))

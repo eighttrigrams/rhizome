@@ -36,7 +36,10 @@
                        (dissoc :modal)
                        (dissoc :danger-preview-items)))
     (-> (js/fetch (str "/rest/items/" parent-id "/related/delete")
-                  #js {:method "POST"})
+                  #js {:method "POST"
+                       :headers #js {"Content-Type" "application/json"}
+                       :body (js/JSON.stringify
+                               #js {:reason "in-app danger-mode bulk delete of related items"})})
         (.then (fn [^js resp] (.json resp)))
         (.then (fn [^js data]
                  (when (.-dropped data)

@@ -1,5 +1,6 @@
 (ns rest-api.middleware
   (:require [cambium.core :as log]
+            [cheshire.core :as json]
             [clojure.string :as str]))
 
 (defonce ^:private *recording? (atom false))
@@ -35,14 +36,76 @@
         [nil req]))
     [nil req]))
 
+(defn- abbreviate-descriptions
+  "Walk a parsed JSON map/seq for log-friendliness:
+   - any :description string value is replaced with \"<N chars>\";
+   - any :contexts map is reduced to its key-set (titles dropped, only ids
+     remain) since titles in log lines are noise;
+   Recurses through nested maps and collections."
+  [x]
+  (cond
+    (map? x) (reduce-kv (fn [acc k v]
+                          (let [desc? (or (= "description" k) (= :description k))
+                                ctxs? (or (= "contexts" k) (= :contexts k))]
+                            (assoc acc k
+                              (cond
+                                (and desc? (string? v)) (str "<" (count v) " chars>")
+                                (and ctxs? (map? v)) (vec (keys v))
+                                :else (abbreviate-descriptions v)))))
+                        {} x)
+    (sequential? x) (mapv abbreviate-descriptions x)
+    :else x))
+
+(defn- abbreviate-descriptions-in-json
+  "If s parses as JSON, return it re-serialised with :description fields
+  collapsed to char-counts; otherwise return s untouched."
+  [s]
+  (or (try (-> s (json/parse-string) abbreviate-descriptions json/generate-string)
+           (catch Exception _ nil))
+      s))
+
 (defn- response-body-str
-  "Stringify a response body for logging without consuming streams."
+  "Stringify a response body for logging without consuming streams.
+  Long :description fields are abbreviated to char-counts so the log
+  line stays scannable."
   [body]
   (cond
     (nil? body) nil
-    (string? body) body
-    (coll? body) (try (pr-str body) (catch Exception _ nil))
+    (string? body) (abbreviate-descriptions-in-json body)
+    (coll? body) (try (pr-str (abbreviate-descriptions body)) (catch Exception _ nil))
     :else nil))
+
+(def ^:private mutation-methods
+  "HTTP methods treated as mutations and therefore required to carry a
+  non-blank :reason in the JSON body."
+  #{:post :put :patch :delete})
+
+(defn wrap-require-reason
+  "For mutation requests (POST/PUT/PATCH/DELETE), require a non-blank
+  \"reason\" field in the JSON body. Reads the body once, validates,
+  then restores it as a ByteArrayInputStream so downstream handlers can
+  re-slurp normally. Read-only methods (GET, HEAD, OPTIONS) pass through
+  untouched. The rule is documented globally in /rest/describe so
+  individual handlers don't have to mention it."
+  [handler]
+  (fn [req]
+    (if-not (mutation-methods (:request-method req))
+      (handler req)
+      (let [body-str (try (slurp (:body req)) (catch Exception _ nil))
+            req' (assoc req :body (java.io.ByteArrayInputStream.
+                                    (.getBytes (or body-str "") "UTF-8")))
+            parsed (try (when (and body-str (not (str/blank? body-str)))
+                          (json/parse-string body-str true))
+                        (catch Exception _ nil))
+            reason (:reason parsed)]
+        (if (and (string? reason) (not (str/blank? reason)))
+          (handler req')
+          {:status 400
+           :headers {"Content-Type" "application/json"}
+           :body (json/generate-string
+                   {:error
+                      (str "\"reason\" is required in the JSON body "
+                           "(non-empty string). See GET /rest/describe.")})})))))
 
 (defn wrap-logging
   "Ring middleware that logs every REST API interaction (request + response)
