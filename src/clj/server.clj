@@ -8,6 +8,7 @@
             [env :refer [wrap-env-defaults]]
             [mount.core :as mount]
             [datastore.config :as config]
+            [datastore.schema :as schema]
             [next.jdbc :as jdbc]
             [repository :as r]
             [et.vp.ds :as datastore]
@@ -135,6 +136,7 @@
                                       (or (nil? (:private-addr config/config))
                                           (not (string? (:private-addr config/config)))))
                              (throw (Exception. "config invalid")))
+                           (schema/apply-schema! (:db config/config))
                            (future (j/run-jetty (app) {:port (:port config/config)
                                                        :host (or (:bind-host config/config) "127.0.0.1")})))
                 :stop 0)

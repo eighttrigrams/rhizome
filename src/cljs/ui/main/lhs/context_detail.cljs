@@ -25,7 +25,7 @@
     (swap! *state assoc-in
       [:selected-item :data :views :current]
       (if-not (:current (:views (:data (:selected-item @*state))))
-        {:secondary-contexts-unassigned-selected false}
+        {:secondary-contexts-unassigned-selected true}
         (update (:current (:views (:data (:selected-item @*state))))
                 :secondary-contexts-unassigned-selected
                 not)))
