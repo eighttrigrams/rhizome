@@ -38,8 +38,6 @@
 
 (defn-over-http delete-item :return-value {})
 
-(defn-over-http preview-deletion-of-related-items :return-value {})
-
 (defn-over-http fetch-context :return-value {})
 
 (defn-over-http deselect-context :return-value {})

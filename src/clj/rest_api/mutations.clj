@@ -5,6 +5,7 @@
             [cheshire.core :as json]
             [et.vp.ds :as datastore]
             [et.vp.ds.relations :as relations]
+            [et.vp.ds.search :as search]
             [rest-api.middleware :as mw]
             [repository.insertion :as insertion]
             [repository.deletion]
@@ -217,60 +218,85 @@
              (log/error e "REST API: backfill-embeddings failed")
              (json-response 500 {:error (.getMessage e)}))))))
 
-(defn- delete-related-items-impl
-  [db parent-id ids]
-  (try (let [parent (datastore/get-item db {:id parent-id})
-             results (mapv (fn [iid]
-                             (let [item (datastore/get-item db {:id iid})]
-                               (if-not (:id item)
-                                 {:id iid :status :missing}
-                                 (do (repository.deletion/delete-item db item)
-                                     (if (:id (datastore/get-item db {:id iid}))
-                                       {:id iid :status :skipped}
-                                       {:id iid :status :deleted})))))
-                           ids)
-             grouped (group-by :status results)
-             ->ids (fn [k] (mapv :id (get grouped k)))]
-         (json-response {:requested (count ids)
-                         :parent-id parent-id
-                         :parent-title (:title parent)
-                         :deleted (->ids :deleted)
-                         :skipped (->ids :skipped)
-                         :missing (->ids :missing)}))
+(defn- candidates-for-related-deletion
+  "Items that danger-mode 'delete related' targets, given the parent
+  item. Mirrors the in-app related-items search but with q forced empty:
+  honours the parent's stored view filters (selected secondary contexts,
+  inverted/unassigned flags, search-mode, description filter)."
+  [db parent]
+  (let [view (-> parent :data :views :current)
+        opts (assoc (select-keys view
+                                 [:secondary-contexts-inverted
+                                  :secondary-contexts-unassigned-selected
+                                  :selected-secondary-contexts
+                                  :search-mode
+                                  :description-filter])
+               :selected-item-id (:id parent))]
+    (search/search-related-items db "" (:id parent) opts {})))
+
+(defn- run-related-deletion!
+  "Walk the candidate items and call repository.deletion/delete-item for
+  each (with dry-run? when previewing). Returns the assembled response
+  body — same shape for preview and real delete so both endpoints stay
+  in lock-step."
+  [db parent dry-run?]
+  (let [items (candidates-for-related-deletion db parent)
+        results (mapv (fn [{:keys [id title] :as item}]
+                        (let [{:keys [status reason]}
+                                (repository.deletion/delete-item db item dry-run?)]
+                          (cond-> {:id id :title title :status status}
+                            reason (assoc :reason reason))))
+                      items)]
+    {:requested (count items)
+     :parent-id (:id parent)
+     :parent-title (:title parent)
+     :dry-run dry-run?
+     :results results}))
+
+(defn ^:no-describe deletion-preview-related-items
+  "GET /rest/items/:id/related/deletion-preview — read-only preview of
+  what POST /rest/items/:id/related/delete would do. Walks the same
+  per-item code path as the real delete (with dry-run? = true), so the
+  preview's :results — including which items would be skipped because
+  they have children, multiply-referenced files, etc. — match what an
+  actual delete would produce. Not gated. Unlisted (no /rest/describe)."
+  [db id]
+  (try (let [parent-id (Integer/parseInt id)
+             parent (datastore/get-item db {:id parent-id})]
+         (if-not (:id parent)
+           (json-response 404 {:error "parent item not found"})
+           (json-response (run-related-deletion! db parent true))))
+       (catch NumberFormatException _ (json-response 400 {:error "Invalid item ID"}))
        (catch Exception e
-         (log/error e "REST API: delete-related-items failed")
+         (log/error e "REST API: deletion-preview-related-items failed")
          (json-response 500 {:error (.getMessage e)}))))
 
 (defn ^:no-describe delete-related-items
-  "POST /rest/items/:id/related/delete — delete a list of items related to the
-  context :id. JSON body: {\"item-ids\" [int ...]}. Each id is deleted via the
-  same path as the in-app deletion (so items that contain children, or whose
-  file is referenced more than once, are skipped server-side and logged).
-  Gated by recording mode: when off, the request is logged with full intent
-  and dropped with {:requested N :deleted 0 :dropped true}. Unlisted: not
-  exposed via /rest/describe."
-  [db id req]
+  "POST /rest/items/:id/related/delete — delete every item that
+  /related/deletion-preview returns for the same parent. The server
+  recomputes the candidate set from the parent's stored view (q forced
+  empty, secondary contexts honoured) and walks the SAME per-item path
+  as the preview (just with dry-run? = false), so the two cannot drift.
+  Gated by recording mode: when off, the request is dropped with
+  :dropped true and an empty :results. Unlisted (no /rest/describe)."
+  [db id]
   (try (let [parent-id (Integer/parseInt id)
-             {:keys [item-ids]} (parse-json-body req)]
-         (cond
-           (not (sequential? item-ids))
-             (json-response 400 {:error "item-ids must be an array of integers"})
-           (not (every? integer? item-ids))
-             (json-response 400 {:error "item-ids must be an array of integers"})
-           (nil? (:id (datastore/get-item db {:id parent-id})))
-             (json-response 404 {:error "parent item not found"})
-           :else
-             (mw/log-and-guard
-               "delete-related-items"
-               {:parent-id parent-id :item-ids item-ids :count (count item-ids)}
-               (json-response {:requested (count item-ids)
-                               :deleted []
-                               :skipped []
-                               :missing []
-                               :parent-id parent-id
-                               :dropped true})
-               (fn [] (delete-related-items-impl db parent-id item-ids)))))
-       (catch NumberFormatException _ (json-response 400 {:error "Invalid item ID"}))))
+             parent (datastore/get-item db {:id parent-id})]
+         (if-not (:id parent)
+           (json-response 404 {:error "parent item not found"})
+           (mw/log-and-guard
+             "delete-related-items"
+             {:parent-id parent-id :parent-title (:title parent)}
+             (json-response {:parent-id parent-id
+                             :parent-title (:title parent)
+                             :dry-run false
+                             :results []
+                             :dropped true})
+             (fn [] (json-response (run-related-deletion! db parent false))))))
+       (catch NumberFormatException _ (json-response 400 {:error "Invalid item ID"}))
+       (catch Exception e
+         (log/error e "REST API: delete-related-items failed")
+         (json-response 500 {:error (.getMessage e)}))))
 
 (defn ^:no-describe toggle-recording-mode
   "POST /rest/recording-mode/toggle — toggle the write-gate. While ON, mutating

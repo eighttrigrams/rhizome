@@ -198,13 +198,6 @@
   [{:keys [db]}]
   (fn [opts item] (deletion/delete-item db item) {:items (search db opts) :item-view? false}))
 
-(defn preview-deletion-of-related-items
-  [{:keys [db]}]
-  (fn [{:keys [selected-item] :as _opts}]
-    (if-not selected-item
-      {:danger-preview-items []}
-      {:danger-preview-items (search-related-items db "" selected-item)})))
-
 
 (defn delete-context
   [{:keys [db]}]

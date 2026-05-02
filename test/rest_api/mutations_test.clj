@@ -185,79 +185,71 @@
           (is (= "ShouldNotPersist" (:title body))))
         (finally (mw/toggle!))))))
 
-(deftest delete-related-items-deletes-listed-test
-  (test-with-fresh-db "deletes only the items whose ids are in :item-ids"
+(defn- POST-empty*
+  [path]
+  (with-redefs [config/config {:db db}]
+    (@handler (mock/request :post path))))
+
+(defn- GET*
+  [path]
+  (with-redefs [config/config {:db db}]
+    (@handler (mock/request :get path))))
+
+(defn- ids-with-status
+  [body status]
+  (mapv :id (filter #(= status (:status %)) (:results body))))
+
+(deftest delete-related-items-deletes-all-related-test
+  (test-with-fresh-db "deletes every item related to the parent (q ignored)"
     (let [parent (ds/new-context db {:title "Books"})
           a (ds/new-item db "Item A" "" #{(:id parent)} 1)
           b (ds/new-item db "Item B" "" #{(:id parent)} 2)
-          c (ds/new-item db "Item C" "" #{(:id parent)} 3)
-          resp (POST* (str "/rest/items/" (:id parent) "/related/delete")
-                      {:item-ids [(:id a) (:id b)]})
+          unrelated (ds/new-context db {:title "Other"})
+          c (ds/new-item db "Item C" "" #{(:id unrelated)} 3)
+          resp (POST-empty* (str "/rest/items/" (:id parent) "/related/delete"))
           body (body-json resp)]
       (is (= 200 (:status resp)))
+      (is (false? (:dry-run body)))
       (is (= 2 (:requested body)))
-      (is (= (set [(:id a) (:id b)]) (set (:deleted body))))
-      (is (empty? (:skipped body)))
-      (is (empty? (:missing body)))
+      (is (= (set [(:id a) (:id b)]) (set (ids-with-status body "deleted"))))
+      (is (empty? (ids-with-status body "skipped")))
       (is (nil? (:id (ds/get-item db {:id (:id a)}))))
       (is (nil? (:id (ds/get-item db {:id (:id b)}))))
       (is (= (:id c) (:id (ds/get-item db {:id (:id c)})))))))
 
-(deftest delete-related-items-empty-list-test
-  (test-with-fresh-db "empty :item-ids is a no-op that returns 200"
+(deftest delete-related-items-no-related-test
+  (test-with-fresh-db "parent with no related items returns empty :results"
     (let [parent (ds/new-context db {:title "Books"})
-          resp (POST* (str "/rest/items/" (:id parent) "/related/delete")
-                      {:item-ids []})
+          resp (POST-empty* (str "/rest/items/" (:id parent) "/related/delete"))
           body (body-json resp)]
       (is (= 200 (:status resp)))
       (is (= 0 (:requested body)))
-      (is (= [] (:deleted body))))))
-
-(deftest delete-related-items-missing-id-test
-  (test-with-fresh-db "non-existent ids are reported as :missing, not :deleted"
-    (let [parent (ds/new-context db {:title "Books"})
-          a (ds/new-item db "Item A" "" #{(:id parent)} 1)
-          resp (POST* (str "/rest/items/" (:id parent) "/related/delete")
-                      {:item-ids [(:id a) 9999999]})
-          body (body-json resp)]
-      (is (= 200 (:status resp)))
-      (is (= [(:id a)] (:deleted body)))
-      (is (= [9999999] (:missing body))))))
+      (is (= [] (:results body))))))
 
 (deftest delete-related-items-skipped-when-has-children-test
-  (test-with-fresh-db "items with contained children are reported :skipped (not deleted)"
+  (test-with-fresh-db "items with contained children are reported :skipped"
     (let [parent (ds/new-context db {:title "Library"})
-          ;; mid is itself a context that contains a child, so deletion/delete-item
-          ;; refuses to delete it (contained-items-count > 0)
-          mid (ds/new-context db {:title "Sub-context"})
+          ;; mid is itself a context, so deletion/delete-item refuses to delete it
+          ;; (contained-items-count > 0). Link it as a related item of parent.
+          mid (ds/new-item db "Sub-context" "" #{(:id parent)} 1)
+          _ (jdbc/execute-one! db ["update items set is_context = true where id = ?" (:id mid)])
           _child (ds/new-item db "Child" "" #{(:id mid)} 1)
-          ;; link mid into parent so it appears as related
-          _ (ds/new-item db "Plain item" "" #{(:id parent)} 2)
-          resp (POST* (str "/rest/items/" (:id parent) "/related/delete")
-                      {:item-ids [(:id mid)]})
-          body (body-json resp)]
+          resp (POST-empty* (str "/rest/items/" (:id parent) "/related/delete"))
+          body (body-json resp)
+          skipped (filter #(= "skipped" (:status %)) (:results body))]
       (is (= 200 (:status resp)))
-      (is (= [] (:deleted body)))
-      (is (= [(:id mid)] (:skipped body)))
+      (is (some #(= (:id mid) (:id %)) skipped))
+      (is (some #(= "has-children" (:reason %)) skipped))
       (is (= (:id mid) (:id (ds/get-item db {:id (:id mid)})))))))
-
-(deftest delete-related-items-bad-payload-test
-  (test-with-fresh-db "rejects payloads where :item-ids is missing or not a list of ints"
-    (let [parent (ds/new-context db {:title "Books"})
-          resp1 (POST* (str "/rest/items/" (:id parent) "/related/delete") {})
-          resp2 (POST* (str "/rest/items/" (:id parent) "/related/delete")
-                       {:item-ids ["not-an-int"]})]
-      (is (= 400 (:status resp1)))
-      (is (= 400 (:status resp2))))))
 
 (deftest delete-related-items-parent-not-found-test
   (test-with-fresh-db "404s when the parent id has no corresponding item"
-    (let [resp (POST* "/rest/items/9999999/related/delete" {:item-ids []})]
+    (let [resp (POST-empty* "/rest/items/9999999/related/delete")]
       (is (= 404 (:status resp))))))
 
 (deftest delete-related-items-bad-parent-id-test
   (test-with-fresh-db "400s when the path id is not an integer"
-    (let [resp (POST* "/rest/items/not-an-int/related/delete" {:item-ids []})]
+    (let [resp (POST-empty* "/rest/items/not-an-int/related/delete")]
       (is (= 400 (:status resp))))))
 
 (deftest delete-related-items-recording-off-test
@@ -268,18 +260,63 @@
             a (ds/new-item db "Item A" "" #{(:id parent)} 1)]
         (mw/toggle!)
         (try
-          (let [resp (POST* (str "/rest/items/" (:id parent) "/related/delete")
-                            {:item-ids [(:id a)]})
+          (let [resp (POST-empty* (str "/rest/items/" (:id parent) "/related/delete"))
                 body (body-json resp)]
             (is (= 200 (:status resp)))
             (is (true? (:dropped body)))
-            (is (= [] (:deleted body)))
+            (is (= [] (:results body)))
             (is (= (:id a) (:id (ds/get-item db {:id (:id a)})))))
           (finally (mw/toggle!)))))))
 
+(deftest deletion-preview-related-items-test
+  (test-with-fresh-db "preview returns the same candidates without deleting"
+    (let [parent (ds/new-context db {:title "Books"})
+          a (ds/new-item db "Item A" "" #{(:id parent)} 1)
+          b (ds/new-item db "Item B" "" #{(:id parent)} 2)
+          resp (GET* (str "/rest/items/" (:id parent) "/related/deletion-preview"))
+          body (body-json resp)]
+      (is (= 200 (:status resp)))
+      (is (true? (:dry-run body)))
+      (is (= 2 (:requested body)))
+      (is (= (set [(:id a) (:id b)]) (set (ids-with-status body "deleted"))))
+      ;; nothing was actually deleted
+      (is (= (:id a) (:id (ds/get-item db {:id (:id a)}))))
+      (is (= (:id b) (:id (ds/get-item db {:id (:id b)})))))))
+
+(deftest deletion-preview-bypasses-recording-mode-test
+  (testing "preview runs read-only even when recording mode is off"
+    (reset-db)
+    (with-time
+      (let [parent (ds/new-context db {:title "Books"})
+            a (ds/new-item db "Item A" "" #{(:id parent)} 1)]
+        (mw/toggle!)
+        (try
+          (let [resp (GET* (str "/rest/items/" (:id parent) "/related/deletion-preview"))
+                body (body-json resp)]
+            (is (= 200 (:status resp)))
+            (is (true? (:dry-run body)))
+            (is (false? (contains? body :dropped)))
+            (is (= [(:id a)] (ids-with-status body "deleted")))
+            (is (= (:id a) (:id (ds/get-item db {:id (:id a)})))))
+          (finally (mw/toggle!)))))))
+
+(deftest deletion-preview-and-delete-agree-on-skipped-test
+  (test-with-fresh-db "preview's :skipped matches what an actual delete would skip"
+    (let [parent (ds/new-context db {:title "Library"})
+          mid (ds/new-item db "Sub-context" "" #{(:id parent)} 1)
+          _ (jdbc/execute-one! db ["update items set is_context = true where id = ?" (:id mid)])
+          _child (ds/new-item db "Child" "" #{(:id mid)} 1)
+          preview (body-json (GET* (str "/rest/items/" (:id parent) "/related/deletion-preview")))
+          actual (body-json (POST-empty* (str "/rest/items/" (:id parent) "/related/delete")))]
+      (is (= (set (ids-with-status preview "deleted"))
+             (set (ids-with-status actual "deleted"))))
+      (is (= (set (ids-with-status preview "skipped"))
+             (set (ids-with-status actual "skipped")))))))
+
 (deftest delete-related-items-not-in-describe-test
-  (testing "delete-related-items is unlisted (excluded from /rest/describe)"
+  (testing "delete-related-items + deletion-preview are unlisted in /rest/describe"
     (let [resp (with-redefs [config/config {:db db}]
                  (@handler (mock/request :get "/rest/describe")))
           names (set (map :name (body-json resp)))]
-      (is (not (contains? names "delete-related-items"))))))
+      (is (not (contains? names "delete-related-items")))
+      (is (not (contains? names "deletion-preview-related-items"))))))

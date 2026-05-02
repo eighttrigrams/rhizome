@@ -1,9 +1,6 @@
 (ns ui.danger-mode
   (:require [reagent.core :as r]
-            [cljs.core.async :refer [go]]
-            [cljs.core.async.interop :refer-macros [<p!]]
-            [ui.actions.common :refer [fetch-and-reset!]]
-            api))
+            [ui.actions.common :refer [fetch-and-reset!]]))
 
 (defn toggle!
   [*state]
@@ -17,12 +14,14 @@
 
 (defn- open-confirm!
   [*state]
-  (when (:selected-item @*state)
-    (go (let [resp (<p! (api/preview-deletion-of-related-items @*state))
-              items (or (:danger-preview-items resp) [])]
-          (swap! *state assoc
-            :danger-preview-items items
-            :modal :danger-confirm)))))
+  (when-let [parent-id (:id (:selected-item @*state))]
+    (-> (js/fetch (str "/rest/items/" parent-id "/related/deletion-preview"))
+        (.then (fn [^js resp] (.json resp)))
+        (.then (fn [^js data]
+                 (let [results (js->clj (.-results data) :keywordize-keys true)]
+                   (swap! *state assoc
+                     :danger-preview-items results
+                     :modal :danger-confirm)))))))
 
 (defn- close-confirm!
   [*state]
@@ -32,24 +31,18 @@
 
 (defn- confirm-delete!
   [*state]
-  (let [parent-id (:id (:selected-item @*state))
-        ids (mapv :id (:danger-preview-items @*state))
-        body (js/JSON.stringify (clj->js {:item-ids ids}))]
+  (let [parent-id (:id (:selected-item @*state))]
     (swap! *state #(-> %
                        (dissoc :modal)
                        (dissoc :danger-preview-items)))
     (-> (js/fetch (str "/rest/items/" parent-id "/related/delete")
-                  #js {:method "POST"
-                       :headers #js {"Content-Type" "application/json"}
-                       :body body})
-        (.then (fn [^js resp]
-                 (-> resp
-                     (.json)
-                     (.then (fn [^js data]
-                              (when (.-dropped data)
-                                (js/window.alert
-                                  "Recording mode is OFF — deletion was dropped."))
-                              (fetch-and-reset! *state (assoc @*state :q nil))))))))))
+                  #js {:method "POST"})
+        (.then (fn [^js resp] (.json resp)))
+        (.then (fn [^js data]
+                 (when (.-dropped data)
+                   (js/window.alert
+                     "Recording mode is OFF — deletion was dropped."))
+                 (fetch-and-reset! *state (assoc @*state :q nil)))))))
 
 (defn indicator
   [*state]
@@ -98,7 +91,10 @@
      :reagent-render
        (fn [*state]
          (let [items (:danger-preview-items @*state)
-               n (count items)
+               will-delete (filter #(= "deleted" (:status %)) items)
+               will-skip (filter #(= "skipped" (:status %)) items)
+               n-del (count will-delete)
+               n-skip (count will-skip)
                handle-keydown (fn [e]
                                 (.stopPropagation e)
                                 (let [code (.-code e)]
@@ -107,7 +103,7 @@
                                               (close-confirm! *state))
                                         (= "Enter" code)
                                           (do (.preventDefault e)
-                                              (when (pos? n)
+                                              (when (pos? n-del)
                                                 (confirm-delete! *state))))))]
            [:div#danger-confirm-mask
             {:style {:position "fixed"
@@ -130,16 +126,24 @@
                       :flex-direction "column"
                       :outline "none"}}
              [:h3 {:style {:margin-top 0 :color "#c0392b"}}
-              (str "Delete " n " related item" (when (not= n 1) "s") "?")]
-             [:p "The following items will be permanently deleted:"]
+              (str "Delete " n-del " related item" (when (not= n-del 1) "s") "?"
+                   (when (pos? n-skip)
+                     (str " (" n-skip " will be skipped)")))]
+             [:p "Recording mode must be ON for the deletion to take effect."]
              [:ul {:style {:overflow-y "auto"
                            :flex 1
                            :margin 0
                            :padding-left "20px"}}
               (map-indexed
                 (fn [idx item]
-                  ^{:key (or (:id item) idx)}
-                  [:li (:title item)])
+                  (let [skipped? (= "skipped" (:status item))]
+                    ^{:key (or (:id item) idx)}
+                    [:li {:style {:color (if skipped? "#888" "inherit")
+                                  :text-decoration (when skipped? "line-through")}}
+                     (:title item)
+                     (when skipped?
+                       [:span {:style {:font-size "10px" :margin-left "6px"}}
+                        (str "(skip: " (:reason item) ")")])]))
                 items)]
              [:div {:style {:margin-top "16px"
                             :display "flex"
@@ -147,14 +151,14 @@
                             :justify-content "flex-end"}}
               [:button {:on-click #(close-confirm! *state)} "Cancel"]
               [:button {:on-click #(confirm-delete! *state)
-                        :disabled (zero? n)
+                        :disabled (zero? n-del)
                         :style {:background "#c0392b"
                                 :color "white"
                                 :border "none"
                                 :padding "6px 12px"
                                 :border-radius "3px"
-                                :cursor (if (zero? n) "not-allowed" "pointer")}}
-               (str "Delete " n)]]]]))}))
+                                :cursor (if (zero? n-del) "not-allowed" "pointer")}}
+               (str "Delete " n-del)]]]]))}))
 
 (defn confirm-modal
   [*state]
