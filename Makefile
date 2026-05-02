@@ -47,4 +47,4 @@ e2e:
 	npm run e2e
 
 deploy: test e2e
-	cd /Users/daniel/Applications/rhizome && git pull && ./deploy.sh && rhizome-run
+	cd /Users/daniel/Applications/rhizome && git pull && ./deploy.sh
