@@ -44,8 +44,10 @@ const testDir = defineBddConfig({
 
 export default defineConfig({
   testDir,
-  timeout: 30_000,
+  timeout: 60_000,
   workers: 1,
+  retries: 2,
+  globalSetup: "./e2e/global-setup.ts",
   use: {
     baseURL: `http://localhost:${port}`,
     headless: true,

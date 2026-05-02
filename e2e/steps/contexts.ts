@@ -32,3 +32,15 @@ Then("I should see {string} in the lhs", async ({ page }, text: string) => {
 Then("I should see {string} in the rhs", async ({ page }, text: string) => {
   await expect(page.locator("#rhs-component")).toContainText(text);
 });
+
+Then("I should not see {string} in the lhs", async ({ page }, text: string) => {
+  await expect(page.locator("#lhs-component")).not.toContainText(text);
+});
+
+Then("I should not see {string} in the rhs", async ({ page }, text: string) => {
+  await expect(page.locator("#rhs-component")).not.toContainText(text);
+});
+
+Then("I should see the search input", async ({ page }) => {
+  await expect(page.locator("#search-input")).toBeVisible();
+});

@@ -72,6 +72,9 @@ PGPASSWORD=abcdef psql -h 127.0.0.1 -p 5437 -U daniel -d cometoid_test \
 npx playwright test --grep "scenario name"
 ```
 
+Also, re-running a single or multiple tests a couple of times (3) in a row 
+can often be a good idea to gain trust in the test or suite.
+
 ## Inspecting failures
 
 Playwright drops a trace and `error-context.md` per failed scenario under
