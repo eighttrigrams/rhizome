@@ -31,7 +31,7 @@ RUN curl -sLO https://raw.githubusercontent.com/babashka/babashka/master/install
  && ./install --dir /usr/local/bin --static \
  && rm install
 
-ARG SQLITE_VEC_VERSION=0.1.6
+ARG SQLITE_VEC_VERSION=0.1.9
 RUN mkdir -p /usr/local/lib/sqlite-vec \
  && case "$(uname -m)" in \
       x86_64)  slug=linux-x86_64 ;; \
