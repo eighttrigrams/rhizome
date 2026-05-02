@@ -22,10 +22,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "3005:3005"
       - "3006:3006"
-      - "8020:8020"
-      - "9630:9630"
     stdin_open: true
     tty: true
 
