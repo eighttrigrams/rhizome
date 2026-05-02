@@ -28,6 +28,12 @@ When("I press the {string} key", async ({ page }, key: string) => {
   // Most key presses trigger a fetch-and-reset! whose response calls
   // reset-state! using a state snapshot captured at the call site. Drain
   // in-flight requests so a late response can't clobber subsequent state.
+  // Brief tick first: fetch-and-reset! schedules its XHR via a cljs go-block
+  // (microtask), so the request hasn't yet hit the wire when target.press
+  // resolves. Without this nudge, networkidle can fire before the XHR is
+  // observable, and a subsequent press races against the in-flight response
+  // — producing only one effective "cycle" out of two, etc.
+  await page.waitForTimeout(100);
   await page.waitForLoadState("networkidle");
   // networkidle is a network-layer signal; Reagent's render that unmounts
   // the old input (lhs) and mounts the new one (rhs) flushes via rAF and
@@ -77,4 +83,25 @@ Then("I should not see {string} in the rhs", async ({ page }, text: string) => {
 
 Then("I should see the search input", async ({ page }) => {
   await expect(page.locator("#search-input")).toBeVisible();
+});
+
+When("I click {string} in the lhs", async ({ page }, text: string) => {
+  // Secondary-context list items, "Invert", and "No secondary contexts" are
+  // plain spans/li with on-click handlers under #lhs-component. Click the
+  // first matching label.
+  await page.locator("#lhs-component").getByText(text, { exact: false }).first().click();
+  // The handler calls change-secondary-contexts-* via fetch-and-reset!,
+  // same drain pattern as a key press: settle the network, then give Reagent
+  // a frame to commit the render. The grace tick before networkidle is
+  // load-bearing — fetch-and-reset! schedules its XHR via a cljs go-block
+  // (microtask), so networkidle can fire before the XHR is even on the
+  // wire. A subsequent click would then race the in-flight response and
+  // its late reset-state! can clobber the second click's swap!.
+  await page.waitForTimeout(100);
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(
+    () => new Promise<void>((r) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => r())),
+    ),
+  );
 });
