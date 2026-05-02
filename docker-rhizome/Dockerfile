@@ -1,9 +1,9 @@
-FROM clojure:temurin-21-tools-deps-alpine
+FROM clojure:temurin-21-tools-deps-bookworm-slim
 
 ARG USER_UID=501
 ARG USER_GID=20
 
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
     curl \
     git \
@@ -13,18 +13,17 @@ RUN apk add --no-cache \
     npm \
     openssh-client \
     postgresql-client \
-    shadow \
     sudo \
     chromium \
-    nss \
-    freetype \
-    harfbuzz \
+    libnss3 \
+    libfreetype6 \
+    libharfbuzz0b \
     ca-certificates \
-    ttf-freefont \
-    font-noto-emoji \
+    fonts-freefont-ttf \
+    fonts-noto-color-emoji \
     lsof \
     procps \
-    gcompat
+ && rm -rf /var/lib/apt/lists/*
 
 RUN curl -sLO https://raw.githubusercontent.com/babashka/babashka/master/install \
  && chmod +x install \
@@ -58,8 +57,8 @@ RUN npm install -g @anthropic-ai/claude-code \
 RUN printf '#!/bin/sh\ncase "$1" in\n  commit|merge)\n    branch=$(/usr/bin/git rev-parse --abbrev-ref HEAD 2>/dev/null)\n    if [ "$branch" = "main" ]; then\n      echo "refusing to $1 on main from inside the container. switch to a feature branch first." >&2\n      exit 1\n    fi\n    ;;\nesac\nexec /usr/bin/git "$@"\n' > /usr/local/bin/git \
  && chmod +x /usr/local/bin/git
 
-RUN if ! getent group ${USER_GID} >/dev/null; then addgroup -g ${USER_GID} hostgrp; fi \
- && adduser -D -u ${USER_UID} -G $(getent group ${USER_GID} | cut -d: -f1) claude \
+RUN if ! getent group ${USER_GID} >/dev/null; then groupadd -g ${USER_GID} hostgrp; fi \
+ && useradd -m -u ${USER_UID} -g ${USER_GID} -s /bin/bash claude \
  && mkdir -p /home/claude/.claude /home/claude/.m2 /home/claude/.npm \
  && mkdir -p /workspace /workspace/.cpcache /workspace/.shadow-cljs /workspace/node_modules \
  && chown -R ${USER_UID}:${USER_GID} /home/claude /workspace
