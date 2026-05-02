@@ -89,13 +89,9 @@
 
 (defn- on-mouse-enter
   [*state item]
-  #(do (when-not (:loading @*state)
-         (swap! *state assoc :preview-item item :mouse :enter)
-         (when-not (:active-search @*state)
-           ;;  (js/setTimeout (fn [_]
-           (actions/fetch-item-description! *state item))
-         ;; 300)
-       )))
+  #(when-not (:loading @*state)
+     (swap! *state assoc :preview-item item :mouse :enter)
+     (actions/fetch-item-description! *state item)))
 
 (defn regular-items-list-item-component
   [*state item idx
