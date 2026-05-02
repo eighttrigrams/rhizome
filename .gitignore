@@ -44,3 +44,5 @@ rhizome.db
 .features-gen
 test-results
 playwright-report
+docker-rhizome/token
+docker-rhizome/gh_token

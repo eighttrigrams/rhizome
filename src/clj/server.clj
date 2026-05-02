@@ -136,7 +136,7 @@
                                           (not (string? (:private-addr config/config)))))
                              (throw (Exception. "config invalid")))
                            (future (j/run-jetty (app) {:port (:port config/config)
-                                                       :host "127.0.0.1"})))
+                                                       :host (or (:bind-host config/config) "127.0.0.1")})))
                 :stop 0)
 
 (defn -main

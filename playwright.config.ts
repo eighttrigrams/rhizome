@@ -52,7 +52,18 @@ export default defineConfig({
     baseURL: `http://localhost:${port}`,
     headless: true,
   },
-  projects: [{ name: "chromium", use: { browserName: "chromium" } }],
+  projects: [{
+    name: "chromium",
+    use: {
+      browserName: "chromium",
+      ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
+        ? { launchOptions: {
+              executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+              args: ["--no-sandbox", "--disable-dev-shm-usage"],
+            } }
+        : {}),
+    },
+  }],
   webServer: {
     command,
     url: `http://localhost:${port}`,

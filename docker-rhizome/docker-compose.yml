@@ -1,0 +1,37 @@
+services:
+  claude:
+    build: .
+    volumes:
+      - ../:/workspace:rw
+      - ./config.edn:/workspace/config.edn:rw
+      - ./test_config.edn:/workspace/test_config.edn:rw
+      - ./e2e_config.edn:/workspace/e2e_config.edn:rw
+      - /Users/daniel/Workspace/eighttrigrams/tracker.project/tracker/files:/Users/daniel/Workspace/eighttrigrams/tracker.project/tracker/files:rw
+      - m2_cache:/home/claude/.m2
+      - npm_cache:/home/claude/.npm
+      - claude_home:/home/claude/.claude
+      - cpcache:/workspace/.cpcache
+      - shadow_cache:/workspace/.shadow-cljs
+      - node_modules:/workspace/node_modules
+    working_dir: /workspace
+    environment:
+      - CLAUDE_CODE_OAUTH_TOKEN
+      - GH_TOKEN
+      - PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "3005:3005"
+      - "3006:3006"
+      - "8020:8020"
+      - "9630:9630"
+    stdin_open: true
+    tty: true
+
+volumes:
+  m2_cache:
+  npm_cache:
+  claude_home:
+  cpcache:
+  shadow_cache:
+  node_modules:
