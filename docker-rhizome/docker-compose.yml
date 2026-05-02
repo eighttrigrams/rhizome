@@ -23,6 +23,7 @@ services:
       - "host.docker.internal:host-gateway"
     ports:
       - "3006:3006"
+      - "9630:9630"
     stdin_open: true
     tty: true
 
