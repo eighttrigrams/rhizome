@@ -45,5 +45,4 @@ rhizome.db
 test-results
 playwright-report
 docker-rhizome/token
-docker-rhizome/gh_token
 .playwright-mcp

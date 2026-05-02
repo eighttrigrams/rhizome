@@ -7,7 +7,6 @@ RUN apk add --no-cache \
     bash \
     curl \
     git \
-    github-cli \
     jq \
     make \
     nodejs \
@@ -41,6 +40,9 @@ RUN npm install -g @anthropic-ai/claude-code \
  && mv /usr/local/bin/claude /usr/local/bin/claude-bin \
  && printf '#!/bin/sh\nexec /usr/local/bin/claude-bin --dangerously-skip-permissions "$@"\n' > /usr/local/bin/claude \
  && chmod +x /usr/local/bin/claude
+
+RUN printf '#!/bin/sh\ncase "$1" in\n  commit|merge)\n    branch=$(/usr/bin/git rev-parse --abbrev-ref HEAD 2>/dev/null)\n    if [ "$branch" = "main" ]; then\n      echo "refusing to $1 on main from inside the container. switch to a feature branch first." >&2\n      exit 1\n    fi\n    ;;\nesac\nexec /usr/bin/git "$@"\n' > /usr/local/bin/git \
+ && chmod +x /usr/local/bin/git
 
 RUN if ! getent group ${USER_GID} >/dev/null; then addgroup -g ${USER_GID} hostgrp; fi \
  && adduser -D -u ${USER_UID} -G $(getent group ${USER_GID} | cut -d: -f1) claude \
