@@ -33,10 +33,16 @@ RUN curl -sLO https://raw.githubusercontent.com/babashka/babashka/master/install
 
 ARG SQLITE_VEC_VERSION=0.1.6
 RUN mkdir -p /usr/local/lib/sqlite-vec \
- && curl -fsSL "https://github.com/asg017/sqlite-vec/releases/download/v${SQLITE_VEC_VERSION}/sqlite-vec-${SQLITE_VEC_VERSION}-loadable-linux-x86_64.tar.gz" \
+ && case "$(uname -m)" in \
+      x86_64)  slug=linux-x86_64 ;; \
+      aarch64) slug=linux-aarch64 ;; \
+      *) echo "unsupported arch: $(uname -m)" >&2; exit 1 ;; \
+    esac \
+ && curl -fsSL "https://github.com/asg017/sqlite-vec/releases/download/v${SQLITE_VEC_VERSION}/sqlite-vec-${SQLITE_VEC_VERSION}-loadable-${slug}.tar.gz" \
     | tar -xz -C /tmp \
  && cp /tmp/vec0.so /usr/local/lib/sqlite-vec/vec0.so \
- && rm -f /tmp/vec0.so
+ && rm -f /tmp/vec0.so \
+ && test -f /usr/local/lib/sqlite-vec/vec0.so
 ENV SQLITE_VEC_PATH=/usr/local/lib/sqlite-vec/vec0
 
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
