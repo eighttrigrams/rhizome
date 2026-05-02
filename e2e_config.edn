@@ -1,0 +1,9 @@
+{:port 3005
+ :dev? true
+ :db {:dbtype   "postgresql"
+      :dbname   "cometoid_test"
+      :user     "daniel"
+      :password "abcdef"
+      :port     5437
+      :hostname "127.0.0.1"}
+ :folders {:homefolder "./files/"}}

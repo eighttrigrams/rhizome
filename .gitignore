@@ -12,10 +12,7 @@ target
 server.jar
 config.edn
 config.edn.bkp
-tracker.log
-tracker-*.log*
-rest-api.log
-rest-api-*.log*
+logs
 *.jks
 *.pkcs12
 *.pem
@@ -37,7 +34,6 @@ resources/public/imgs
 .lsp/*
 !.lsp/
 !.lsp/config.edn
-hooks.log
 .clj-kondo/*
 !.clj-kondo/
 !.clj-kondo/config.edn
@@ -45,3 +41,6 @@ hooks.log
 !.clj-kondo/hooks/*
 test_config.edn
 rhizome.db
+.features-gen
+test-results
+playwright-report

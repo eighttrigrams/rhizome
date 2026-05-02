@@ -8,6 +8,7 @@
             [env :refer [wrap-env-defaults]]
             [mount.core :as mount]
             [datastore.config :as config]
+            [next.jdbc :as jdbc]
             [repository :as r]
             [et.vp.ds :as datastore]
             opener
@@ -60,7 +61,7 @@
     (response/response "File uploaded successfully!")))
 
 (def homefolder
-  (-> (read-string (slurp "./config.edn"))
+  (-> (config/ds)
       :folders
       :homefolder))
 
@@ -87,6 +88,15 @@
          (log/error e "Error serving image by ID")
          {:status 500 :body "Internal server error"})))
 
+(defn- reset-handler
+  [_req]
+  (if (true? (:dev? config/config))
+    (let [db (:db config/config)]
+      (jdbc/execute-one! db ["DELETE FROM relations"])
+      (jdbc/execute-one! db ["DELETE FROM items"])
+      {:status 200 :body "ok"})
+    {:status 403 :body "not in dev mode"}))
+
 (defn- routes
   []
   (context
@@ -94,6 +104,7 @@
     []
     (context "/api" [] (POST "/" [] (api)))
     (rest-api/rest-routes)
+    (POST "/test/reset" [] reset-handler)
     (GET "/open/:file-id" [] open)
     (GET "/img-by-id/:item-id" [] img-by-id-handler)
     (POST "/upload" req (upload-handler req))
@@ -101,7 +112,7 @@
     (fn [req] (log/warn (str "File not found:" (:uri req))) {:status 404 :body "Not Found"})))
 
 (def dev?
-  (true? (-> (read-string (slurp "./config.edn"))
+  (true? (-> (config/ds)
              :dev?)))
 
 (defn app

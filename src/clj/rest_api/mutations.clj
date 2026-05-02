@@ -206,7 +206,7 @@
   during writes, or after UI-created items bypassed the ingestion hook).
   Synchronous — the request blocks until completion, so long runs tie up the
   connection. Gated by recording mode. Returns {:embedded N :failed M}. Per-
-  item progress is logged server-side (tail dev.out)."
+  item progress is logged server-side (tail logs/dev.out)."
   [db]
   (mw/log-and-guard
     "backfill-embeddings"

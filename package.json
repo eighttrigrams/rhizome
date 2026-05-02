@@ -3,7 +3,12 @@
   "version": "0.0.1",
   "private": true,
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "playwright-bdd": "^8.4.2",
     "shadow-cljs": "2.20.15"
+  },
+  "scripts": {
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@codemirror/basic-setup": "^0.20.0",

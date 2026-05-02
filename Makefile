@@ -1,23 +1,40 @@
 PORT ?= 3006
+E2E_PORT ?= 3005
+SHADOW_PORT ?= 8020
 
-.PHONY: start stop restart test
+.PHONY: start stop restart test e2e deploy
 
 start:
-	@if lsof -nP -iTCP:$(PORT) -sTCP:LISTEN >/dev/null 2>&1; then \
-	  echo "already running on :$(PORT) (pid $$(lsof -nP -iTCP:$(PORT) -sTCP:LISTEN -t))"; \
+	@if lsof -nP -iTCP:$(E2E_PORT) -sTCP:LISTEN >/dev/null 2>&1; then \
+	  echo "e2e server is running on :$(E2E_PORT) (pid $$(lsof -nP -iTCP:$(E2E_PORT) -sTCP:LISTEN -t)). Wait for it to finish, or stop it, before starting dev."; \
 	  exit 1; \
 	fi
-	@echo "starting dev server on :$(PORT) (logs: dev.out)"
-	@nohup ./dev.sh > dev.out 2>&1 &
+	@for p in $(PORT) $(SHADOW_PORT); do \
+	  if lsof -nP -iTCP:$$p -sTCP:LISTEN >/dev/null 2>&1; then \
+	    echo "already running on :$$p (pid $$(lsof -nP -iTCP:$$p -sTCP:LISTEN -t))"; \
+	    exit 1; \
+	  fi; \
+	done
+	@mkdir -p logs
+	@echo "starting dev server on :$(PORT) (logs: logs/dev.out)"
+	@nohup clj -M:dev -m server > logs/dev.out 2>&1 &
+	@echo "starting shadow-cljs watch on :$(SHADOW_PORT) (logs: logs/shadow.out)"
+	@nohup npx shadow-cljs watch app > logs/shadow.out 2>&1 &
 
+# Only kills what this project bound: the JVM on $(PORT) and the node process
+# holding $(SHADOW_PORT) (rhizome's :dev-http). That same node process also
+# holds shadow's primary port (default 9630), so killing it frees both —
+# without us probing 9630 and risking somebody else's shadow project.
 stop:
-	@pids=$$(lsof -nP -iTCP:$(PORT) -sTCP:LISTEN -t 2>/dev/null); \
-	if [ -n "$$pids" ]; then \
-	  echo "killing $$pids on :$(PORT)"; \
-	  kill $$pids; \
-	else \
-	  echo "nothing listening on :$(PORT)"; \
-	fi
+	@any=0; for p in $(PORT) $(SHADOW_PORT); do \
+	  pids=$$(lsof -nP -iTCP:$$p -sTCP:LISTEN -t 2>/dev/null); \
+	  if [ -n "$$pids" ]; then \
+	    echo "killing $$pids on :$$p"; \
+	    kill $$pids; \
+	    any=1; \
+	  fi; \
+	done; \
+	if [ $$any -eq 0 ]; then echo "nothing to stop"; fi
 
 restart: stop
 	@sleep 1
@@ -25,3 +42,9 @@ restart: stop
 
 test:
 	clj -M:test
+
+e2e:
+	npm run e2e
+
+deploy: test e2e
+	cd /Users/daniel/Applications/rhizome && git pull && ./deploy.sh && rhizome-run
