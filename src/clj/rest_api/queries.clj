@@ -129,7 +129,7 @@
          (if vector?
            (let [items (semsearch/search-related-items-vector
                          db q selected-id
-                         {:secondary-context-ids secondary :limit 20})]
+                         {:selected-secondary-contexts secondary :limit 20})]
              (json-response (map item->api items)))
            (let [mode (parse-int-opt search-mode)
                  limit (cond (= 2 mode) 5000

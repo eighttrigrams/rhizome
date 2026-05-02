@@ -1,36 +1,20 @@
 (ns semsearch.query
   (:require [clojure.string :as str]
-            [next.jdbc :as jdbc]
-            [cambium.core :as log]
             [semsearch.embedder :as embedder]
-            [et.vp.ds :as datastore]))
-
-(defn- context-filter-sql [ctx-ids]
-  (str/join " AND "
-    (repeat (count ctx-ids)
-            "items_vec.item_id IN (SELECT target_id FROM relations WHERE owner_id = ?)")))
+            [et.vp.ds.search :as search]))
 
 (defn search-related-items-vector
-  "kNN over items_vec, scoped to items related to selected-id (AND every
-   id in secondary-context-ids). Items without an embedding row are
-   excluded. Returns fully-enriched items, ordered by cosine distance."
-  [db q selected-id {:keys [secondary-context-ids limit]}]
+  "Vector-ranked retrieval. Reuses search/search-related-items so all the
+   regular relational filters (selected-secondary-contexts,
+   secondary-contexts-inverted, secondary-contexts-unassigned-selected,
+   search-mode, description-filter) continue to apply; the only difference
+   is an extra INNER JOIN on items_vec and ORDER BY cosine distance to the
+   embedded query. Items without an items_vec row are excluded."
+  [db q selected-id {:keys [limit] :as opts}]
   (when (str/blank? q)
     (throw (IllegalArgumentException. "vector search requires non-empty q")))
-  (let [qvec (embedder/embed-text q)
-        qjson (embedder/vec->json qvec)
-        ctx-ids (cons selected-id (or secondary-context-ids []))
-        k (or limit 20)
-        sql (str "SELECT items_vec.item_id, items_vec.distance "
-                 "FROM items_vec "
-                 "WHERE items_vec.embedding MATCH ? AND k = ? "
-                 "AND " (context-filter-sql ctx-ids) " "
-                 "ORDER BY items_vec.distance")
-        params (into [sql qjson k] ctx-ids)
-        rows (jdbc/execute! db params)]
-    (log/info {:vector-search {:selected-id selected-id
-                               :ctx-ids ctx-ids
-                               :hits (count rows)}})
-    (->> rows
-         (map :items_vec/item_id)
-         (keep #(datastore/get-item db {:id %})))))
+  (let [qjson (embedder/vec->json (embedder/embed-text q))]
+    (search/search-related-items
+      db "" selected-id
+      (assoc opts :vector-qjson qjson)
+      {:limit (or limit 100)})))

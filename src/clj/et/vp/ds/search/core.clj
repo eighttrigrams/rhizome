@@ -116,9 +116,15 @@
 
 (defn search-related-items
   [q
-   {:keys [selected-item-id join-ids search-mode unassigned-mode? inverted-mode? description-filter]
+   {:keys [selected-item-id join-ids search-mode unassigned-mode? inverted-mode?
+           description-filter vector-qjson]
     :as _opts} {:keys [limit] :as _ctx}]
-  (let [or-mode? (when join-ids inverted-mode?)]
+  (let [or-mode? (when join-ids inverted-mode?)
+        joins (cond-> [:relations [:= :items.id :relations.target_id]]
+                vector-qjson (into [:items_vec [:= :items.id :items_vec.item_id]]))
+        ordering (if vector-qjson
+                   [[[:vec_distance_cosine :items_vec.embedding vector-qjson] :asc]]
+                   (order-by search-mode))]
     (-> (merge {:select (vec (concat select [:relations.annotation]))
                 :from :items
                 :where [:and
@@ -130,7 +136,7 @@
                         (get-description-filter-clause description-filter)
                         [:= :relations.owner_id [:raw selected-item-id]]
                         (when (or (= 2 search-mode) (= 3 search-mode)) [:<> :sort_idx -1])]}
-               {:order-by (order-by search-mode)}
+               {:order-by ordering}
                (when limit {:limit limit})
-               {:join [:relations [:= :items.id :relations.target_id]]})
+               {:join joins})
         sql/format)))

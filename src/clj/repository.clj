@@ -335,15 +335,13 @@
 
 (defn vector-search-related-items
   [{:keys [db]}]
-  (fn [{:keys [selected-item q]}]
-    (let [{:keys [selected-secondary-contexts secondary-contexts-inverted]}
-            (-> selected-item :data :views :current)
-          secondary-ids (when-not secondary-contexts-inverted (vec selected-secondary-contexts))]
-      (if (or (nil? q) (str/blank? q))
-        {:items []}
+  (fn [{:keys [selected-item q] :as opts}]
+    (if (or (nil? q) (str/blank? q))
+      {:items []}
+      (let [[selected-item-id search-opts]
+              (simplify-params (assoc opts :selected-item selected-item))]
         {:items (semsearch/search-related-items-vector
-                  db q (:id selected-item)
-                  {:secondary-context-ids secondary-ids :limit 100})}))))
+                  db q selected-item-id (assoc search-opts :limit limit))}))))
 
 (defn start-linking-selected-item-to-context-with-local-search
   [db opts]
