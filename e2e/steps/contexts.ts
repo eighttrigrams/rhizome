@@ -13,6 +13,9 @@ When("I press the {string} key", async ({ page }, key: string) => {
   const searchInput = page.locator("#search-input");
   const target = (await searchInput.count()) > 0 ? searchInput : page.locator("#main-layer");
   await target.press(key);
+  if (key === "Enter" || key === "Shift+Enter") {
+    await page.waitForLoadState("networkidle");
+  }
 });
 
 When("I type {string} in the search input", async ({ page }, text: string) => {

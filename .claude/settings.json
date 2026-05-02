@@ -7,6 +7,7 @@
       "Bash(clojure -X:test:*)",
       "Bash(psql cometoid_dev *)",
       "Skill(rhizome-devel)",
+      "Skill(develop-e2e-tests)",
       "Skill(rhizome:navigate-rhizome-user-interface)",
       "Skill(rhizome:rhizome-books)",
       "Skill(rhizome:rhizome-rest-api)"
