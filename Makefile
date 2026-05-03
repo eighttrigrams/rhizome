@@ -1,6 +1,7 @@
 PORT ?= 3006
 E2E_PORT ?= 3005
 SHADOW_PORT ?= 8020
+DEPLOY_TARGET ?= $(HOME)/Applications/rhizome
 
 .PHONY: start stop restart test e2e deploy install-sqlite-vec
 
@@ -50,4 +51,10 @@ e2e:
 	npm run e2e
 
 deploy: test e2e
-	cd /Users/daniel/Applications/rhizome && git pull && ./deploy.sh
+	npm i
+	npx shadow-cljs release app
+	clj -T:build jar
+	@if [ ! -d "$(DEPLOY_TARGET)" ]; then echo "deploy target not found: $(DEPLOY_TARGET)"; exit 1; fi
+	@if [ -f "$(DEPLOY_TARGET)/server.jar" ]; then cp "$(DEPLOY_TARGET)/server.jar" "$(DEPLOY_TARGET)/server.jar.bkp"; fi
+	cp server.jar "$(DEPLOY_TARGET)/server.jar"
+	@echo "deployed server.jar -> $(DEPLOY_TARGET)"

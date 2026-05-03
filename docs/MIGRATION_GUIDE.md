@@ -1,5 +1,10 @@
 # SQLite Migration Guide
 
+I leave this here for a while at least, as the migration from 
+Postgres to SQLITE is still fresh.
+
+---
+
 Rhizome has switched from PostgreSQL (with `pgvector` and a `tsvector` full-text
 index) to SQLite as its only supported backend. This guide covers:
 
