@@ -55,3 +55,4 @@ rhizome-e2e.db
 .sqlite-vec
 tracker
 claude-stuff
+settings.local.json
