@@ -57,4 +57,5 @@ deploy: test e2e
 	@if [ ! -d "$(DEPLOY_TARGET)" ]; then echo "deploy target not found: $(DEPLOY_TARGET)"; exit 1; fi
 	@if [ -f "$(DEPLOY_TARGET)/server.jar" ]; then cp "$(DEPLOY_TARGET)/server.jar" "$(DEPLOY_TARGET)/server.jar.bkp"; fi
 	cp server.jar "$(DEPLOY_TARGET)/server.jar"
+	rm server.jar
 	@echo "deployed server.jar -> $(DEPLOY_TARGET)"
