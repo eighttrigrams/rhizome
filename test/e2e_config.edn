@@ -2,5 +2,5 @@
  :bind-host "0.0.0.0"
  :dev? true
  :db {:dbtype "sqlite"
-      :dbname "./rhizome-e2e.db"}
+      :dbname "./test/rhizome-e2e.db"}
  :folders {:homefolder "./files/"}}

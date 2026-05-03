@@ -7,7 +7,7 @@
    [next.jdbc :as jdbc]
    [clojure.edn :as edn]))
 
-(defonce db (edn/read-string (slurp "./test_config.edn")))
+(defonce db (edn/read-string (slurp "./test/test_config.edn")))
 
 (defn reset-db []
   (jdbc/execute-one! db ["delete from relations"])

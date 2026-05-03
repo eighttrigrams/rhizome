@@ -4,8 +4,8 @@ services:
     volumes:
       - ../:/workspace:rw
       - ./config.edn:/workspace/config.edn:rw
-      - ./test_config.edn:/workspace/test_config.edn:rw
-      - ./e2e_config.edn:/workspace/e2e_config.edn:rw
+      - ./test_config.edn:/workspace/test/test_config.edn:rw
+      - ./e2e_config.edn:/workspace/test/e2e_config.edn:rw
       - ./.mcp.json:/workspace/.mcp.json:rw
       - /Users/daniel/Workspace/eighttrigrams/tracker.project/tracker/files:/Users/daniel/Workspace/eighttrigrams/tracker.project/tracker/files:rw
       - /Users/daniel/.gitconfig:/home/claude/.gitconfig:ro

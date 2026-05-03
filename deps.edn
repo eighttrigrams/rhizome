@@ -16,14 +16,17 @@
            cambium/cambium.codec-simple      {:mvn/version "1.0.0"}
            cambium/cambium.logback.core      {:mvn/version "0.4.5"}
           tick/tick                         {:mvn/version "1.0"}}
- :aliases {:dev   {:extra-paths ["env/dev" "test"]}
-           :test  {:extra-paths ["test" "env/test"]
+ :aliases {:dev   {:extra-paths ["env/dev" "test/unit" "test/integration"]}
+           :test  {:extra-paths ["test/unit" "test/integration" "env/test"]
                    :extra-deps  {io.github.cognitect-labs/test-runner {:git/tag "v0.5.1"
                                                                        :git/sha "dfb30dd"}
                                  ring/ring-mock                       {:mvn/version "0.4.0"}
                                  com.cognitect/transit-clj            {:mvn/version "1.0.333"}}
-                   :main-opts   ["-m" "cognitect.test-runner"]
-                   :exec-fn     cognitect.test-runner.api/test}
+                   :main-opts   ["-m" "cognitect.test-runner"
+                                 "-d" "test/unit"
+                                 "-d" "test/integration"]
+                   :exec-fn     cognitect.test-runner.api/test
+                   :exec-args   {:dirs ["test/unit" "test/integration"]}}
            :build {:deps       {io.github.clojure/tools.build {:git/tag "v0.10.6" :git/sha "52cf7d6"}}
                    :ns-default build}
            :migrate {:extra-paths ["scripts"]

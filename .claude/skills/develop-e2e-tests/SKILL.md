@@ -5,7 +5,7 @@ description: Gotchas and patterns for writing Rhizome e2e tests (Playwright + pl
 
 # Developing e2e tests
 
-The suite lives in `e2e/features/*.feature` (Gherkin) and `e2e/steps/*.ts`
+The suite lives in `test/e2e/features/*.feature` (Gherkin) and `test/e2e/steps/*.ts`
 (step definitions). `npm run e2e` builds a release bundle, spawns a JVM on
 :3005 against `cometoid_test`, and runs Playwright.
 
@@ -96,7 +96,7 @@ handle:
   `search!` → `fetch-and-reset!`; if Enter lands first, the debounce's
   late response can clobber the state Enter just produced.
 
-The existing step definitions in `e2e/steps/contexts.ts` encode the
+The existing step definitions in `test/e2e/steps/contexts.ts` encode the
 corresponding waits (`waitForLoadState("networkidle")` after page load and
 keypresses; `waitForTimeout(220)` past the debounce window before draining)
 with comments explaining each. Treat those waits as **load-bearing**: when

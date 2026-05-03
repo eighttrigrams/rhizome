@@ -77,7 +77,7 @@ except Ollama itself (which stays on the host):
   math drifts and SQLite is asked to open a non-existent blob. 0.1.9
   fixes the symptom for our test shape, but the path stayed brittle
   enough across versions that
-  `test/rest_api/queries_test.clj :: get-related-items-vector-test`
+  `test/integration/rest_api/queries_test.clj :: get-related-items-vector-test`
   is currently `#_`-gated until a release we trust everywhere lands.
   See the comment block above the test for the full story and the
   re-enable checklist.

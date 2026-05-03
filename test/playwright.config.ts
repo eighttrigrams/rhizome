@@ -1,8 +1,9 @@
 import { execSync } from "child_process";
+import * as path from "path";
 import { defineConfig } from "@playwright/test";
 import { defineBddConfig } from "playwright-bdd";
 
-const configPath = "./e2e_config.edn";
+const configPath = path.resolve(__dirname, "e2e_config.edn");
 
 // Refuse to run while the dev server is up. `shadow-cljs release app` would
 // clobber the `main.js` the dev session is serving, leaving it without the
@@ -38,8 +39,8 @@ const command =
   `npx shadow-cljs release app && RHIZOME_CONFIG=${configPath} clj -M -m server`;
 
 const testDir = defineBddConfig({
-  features: "./e2e/features",
-  steps: "./e2e/steps/*.ts",
+  features: path.resolve(__dirname, "e2e/features"),
+  steps: path.resolve(__dirname, "e2e/steps/*.ts"),
 });
 
 export default defineConfig({
@@ -47,7 +48,7 @@ export default defineConfig({
   timeout: 60_000,
   workers: 1,
   retries: 2,
-  globalSetup: "./e2e/global-setup.ts",
+  globalSetup: path.resolve(__dirname, "e2e/global-setup.ts"),
   use: {
     baseURL: `http://localhost:${port}`,
     headless: true,
@@ -66,6 +67,7 @@ export default defineConfig({
   }],
   webServer: {
     command,
+    cwd: path.resolve(__dirname, ".."),
     url: `http://localhost:${port}`,
     timeout: 120_000,
     reuseExistingServer: false,

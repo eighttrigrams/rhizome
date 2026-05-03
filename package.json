@@ -8,7 +8,7 @@
     "shadow-cljs": "2.20.15"
   },
   "scripts": {
-    "e2e": "playwright test"
+    "e2e": "playwright test -c test/playwright.config.ts"
   },
   "dependencies": {
     "@codemirror/basic-setup": "^0.20.0",

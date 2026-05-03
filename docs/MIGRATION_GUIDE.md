@@ -106,8 +106,9 @@ The connection layer (`datastore.connection/make-datasource`) resolves
 `SQLITE_VEC_PATH` first, then falls back to a per-OS default.
 
 ### Configuration
-- `config.edn`, `config.edn.template`, `e2e_config.edn`, `test_config.edn` all
-  point at SQLite (`:dbtype "sqlite"`, `:dbname "./rhizome[-test|-e2e].db"`).
+- `config.edn`, `config.edn.template`, `test/e2e_config.edn`, `test/test_config.edn`
+  all point at SQLite (`:dbtype "sqlite"`, `:dbname "./rhizome.db"` for the dev
+  config, `"./test/rhizome[-test|-e2e].db"` for the test configs).
 - `config-sqlite.edn.template` is gone — it is now the only template.
 
 ### Dependencies
@@ -116,7 +117,7 @@ The connection layer (`datastore.connection/make-datasource`) resolves
   (see section 3).
 
 ### Tests
-- `test_config.edn` is SQLite. `et.vp.ds.search-test` applies the schema
+- `test/test_config.edn` is SQLite. `et.vp.ds.search-test` applies the schema
   on load (via `datastore.schema/apply-schema!`) so test runs need no manual
   setup beyond having `schema-sqlite.sql` on disk.
 - `rest-api.queries-test`'s `get-related-items-vector-test` is removed —
