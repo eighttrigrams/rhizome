@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="${SQLITE_VEC_VERSION:-0.1.6}"
+VERSION="${SQLITE_VEC_VERSION:-0.1.9}"
 DEST="${1:-./.sqlite-vec}"
 
 uname_s="$(uname -s)"
@@ -17,8 +17,9 @@ esac
 
 mkdir -p "$DEST"
 
-if [ -f "$DEST/vec0.$ext" ]; then
-  echo "sqlite-vec already installed at $DEST/vec0.$ext"
+stamp="$DEST/vec0.$ext.version"
+if [ -f "$DEST/vec0.$ext" ] && [ "$(cat "$stamp" 2>/dev/null)" = "$VERSION" ]; then
+  echo "sqlite-vec $VERSION already installed at $DEST/vec0.$ext"
   exit 0
 fi
 
@@ -37,4 +38,5 @@ if [ -z "$found" ]; then
   exit 1
 fi
 cp "$found" "$DEST/vec0.$ext"
-echo "installed $DEST/vec0.$ext"
+printf '%s\n' "$VERSION" > "$stamp"
+echo "installed $DEST/vec0.$ext (v$VERSION)"
