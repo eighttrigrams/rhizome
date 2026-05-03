@@ -143,3 +143,49 @@ except Ollama itself (which stays on the host):
   container can reach the host's Ollama daemon. If Ollama is bound to
   `127.0.0.1` only and the gateway path doesn't work in your Docker
   setup, start it with `OLLAMA_HOST=0.0.0.0:11434 ollama serve`.
+
+### Operational notes (gotchas we hit)
+
+- **Prod doesn't auto-install the extension.** `deploy.sh` and
+  `start.sh` don't call `bin/install-sqlite-vec.sh`; only `make start`
+  does. After bumping the version (or on a first deploy), SSH to prod
+  and run the installer once with the right destination —
+  `datastore.connection/vec-extension-path` defaults to
+  `/usr/local/lib/sqlite-vec/vec0` on Linux, so:
+  ```
+  sudo ./bin/install-sqlite-vec.sh /usr/local/lib/sqlite-vec
+  ```
+  The script writes a `vec0.<ext>.version` stamp next to the binary and
+  re-downloads only when the stamp is missing or doesn't match
+  `SQLITE_VEC_VERSION`, so subsequent runs are no-ops. `SQLITE_VEC_PATH`
+  on prod can override the default location.
+
+- **0.1.6 has a `vec0` MATCH bug we hit in tests.** kNN over a freshly
+  populated `items_vec` with very few rows fails with "Error opening
+  vector blob at main.items_vec_vector_chunks00.<n>". The chunk-rowid
+  math drifts and SQLite is asked to open a non-existent blob. 0.1.9
+  fixes the symptom for our test shape, but the path stayed brittle
+  enough across versions that
+  `test/rest_api/queries_test.clj :: get-related-items-vector-test`
+  is currently `#_`-gated until a release we trust everywhere lands.
+  See the comment block above the test for the full story and the
+  re-enable checklist.
+
+- **macOS SIGKILLs `java` on dylib mtime drift.** If you `cp`,
+  `touch`, `xattr -c`, or otherwise change the mtime of an already-
+  loaded `vec0.dylib`, the kernel's code-signing cache marks the
+  mapped pages tainted and SIGKILLs every process that has it mapped
+  — visible only as `make: *** [test] Killed: 9` with no Java output.
+  Confirm via `log show --last 5m | grep cs_mtime` (look for
+  `tainted:1` against `vec0.dylib`). Fix is to remove and reinstall
+  cleanly, then leave the file alone:
+  ```
+  rm -rf ./.sqlite-vec && ./bin/install-sqlite-vec.sh
+  ```
+
+- **Test JVM SIGKILL with no output is almost always the dylib.**
+  `cognitect.test-runner` prints `Running tests in #{"test"}` before
+  it requires test namespaces, and that's where `vec0.dylib` first
+  gets `dlopen`'d (transitively, via `datastore.connection`). If the
+  JVM dies right after that line with `Killed: 9` and no stack, check
+  the kernel log before chasing memory pressure or test logic.
