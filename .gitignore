@@ -53,3 +53,5 @@ rhizome-e2e.db
 *.db-wal
 *.db-shm
 .sqlite-vec
+tracker
+claude-stuff
