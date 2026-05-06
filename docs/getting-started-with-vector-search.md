@@ -1,45 +1,77 @@
 # Getting Started - With Vector Search
 
-Preconditions:
+This guide walks through bringing up Rhizome from a fresh clone with vector
+search enabled.
 
-Start with a fresh clone of this git repo
+## 1. Preconditions
+
+Start with a fresh clone of this git repo (or `git clean -xfd` an existing
+checkout to wipe build artefacts, ignored files, and local databases).
+
+Install and start Ollama with the `nomic-embed-text` model — Rhizome calls it
+to turn descriptions and queries into 768-dim vectors.
 
 ```bash
 brew install ollama # or your platform's installer
 ollama pull nomic-embed-text
-ollama serve # listens on http://127.0.0.1:11434
+ollama serve        # listens on http://127.0.0.1:11434
+```
+
+Then bring up Rhizome:
+
+```bash
 make install-sqlite-vec
 make onboard
 ```
 
-Visit `localhost:3006`
+`make onboard` does two distinct things:
 
-Add items with a description to a context of your choice. Only items with a
-non-empty `description` get embedded — title-only items are skipped on
-purpose and will never appear in vector results. Item creation through the
-UI **bypasses the per-item embed hook**, so freshly added items have a NULL
-`embedding` until you backfill (see below). The REST endpoints
-(`POST /rest/items`, `PUT /rest/items/:id`) do embed on write.
+- **Schema** — applies `schema-sqlite.sql` to create `rhizome.db` (tables,
+  indexes, triggers, plus the `items_vec` virtual table because sqlite-vec
+  is now installed). It also creates a separate `rhizome-test.db` for the
+  unit-test suite.
+- **Contents** — runs `scripts/setup-demo-contexts.bb` to seed a default tree of
+  contexts (`Imports`, `Documents`, `Audio`, `Video`, kind-contexts like
+  `Page` / `Quote`, year contexts, etc.) so you have somewhere to put
+  items.
 
-Enable recording mode (press **Option+Shift+W** in the running app — a red
-⚠ REC badge appears top-left) and call
+When `make onboard` finishes the dev server is already running on
+`localhost:3006`.
 
-```
+## 2. Add items with descriptions
+
+Open the app at `localhost:3006`, pick a context (e.g. `Documents`) and
+create a few items. Give each one a **non-empty description** — title-only
+items are skipped on purpose by the embedder and will never appear in vector
+results.
+
+Item creation through the UI **bypasses the per-item embed hook**, so the
+items you just made have a NULL `embedding` until you backfill (next step).
+The REST endpoints (`POST /rest/items`, `PUT /rest/items/:id`) do embed on
+write, so anything created through them is already searchable.
+
+## 3. Backfill embeddings
+
+Embedding writes are gated by **recording mode**. Press **Option+Shift+W**
+in the running app — a red ⚠ REC badge appears top-left — then:
+
+```bash
 make backfill-embeddings
 ```
 
-Without recording the response is `{"embedded":0,"dry-run":true}` and
-nothing is written. With recording on you'll see `{"embedded":N}`.
+Without recording you'll see `{"embedded":0,"dry-run":true}` and nothing is
+written. With recording on you'll see `{"embedded":N}`. The endpoint is
+idempotent and resumable.
 
-To search:
+## 4. Run a vector search
 
 ```bash
-# 1) find the context id
+# find the context id
 curl -s "http://127.0.0.1:3006/rest/contexts?q=Documents" | jq
 
-# 2) vector search inside that context (URL-encode multi-word queries)
+# vector search inside that context (URL-encode multi-word queries)
 curl -s "http://127.0.0.1:3006/rest/items/<id>/related?vector=true&q=greeting" | jq
 ```
 
-In the UI, the same query path is reachable from the search box once a
+The same query path is reachable from the search box in the UI once a
 context is selected.

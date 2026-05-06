@@ -1,0 +1,79 @@
+[{:title "The Market for Lemons"
+  :description
+  "George Akerlof's 1970 paper showed how asymmetric information can unravel a market entirely. Sellers of used cars know whether a vehicle is a peach or a lemon; buyers do not. Buyers therefore offer only the average price — which is too low for peach owners and too generous for lemon owners. Peaches leave the market, the average quality drops, and the price falls again, in a loop that can collapse trade altogether.
+
+The same dynamic shows up wherever quality is hidden behind a posted price: insurance markets where the sick self-select into coverage, labour markets where ability is observed only after hiring, freelance platforms where reputation systems exist precisely to undo the lemon problem. The lesson is not that markets fail, but that markets need institutions — warranties, certifications, ratings, regulation — to keep information flowing alongside money.
+
+Akerlof's result reframed information from a curiosity into a first-class economic primitive, and earned him the Nobel in 2001 alongside Spence and Stiglitz."}
+
+ {:title "Ricardo's Theory of Comparative Advantage"
+  :description
+  "Comparative advantage is the deepest counter-intuitive idea in economics: two parties can both gain from trade even when one of them is better at everything. The trick is opportunity cost — what each side gives up by producing one good instead of another — not absolute productivity.
+
+Ricardo's England-Portugal example with cloth and wine still does the heavy lifting in textbooks. Even when Portugal makes both goods more cheaply, specialisation along the lines of relative cost expands the joint output of both countries. The argument generalises to individuals, firms, and across time, and underlies most modern arguments for free trade.
+
+The friction in practice is distributional: comparative advantage promises bigger national pies, not painless transitions for the workers and regions whose absolute advantage was just outcompeted."}
+
+ {:title "The Tragedy of the Commons"
+  :description
+  "Garrett Hardin's 1968 essay described a pasture open to all herders. Each adds one more cow to capture the full benefit while spreading the grazing cost across everybody, so the pasture is overgrazed even though no individual would call this rational. The structure recurs everywhere a resource is rivalrous but not excludable: fisheries, groundwater, the atmosphere, antibiotic effectiveness.
+
+Hardin's stark framing has been criticised — Elinor Ostrom won the Nobel in 2009 by documenting actual commons governed for centuries by local rules, monitoring, and graduated sanctions. The tragedy is not inevitable; it is what happens when neither markets nor community institutions step in to assign and enforce rights of use.
+
+The policy menu mirrors that diagnosis: privatise (cap-and-trade for carbon), regulate (catch quotas), or strengthen the commons-managing institution itself."}
+
+ {:title "Veblen Goods and Conspicuous Consumption"
+  :description
+  "Thorstein Veblen, writing in 1899, argued that some goods are bought precisely because they are expensive. The high price is not a barrier to consumption but the point of it: a credible signal of wealth that cheap substitutes cannot mimic. Demand for these goods slopes the wrong way — raise the price and you sell more.
+
+Modern luxury markets — handbags, Swiss watches, top-shelf champagne, certain neighbourhoods — exhibit this pattern often enough to make textbook demand curves look incomplete. The signalling logic also explains why heavily discounted luxury goods can damage a brand: the lower price erodes the very scarcity the buyer was paying for.
+
+Veblen's broader claim, that whole classes organise their consumption around social standing rather than utility, anticipated decades of work in behavioural economics and sociology of taste."}
+
+ {:title "Weimar Hyperinflation, 1921-1923"
+  :description
+  "By late 1923 prices in Germany were doubling roughly every two days. A loaf of bread that cost 250 marks in January 1923 reached 200 billion marks by November. Workers were paid twice a day so they could spend their wages before they evaporated, and wheelbarrows of cash were a literal fact of daily life, not a metaphor.
+
+The collapse was monetary on the surface — the Reichsbank financing reparations and budget deficits by printing — but its deeper cause was political: a state that could not raise enough taxes after the war and reparations settlement chose the inflation tax instead. Stabilisation in late 1923 came through a new currency (the Rentenmark) backed by mortgaged real assets and a credible commitment to stop the presses.
+
+Weimar still anchors the modern central banker's instincts about independence, fiscal dominance, and the importance of expectations."}
+
+ {:title "Diminishing Marginal Utility"
+  :description
+  "The first glass of water on a hot day is worth a great deal; the tenth is worth almost nothing, and the twentieth might be a nuisance. Diminishing marginal utility is the observation that successive units of a good usually add less satisfaction than the units before them.
+
+The principle does enormous work in economics. It produces downward-sloping demand curves, justifies risk aversion (the next dollar is worth less than the last one you might lose), and underpins the case for redistribution: a euro taken from a rich household and given to a poor one raises total utility because the poor household values it more at the margin.
+
+It is, however, an assumption rather than a measurement. Modern behavioural and neuroeconomic work has complicated the smooth concave curves of textbook treatments without dislodging the basic shape."}
+
+ {:title "Network Effects and Platform Markets"
+  :description
+  "A telephone is useless if nobody else has one and indispensable if everybody does. Goods with this property — where a user's value rises with the number of other users — exhibit network effects, and they push markets toward concentration. Once a platform passes a critical mass, the gap between it and any rival widens on its own.
+
+Network effects come in flavours. Direct effects: more users on a chat app make it more useful for each user. Indirect (two-sided) effects: more drivers on a ride-hailing platform attract more riders, which attracts more drivers. Data network effects: more usage produces better predictions, which improves the product, which attracts more usage.
+
+The strategic implications dominate modern tech competition. Subsidising one side of a market, racing to early scale, exclusivity deals, and interoperability mandates are all moves on the same chessboard — trying to own, contest, or break a network effect."}
+
+ {:title "Sticky Wages and the Keynesian Mechanism"
+  :description
+  "Classical theory predicted that a fall in demand should be absorbed by falling wages and prices, returning the economy to full employment quickly. Keynes's observation in the 1930s was that wages do not actually fall much, especially downward — workers resist nominal cuts, contracts are sticky, and firms fear the morale effects of repeated cuts more than they fear paying above market.
+
+When wages can't fall, the adjustment falls instead on quantities: firms lay off workers and unemployment rises. A demand shock that classical theory said would be self-correcting becomes persistent, and there is a role for policy — fiscal stimulus, monetary easing — to push aggregate demand back toward potential output.
+
+Sixty years of empirical work, from Bewley's interviews with managers to surveys of nominal wage changes, broadly confirm the asymmetry: wages rise easily and fall reluctantly, especially in nominal terms."}
+
+ {:title "Rent-Seeking and Public Choice"
+  :description
+  "Public choice theory, associated with James Buchanan and Gordon Tullock, applies the same self-interested rationality to politicians, regulators, and voters that economists already applied to consumers and firms. The result is unflattering: actors in the political process pursue their own interests, not a benevolent social welfare function.
+
+Rent-seeking is the canonical pathology. Instead of competing to produce value, firms compete to lobby for protected positions — tariffs, exclusive licences, regulatory carve-outs. The rent itself is just a transfer, but the resources spent fighting for it are pure waste. Tullock's insight was that the dissipated resources can approach the size of the rent itself.
+
+The framework explains a lot of the world that public-interest models cannot: persistent agricultural subsidies, occupational licensing creep, regulatory capture, and the durability of policies that benefit small concentrated groups at diffuse cost to everyone else."}
+
+ {:title "The Solow Growth Model and Convergence"
+  :description
+  "Robert Solow's 1956 model stripped growth down to capital accumulation, labour, and technology. With diminishing returns to capital, an economy that saves and invests grows quickly while it is poor in capital and slows as it gets richer, eventually settling at a steady state determined by its savings rate, depreciation, and population growth.
+
+A striking prediction is conditional convergence: countries with similar savings and technology should converge to the same income level, and the poorer ones should grow faster on the way there. Empirically this works within groups (OECD economies converge, Chinese provinces converge) but not globally, which points to differences in what Solow's model relegates to the residual: institutions, human capital, technology adoption.
+
+The Solow residual — the part of growth not explained by more capital or more workers — became the launching pad for the entire endogenous-growth literature, where Romer, Lucas and others put ideas, education, and increasing returns at the centre of the story."}]

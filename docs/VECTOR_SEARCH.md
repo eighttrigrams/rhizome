@@ -13,7 +13,7 @@ The same path is also exposed at the REST API as
 - **sqlite-vec** — the `vec0` SQLite extension is loaded on every JDBC
   connection (`src/clj/datastore/connection.clj`). On Mac the loader
   defaults to `./.sqlite-vec/vec0`; install it once with
-  `bin/install-sqlite-vec.sh`. On Linux it defaults to
+  `scripts/install-sqlite-vec.sh`. On Linux it defaults to
   `/usr/local/lib/sqlite-vec/vec0`. `SQLITE_VEC_PATH` overrides both.
 
 - **Ollama** — query embedding is done by Ollama, default
@@ -58,13 +58,13 @@ except Ollama itself (which stays on the host):
 ### Operational notes (gotchas we hit)
 
 - **Prod doesn't auto-install the extension.** `deploy.sh` and
-  `start.sh` don't call `bin/install-sqlite-vec.sh`; only `make start`
+  `start.sh` don't call `scripts/install-sqlite-vec.sh`; only `make start`
   does. After bumping the version (or on a first deploy), SSH to prod
   and run the installer once with the right destination —
   `datastore.connection/vec-extension-path` defaults to
   `/usr/local/lib/sqlite-vec/vec0` on Linux, so:
   ```
-  sudo ./bin/install-sqlite-vec.sh /usr/local/lib/sqlite-vec
+  sudo ./scripts/install-sqlite-vec.sh /usr/local/lib/sqlite-vec
   ```
   The script writes a `vec0.<ext>.version` stamp next to the binary and
   re-downloads only when the stamp is missing or doesn't match
@@ -91,7 +91,7 @@ except Ollama itself (which stays on the host):
   `tainted:1` against `vec0.dylib`). Fix is to remove and reinstall
   cleanly, then leave the file alone:
   ```
-  rm -rf ./.sqlite-vec && ./bin/install-sqlite-vec.sh
+  rm -rf ./.sqlite-vec && ./scripts/install-sqlite-vec.sh
   ```
 
 - **Test JVM SIGKILL with no output is almost always the dylib.**

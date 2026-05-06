@@ -66,7 +66,10 @@ else
 fi
 
 echo "Seeding database with contexts..."
-./setup-test-contexts.bb
+./scripts/setup-demo-contexts.bb
+
+echo "Seeding demo articles..."
+./scripts/setup-demo-articles.bb
 
 echo "Installing npm dependencies..."
 npm install

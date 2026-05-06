@@ -275,7 +275,7 @@
 ;;   data.
 ;;
 ;; - We hit this concretely with sqlite-vec 0.1.6, the version
-;;   `bin/install-sqlite-vec.sh` originally pinned. Pulling 0.1.9
+;;   `scripts/install-sqlite-vec.sh` originally pinned. Pulling 0.1.9
 ;;   (latest at the time of writing) made the symptom go away on
 ;;   macOS-aarch64. The Dockerfile was bumped in lockstep — see
 ;;   `docker-rhizome/Dockerfile` and the project README's
@@ -288,7 +288,7 @@
 ;;   (`./.sqlite-vec/vec0.dylib`) and CI/Docker (`/usr/local/lib/...`)
 ;;   has historically been enough to flip this test red.
 ;;
-;; - Since `bin/install-sqlite-vec.sh` skipped re-downloading whenever
+;; - Since `scripts/install-sqlite-vec.sh` skipped re-downloading whenever
 ;;   `vec0.<ext>` already existed, just bumping the version constant
 ;;   wasn't enough on developer machines that already had a stale
 ;;   0.1.6 binary on disk. The script now writes a `vec0.<ext>.version`
@@ -316,7 +316,7 @@
 ;; Re-enabling: when sqlite-vec ships a release where this test passes
 ;; reliably on both host (macOS-aarch64) and container (Debian-slim,
 ;; aarch64 + x86_64), uncomment the deftest, bump the version in
-;; `bin/install-sqlite-vec.sh` and `docker-rhizome/Dockerfile`, and
+;; `scripts/install-sqlite-vec.sh` and `docker-rhizome/Dockerfile`, and
 ;; verify with `make test` from a clean `./.sqlite-vec/`.
 ;;
 #_(deftest get-related-items-vector-test

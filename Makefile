@@ -9,7 +9,7 @@ onboard:
 	./onboard.sh
 
 install-sqlite-vec:
-	@./bin/install-sqlite-vec.sh
+	@./scripts/install-sqlite-vec.sh
 
 start:
 	@if lsof -nP -iTCP:$(E2E_PORT) -sTCP:LISTEN >/dev/null 2>&1; then \
