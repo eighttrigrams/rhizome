@@ -1,8 +1,8 @@
 {:port 3006
- :private-addr "127.0.0.1"
- :private-user-agent "Chromium xyz"
+ :private-addr "127.0.0.1"          ;; used for prod mode
+ :private-user-agent "Chromium xyz" ;; used for prod mode
  :substack {:external-substacks []}
  :dev? true
  :db {:dbtype "sqlite"
       :dbname "./rhizome.db"}
- :folders {:homefolder "/Users/daniel/"}}
+ :folders {:homefolder "./files/"}}

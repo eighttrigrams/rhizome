@@ -1,3 +1,4 @@
+.DS_Store
 .lsp
 public/imgs
 .calva
@@ -16,20 +17,7 @@ logs
 *.jks
 *.pkcs12
 *.pem
-files/Documents/Tracked/*
-!files/Documents/Tracked/.gitkeep
-files/Downloads/Tracked/*
-!files/Downloads/Tracked/.gitkeep
-files/Movies/Tracked/*
-!files/Movies/Tracked/.gitkeep
-files/Music/Tracked/*
-!files/Music/Tracked/.gitkeep
-files/Pictures/Tracked/*
-!files/Pictures/Tracked/Preview
-files/Pictures/Tracked/Preview/*
-!files/Pictures/Tracked/Preview/Lowres
-files/Pictures/Tracked/Preview/Lowres/*
-!files/Pictures/Tracked/Preview/Lowres/.gitkeep
+files/
 resources/public/imgs
 .lsp/*
 !.lsp/
@@ -39,8 +27,6 @@ resources/public/imgs
 !.clj-kondo/config.edn
 !.clj-kondo/hooks/
 !.clj-kondo/hooks/*
-test_config.edn
-/e2e_config.edn
 rhizome.db
 .features-gen
 test-results

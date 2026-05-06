@@ -44,7 +44,7 @@ restart: stop
 	@sleep 1
 	@$(MAKE) start
 
-test:
+test: install-sqlite-vec
 	clj -M:test
 
 e2e:
