@@ -36,7 +36,7 @@ make onboard
 - Press 'shift+option+v' (input field should become green)
 - Type in a search term
 
-### End-to-end (Playwright)
+## End-to-end (Playwright)
 
 Headless browser tests live under `test/e2e/`. They drive the real UI against a
 server bound to a separate port (`:3005`) using `./rhizome-e2e.db`, with
@@ -56,6 +56,14 @@ devtools client embedded — it's the same shape of bundle that ships in
 
 The `RHIZOME_CONFIG` env var overrides the default `./config.edn` path —
 useful for any alternate profile, not just e2e.
+
+## Docker
+
+See ./docker for a sandboxed Claude. But basically:
+
+```bash
+make yolo
+```
 
 ## Package, deploy and run
 
