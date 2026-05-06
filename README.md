@@ -5,8 +5,8 @@ For the whitepaper, see here: [*Rhizome - A “total recall” note-taking and c
 ## Getting started
 
 ```bash
-bin/install-sqlite-vec.sh # you can skip this on first contact
-./onboard.sh
+make install-sqlite-vec # you can skip this on first contact
+make onbaord
 ```
 
 Visit `localhost:3006`

@@ -5,6 +5,9 @@ DEPLOY_TARGET ?= $(HOME)/Applications/rhizome
 
 .PHONY: start stop restart test e2e deploy install-sqlite-vec
 
+onboard:
+	./onboard.sh
+
 install-sqlite-vec:
 	@./bin/install-sqlite-vec.sh
 
