@@ -20,8 +20,21 @@ make start # to start the server again
 
 ### With Vector DB
 
-This guide ./docs/getting-started-with-vector-search.md describes
-how to get started, but this time with the vector search feature enabled.
+Start with a fresh clone of this git repo (or `git clean -xfd` an existing
+checkout to wipe build artefacts, ignored files, and local databases).
+
+```bash
+brew install ollama # or your platform's installer
+ollama pull nomic-embed-text
+ollama serve        # listens on http://127.0.0.1:11434
+make install-sqlite-vec
+make onboard
+```
+
+- Visit the Articles context
+- Press 'i' (input field on right hand side opens)
+- Press 'shift+option+v' (input field should become green)
+- Type in a search term
 
 ### End-to-end (Playwright)
 
