@@ -9,7 +9,7 @@
    [next.jdbc :as jdbc]
    [clojure.edn :as edn]))
 
-(defonce db (connection/make-datasource (edn/read-string (slurp "./test/test_config.edn"))))
+(defonce db (connection/make-datasource (:db (edn/read-string (slurp "./test/test_config.edn")))))
 
 (defonce ^:private _schema-init (do (schema/apply-schema! db) :ok))
 
