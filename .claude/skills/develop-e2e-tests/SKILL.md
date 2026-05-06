@@ -6,11 +6,11 @@ description: Gotchas and patterns for writing Rhizome e2e tests (Playwright + pl
 # Developing e2e tests
 
 The suite lives in `test/e2e/features/*.feature` (Gherkin) and `test/e2e/steps/*.ts`
-(step definitions). `npm run e2e` builds a release bundle, spawns a JVM on
-:3005 against `cometoid_test`, and runs Playwright.
-
-If `.features-gen/` is stale or missing, run `npx bddgen` once before
-`npm run e2e`.
+(step definitions). `make e2e` (or `npm run e2e`) builds a release bundle,
+spawns a JVM on :3005 against `./rhizome-e2e.db` (SQLite), and runs Playwright.
+The npm script runs `bddgen` first, so generated specs under
+`test/.features-gen/` are kept fresh automatically. `make e2e HEADED=1` shows
+the browser.
 
 ## Gotchas
 
@@ -112,8 +112,7 @@ the DB carries state across runs and tests can pass on stale data — e.g. a
 previous session. When debugging, clear the DB manually:
 
 ```bash
-PGPASSWORD=abcdef psql -h 127.0.0.1 -p 5437 -U daniel -d cometoid_test \
-  -c 'DELETE FROM relations; DELETE FROM items;'
+sqlite3 ./rhizome-e2e.db 'DELETE FROM relations; DELETE FROM items;'
 ```
 
 …and re-run a single scenario in isolation:
