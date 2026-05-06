@@ -15,7 +15,7 @@ of articles listed on the right hand side.
 ```
 make stop
 make test # if you want to run the tests
-make start
+make start # to start the server again
 ```
 
 ### With Vector DB
