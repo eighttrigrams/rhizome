@@ -3,7 +3,7 @@ E2E_PORT ?= 3005
 SHADOW_PORT ?= 8020
 DEPLOY_TARGET ?= $(HOME)/Applications/rhizome
 
-.PHONY: start stop restart test e2e deploy install-sqlite-vec
+.PHONY: start stop restart test e2e deploy install-sqlite-vec backfill-embeddings
 
 onboard:
 	./onboard.sh
@@ -49,6 +49,12 @@ restart: stop
 
 test:
 	clj -M:test
+
+backfill-embeddings:
+	@curl -sS -X POST http://127.0.0.1:$(PORT)/rest/backfill/embeddings \
+	  -H 'Content-Type: application/json' \
+	  -d '{"reason":"make backfill-embeddings"}'
+	@echo
 
 e2e:
 	npm run e2e

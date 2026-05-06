@@ -5,7 +5,6 @@ For the whitepaper, see here: [*Rhizome - A “total recall” note-taking and c
 ## Getting started
 
 ```bash
-make install-sqlite-vec # you can skip this on first contact
 make onbaord
 ```
 
@@ -15,6 +14,31 @@ Visit `localhost:3006`
 make stop
 make test # if you want to run the tests
 make start
+```
+
+### With vector db
+
+Clean with `git clean -xf`.
+
+```bash
+make install-sqlite-vec
+make onbaord
+```
+
+Visit `localhost:3006`
+
+Add items with a description to a context of your choice.
+
+Call
+
+```
+make backfill-embeddings
+```
+
+Then also
+
+```
+make test
 ```
 
 ### End-to-end (Playwright)
