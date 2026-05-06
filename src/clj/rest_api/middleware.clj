@@ -1,11 +1,17 @@
 (ns rest-api.middleware
   (:require [cambium.core :as log]
             [cheshire.core :as json]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [datastore.config :as config]))
 
 (defonce ^:private *recording? (atom false))
 
-(defn enabled? [] @*recording?)
+(defn enabled?
+  "Recording mode is on either when toggled on at runtime, or whenever
+   the server is running with `:dev? true` in config — in dev the REST
+   API is always open."
+  []
+  (or (:dev? config/config) @*recording?))
 
 (defn toggle! [] (swap! *recording? not))
 
