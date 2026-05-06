@@ -38,9 +38,7 @@ make onboard
 
 ## End-to-end (Playwright)
 
-Headless browser tests live under `test/e2e/`. They drive the real UI against a
-server bound to a separate port (`:3005`) using `./rhizome-e2e.db`, with
-state reset between scenarios via `POST /test/reset`.
+E2E tests run at port 3005.
 
 ```bash
 $ npm install
@@ -48,15 +46,6 @@ $ npx playwright install chromium   # first time only
 $ make e2e               # headless (default)
 $ make e2e HEADED=1      # show the browser window
 ```
-
-Each run builds a fresh production-mode cljs bundle (`shadow-cljs release
-app`) before booting the JVM, so the artifact under test has no shadow
-devtools client embedded — it's the same shape of bundle that ships in
-`./deploy.sh`. The webServer command is therefore
-`npx shadow-cljs release app && RHIZOME_CONFIG=./test/e2e_config.edn clj -M -m server`.
-
-The `RHIZOME_CONFIG` env var overrides the default `./config.edn` path —
-useful for any alternate profile, not just e2e.
 
 ## Docker
 
