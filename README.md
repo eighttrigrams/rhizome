@@ -18,7 +18,7 @@ make start
 
 ### With vector db
 
-Clean with `git clean -xf`.
+Clean with `git clean -xfd`.
 
 ```bash
 make install-sqlite-vec
