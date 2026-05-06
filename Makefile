@@ -11,7 +11,7 @@ onboard:
 install-sqlite-vec:
 	@./bin/install-sqlite-vec.sh
 
-start: install-sqlite-vec
+start:
 	@if lsof -nP -iTCP:$(E2E_PORT) -sTCP:LISTEN >/dev/null 2>&1; then \
 	  echo "e2e server is running on :$(E2E_PORT) (pid $$(lsof -nP -iTCP:$(E2E_PORT) -sTCP:LISTEN -t)). Wait for it to finish, or stop it, before starting dev."; \
 	  exit 1; \
