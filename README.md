@@ -29,17 +29,15 @@ Visit `localhost:3006`
 
 Add items with a description to a context of your choice.
 
-Call
+TODO explain how
+
+Enable recording mode and call
 
 ```
 make backfill-embeddings
 ```
 
-Then also
-
-```
-make test
-```
+TODO explain how to find something
 
 ### End-to-end (Playwright)
 
