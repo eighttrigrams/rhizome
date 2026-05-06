@@ -236,7 +236,6 @@
 
 (defn- update-item'
   [db {:keys [id title short_title annotation sort_idx tags data hide_in_global_search] :as item}]
-  (log/info (str "update-item!!!!!!!!!" title ":" sort_idx "<-" (integer? sort_idx)))
   (let [old-item (get-item db item)
         old-data (:data old-item)
         data (if data

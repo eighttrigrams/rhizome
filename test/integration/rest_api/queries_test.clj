@@ -319,7 +319,7 @@
 ;; `scripts/install-sqlite-vec.sh` and `docker-rhizome/Dockerfile`, and
 ;; verify with `make test` from a clean `./.sqlite-vec/`.
 ;;
-#_(deftest get-related-items-vector-test
+(deftest ^:vector get-related-items-vector-test
     (test-with-fresh-db "ranks items by cosine distance to the embedded query"
       (let [texts-to-vecs {"The Prize"             (unit-vec 0)
                            "Sapiens"               (unit-vec 1)

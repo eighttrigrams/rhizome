@@ -51,7 +51,14 @@ restart: stop
 	@$(MAKE) start
 
 test:
-	clj -M:test
+	@vec_path="$${SQLITE_VEC_PATH:-./.sqlite-vec/vec0}"; \
+	case "$$(uname -s)" in Darwin) ext=dylib;; *) ext=so;; esac; \
+	if [ -f "$${vec_path}.$${ext}" ]; then \
+	  clj -M:test; \
+	else \
+	  echo "sqlite-vec not installed; excluding ^:vector tests"; \
+	  clj -M:test --exclude :vector; \
+	fi
 
 HEADED ?= 0
 e2e:

@@ -60,10 +60,21 @@ useful for any alternate profile, not just e2e.
 
 ## Docker
 
-See ./docker for a sandboxed Claude. But basically:
+Sandboxed Claude (using Docker). Run
 
 ```bash
 make yolo
+```
+
+Inside, use
+
+```
+ls # list directories
+claude # has playwright MCP
+make start # runs app at 3006 (accessible for the host system)
+make test
+SQLITE_VEC_PATH=/nope make test # skipping vector tests
+make e2e
 ```
 
 ## Package, deploy and run
