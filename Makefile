@@ -46,10 +46,6 @@ stop:
 	done; \
 	if [ $$any -eq 0 ]; then echo "nothing to stop"; fi
 
-restart: stop
-	@sleep 1
-	@$(MAKE) start
-
 test:
 	@vec_path="$${SQLITE_VEC_PATH:-./.sqlite-vec/vec0}"; \
 	case "$$(uname -s)" in Darwin) ext=dylib;; *) ext=so;; esac; \
