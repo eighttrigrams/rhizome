@@ -22,8 +22,10 @@ Then bring up Rhizome:
 ```bash
 make install-sqlite-vec
 make onboard
-make backfill-embeddings
 ```
+
+`make onboard` notices that sqlite-vec is installed and embeds the seeded
+demo articles automatically before exiting.
 
 Visit the Articles context. 
 Search for Lemons.

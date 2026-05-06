@@ -76,5 +76,21 @@ npm install
 
 make start
 
+if [ -n "$VEC_EXT" ] && [ -f "$VEC_LIB" ]; then
+    echo "Waiting for the dev server to come up on :3006..."
+    for i in $(seq 1 60); do
+        if curl -sS -o /dev/null -w "%{http_code}" "http://127.0.0.1:3006/rest/contexts?q=Articles" 2>/dev/null | grep -q '^200$'; then
+            break
+        fi
+        sleep 1
+    done
+
+    echo "Backfilling embeddings for the demo articles..."
+    curl -sS -X POST "http://127.0.0.1:3006/rest/backfill/embeddings" \
+         -H 'Content-Type: application/json' \
+         -d '{"reason":"onboard auto-backfill"}'
+    echo
+fi
+
 echo ""
 echo "Then visit http://localhost:3006"
