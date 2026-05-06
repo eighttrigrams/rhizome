@@ -8,7 +8,9 @@ For the whitepaper, see here: [*Rhizome - A “total recall” note-taking and c
 make onboard
 ```
 
-Visit `localhost:3006`
+Visit `localhost:3006` (you might want to give it some seconds, then refresh until you see items listed).
+Press 'c', then type "ar" and hit Enter and you should be in context "Articles", where you should see a couple
+of articles listed on the right hand side.
 
 ```
 make stop

@@ -24,17 +24,6 @@ make install-sqlite-vec
 make onboard
 ```
 
-`make onboard` does two distinct things:
-
-- **Schema** — applies `schema-sqlite.sql` to create `rhizome.db` (tables,
-  indexes, triggers, plus the `items_vec` virtual table because sqlite-vec
-  is now installed). It also creates a separate `rhizome-test.db` for the
-  unit-test suite.
-- **Contents** — runs `scripts/setup-demo-contexts.bb` to seed a default tree of
-  contexts (`Imports`, `Documents`, `Audio`, `Video`, kind-contexts like
-  `Page` / `Quote`, year contexts, etc.) so you have somewhere to put
-  items.
-
 When `make onboard` finishes the dev server is already running on
 `localhost:3006`.
 
