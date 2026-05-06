@@ -10,7 +10,9 @@ git config --global --add safe.directory '*'
 # The bit is stored in .git/index (shared with the host via the workspace
 # mount), so this is idempotent and persists for the life of the clone.
 if [ -d /workspace/rhizome/.git ]; then
-  git -C /workspace/rhizome update-index --skip-worktree .mcp.json 2>/dev/null || true
+  git -C /workspace/rhizome update-index --skip-worktree \
+      .mcp.json \
+      .claude/settings.json 2>/dev/null || true
 fi
 
 exec /bin/bash "$@"
