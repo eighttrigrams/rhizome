@@ -58,13 +58,6 @@ echo "Creating SQLite database from schema..."
 rm -f rhizome.db
 load_schema rhizome.db
 
-echo "Creating test SQLite database from schema..."
-if [ -f "rhizome-test.db" ]; then
-    echo "rhizome-test.db already exists. Refusing to overwrite."
-else
-    load_schema rhizome-test.db
-fi
-
 echo "Seeding database with contexts..."
 ./setup-test-contexts.bb
 
