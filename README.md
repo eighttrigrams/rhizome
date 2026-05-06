@@ -12,6 +12,8 @@ Visit `localhost:3006` (you might want to give it some seconds, then refresh unt
 Press 'c', then type "ar" and hit Enter and you should be in context "Articles", where you should see a couple
 of articles listed on the right hand side.
 
+![header](./header.png)
+
 ```
 make stop
 make test # if you want to run the tests
