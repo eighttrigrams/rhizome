@@ -32,6 +32,7 @@ rhizome.db
 test-results
 playwright-report
 docker-rhizome/token
+docker/package-lock.json
 .playwright-mcp
 rhizome-test.db
 rhizome-e2e.db

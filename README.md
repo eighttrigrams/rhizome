@@ -45,7 +45,8 @@ state reset between scenarios via `POST /test/reset`.
 ```bash
 $ npm install
 $ npx playwright install chromium   # first time only
-$ npm run e2e
+$ make e2e               # headless (default)
+$ make e2e HEADED=1      # show the browser window
 ```
 
 Each run builds a fresh production-mode cljs bundle (`shadow-cljs release

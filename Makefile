@@ -53,8 +53,9 @@ restart: stop
 test:
 	clj -M:test
 
+HEADED ?= 0
 e2e:
-	npm run e2e
+	HEADED=$(HEADED) npm run e2e
 
 deploy: test e2e
 	npm i

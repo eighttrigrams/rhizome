@@ -51,7 +51,7 @@ export default defineConfig({
   globalSetup: path.resolve(__dirname, "e2e/global-setup.ts"),
   use: {
     baseURL: `http://localhost:${port}`,
-    headless: true,
+    headless: process.env.HEADED !== "1",
   },
   projects: [{
     name: "chromium",

@@ -137,8 +137,13 @@
                                           (not (string? (:private-addr config/config)))))
                              (throw (Exception. "config invalid")))
                            (schema/apply-schema! (:db config/config))
-                           (future (j/run-jetty (app) {:port (:port config/config)
-                                                       :host (or (:bind-host config/config) "127.0.0.1")})))
+                           (let [host (or (:bind-host config/config)
+                                          (when (and (:dev? config/config)
+                                                     (= "1" (System/getenv "RHIZOME_BIND_ALL")))
+                                            "0.0.0.0")
+                                          "127.0.0.1")]
+                             (future (j/run-jetty (app) {:port (:port config/config)
+                                                         :host host}))))
                 :stop 0)
 
 (defn -main
