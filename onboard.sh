@@ -71,11 +71,7 @@ echo "Seeding database with contexts..."
 echo "Installing npm dependencies..."
 npm install
 
-echo ""
-echo "=== Setup Complete ==="
-echo ""
-echo "To start the application, run these in separate terminals:"
-echo "  Terminal 1: make start"
-echo "  Terminal 2: npx shadow-cljs watch app"
+make start
+
 echo ""
 echo "Then visit http://localhost:3006"

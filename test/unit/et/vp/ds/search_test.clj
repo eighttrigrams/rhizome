@@ -1,6 +1,6 @@
 (ns et.vp.ds.search-test
   (:require
-   [clojure.test :refer [deftest is testing]]
+   [clojure.test :refer [deftest is testing use-fixtures]]
    [et.vp.ds :as ds]
    [et.vp.ds.search :as search]
    [et.vp.ds.helpers :as helpers]
@@ -13,8 +13,15 @@
 
 (defonce ^:private _schema-init (do (schema/apply-schema! db) :ok))
 
+(use-fixtures :once
+  (fn [f]
+    (if connection/vec-available?
+      (f)
+      (println "Skipping et.vp.ds.search-test: sqlite-vec extension not installed (run 'make install-sqlite-vec')."))))
+
 (defn reset-db []
-  (jdbc/execute-one! db ["delete from items_vec"])
+  (when connection/vec-available?
+    (jdbc/execute-one! db ["delete from items_vec"]))
   (jdbc/execute-one! db ["delete from relations"])
   (jdbc/execute-one! db ["delete from items"]))
 

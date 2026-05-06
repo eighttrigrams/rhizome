@@ -6,6 +6,7 @@
    single-quote string literals and BEGIN/END nesting so trigger
    creation comes through as a single statement."
   (:require [clojure.string :as str]
+            [datastore.connection :as connection]
             [next.jdbc :as jdbc]))
 
 (def ^:private schema-path "schema-sqlite.sql")
@@ -55,10 +56,15 @@
             :else
               (recur (inc i) depth in-quote start acc)))))))
 
+(defn- vec-statement? [^String stmt]
+  (boolean (re-find #"(?i)\busing\s+vec0\b" stmt)))
+
 (defn apply-schema!
   "Apply schema-sqlite.sql to the given db spec. All CREATEs use
-   IF NOT EXISTS, so this is idempotent."
+   IF NOT EXISTS, so this is idempotent. Statements that depend on the
+   sqlite-vec extension are skipped when the extension is unavailable."
   ([db] (apply-schema! db schema-path))
   ([db path]
-   (doseq [stmt (split-statements (slurp path))]
+   (doseq [stmt (split-statements (slurp path))
+           :when (or connection/vec-available? (not (vec-statement? stmt)))]
      (jdbc/execute-one! db [stmt]))))
