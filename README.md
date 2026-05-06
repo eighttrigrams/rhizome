@@ -5,7 +5,7 @@ For the whitepaper, see here: [*Rhizome - A “total recall” note-taking and c
 ## Getting started
 
 ```bash
-make onbaord
+make onboard
 ```
 
 Visit `localhost:3006`
@@ -16,28 +16,10 @@ make test # if you want to run the tests
 make start
 ```
 
-### With vector db
+### With Vector DB
 
-Clean with `git clean -xfd`.
-
-```bash
-make install-sqlite-vec
-make onbaord
-```
-
-Visit `localhost:3006`
-
-Add items with a description to a context of your choice.
-
-TODO explain how
-
-Enable recording mode and call
-
-```
-make backfill-embeddings
-```
-
-TODO explain how to find something
+This guide ./docs/getting-started-with-vector-search.md describes
+how to get started, but this time with the vector search feature enabled.
 
 ### End-to-end (Playwright)
 
