@@ -12,7 +12,8 @@ Prerequisites:
 
 ```bash
 make box
-root@dev-box:/workspace/rhizome# npm i && make onboard
+root@dev-box:/workspace/rhizome# npm install
+root@dev-box:/workspace/rhizome# make onboard
 root@dev-box:/workspace/rhizome# make start
 ```
 
@@ -29,7 +30,8 @@ Prerequisites are
 - sqlite3 CLI
 
 ```bash
-npm i && make onboard
+npm i
+make onboard # If you haven't done this already
 make start      
 ```
 
@@ -58,6 +60,7 @@ Sandboxed Claude (using Docker). Run
 
 ```bash
 make yolo
+claude@yolo-box:/workspace/rhizome$ npm install
 claude@yolo-box:/workspace/rhizome$ make onboard # if haven't done already
 claude@yolo-box:/workspace/rhizome$ claude # has playwright MCP, can start app etc.
 ```
@@ -127,7 +130,7 @@ SQLITE_VEC_PATH=/nope make test
 E2E tests run at port 3005.
 
 ```bash
-$ npx playwright install chromium  # first time only
+$ npx playwright install chromium  # first time only (on host system only)
 $ make e2e               # headless (default)
 $ make e2e HEADED=1      # show the browser window
 ```
