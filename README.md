@@ -2,16 +2,18 @@
 
 For the whitepaper, see here: [*Rhizome - A “total recall” note-taking and content-management and -archival system for Superhuman Memory [Whitepaper]*](https://eighttrigrams.net/article/21)
 
+`make onboard` writes a fresh `config.edn`, applies the schema to
+`rhizome.db` / `rhizome-test.db`, and seeds the demo contexts and articles.
+
 ## Quickstart with Docker
 
 Prerequisites:
 - Docker
 
-Run
-
 ```bash
 make box
-root@dev-box:/workspace/rhizome# make onboard
+root@dev-box:/workspace/rhizome# npm i && make onboard
+root@dev-box:/workspace/rhizome# make start
 ```
 
 Skip the next section and continue with section "Visiting the App" below.
@@ -23,23 +25,18 @@ Prerequisites are
 - JDK21
 - Clojure CLI (`clj`)
 - Babashka (`bb`)
-- node 18+, npm 
+- node 18+, npm
 - sqlite3 CLI
 
-If you have already done an onboarding through a container, use
-
 ```bash
-npm i && make start
+npm i && make onboard
+make start      
 ```
 
-to get it started. Otherwise, just run
-
-```bash
-make onboard 
-```
-
-(if you started with local, and then with a container, also do the `npm i && make start` thing inside the container after visiting it
-for the first time)
+If you've already onboarded on the other side (host vs. container), skip
+`make onboard` — `rhizome.db` and `config.edn` are already there from the
+bind-mount. You still need `npm install` once on this side because each
+side has its own `node_modules`.
 
 ## Visiting the App
 
@@ -61,6 +58,7 @@ Sandboxed Claude (using Docker). Run
 
 ```bash
 make yolo
+claude@yolo-box:/workspace/rhizome$ make onboard # if haven't done already
 claude@yolo-box:/workspace/rhizome$ claude # has playwright MCP, can start app etc.
 ```
 
@@ -88,7 +86,25 @@ make box WITH_VEC=1
 make yolo WITH_VEC=1
 ```
 
-to start the containers with vector support
+to start the containers with vector support.
+
+After installing vec, embed the seeded demo articles (the JVM must be
+running):
+
+```bash
+make backfill-embeddings
+```
+
+Adding vec **after** an existing onboard works the same way — install,
+stop the JVM, start it again so `apply-schema!` adds the `items_vec`
+table, then backfill:
+
+```bash
+make install-sqlite-vec
+make stop
+make start
+make backfill-embeddings
+```
 
 #### Usage
 

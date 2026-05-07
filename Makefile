@@ -3,7 +3,7 @@ E2E_PORT ?= 3005
 SHADOW_PORT ?= 8020
 DEPLOY_TARGET ?= $(HOME)/Applications/rhizome
 
-.PHONY: start stop restart test e2e deploy install-sqlite-vec yolo box
+.PHONY: start stop test e2e deploy install-sqlite-vec yolo box backfill-embeddings
 
 onboard:
 	./onboard.sh
@@ -16,6 +16,12 @@ box:
 
 install-sqlite-vec:
 	@./scripts/install-sqlite-vec.sh
+
+backfill-embeddings:
+	@curl -sS -X POST http://127.0.0.1:$(PORT)/rest/backfill/embeddings \
+	  -H 'Content-Type: application/json' \
+	  -d '{"reason":"make backfill-embeddings"}'
+	@echo
 
 start:
 	@if lsof -nP -iTCP:$(E2E_PORT) -sTCP:LISTEN >/dev/null 2>&1; then \
