@@ -92,11 +92,11 @@ ollama serve        # listens on http://127.0.0.1:11434
 
 Use
 
-```
+```bash
 make install-sqlite-vec
 ```
 
-on the host system or 
+on the host system (should work both before or after a `make onboard`) or 
 
 ```bash
 make box WITH_VEC=1
@@ -109,17 +109,6 @@ After installing vec, embed the seeded demo articles (the JVM must be
 running):
 
 ```bash
-make backfill-embeddings
-```
-
-Adding vec **after** an existing onboard works the same way — install,
-stop the JVM, start it again so `apply-schema!` adds the `items_vec`
-table, then backfill:
-
-```bash
-make install-sqlite-vec
-make stop
-make start
 make backfill-embeddings
 ```
 
