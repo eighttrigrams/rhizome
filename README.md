@@ -2,7 +2,28 @@
 
 For the whitepaper, see here: [*Rhizome - A “total recall” note-taking and content-management and -archival system for Superhuman Memory [Whitepaper]*](https://eighttrigrams.net/article/21)
 
-## Getting started
+## Quickstart with Docker
+
+Prerequisites:
+- Docker
+
+Run
+
+```bash
+make box
+```
+
+## Getting started (on the host system)
+
+Prerequisites are
+
+- JDK21
+- Clojure CLI (`clj`)
+- Babashka (`bb`)
+- node 18+, npm 
+- sqlite3 CLI
+
+To get it started, run
 
 ```bash
 make onboard
@@ -20,36 +41,7 @@ make test # if you want to run the tests
 make start # to start the server again
 ```
 
-### With Vector DB
-
-Start with a fresh clone of this git repo (or `git clean -xfd` an existing
-checkout to wipe build artefacts, ignored files, and local databases).
-
-```bash
-brew install ollama # or your platform's installer
-ollama pull nomic-embed-text
-ollama serve        # listens on http://127.0.0.1:11434
-make install-sqlite-vec
-make onboard
-```
-
-- Visit the Articles context
-- Press 'i' (input field on right hand side opens)
-- Press 'shift+option+v' (input field should become green)
-- Type in a search term
-
-## End-to-end (Playwright)
-
-E2E tests run at port 3005.
-
-```bash
-$ npm install
-$ npx playwright install chromium   # first time only
-$ make e2e               # headless (default)
-$ make e2e HEADED=1      # show the browser window
-```
-
-## Docker
+## Docker - Claude YOLO
 
 Sandboxed Claude (using Docker). Run
 
@@ -64,8 +56,64 @@ ls # list directories
 claude # has playwright MCP
 make start # runs app at 3006 (accessible for the host system)
 make test
-SQLITE_VEC_PATH=/nope make test # skipping vector tests
+
 make e2e
+```
+
+### With Vector DB
+
+On host system you need that, independent of whether you develop then in your host system
+or inside a Docker
+
+```bash
+brew install ollama # or your platform's installer
+ollama pull nomic-embed-text
+ollama serve        # listens on http://127.0.0.1:11434
+```
+
+#### Running with vector support on host system
+
+Make sure to start with a fresh clone of this git repo (or `git clean -xfd` an existing
+checkout to wipe build artefacts, ignored files, and local databases).
+
+```
+make install-sqlite-vec
+make onboard
+```
+
+#### Running with vector support in a Docker variant
+
+Use
+
+```bash
+make box WITH_VEC=1
+make yolo WITH_VEC=1
+```
+
+#### Usage
+
+- Visit the Articles context
+- Press 'i' (input field on right hand side opens)
+- Press 'shift+option+v' (input field should become green)
+- Type in a search term
+
+##### Tests
+
+When vector mode is enabled, some additional unit tests run,
+but can also be skipped with
+
+```bash
+SQLITE_VEC_PATH=/nope make test
+```
+
+## End-to-end (Playwright)
+
+E2E tests run at port 3005.
+
+```bash
+$ npx playwright install chromium  # first time only
+$ make e2e               # headless (default)
+$ make e2e HEADED=1      # show the browser window
 ```
 
 ## Package, deploy and run

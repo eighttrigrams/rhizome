@@ -3,13 +3,16 @@ E2E_PORT ?= 3005
 SHADOW_PORT ?= 8020
 DEPLOY_TARGET ?= $(HOME)/Applications/rhizome
 
-.PHONY: start stop restart test e2e deploy install-sqlite-vec yolo
+.PHONY: start stop restart test e2e deploy install-sqlite-vec yolo box
 
 onboard:
 	./onboard.sh
 
 yolo:
-	./docker/run.sh
+	WITH_VEC=$(WITH_VEC) ./docker/run.sh
+
+box:
+	cd docker && WITH_VEC=$(WITH_VEC) docker compose build box && WITH_VEC=$(WITH_VEC) docker compose run --rm --service-ports box
 
 install-sqlite-vec:
 	@./scripts/install-sqlite-vec.sh
