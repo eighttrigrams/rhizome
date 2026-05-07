@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     npm \
     sqlite3 \
     ca-certificates \
+    lsof \
     chromium \
     libnss3 \
     libfreetype6 \
@@ -41,9 +42,6 @@ RUN if [ "$WITH_VEC" = "1" ]; then \
     fi
 ENV SQLITE_VEC_PATH=/usr/local/lib/sqlite-vec/vec0
 ENV RHIZOME_BIND_ALL=1
-
-COPY box-run.sh /usr/local/bin/box-run.sh
-RUN chmod +x /usr/local/bin/box-run.sh
 
 WORKDIR /workspace/rhizome
 EXPOSE 3006

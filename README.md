@@ -11,6 +11,7 @@ Run
 
 ```bash
 make box
+root@dev-box:/workspace/rhizome# make onboard
 ```
 
 ## Getting started (on the host system)
@@ -28,6 +29,8 @@ To get it started, run
 ```bash
 make onboard
 ```
+
+## Visiting the App
 
 Visit `localhost:3006` (you might want to give it some seconds, then refresh until you see items listed).
 Press 'c', then type "ar" and hit Enter and you should be in context "Articles", where you should see a couple
@@ -47,17 +50,7 @@ Sandboxed Claude (using Docker). Run
 
 ```bash
 make yolo
-```
-
-Inside, use
-
-```
-ls # list directories
-claude # has playwright MCP
-make start # runs app at 3006 (accessible for the host system)
-make test
-
-make e2e
+claude@yolo-box:/workspace/rhizome$ claude # has playwright MCP, can start app etc.
 ```
 
 ### With Vector DB
@@ -115,6 +108,8 @@ $ npx playwright install chromium  # first time only
 $ make e2e               # headless (default)
 $ make e2e HEADED=1      # show the browser window
 ```
+
+This works on the host system as well as in the Docker containers.
 
 ## Package, deploy and run
 
