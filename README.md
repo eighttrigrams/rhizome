@@ -2,7 +2,7 @@
 
 For the whitepaper, see here: [*Rhizome - A “total recall” note-taking and content-management and -archival system for Superhuman Memory [Whitepaper]*](https://eighttrigrams.net/article/21)
 
-## Quickstart with Docker
+## Getting started - with Docker
 
 Prerequisites:
 - Docker
