@@ -2,9 +2,6 @@
 
 For the whitepaper, see here: [*Rhizome - A “total recall” note-taking and content-management and -archival system for Superhuman Memory [Whitepaper]*](https://eighttrigrams.net/article/21)
 
-`make onboard` writes a fresh `config.edn`, applies the schema to
-`rhizome.db` / `rhizome-test.db`, and seeds the demo contexts and articles.
-
 ## Quickstart with Docker
 
 Prerequisites:
@@ -14,10 +11,31 @@ Prerequisites:
 make box
 root@dev-box:/workspace/rhizome# npm install
 root@dev-box:/workspace/rhizome# make onboard
+```
+
+`make onboard` writes a fresh `config.edn`, applies the schema to
+`rhizome.db` / `rhizome-test.db`, and seeds the demo contexts and articles.
+
+To start the app, use:
+
+## Starting the App
+
+```bash
 root@dev-box:/workspace/rhizome# make start
 ```
 
-Skip the next section and continue with section "Visiting the App" below.
+Visit `localhost:3006` (on you host machine; you might want to give it some seconds, then refresh until you see items listed).
+
+When the app is up: press 'c', then type "ar" and hit Enter and you should be in context "Articles", where you should see a couple
+of articles listed on the right hand side.
+
+![header](./header.png)
+
+```
+make stop
+make test # if you want to run the tests
+make start # to start the server again
+```
 
 ## Getting started on the host system
 
@@ -37,21 +55,17 @@ make start
 
 If you've already onboarded on the other side (host vs. container), skip
 `make onboard` — `rhizome.db` and `config.edn` are already there from the
-bind-mount. You still need `npm install` once on this side because each
-side has its own `node_modules`.
+bind-mount (you still need `npm install` once on this side because each
+side has its own `node_modules`).
 
-## Visiting the App
+There exists `make clean`, if something needs to be cleaned up. Switching 
+between working on the host system and inside Docker should work, but if there
+are problems, this command helps with removing the test dbs and the test configs.
 
-Visit `localhost:3006` (you might want to give it some seconds, then refresh until you see items listed).
-Press 'c', then type "ar" and hit Enter and you should be in context "Articles", where you should see a couple
-of articles listed on the right hand side.
+Then start the app (see above)
 
-![header](./header.png)
-
-```
-make stop
-make test # if you want to run the tests
-make start # to start the server again
+```bash
+make start  
 ```
 
 ## Docker - Claude YOLO

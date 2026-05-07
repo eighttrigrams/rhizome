@@ -3,10 +3,14 @@ E2E_PORT ?= 3005
 SHADOW_PORT ?= 8020
 DEPLOY_TARGET ?= $(HOME)/Applications/rhizome
 
-.PHONY: start stop test e2e deploy install-sqlite-vec yolo box backfill-embeddings
+.PHONY: start stop test e2e deploy install-sqlite-vec yolo box backfill-embeddings clean
 
 onboard:
 	./onboard.sh
+
+clean:
+	rm -f config.edn rhizome.db rhizome-test.db rhizome-e2e.db
+	rm -f *.db-journal *.db-wal *.db-shm
 
 yolo:
 	WITH_VEC=$(WITH_VEC) ./docker/run.sh
