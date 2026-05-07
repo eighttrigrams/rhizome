@@ -14,7 +14,9 @@ make box
 root@dev-box:/workspace/rhizome# make onboard
 ```
 
-## Getting started (on the host system)
+Skip the next section and continue with section "Visiting the App" below.
+
+## Getting started on the host system
 
 Prerequisites are
 
@@ -24,11 +26,20 @@ Prerequisites are
 - node 18+, npm 
 - sqlite3 CLI
 
-To get it started, run
+If you have already done an onboarding through a container, use
 
 ```bash
-make onboard
+npm i && make start
 ```
+
+to get it started. Otherwise, just run
+
+```bash
+make onboard 
+```
+
+(if you started with local, and then with a container, also do the `npm i && make start` thing inside the container after visiting it
+for the first time)
 
 ## Visiting the App
 
@@ -64,24 +75,20 @@ ollama pull nomic-embed-text
 ollama serve        # listens on http://127.0.0.1:11434
 ```
 
-#### Running with vector support on host system
-
-Make sure to start with a fresh clone of this git repo (or `git clean -xfd` an existing
-checkout to wipe build artefacts, ignored files, and local databases).
+Use
 
 ```
 make install-sqlite-vec
-make onboard
 ```
 
-#### Running with vector support in a Docker variant
-
-Use
+on the host system or 
 
 ```bash
 make box WITH_VEC=1
 make yolo WITH_VEC=1
 ```
+
+to start the containers with vector support
 
 #### Usage
 
