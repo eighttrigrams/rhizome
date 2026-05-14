@@ -72,10 +72,12 @@ test:
 	@vec_path="$${SQLITE_VEC_PATH:-./.sqlite-vec/vec0}"; \
 	case "$$(uname -s)" in Darwin) ext=dylib;; *) ext=so;; esac; \
 	if [ -f "$${vec_path}.$${ext}" ]; then \
-	  clj -M:test; \
+	  clj -M:test \
+	    && echo "tests passed (including :vector tests; sqlite-vec found at $${vec_path}.$${ext})"; \
 	else \
 	  echo "sqlite-vec not installed; excluding ^:vector tests"; \
-	  clj -M:test --exclude :vector; \
+	  clj -M:test --exclude :vector \
+	    && echo "tests passed (WITHOUT :vector tests; sqlite-vec not installed)"; \
 	fi
 
 HEADED ?= 0

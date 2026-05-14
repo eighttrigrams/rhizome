@@ -18,7 +18,7 @@ be seemlessly possible.
 Tests with Playwright (can be headless)
 from the host system, and controlling another CMUX surface.
 
-### 1 First docker box, then host, then docker yolo
+### 1 First docker box, then host, then docker yolo, then vector inside docker box
 
 Assume
 - Clojure, Babashka etc. are installed
@@ -31,16 +31,25 @@ Make sure
 
 Steps
 1. Developer installs via Docker, using default ports, using `make box`.
-2. Developer starts application inside container with `make stop`
-3. App should be reachable at 3006 (verify with Playwright), should show seed data
-5. Developer exists container and switches to host system
-6. Developer runs `npm i`
-7. Developer starts the app from outside the container with `make start`
-8. App should be reachable at 3006 (verify with Playwright), should show seed data
-9. Developer stops the app with `make stop`
-10. Developer runs `make yolo`
-11. Inside the container, run `claude` (bypass permissions mode is ok *inside* the container)
-12. Claude should indicate that it is logged in (try `/status`)
-13. `/mcp` should list `playwright` as connected
-14. Prompt "start the app and take a screenshot. call it abc1.png"
-15. Verify on the host system that the screenshot shows Rhizome seed data with Contexts on the LHS and Items on the RHS
+1. `make test` should work
+1. Developer starts application inside container with `make start`
+1. App should be reachable at 3006 (verify with Playwright), should show seed data
+1. Developer exists container and switches to host system
+1. Developer runs `npm i`
+1. `make test` should work
+1. Developer starts the app from outside the container with `make start`
+1. App should be reachable at 3006 (verify with Playwright), should show seed data
+1. Developer stops the app with `make stop`
+1. Developer runs `make yolo`
+1. Inside the container, run `claude` (bypass permissions mode is ok *inside* the container)
+1. Claude should indicate that it is logged in (try `/status`)
+1. `/mcp` should list `playwright` as connected
+1. Prompt "start the app and take a screenshot. call it abc1.png"
+1. Verify on the host system that the screenshot shows Rhizome seed data with Contexts on the LHS and Items on the RHS
+1. Exit container
+1. `make clean` on host
+1. `make box WITH_VEC=1`
+1. `make onboard`
+1. `make start`
+1. `make backfill-embeddings`
+1. On host, system, filtering "Articles" by vector search, as shown in the README, should work

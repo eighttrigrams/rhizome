@@ -97,11 +97,22 @@ ollama serve        # listens on http://127.0.0.1:11434
 make install-sqlite-vec
 ```
 
-The Ollama URL and model are configured in `config.edn` under the
-`:semsearch` key, so swap models or hosts there if needed.
+In both cases, if you haven't yet onboarded, do so
 
-After installing vec, embed the seeded demo articles (the JVM must be
-running):
+```bash
+make onboard
+```
+
+or simply add
+
+```clojure
+:semsearch {:ollama-url "http://127.0.0.1:11434"
+            :ollama-model "nomic-embed-text"}
+```
+
+by hand to `config.edn`.
+
+After installing vec, embed the seeded demo articles, while Rhizome is running, run:
 
 ```bash
 make backfill-embeddings

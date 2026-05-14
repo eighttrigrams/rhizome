@@ -45,10 +45,20 @@ if [ "$(cat /etc/rhizome-use-ollama 2>/dev/null)" = "1" ]; then
 
   if timeout 60 bash -c 'until curl -fsS http://127.0.0.1:11434/ >/dev/null 2>&1; do sleep 1; done'; then
     if ! curl -fsS http://127.0.0.1:11434/api/tags 2>/dev/null | grep -q '"name":"nomic-embed-text'; then
-      echo "[entrypoint] pulling nomic-embed-text into the ollama sidecar (first run)..."
-      curl -fsS -X POST http://127.0.0.1:11434/api/pull \
+      echo "[entrypoint] pulling nomic-embed-text into the ollama sidecar (first run, ~274 MB)..."
+      # Stream the pull and project each JSON-line event into a single line of
+      # human progress. The pull only happens once per ollama_models volume, so
+      # the noise is bounded.
+      curl -fsSN -X POST http://127.0.0.1:11434/api/pull \
         -H 'Content-Type: application/json' \
-        -d '{"name":"nomic-embed-text","stream":false}' >/dev/null \
+        -d '{"name":"nomic-embed-text"}' \
+        | jq -r --unbuffered '
+            if .total and .completed then
+              "[ollama] " + .status + ": "
+              + ((.completed / 1048576) | floor | tostring) + "/"
+              + ((.total     / 1048576) | floor | tostring) + " MB"
+            elif .status then "[ollama] " + .status
+            else "" end' \
         || echo "[entrypoint] WARNING: model pull failed; retry by restarting the ollama service" >&2
     fi
   else

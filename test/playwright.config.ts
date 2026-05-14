@@ -69,7 +69,9 @@ export default defineConfig({
     command,
     cwd: path.resolve(__dirname, ".."),
     url: `http://localhost:${port}`,
-    timeout: 120_000,
+    // 5 minutes: on a fresh container (no .m2 cache, no .shadow-cljs cache)
+    // resolving Clojure deps + compiling shadow-cljs can take >2 minutes.
+    timeout: 300_000,
     reuseExistingServer: false,
   },
 });
