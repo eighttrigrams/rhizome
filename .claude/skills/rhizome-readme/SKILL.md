@@ -18,7 +18,7 @@ be seemlessly possible.
 Tests with Playwright (can be headless)
 from the host system, and controlling another CMUX surface.
 
-### 1 First docker, then host
+### 1 First docker box, then host, then docker yolo
 
 Assume
 - Clojure, Babashka etc. are installed
@@ -26,6 +26,7 @@ Assume
 Make sure
 - No containers, no volumes exist which belong to Rhizome (delete them)
 - node_modules on host does not exist (delete it)
+- a `docker/token` exists
 
 Steps
 1. Developer installs via Docker, using default ports, using `make box`.
@@ -36,8 +37,6 @@ Steps
 7. Developer starts the app from outside the container with `make start`
 8. App should be reachable at 3006 (verify with Playwright), should show seed data
 9. Developer stops the app with `make stop`
-
-If a `docker/token` exists
 10. Developer runs `make yolo`
 11. Inside the container, run `claude` (bypass permissions mode is ok *inside* the container)
 12. Claude should indicate that it is logged in (try `/status`)
