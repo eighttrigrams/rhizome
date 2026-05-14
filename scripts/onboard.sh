@@ -3,18 +3,60 @@ set -e
 
 echo "=== Rhizome Developer Onboarding ==="
 
+# Ports default to whatever's in the environment (so `make box PORT=3007`
+# followed by `make onboard` inside the container picks 3007 automatically),
+# falling back to the canonical defaults. Flags still win over env vars.
+PORT="${PORT:-3006}"
+SHADOW_PORT="${SHADOW_PORT:-8020}"
+SHADOW_NREPL_PORT="${SHADOW_NREPL_PORT:-9630}"
+
+usage () {
+    cat <<USAGE
+Usage: $0 [--port N] [--shadow-port N] [--shadow-nrepl-port N]
+
+Defaults are read from PORT / SHADOW_PORT / SHADOW_NREPL_PORT env vars
+(set by 'make box PORT=...'), then the canonical 3006 / 8020 / 9630.
+
+Note: --shadow-port currently only adjusts the docker port mapping. The
+shadow-cljs.edn :dev-http key remains 8020 -- edit that file if you also
+want shadow itself to bind a different port.
+USAGE
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --port)              PORT="$2"; shift 2 ;;
+        --shadow-port)       SHADOW_PORT="$2"; shift 2 ;;
+        --shadow-nrepl-port) SHADOW_NREPL_PORT="$2"; shift 2 ;;
+        -h|--help)           usage; exit 0 ;;
+        *) echo "Unknown flag: $1" >&2; usage; exit 1 ;;
+    esac
+done
+
 if [ -f "config.edn" ]; then
-    echo "config.edn already exists. Remove it first if you want to reset."
+    echo "config.edn already exists. Remove it first (or 'make clean') if you want to reset."
     exit 1
 fi
 
-echo "Creating SQLite configuration..."
-cat > config.edn << 'EOF'
-{:port 3006
+echo "Creating SQLite configuration on port ${PORT}..."
+cat > config.edn <<EOF
+{:port ${PORT}
  :dev? true
  :db {:dbtype "sqlite"
       :dbname "./rhizome.db"}
- :folders {:homefolder "./files/"}}
+ :folders {:homefolder "./files/"}
+ :semsearch {:ollama-url "http://127.0.0.1:11434"
+             :ollama-model "nomic-embed-text"}}
+EOF
+
+# docker/.env is auto-loaded by docker compose so ports flow into the YAML's
+# \${PORT:-...} interpolations without the user retyping them. Recreated on
+# every onboard run; `make clean` removes it.
+echo "Writing docker/.env..."
+cat > docker/.env <<EOF
+PORT=${PORT}
+SHADOW_PORT=${SHADOW_PORT}
+SHADOW_NREPL_PORT=${SHADOW_NREPL_PORT}
 EOF
 
 echo "Creating directories..."
@@ -78,4 +120,4 @@ echo "  make start       # boots the JVM + shadow-cljs"
 if [ -n "$VEC_EXT" ] && [ -f "$VEC_LIB" ]; then
     echo "  make backfill-embeddings   # embed the seeded articles"
 fi
-echo "Then visit http://localhost:3006"
+echo "Then visit http://localhost:${PORT}"

@@ -5,4 +5,6 @@
  :dev? true
  :db {:dbtype "sqlite"
       :dbname "./rhizome.db"}
- :folders {:homefolder "./files/"}}
+ :folders {:homefolder "./files/"},
+ :semsearch {:ollama-url "http://127.0.0.1:11434"
+             :ollama-model "nomic-embed-text"}}

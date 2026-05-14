@@ -3,4 +3,8 @@
  :dev? true
  :db {:dbtype "sqlite"
       :dbname "./test/rhizome-e2e.db"}
- :folders {:homefolder "./files/"}}
+ :folders {:homefolder "./files/"}
+ ;; In docker, semsearch talks to the `ollama` sidecar service. Host-mode
+ ;; e2e (test/e2e_config.edn) uses 127.0.0.1 instead.
+ :semsearch {:ollama-url "http://ollama:11434"
+             :ollama-model "nomic-embed-text"}}

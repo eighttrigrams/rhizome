@@ -4,16 +4,14 @@ For the whitepaper, see here: [*Rhizome - A “total recall” note-taking and c
 
 ## Getting started - with Docker
 
-Prerequisites:
-- Docker
+Run
 
 ```bash
-make box
-root@dev-box:/workspace/rhizome# npm install
+make box [PORT=3006] [SHADOW_PORT=8020] [SHADOW_NREPL_PORT=9630]
 root@dev-box:/workspace/rhizome# make onboard
 ```
 
-`make onboard` writes a fresh `config.edn`, applies the schema to
+The command `make onboard` writes a fresh `config.edn` (with the chosen or default ports), applies the schema to
 `rhizome.db` / `rhizome-test.db`, and seeds the demo contexts and articles.
 
 To start the app, use:
@@ -23,8 +21,6 @@ To start the app, use:
 ```bash
 root@dev-box:/workspace/rhizome# make start
 ```
-
-Visit `localhost:3006` (on you host machine; you might want to give it some seconds, then refresh until you see items listed).
 
 When the app is up: press 'c', then type "ar" and hit Enter and you should be in context "Articles", where you should see a couple
 of articles listed on the right hand side.
@@ -74,36 +70,32 @@ Sandboxed Claude (using Docker). Run
 
 ```bash
 make yolo
-claude@yolo-box:/workspace/rhizome$ npm install
 claude@yolo-box:/workspace/rhizome$ make onboard # if haven't done already
 claude@yolo-box:/workspace/rhizome$ claude # has playwright MCP, can start app etc.
 ```
 
 ### With Vector DB
 
-On host system you need that, independent of whether you develop then in your host system
-or inside a Docker
-
-```bash
-brew install ollama # or your platform's installer
-ollama pull nomic-embed-text
-ollama serve        # listens on http://127.0.0.1:11434
-```
-
-Use
-
-```bash
-make install-sqlite-vec
-```
-
-on the host system (should work both before or after a `make onboard`) or 
+**In Docker:** just add `WITH_VEC=1`. An `ollama` sidecar container is
+brought up automatically; the embedding model is pulled into a named volume
+on first run and cached afterwards. No host-side Ollama install required.
 
 ```bash
 make box WITH_VEC=1
 make yolo WITH_VEC=1
 ```
 
-to start the containers with vector support.
+**On the host system:** you need Ollama yourself. On MacOS:
+
+```bash
+brew install ollama # or your platform's installer
+ollama pull nomic-embed-text
+ollama serve        # listens on http://127.0.0.1:11434
+make install-sqlite-vec
+```
+
+The Ollama URL and model are configured in `config.edn` under the
+`:semsearch` key, so swap models or hosts there if needed.
 
 After installing vec, embed the seeded demo articles (the JVM must be
 running):

@@ -1,22 +1,31 @@
 PORT ?= 3006
 E2E_PORT ?= 3005
 SHADOW_PORT ?= 8020
+SHADOW_NREPL_PORT ?= 9630
 DEPLOY_TARGET ?= $(HOME)/Applications/rhizome
 
 .PHONY: start stop test e2e deploy install-sqlite-vec yolo box backfill-embeddings clean
 
 onboard:
-	./onboard.sh
+	./scripts/onboard.sh
 
 clean:
-	rm -f config.edn rhizome.db rhizome-test.db rhizome-e2e.db
+	rm -f config.edn rhizome.db rhizome-test.db
+	rm -f test/rhizome-e2e.db
+	rm -f docker/.env
 	rm -f *.db-journal *.db-wal *.db-shm
+	rm -f test/*.db-journal test/*.db-wal test/*.db-shm
+
+# When WITH_VEC=1, also activate the `vec` compose profile so the Ollama
+# sidecar starts. Otherwise it stays absent and devs who don't need semsearch
+# never pay the 3 GB pull cost.
+COMPOSE_VEC = $(if $(filter 1,$(WITH_VEC)),COMPOSE_PROFILES=vec,)
 
 yolo:
-	WITH_VEC=$(WITH_VEC) ./docker/run.sh
+	WITH_VEC=$(WITH_VEC) $(COMPOSE_VEC) ./docker/run.sh
 
 box:
-	cd docker && WITH_VEC=$(WITH_VEC) docker compose build box && WITH_VEC=$(WITH_VEC) docker compose run --rm --service-ports box
+	cd docker && $(COMPOSE_VEC) WITH_VEC=$(WITH_VEC) docker compose build box && $(COMPOSE_VEC) WITH_VEC=$(WITH_VEC) docker compose run --rm --service-ports box
 
 install-sqlite-vec:
 	@./scripts/install-sqlite-vec.sh

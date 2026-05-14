@@ -1,2 +1,6 @@
 {:db {:dbtype "sqlite"
-      :dbname "./rhizome-test.db"}}
+      :dbname "./rhizome-test.db"}
+ ;; Dummy semsearch config so embedder doesn't NPE if a test forgets to
+ ;; redef embed-text. No real Ollama is reachable here.
+ :semsearch {:ollama-url "http://127.0.0.1:11434"
+             :ollama-model "nomic-embed-text"}}
