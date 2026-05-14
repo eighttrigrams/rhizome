@@ -15,6 +15,8 @@ be seemlessly possible.
 
 ## Paths that should verifably work
 
+### First docker, then host
+
 1. Developer installs via Docker, using default ports, using `make box`.
 2. Developer starts application inside container with `make stop`
 3. App should be reachable at 3006 (verify with Playwright), should show seed data
