@@ -15,12 +15,33 @@ be seemlessly possible.
 
 ## Paths that should verifably work
 
-### First docker, then host
+Tests with Playwright (can be headless)
+from the host system, and controlling another CMUX surface.
 
+### 1 First docker, then host
+
+Assume
+- Clojure, Babashka etc. are installed
+
+Make sure
+- No containers, no volumes exist which belong to Rhizome (delete them)
+- node_modules on host does not exist (delete it)
+
+Steps
 1. Developer installs via Docker, using default ports, using `make box`.
 2. Developer starts application inside container with `make stop`
 3. App should be reachable at 3006 (verify with Playwright), should show seed data
-4. Developer stop the application with `make stop`
 5. Developer exists container and switches to host system
-6. Developer starts the app from outside the container with `make start`
-7. App should be reachable at 3006 (verify with Playwright), should show seed data
+6. Developer runs `npm i`
+7. Developer starts the app from outside the container with `make start`
+8. App should be reachable at 3006 (verify with Playwright), should show seed data
+9. Developer stops the app with `make stop`
+
+If a `docker/token` exists
+10. Developer runs `make yolo`
+11. Inside the container, run `claude` (bypass permissions mode is ok *inside* the container)
+12. Claude should indicate that it is logged in (try `/status`)
+13. `/mcp` should list `playwright` as connected
+14. Prompt "start the app and take a screenshot. call it abc1.png"
+15. Verify on the host system that the screenshot shows Rhizome seed data with Contexts on the LHS and Items on the RHS
+

@@ -39,14 +39,21 @@ if [ -f "config.edn" ]; then
 fi
 
 echo "Creating SQLite configuration on port ${PORT}..."
+# :semsearch is only written when this onboard was launched with WITH_VEC=1
+# (either `make box WITH_VEC=1 && make onboard` inside the container, or
+# `WITH_VEC=1 ./scripts/onboard.sh` on the host). Without it, semsearch is
+# disabled, which is what we want for users who don't need vector search.
+if [ "${WITH_VEC:-0}" = "1" ]; then
+    SEMSEARCH_LINE=$'\n :semsearch {:ollama-url "http://127.0.0.1:11434"\n             :ollama-model "nomic-embed-text"}'
+else
+    SEMSEARCH_LINE=""
+fi
 cat > config.edn <<EOF
 {:port ${PORT}
  :dev? true
  :db {:dbtype "sqlite"
       :dbname "./rhizome.db"}
- :folders {:homefolder "./files/"}
- :semsearch {:ollama-url "http://127.0.0.1:11434"
-             :ollama-model "nomic-embed-text"}}
+ :folders {:homefolder "./files/"}${SEMSEARCH_LINE}}
 EOF
 
 # docker/.env is auto-loaded by docker compose so ports flow into the YAML's
@@ -115,7 +122,12 @@ echo "Seeding demo articles..."
 
 echo ""
 echo "Done. Next:"
-echo "  npm install      # one time"
+# Inside the dev container `npm install` is already done by entrypoint.sh on
+# first entry, so don't tell the user to run it again. /.dockerenv is the
+# standard "are we in a docker container" marker.
+if [ ! -f /.dockerenv ]; then
+    echo "  npm install      # one time"
+fi
 echo "  make start       # boots the JVM + shadow-cljs"
 if [ -n "$VEC_EXT" ] && [ -f "$VEC_LIB" ]; then
     echo "  make backfill-embeddings   # embed the seeded articles"

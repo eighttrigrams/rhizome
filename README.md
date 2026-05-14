@@ -22,6 +22,9 @@ To start the app, use:
 root@dev-box:/workspace/rhizome# make start
 ```
 
+Not that the command comes back immediately, but that the build can take some time, so have a little patience
+(until the app comes up (~30-45s) and the stale build shadow cljs banner disappears (~45-75s).
+
 When the app is up: press 'c', then type "ar" and hit Enter and you should be in context "Articles", where you should see a couple
 of articles listed on the right hand side.
 

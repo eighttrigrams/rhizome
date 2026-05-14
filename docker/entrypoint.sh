@@ -18,7 +18,18 @@ fi
 # Auto-install node deps on first container run. The node_modules volume keeps
 # this cached afterwards so re-entering the container is fast. Sentinel marker
 # avoids running npm install on every shell start; delete .npm-installed to
-# force a re-run.
+# force a re-run. In yolo (non-root) the freshly created named volume is owned
+# by root, so claim it via sudo first -- yolo's Dockerfile installs
+# NOPASSWD sudoers for the claude user. Box runs as root and doesn't need it.
+# Fresh named volumes mounted on workspace subpaths land as root-owned; in
+# yolo we run as `claude` and can't write to them. Claim them with sudo
+# (yolo's Dockerfile installs NOPASSWD sudoers); box already runs as root.
+for d in /workspace/rhizome/node_modules /workspace/rhizome/.shadow-cljs /workspace/rhizome/.cpcache; do
+  if [ -d "$d" ] && [ ! -w "$d" ] && command -v sudo >/dev/null 2>&1; then
+    sudo chown -R "$(id -u):$(id -g)" "$d"
+  fi
+done
+
 if [ -f /workspace/rhizome/package.json ] && [ ! -f /workspace/rhizome/node_modules/.npm-installed ]; then
   echo "[entrypoint] running npm install (first run)..."
   (cd /workspace/rhizome && npm install && touch node_modules/.npm-installed) \
