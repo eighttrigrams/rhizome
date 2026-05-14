@@ -26,6 +26,7 @@ Assume
 Make sure
 - No containers, no volumes exist which belong to Rhizome (delete them)
 - node_modules on host does not exist (delete it)
+- Configs are clean (run `make clean`)
 - a `docker/token` exists
 
 Steps
@@ -43,4 +44,3 @@ Steps
 13. `/mcp` should list `playwright` as connected
 14. Prompt "start the app and take a screenshot. call it abc1.png"
 15. Verify on the host system that the screenshot shows Rhizome seed data with Contexts on the LHS and Items on the RHS
-
