@@ -132,8 +132,9 @@ E2E tests run at port 3005.
 
 ```bash
 $ npx playwright install chromium  # first time only (on host system only)
-$ make e2e               # headless (default)
-$ make e2e HEADED=1      # show the browser window
+$ make e2e                  # headless (default)
+$ make e2e HEADED=1         # show the browser window
+$ make e2e E2E_PORT=3015    # override the port
 ```
 
 This works on the host system as well as in the Docker containers.

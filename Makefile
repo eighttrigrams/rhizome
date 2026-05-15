@@ -87,7 +87,7 @@ HEADED ?= 0
 # afterwards so this step is fast on subsequent runs.
 e2e:
 	npx shadow-cljs release app
-	HEADED=$(HEADED) npm run e2e
+	HEADED=$(HEADED) E2E_PORT=$(E2E_PORT) npm run e2e
 
 deploy: test e2e
 	npm i
