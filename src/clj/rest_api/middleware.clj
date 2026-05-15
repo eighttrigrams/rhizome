@@ -15,6 +15,8 @@
 
 (defn toggle! [] (swap! *recording? not))
 
+(defn set-recording! [v] (reset! *recording? (boolean v)))
+
 (defn log-and-guard
   "Log the intended write action, then either run `thunk` (when recording)
    or drop the request silently and return `dropped-response` instead.

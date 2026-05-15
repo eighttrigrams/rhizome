@@ -12,9 +12,8 @@
 
 (defn- with-recording-on
   [f]
-  (let [was-on? (mw/enabled?)]
-    (when-not was-on? (mw/toggle!))
-    (try (f) (finally (when-not was-on? (mw/toggle!))))))
+  (mw/set-recording! true)
+  (try (f) (finally (mw/set-recording! false))))
 
 (use-fixtures :once
   (fn [f] (with-recording-on f)))
