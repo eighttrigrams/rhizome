@@ -70,3 +70,8 @@ CREATE VIRTUAL TABLE IF NOT EXISTS items_vec USING vec0(
     item_id INTEGER PRIMARY KEY,
     embedding FLOAT[768]
 );
+
+CREATE TABLE IF NOT EXISTS items_vec_skipped (
+    item_id INTEGER PRIMARY KEY,
+    FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
+);

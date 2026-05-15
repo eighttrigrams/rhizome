@@ -16,6 +16,7 @@
 (defn reset-db []
   (when connection/vec-available?
     (jdbc/execute-one! db ["delete from items_vec"]))
+  (jdbc/execute-one! db ["delete from items_vec_skipped"])
   (jdbc/execute-one! db ["delete from relations"])
   (jdbc/execute-one! db ["delete from items"]))
 

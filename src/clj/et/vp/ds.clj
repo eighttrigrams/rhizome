@@ -3,9 +3,19 @@
             [honey.sql :as sql]
             [cheshire.core :as json]
             [cambium.core :as log]
+            [datastore.connection :as connection]
             [et.vp.ds.relations :as datastore.relations]
             [et.vp.ds.helpers :refer [un-namespace-keys post-process-base] :as helpers]
             [datastore.dialect :as dialect]))
+
+(defn clear-item-embedding!
+  "Drop the stored embedding (and any 'skipped' marker) for an item, so the
+   next backfill treats it as unembedded. Called on every description version
+   bump so the embedding tracks the latest text."
+  [db id]
+  (when connection/vec-available?
+    (jdbc/execute-one! db ["DELETE FROM items_vec WHERE item_id = ?" id]))
+  (jdbc/execute-one! db ["DELETE FROM items_vec_skipped WHERE item_id = ?" id]))
 
 (defn delete-date
   [db item-id]
@@ -306,6 +316,7 @@
                                           :updated_at_ctx (dialect/now-sql)}
                                     :where [:= :id [:inline id]]})
                        {:return-keys true})
+    (clear-item-embedding! db id)
     (get-item db {:id id})))
 
 (defn store-current-view

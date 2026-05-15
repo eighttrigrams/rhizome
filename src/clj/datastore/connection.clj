@@ -1,4 +1,5 @@
 (ns datastore.connection
+  (:require [clojure.edn :as edn])
   (:import [java.io File]
            [javax.sql DataSource]
            [java.sql Connection]
@@ -20,9 +21,24 @@
                    :else ".dylib")]
     (File. (str base ext))))
 
+(defn- semsearch-configured?
+  "Peek at the config file directly (bypassing the `config` ns to avoid a
+   require cycle) and return true iff `:semsearch` is present. Unknown
+   EDN tag readers are stubbed so we don't have to mirror `config`'s
+   reader set just for a presence check."
+  []
+  (try
+    (let [path (or (System/getenv "RHIZOME_CONFIG") "./config.edn")
+          readers {'env (constantly nil) 'or (constantly nil)}]
+      (some? (:semsearch (edn/read-string {:readers readers} (slurp path)))))
+    (catch Exception _ false)))
+
 (def vec-available?
-  "True iff the sqlite-vec extension file is present on disk."
-  (.exists (vec-extension-file)))
+  "True iff the sqlite-vec extension file is on disk AND `:semsearch` is
+   configured. Without `:semsearch`, semantic search is treated as off
+   regardless of whether the extension dylib is present."
+  (and (.exists (vec-extension-file))
+       (semsearch-configured?)))
 
 (defn- load-vec! [^Connection c]
   (with-open [s (.createStatement c)]
