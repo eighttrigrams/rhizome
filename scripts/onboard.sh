@@ -3,35 +3,17 @@ set -e
 
 echo "=== Rhizome Developer Onboarding ==="
 
-# Ports default to whatever's in the environment (so `make box PORT=3007`
-# followed by `make onboard` inside the container picks 3007 automatically),
-# falling back to the canonical defaults. Flags still win over env vars.
-PORT="${PORT:-3006}"
-SHADOW_PORT="${SHADOW_PORT:-8020}"
-SHADOW_NREPL_PORT="${SHADOW_NREPL_PORT:-9630}"
-
-usage () {
-    cat <<USAGE
-Usage: $0 [--port N] [--shadow-port N] [--shadow-nrepl-port N]
-
-Defaults are read from PORT / SHADOW_PORT / SHADOW_NREPL_PORT env vars
-(set by 'make box PORT=...'), then the canonical 3006 / 8020 / 9630.
-
-Note: --shadow-port currently only adjusts the docker port mapping. The
-shadow-cljs.edn :dev-http key remains 8020 -- edit that file if you also
-want shadow itself to bind a different port.
-USAGE
-}
-
-while [ "$#" -gt 0 ]; do
-    case "$1" in
-        --port)              PORT="$2"; shift 2 ;;
-        --shadow-port)       SHADOW_PORT="$2"; shift 2 ;;
-        --shadow-nrepl-port) SHADOW_NREPL_PORT="$2"; shift 2 ;;
-        -h|--help)           usage; exit 0 ;;
-        *) echo "Unknown flag: $1" >&2; usage; exit 1 ;;
-    esac
+missing=""
+for var in PORT SHADOW_PORT SHADOW_NREPL_PORT; do
+    if [ -z "${!var}" ]; then
+        missing="$missing $var"
+    fi
 done
+if [ -n "$missing" ]; then
+    echo "onboard.sh requires these env vars to be set:$missing" >&2
+    echo "Run via 'make onboard' (which passes them from the Makefile), or export them yourself." >&2
+    exit 1
+fi
 
 if [ -f "config.edn" ]; then
     echo "config.edn already exists. Remove it first (or 'make clean') if you want to reset."

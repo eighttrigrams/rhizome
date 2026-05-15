@@ -7,11 +7,13 @@ DEPLOY_TARGET ?= $(HOME)/Applications/rhizome
 .PHONY: start stop test e2e deploy install-sqlite-vec yolo box backfill-embeddings clean
 
 onboard:
-	./scripts/onboard.sh
+	PORT=$(PORT) SHADOW_PORT=$(SHADOW_PORT) SHADOW_NREPL_PORT=$(SHADOW_NREPL_PORT) ./scripts/onboard.sh
 
 clean:
-	rm -f config.edn rhizome.db rhizome-test.db
+	rm -f config.edn 
+	rm -f rhizome.db
 	rm -f test/rhizome-e2e.db
+	rm -f test/rhizome-test.db
 	rm -f docker/.env
 	rm -f *.db-journal *.db-wal *.db-shm
 	rm -f test/*.db-journal test/*.db-wal test/*.db-shm
