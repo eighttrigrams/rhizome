@@ -48,6 +48,7 @@ start:
 	  fi; \
 	done
 	@mkdir -p logs
+	@if [ -f /.dockerenv ]; then echo container > .dev-server.lock; else echo host > .dev-server.lock; fi
 	@echo "starting dev server on :$(PORT) (logs: logs/dev.out)"
 	@nohup clj -M:dev -m server > logs/dev.out 2>&1 &
 	@echo "starting shadow-cljs watch on :$(SHADOW_PORT) (logs: logs/shadow.out)"
@@ -57,16 +58,43 @@ start:
 # holding $(SHADOW_PORT) (rhizome's :dev-http). That same node process also
 # holds shadow's primary port (default 9630), so killing it frees both —
 # without us probing 9630 and risking somebody else's shadow project.
+#
+# .dev-server.lock (written by `make start`) records which side -- host or
+# container -- owns the running server. Refuse to tear down a server started
+# from the other side: on macOS, `lsof -ti:$PORT` from the host returns
+# Docker's port-forward proxy PIDs, and killing those breaks the container's
+# networking; the reverse misses the real PID entirely.
 stop:
-	@any=0; for p in $(PORT) $(SHADOW_PORT); do \
+	@listening=0; for p in $(PORT) $(SHADOW_PORT); do \
+	  if lsof -nP -iTCP:$$p -sTCP:LISTEN >/dev/null 2>&1; then listening=1; fi; \
+	done; \
+	if [ $$listening -eq 0 ]; then \
+	  echo "nothing to stop"; \
+	  rm -f .dev-server.lock; \
+	  exit 0; \
+	fi; \
+	if [ -f /.dockerenv ]; then here=container; else here=host; fi; \
+	owner=$$(cat .dev-server.lock 2>/dev/null); \
+	if [ -z "$$owner" ]; then \
+	  if [ ! -f /.dockerenv ]; then \
+	    echo "ports are held but no .dev-server.lock -- most likely Docker's port-forwarder for a running container. Exit the container (or 'docker compose down') and try again."; \
+	  else \
+	    echo "ports are held but .dev-server.lock is missing -- refusing to kill an unknown process. Investigate manually."; \
+	  fi; \
+	  exit 1; \
+	fi; \
+	if [ "$$owner" != "$$here" ]; then \
+	  echo "dev server was started from the $$owner; run 'make stop' there (you are on the $$here)"; \
+	  exit 1; \
+	fi; \
+	for p in $(PORT) $(SHADOW_PORT); do \
 	  pids=$$(lsof -nP -iTCP:$$p -sTCP:LISTEN -t 2>/dev/null); \
 	  if [ -n "$$pids" ]; then \
 	    echo "killing $$pids on :$$p"; \
 	    kill $$pids; \
-	    any=1; \
 	  fi; \
 	done; \
-	if [ $$any -eq 0 ]; then echo "nothing to stop"; fi
+	rm -f .dev-server.lock
 
 test:
 	@vec_path="$${SQLITE_VEC_PATH:-./.sqlite-vec/vec0}"; \

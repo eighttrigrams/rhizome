@@ -66,4 +66,9 @@ if [ "$(cat /etc/rhizome-use-ollama 2>/dev/null)" = "1" ]; then
   fi
 fi
 
-exec "${@:-/bin/bash}"
+# Remove the dev-server ownership lock on container exit so the host side
+# isn't left thinking a (now-gone) container still owns the dev server. Note:
+# no `exec` below -- we need this shell to stick around so the trap fires.
+trap 'rm -f /workspace/rhizome/.dev-server.lock' EXIT
+
+"${@:-/bin/bash}"

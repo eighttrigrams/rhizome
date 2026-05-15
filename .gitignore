@@ -45,3 +45,4 @@ tracker
 claude-stuff
 settings.local.json
 .claude/scheduled_tasks.lock
+.dev-server.lock
