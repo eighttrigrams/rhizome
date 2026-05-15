@@ -5,9 +5,14 @@
 
 (defn- config-path [] (or (System/getenv "RHIZOME_CONFIG") "./config.edn"))
 
+(defn- coerce-numeric [s]
+  (if (and (string? s) (re-matches #"-?\d+" s))
+    (Long/parseLong s)
+    s))
+
 (defn- read-env [v]
   (let [[name default] (if (vector? v) v [v nil])]
-    (or (System/getenv (str name)) default)))
+    (coerce-numeric (or (System/getenv (str name)) default))))
 
 (defn- read-or [vs]
   (some #(when (some? %) %) vs))
