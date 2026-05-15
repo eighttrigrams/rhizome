@@ -34,8 +34,7 @@ cat > config.edn <<EOF
 {:port ${PORT}
  :dev? true
  :db {:dbtype "sqlite"
-      :dbname "./rhizome.db"}
- :folders {:homefolder "./files/"}${SEMSEARCH_LINE}}
+      :dbname "./rhizome.db"}${SEMSEARCH_LINE}}
 EOF
 
 # docker/.env is auto-loaded by docker compose so ports flow into the YAML's

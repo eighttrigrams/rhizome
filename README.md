@@ -11,14 +11,6 @@ make box [PORT=3006] [SHADOW_PORT=8020] [SHADOW_NREPL_PORT=9630]
 root@dev-box:/workspace/rhizome# make onboard
 ```
 
-The command `make onboard` writes a fresh `config.edn` (with the chosen or default ports), 
-creates a db with demo contexts and articles. It works inside and outside the container, 
-and the db and the configs are shared from both sides. To *remove* configs and db again, use 
-
-```bash
-make clean
-```
-
 To start the app, use:
 
 ## Starting the App
@@ -39,6 +31,24 @@ of articles listed on the right hand side.
 make stop
 make test # if you want to run the tests
 make start # to start the server again
+```
+
+## Onboard and Cleanup
+
+The command 
+
+```bash
+make onboard
+```
+
+- writes a fresh `config.edn` (with the chosen or default ports; and a `docker/.env` file, with ports information)
+- creates a db with demo contexts and articles. It works inside and outside the container, and the db and the configs are shared from both sides. 
+- creates the `files` directory in which files imported into Rhizome will be stored
+
+To *remove* configs and db again, use 
+
+```bash
+make clean
 ```
 
 ## Getting started on the host system
