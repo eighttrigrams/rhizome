@@ -6,7 +6,6 @@
             [ring.util.response :as response]
             [ring.middleware.json :as json]
             [env :refer [wrap-env-defaults]]
-            [mount.core :as mount]
             [datastore.config :as config]
             [datastore.schema :as schema]
             [next.jdbc :as jdbc]
@@ -130,24 +129,22 @@
         wrap-params
         wrap-multipart-params)))
 
-(mount/defstate ^{:on-reload :noop} http-server
-                :start (do (prn "config valid??" config/config)
-                           (when (and (not (:dev? config/config))
-                                      (or (nil? (:private-addr config/config))
-                                          (not (string? (:private-addr config/config)))))
-                             (throw (Exception. "config invalid")))
-                           (schema/apply-schema! (:db config/config))
-                           (let [host (or (:bind-host config/config)
-                                          (when (and (:dev? config/config)
-                                                     (= "1" (System/getenv "RHIZOME_BIND_ALL")))
-                                            "0.0.0.0")
-                                          "127.0.0.1")]
-                             (future (j/run-jetty (app) {:port (:port config/config)
-                                                         :host host}))))
-                :stop 0)
+(defn start-http-server!
+  []
+  (prn "config valid??" config/config)
+  (when (and (not (:dev? config/config))
+             (or (nil? (:private-addr config/config))
+                 (not (string? (:private-addr config/config)))))
+    (throw (Exception. "config invalid")))
+  (schema/apply-schema! (:db config/config))
+  (let [host (or (:bind-host config/config)
+                 (when (and (:dev? config/config)
+                            (= "1" (System/getenv "RHIZOME_BIND_ALL")))
+                   "0.0.0.0")
+                 "127.0.0.1")]
+    (future (j/run-jetty (app) {:port (:port config/config)
+                                :host host}))))
 
 (defn -main
   [& _args]
-  (prn (mount/start))
-  (.addShutdownHook (Runtime/getRuntime) (Thread. #(prn (mount/stop))))
-  (deref http-server))
+  (deref (start-http-server!)))

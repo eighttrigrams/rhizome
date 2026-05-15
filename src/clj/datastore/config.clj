@@ -1,6 +1,5 @@
 (ns datastore.config
   (:require [clojure.edn :as edn]
-            [mount.core :as mount]
             [datastore.connection :as connection]))
 
 (defn- config-path [] (or (System/getenv "RHIZOME_CONFIG") "./config.edn"))
@@ -38,4 +37,4 @@
     (cond-> c
       (:db c) (update :db connection/make-datasource))))
 
-(mount/defstate config :start (ds) :stop nil)
+(def config (ds))
