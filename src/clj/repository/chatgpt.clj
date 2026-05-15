@@ -1,6 +1,6 @@
 (ns repository.chatgpt
   (:require [cambium.core :as log]
-            [datastore.config :as config]
+            [config :as config]
             [clj-http.client :as http]
             [cheshire.core :as json]))
 

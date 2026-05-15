@@ -1,7 +1,7 @@
 {:port #or [#env E2E_PORT 3005]
  :bind-host "0.0.0.0"
  :dev? true
- :db {:dbtype "sqlite"
-      :dbname "./test/rhizome-e2e.db"}
+ :e2e? true
+ :db {}
  :semsearch {:ollama-url "http://127.0.0.1:11434"
              :ollama-model "nomic-embed-text"}}

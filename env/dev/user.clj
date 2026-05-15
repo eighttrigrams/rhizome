@@ -1,6 +1,6 @@
 (ns user
   (:require server
-            [datastore.config :as config]))
+            [config :as config]))
 
 (def db (:db (config/ds)))
 

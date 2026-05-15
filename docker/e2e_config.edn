@@ -1,8 +1,8 @@
 {:port 3005
  :bind-host "0.0.0.0"
  :dev? true
- :db {:dbtype "sqlite"
-      :dbname "./test/rhizome-e2e.db"}
+ :e2e? true
+ :db {}
  ;; In docker, semsearch talks to the `ollama` sidecar service. Host-mode
  ;; e2e (test/e2e_config.edn) uses 127.0.0.1 instead.
  :semsearch {:ollama-url "http://ollama:11434"

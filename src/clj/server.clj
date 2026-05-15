@@ -6,7 +6,7 @@
             [ring.util.response :as response]
             [ring.middleware.json :as json]
             [env :refer [wrap-env-defaults]]
-            [datastore.config :as config]
+            [config :as config]
             [datastore.schema :as schema]
             [next.jdbc :as jdbc]
             [repository :as r]

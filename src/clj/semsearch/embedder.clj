@@ -1,7 +1,7 @@
 (ns semsearch.embedder
   (:require [clj-http.client :as http]
             [cheshire.core :as json]
-            [datastore.config :as config]))
+            [config :as config]))
 
 (defn- configuration [] (:semsearch config/config))
 

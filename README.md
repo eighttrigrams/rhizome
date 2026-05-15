@@ -79,7 +79,7 @@ claude@yolo-box:/workspace/rhizome$ make onboard # if haven't done already
 claude@yolo-box:/workspace/rhizome$ claude # has playwright MCP, can start app etc.
 ```
 
-### With Vector DB
+## With Vector DB
 
 **In Docker:** just add `WITH_VEC=1`. An `ollama` sidecar container is
 brought up automatically; the embedding model is pulled into a named volume
@@ -120,14 +120,14 @@ After installing vec, embed the seeded demo articles, while Rhizome is running, 
 make backfill-embeddings
 ```
 
-#### Usage
+### Usage
 
 - Visit the Articles context
 - Press 'i' (input field on right hand side opens)
 - Press 'shift+option+v' (input field should become green)
 - Type in a search term
 
-##### Tests
+#### Tests
 
 When vector mode is enabled, some additional unit tests run,
 but can also be skipped with
@@ -175,3 +175,51 @@ make deploy
 rhizome-start
 rhizome-stop
 ```
+
+## Configuration Options
+
+The server reads its config from `./config.edn` (override with the
+`RHIZOME_CONFIG` env var). Example (dev):
+
+```clojure
+{:port 3006
+ :dev? true
+ :db {}
+ :semsearch {:ollama-url "http://127.0.0.1:11434"
+             :ollama-model "nomic-embed-text"}}
+```
+
+### Top-level keys
+
+| Key | Notes |
+|---|---|
+| `:port` | HTTP port. Numeric, accepts `#env`/`#or` readers. |
+| `:bind-host` | Optional explicit bind address. |
+| `:dev?` | Dev mode: REST API always open, `/test/reset` enabled, dev resource pipeline, hardcodes `:folders/:homefolder` and `:db/:dbname`. |
+| `:test?` | Dev sub-mode for unit tests. Requires `:dev? true`. Mutually exclusive with `:e2e?`. Hardcodes db to `./test/rhizome-test.db`. |
+| `:e2e?` | Dev sub-mode for Playwright e2e. Requires `:dev? true`. Mutually exclusive with `:test?`. Hardcodes db to `./test/rhizome-e2e.db`. |
+| `:db` | SQLite config (see below). |
+| `:folders` `:homefolder` | Filesystem root for user files. Required in prod, **must not be set when `:dev? true`** (hardcoded to `./files/`). |
+| `:semsearch` `:ollama-url`, `:ollama-model` | Ollama endpoint and model for embeddings. |
+| `:substack` `:external-substacks` | List of external Substack hostnames (regex-matched on titles). |
+| `:private-addr`, `:private-user-agent` | Prod-only allowlist: `/api` is reachable only from this remote-addr + user-agent. Not used when `:dev? true`. |
+
+### `:db`
+
+Only SQLite is supported. In `:dev?` mode `:dbname` is hardcoded (so leave `:db` as `{}`); the path depends on the sub-mode:
+
+- bare dev → `./rhizome.db`
+- `:test? true` → `./test/rhizome-test.db`
+- `:e2e? true` → `./test/rhizome-e2e.db`
+
+Outside dev mode, set `:db {:dbname "..."}` explicitly.
+
+### Env vars
+
+| Var | Effect |
+|---|---|
+| `RHIZOME_CONFIG` | Config file path. Default `./config.edn`. |
+| `RHIZOME_BIND_ALL=1` | In dev only, bind to `0.0.0.0` instead of `127.0.0.1`. Useful for LAN access. |
+| `SQLITE_VEC_PATH` | Override the sqlite-vec extension lookup (path without `.dylib`/`.so`). Used for vector search; if missing, vector features are unavailable but the rest works. |
+
+EDN readers `#env [NAME default]` and `#or [a b ...]` are available in the config file (used in `test/e2e_config.edn` for the port).

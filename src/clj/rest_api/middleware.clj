@@ -2,7 +2,7 @@
   (:require [cambium.core :as log]
             [cheshire.core :as json]
             [clojure.string :as str]
-            [datastore.config :as config]))
+            [config :as config]))
 
 (defonce ^:private *recording? (atom false))
 

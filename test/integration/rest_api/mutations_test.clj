@@ -4,7 +4,7 @@
             [next.jdbc :as jdbc]
             [ring.mock.request :as mock]
             [ring.middleware.params :refer [wrap-params]]
-            [datastore.config :as config]
+            [config :as config]
             [rest-api :as rest-api]
             [rest-api.middleware :as mw]
             [et.vp.ds :as ds]

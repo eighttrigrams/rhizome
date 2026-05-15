@@ -1,13 +1,14 @@
 (ns et.vp.ds.fetch-aggregated-contexts-test
   (:require
    [clojure.test :refer [deftest is testing]]
+   [datastore.connection :as connection]
    [et.vp.ds :as ds]
    [et.vp.ds.search :as search]
    [et.vp.ds.helpers :as helpers]
    [next.jdbc :as jdbc]
    [clojure.edn :as edn]))
 
-(defonce db (:db (edn/read-string (slurp "./test/test_config.edn"))))
+(defonce db (connection/make-datasource (:db (edn/read-string (slurp "./test/test_config.edn")))))
 
 (defn reset-db []
   (jdbc/execute-one! db ["delete from relations"])
