@@ -11,8 +11,13 @@ make box [PORT=3006] [SHADOW_PORT=8020] [SHADOW_NREPL_PORT=9630]
 root@dev-box:/workspace/rhizome# make onboard
 ```
 
-The command `make onboard` writes a fresh `config.edn` (with the chosen or default ports), applies the schema to
-`rhizome.db` / `rhizome-test.db`, and seeds the demo contexts and articles.
+The command `make onboard` writes a fresh `config.edn` (with the chosen or default ports), 
+creates a db and seeds the demo contexts and articles. It works inside and outside the container, 
+and the db and the configs are shared from both sides. To *remove* configs and db again, use 
+
+```bash
+make clean
+```
 
 To start the app, use:
 
@@ -30,7 +35,7 @@ of articles listed on the right hand side.
 
 ![header](./header.png)
 
-```
+```bash
 make stop
 make test # if you want to run the tests
 make start # to start the server again
@@ -48,23 +53,10 @@ Prerequisites are
 
 ```bash
 npm i
-make onboard # If you haven't done this already
-make start      
-```
-
-If you've already onboarded on the other side (host vs. container), skip
-`make onboard` — `rhizome.db` and `config.edn` are already there from the
-bind-mount (you still need `npm install` once on this side because each
-side has its own `node_modules`).
-
-There exists `make clean`, if something needs to be cleaned up. Switching 
-between working on the host system and inside Docker should work, but if there
-are problems, this command helps with removing the test dbs and the test configs.
-
-Then start the app (see above)
-
-```bash
+make onboard # If you haven't done already
+make test
 make start  
+make stop
 ```
 
 ## Docker - Claude YOLO
