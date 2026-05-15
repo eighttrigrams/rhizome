@@ -12,7 +12,7 @@ root@dev-box:/workspace/rhizome# make onboard
 ```
 
 The command `make onboard` writes a fresh `config.edn` (with the chosen or default ports), 
-creates a db and seeds the demo contexts and articles. It works inside and outside the container, 
+creates a db with demo contexts and articles. It works inside and outside the container, 
 and the db and the configs are shared from both sides. To *remove* configs and db again, use 
 
 ```bash
