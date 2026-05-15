@@ -59,12 +59,34 @@
 (defn- vec-statement? [^String stmt]
   (boolean (re-find #"(?i)\busing\s+vec0\b" stmt)))
 
+(defn- table-exists? [db table]
+  (boolean (seq (jdbc/execute! db
+                               ["SELECT name FROM sqlite_master WHERE type='table' AND name=?"
+                                table]))))
+
+(defn- column-exists? [db table column]
+  (->> (jdbc/execute! db [(str "PRAGMA table_info(" table ")")])
+       (some (fn [row]
+               (= column (or (:table_info/name row) (:name row)))))))
+
+(defn- ensure-column!
+  "Add `column` to `table` as `decl` (e.g. \"TEXT\") if the table already
+   exists and the column does not. Runs before the main CREATE statements
+   so any indexes/triggers in the schema file that reference the new
+   column see it on pre-existing dev DBs."
+  [db table column decl]
+  (when (and (table-exists? db table) (not (column-exists? db table column)))
+    (jdbc/execute-one! db [(str "ALTER TABLE " table " ADD COLUMN " column " " decl)])))
+
 (defn apply-schema!
   "Apply schema-sqlite.sql to the given db spec. All CREATEs use
    IF NOT EXISTS, so this is idempotent. Statements that depend on the
-   sqlite-vec extension are skipped when the extension is unavailable."
+   sqlite-vec extension are skipped when the extension is unavailable.
+   Additive column migrations run first so the schema file can reference
+   the new columns from indexes and triggers."
   ([db] (apply-schema! db schema-path))
   ([db path]
+   (ensure-column! db "items" "human_readable_id" "TEXT")
    (doseq [stmt (split-statements (slurp path))
            :when (or connection/vec-available? (not (vec-statement? stmt)))]
      (jdbc/execute-one! db [stmt]))))

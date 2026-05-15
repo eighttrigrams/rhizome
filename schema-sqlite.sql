@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS items (
     sort_idx INTEGER NOT NULL DEFAULT -1,
     annotation TEXT,
     hide_in_global_search INTEGER NOT NULL DEFAULT 0,
+    human_readable_id TEXT,
     embedding TEXT
 );
 
@@ -37,6 +38,8 @@ CREATE TABLE IF NOT EXISTS history (
 
 CREATE INDEX IF NOT EXISTS idx_items_title ON items(title);
 CREATE INDEX IF NOT EXISTS idx_items_is_context ON items(is_context);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_items_human_readable_id
+  ON items(human_readable_id) WHERE human_readable_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_relations_owner_id ON relations(owner_id);
 CREATE INDEX IF NOT EXISTS idx_relations_target_id ON relations(target_id);
 

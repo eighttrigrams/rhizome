@@ -100,6 +100,23 @@
       (is (= "PN" (:short_title stored)))
       (is (true? (:hide_in_global_search stored))))))
 
+(deftest create-context-with-human-readable-id-test
+  (test-with-fresh-db "stores :human-readable-id when provided"
+    (let [resp (POST* "/rest/contexts" {:title "Books" :human-readable-id "books"})
+          body (body-json resp)
+          stored (ds/get-item db {:id (:id body)})]
+      (is (= 201 (:status resp)))
+      (is (= "books" (:human-readable-id body)))
+      (is (= "books" (:human_readable_id stored)))))
+
+  (test-with-fresh-db "drops a digits-only :human-readable-id but still saves the rest"
+    (let [resp (POST* "/rest/contexts" {:title "Books" :human-readable-id "12345"})
+          body (body-json resp)
+          stored (ds/get-item db {:id (:id body)})]
+      (is (= 201 (:status resp)))
+      (is (= "Books" (:title stored)))
+      (is (nil? (:human_readable_id stored))))))
+
 (deftest create-context-with-sort-idx-test
   (test-with-fresh-db "stores :sort-idx when provided"
     (let [resp (POST* "/rest/contexts" {:title "Chapter 3" :sort-idx 3})

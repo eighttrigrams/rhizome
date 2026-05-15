@@ -51,22 +51,30 @@
          (log/error (str "error in search/search-items: " e " - param was: " q))
          (throw e))))
 
-(defn find-items-by-exact-titles
-  [db titles {:keys [exclude-hidden?] :as _opts}]
-  (try (->> (sql/format {:select core/select
-                         :from [:items]
-                         :where [:and [:= :items.is_context true]
-                                 (when exclude-hidden?
-                                   [:= :items.hide_in_global_search false])
-                                 [:in :items.title titles]]
-                         :order-by [[:items.updated_at_ctx :desc]]})
-            (jdbc/execute! db)
-            (map post-process)
-            (map post-process-contexts))
-       (catch Exception e
-         (log/error (str "error in search/find-items-by-exact-titles: " e
-                         " - titles were: " titles))
-         (throw e))))
+(defn find-items-by-ids
+  "Look up items by primary id and/or by human-readable id, returning the union.
+  Pass only the id categories you actually want matched — empty/missing
+  categories skip their column entirely so we don't waste a scan on a field
+  the caller doesn't care about."
+  [db {:keys [numeric-ids human-readable-ids]}]
+  (let [conds (cond-> []
+                (seq numeric-ids)
+                (conj [:in :items.id (vec numeric-ids)])
+                (seq human-readable-ids)
+                (conj [:in :items.human_readable_id (vec human-readable-ids)]))]
+    (when (seq conds)
+      (try (->> (sql/format {:select (conj core/select :items.human_readable_id)
+                             :from [:items]
+                             :where (into [:or] conds)
+                             :order-by [[:items.updated_at_ctx :desc]]})
+                (jdbc/execute! db)
+                (map post-process)
+                (map post-process-contexts))
+           (catch Exception e
+             (log/error (str "error in search/find-items-by-ids: " e
+                             " - numeric: " numeric-ids
+                             " - human-readable: " human-readable-ids))
+             (throw e))))))
 
 (defn- do-query
   [db formatted-query]

@@ -113,10 +113,15 @@
        (catch NumberFormatException _ (json-response 400 {:error "Invalid item ID"}))))
 
 (defn- context-extras-set
-  [{:keys [short-title sort-idx hide-in-global-search]}]
+  [{:keys [short-title human-readable-id sort-idx hide-in-global-search]}]
   (cond-> {}
     short-title
       (assoc :short_title [:inline short-title])
+    ;; Silently drop a digits-only human-readable-id — the rest of the create
+    ;; still goes through. (Read-side dispatcher uses the digit/non-digit split
+    ;; to route ?id=… so an all-digits handle here would be unreachable.)
+    (and (string? human-readable-id) (re-find #"\D" human-readable-id))
+      (assoc :human_readable_id [:inline human-readable-id])
     sort-idx
       (assoc :sort_idx [:inline sort-idx])
     (true? hide-in-global-search)
@@ -135,6 +140,8 @@
 (defn create-context
   "POST /rest/contexts — create a new context (item with is_context=true).
   JSON body: {\"title\" (required), \"short-title\" (optional),
+  \"human-readable-id\" (optional string — stable handle for GET /rest/items?id=…;
+  must be unique and contain at least one non-digit character),
   \"sort-idx\" (optional int), \"hide-in-global-search\" (optional bool — when
   true, the context is excluded from global contexts search). Gated by
   recording mode."
@@ -144,7 +151,7 @@
       (json-response 400 {:error "title is required"})
       (mw/log-and-guard
         "create-context"
-        (select-keys body [:title :short-title :sort-idx :hide-in-global-search])
+        (select-keys body [:title :short-title :human-readable-id :sort-idx :hide-in-global-search])
         (json-response 201 {:id nil :title (:title body)})
         (fn [] (create-context-impl db body))))))
 

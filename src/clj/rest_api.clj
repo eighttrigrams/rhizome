@@ -14,9 +14,8 @@
            (GET "/describe" [] (queries/describe))
            (POST "/recording-mode/toggle" [] (mutations/toggle-recording-mode))
            (POST "/backfill/embeddings" [] (mutations/backfill-embeddings (:db config/config)))
-           (GET "/contexts" [q by-exact limit]
-                (cond by-exact (queries/find-contexts (:db config/config) q by-exact)
-                      :else (queries/search-contexts (:db config/config) q limit)))
+           (GET "/contexts" [q limit]
+                (queries/search-contexts (:db config/config) q limit))
            (POST "/contexts" req (mutations/create-context (:db config/config) req))
            (GET "/items/by-sort-idx" req
                 (let [qs (:query-string req)
@@ -25,7 +24,9 @@
                   (queries/find-by-sort-idx (:db config/config)
                                             (get params "sort_idx")
                                             (get params "context_ids"))))
-           (GET "/items" [q] (queries/search-items (:db config/config) q))
+           (GET "/items" [q id]
+                (cond id (queries/find-items (:db config/config) id)
+                      :else (queries/search-items (:db config/config) q)))
            (GET "/items/:id/related" [id q secondary_ids search_mode vector]
                 (queries/get-related-items (:db config/config) id
                                            {:q q
