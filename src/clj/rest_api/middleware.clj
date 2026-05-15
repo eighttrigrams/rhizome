@@ -86,68 +86,100 @@
   non-blank :reason in the JSON body."
   #{:post :put :patch :delete})
 
+(defn- rest-uri?
+  [req]
+  (let [uri (or (:uri req) "")]
+    (or (= uri "/rest") (str/starts-with? uri "/rest/"))))
+
+(defn- missing-reason-response
+  []
+  {:status 400
+   :headers {"Content-Type" "application/json"}
+   :body (json/generate-string
+           {:error
+              (str "\"reason\" is required in the JSON body "
+                   "(non-empty string). See GET /rest/describe.")})})
+
+(defn- parse-reason
+  [body-str]
+  (try (when (and body-str (not (str/blank? body-str)))
+         (:reason (json/parse-string body-str true)))
+       (catch Exception _ nil)))
+
+(defn- require-reason
+  [handler req]
+  (let [body-str (try (slurp (:body req)) (catch Exception _ nil))
+        req'    (assoc req :body (java.io.ByteArrayInputStream.
+                                   (.getBytes (or body-str "") "UTF-8")))
+        reason  (parse-reason body-str)]
+    (if (and (string? reason) (not (str/blank? reason)))
+      (handler req')
+      (missing-reason-response))))
+
 (defn wrap-require-reason
-  "For mutation requests (POST/PUT/PATCH/DELETE), require a non-blank
-  \"reason\" field in the JSON body. Reads the body once, validates,
-  then restores it as a ByteArrayInputStream so downstream handlers can
-  re-slurp normally. Read-only methods (GET, HEAD, OPTIONS) pass through
-  untouched. The rule is documented globally in /rest/describe so
-  individual handlers don't have to mention it."
+  "For mutation requests (POST/PUT/PATCH/DELETE) under /rest, require a
+  non-blank \"reason\" field in the JSON body. Reads the body once,
+  validates, then restores it as a ByteArrayInputStream so downstream
+  handlers can re-slurp normally. Read-only methods (GET, HEAD, OPTIONS)
+  and non-/rest URIs pass through untouched. The rule is documented
+  globally in /rest/describe so individual handlers don't have to
+  mention it."
   [handler]
   (fn [req]
-    (if-not (mutation-methods (:request-method req))
-      (handler req)
-      (let [body-str (try (slurp (:body req)) (catch Exception _ nil))
-            req' (assoc req :body (java.io.ByteArrayInputStream.
-                                    (.getBytes (or body-str "") "UTF-8")))
-            parsed (try (when (and body-str (not (str/blank? body-str)))
-                          (json/parse-string body-str true))
-                        (catch Exception _ nil))
-            reason (:reason parsed)]
-        (if (and (string? reason) (not (str/blank? reason)))
-          (handler req')
-          {:status 400
-           :headers {"Content-Type" "application/json"}
-           :body (json/generate-string
-                   {:error
-                      (str "\"reason\" is required in the JSON body "
-                           "(non-empty string). See GET /rest/describe.")})})))))
+    (if (and (rest-uri? req) (mutation-methods (:request-method req)))
+      (require-reason handler req)
+      (handler req))))
+
+(defn- log-request
+  [{:keys [method uri qs remote ua req-body]}]
+  (log/info (cond-> {:event "rest-request"
+                     :method method
+                     :uri uri}
+              qs (assoc :query-string qs)
+              remote (assoc :remote-addr remote)
+              ua (assoc :user-agent ua)
+              (and req-body (not (str/blank? req-body))) (assoc :request-body (truncate req-body)))
+            (str "REST " method " " uri (when qs (str "?" qs)))))
+
+(defn- log-response
+  [{:keys [method uri response duration]}]
+  (let [status    (:status response)
+        resp-body (response-body-str (:body response))]
+    (log/info (cond-> {:event "rest-response"
+                       :method method
+                       :uri uri
+                       :status status
+                       :duration-ms duration}
+                resp-body (assoc :response-body (truncate resp-body)))
+              (str "REST " method " " uri " -> " status " (" duration "ms)"))))
+
+(defn- log-around
+  [handler req]
+  (let [start  (System/currentTimeMillis)
+        method (some-> req :request-method name str/upper-case)
+        uri    (:uri req)
+        qs     (:query-string req)
+        remote (:remote-addr req)
+        ua     (get-in req [:headers "user-agent"])
+        [req-body req'] (read-and-restore-body req)]
+    (log-request {:method method :uri uri :qs qs :remote remote :ua ua :req-body req-body})
+    (let [response (try (handler req')
+                        (catch Throwable t
+                          (log/error t (str "REST " method " " uri " threw"))
+                          (throw t)))
+          duration (- (System/currentTimeMillis) start)]
+      (log-response {:method method :uri uri :response response :duration duration})
+      response)))
 
 (defn wrap-logging
-  "Ring middleware that logs every REST API interaction (request + response)
-   under the `rest-api.middleware` logger. Captures method, URI, query string,
-   request body (truncated), response status, response body (truncated) and
-   duration. Bodies are restored as ByteArrayInputStreams so downstream
-   handlers can still slurp them."
+  "Ring middleware that logs every /rest interaction (request + response)
+   under the `rest-api.middleware` logger. Captures method, URI, query
+   string, request body (truncated), response status, response body
+   (truncated) and duration. Non-/rest URIs pass through untouched.
+   Bodies are restored as ByteArrayInputStreams so downstream handlers
+   can still slurp them."
   [handler]
   (fn [req]
-    (let [start (System/currentTimeMillis)
-          method (some-> req :request-method name str/upper-case)
-          uri (:uri req)
-          qs (:query-string req)
-          remote (:remote-addr req)
-          ua (get-in req [:headers "user-agent"])
-          [req-body req'] (read-and-restore-body req)]
-      (log/info (cond-> {:event "rest-request"
-                         :method method
-                         :uri uri}
-                  qs (assoc :query-string qs)
-                  remote (assoc :remote-addr remote)
-                  ua (assoc :user-agent ua)
-                  (and req-body (not (str/blank? req-body))) (assoc :request-body (truncate req-body)))
-                (str "REST " method " " uri (when qs (str "?" qs))))
-      (let [response (try (handler req')
-                          (catch Throwable t
-                            (log/error t (str "REST " method " " uri " threw"))
-                            (throw t)))
-            duration (- (System/currentTimeMillis) start)
-            status (:status response)
-            resp-body (response-body-str (:body response))]
-        (log/info (cond-> {:event "rest-response"
-                           :method method
-                           :uri uri
-                           :status status
-                           :duration-ms duration}
-                    resp-body (assoc :response-body (truncate resp-body)))
-                  (str "REST " method " " uri " -> " status " (" duration "ms)"))
-        response))))
+    (if (rest-uri? req)
+      (log-around handler req)
+      (handler req))))
