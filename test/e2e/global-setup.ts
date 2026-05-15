@@ -1,7 +1,7 @@
 import { chromium, request } from "@playwright/test";
 
 export default async function globalSetup() {
-  const port = process.env.PORT || "3005";
+  const port = process.env.E2E_PORT || "3005";
   const baseURL = `http://localhost:${port}`;
   const start = Date.now();
 

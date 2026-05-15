@@ -81,7 +81,12 @@ test:
 	fi
 
 HEADED ?= 0
+# Build the cljs release bundle here, before playwright spawns its webServer.
+# Doing the release inside playwright's child can hang on a cold .shadow-cljs
+# cache (no output past the config banner), and either way the cache is reused
+# afterwards so this step is fast on subsequent runs.
 e2e:
+	npx shadow-cljs release app
 	HEADED=$(HEADED) npm run e2e
 
 deploy: test e2e

@@ -27,16 +27,22 @@ try {
   // lsof exits 1 when nothing is listening — that's the happy path.
 }
 
-let port = process.env.PORT;
-if (!port) {
-  try {
-    port = execSync(`bb -e '(:port (read-string (slurp "${configPath}")))'`, { encoding: "utf-8" }).trim();
-  } catch {}
-}
-if (!port) throw new Error(`PORT env var not set and could not read :port from ${configPath}`);
+// Single source of truth for the e2e port is the E2E_PORT env var (with the
+// canonical default of 3005). The server reads it via e2e_config.edn's
+// `#env E2E_PORT` reader tag; playwright doesn't need to parse EDN, it just
+// polls the same env-derived value here.
+const port = process.env.E2E_PORT || "3005";
 
-const command =
-  `npx shadow-cljs release app && RHIZOME_CONFIG=${configPath} clj -M -m server`;
+// shadow-cljs is built by `make e2e` before this config is loaded -- doing
+// the build here, under playwright's webServer wrapper, occasionally hangs
+// the child process (no output past shadow-cljs's banner). Keep the wrapper
+// to a single JVM that's quick to boot and easy to time out on.
+//
+// Redirect stdin from /dev/null: when playwright spawns the child in a
+// non-tty context, `clj` (the bash wrapper) reads from its stdin and gets
+// SIGTTIN if it's still attached to a controlling terminal -- the JVM never
+// starts and the webServer times out.
+const command = `RHIZOME_CONFIG=${configPath} clj -M -m server < /dev/null`;
 
 const testDir = defineBddConfig({
   features: path.resolve(__dirname, "e2e/features"),
@@ -69,9 +75,9 @@ export default defineConfig({
     command,
     cwd: path.resolve(__dirname, ".."),
     url: `http://localhost:${port}`,
-    // 5 minutes: on a fresh container (no .m2 cache, no .shadow-cljs cache)
-    // resolving Clojure deps + compiling shadow-cljs can take >2 minutes.
-    timeout: 300_000,
+    // Just JVM boot + schema load now that shadow-cljs is built ahead of time
+    // by `make e2e`. 60s is plenty even on a cold .m2.
+    timeout: 60_000,
     reuseExistingServer: false,
   },
 });
