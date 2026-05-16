@@ -48,13 +48,26 @@ fi
 # under what is really a clean no-op from the user's point of view.
 
 if [ "$listening" -eq 0 ] && [ -n "$lock_mode" ]; then
-  # Lockfile present but no listeners: most likely an in-flight e2e between
-  # claiming the lock and binding the port. Don't kill anything -- just say
-  # what's going on so the user can decide whether to wait or rm the lock.
+  # Lockfile present but no listeners.  e2e mode is ambiguous (the run may
+  # just be ramping up between claiming the lock and binding the port) so
+  # don't auto-clean.  dev mode with no listeners is unambiguously stale
+  # when the lock belongs to *this* env -- clear it and say so.  Cross-env
+  # stale locks have to be cleared from the env that wrote them.
   case "$lock_mode" in
-    e2e) echo "An e2e run is ramping up (env=$lock_env, headed=${lock_headed:-0}, pid=$lock_pid). Wait for it, or 'rm .dev-server.lock' if stale." ;;
-    dev) echo "Lock claims a dev server (env=$lock_env, pid=$lock_pid) but nothing is listening. Probably stale; 'rm .dev-server.lock' to clear." ;;
-    *)   echo "Unrecognised lock mode '$lock_mode'. Inspect .dev-server.lock and delete if stale." ;;
+    e2e)
+      echo "An e2e run is ramping up (env=$lock_env, headed=${lock_headed:-0}, pid=$lock_pid). Wait for it, or 'rm .dev-server.lock' if stale."
+      ;;
+    dev)
+      if [ "$lock_env" = "$here" ]; then
+        rm -f "$LOCK" .shadow-cljs.pid
+        echo "Lock claimed a dev server (env=$lock_env, pid=$lock_pid) but nothing was listening. Cleared .dev-server.lock${lock_pid:+ and .shadow-cljs.pid}."
+      else
+        echo "Lock claims a dev server (env=$lock_env, pid=$lock_pid) but nothing is listening on this side. Run 'make stop' from the $lock_env (or 'rm .dev-server.lock' there) if it's stale."
+      fi
+      ;;
+    *)
+      echo "Unrecognised lock mode '$lock_mode'. Inspect .dev-server.lock and delete if stale."
+      ;;
   esac
   exit 0
 fi

@@ -15,8 +15,13 @@ make stop     # kills both (only what this project bound)
 
 `make start` runs the JVM in the foreground, with shadow-cljs watch
 backgrounded into the same TTY — both stdouts interleave. Ctrl-C kills the
-JVM; shadow-cljs keeps watching (its pid is in `.shadow-cljs.pid`), so
-follow Ctrl-C with `make stop` to clean it up too.
+JVM. On the host, shadow-cljs keeps watching (its pid is in
+`.shadow-cljs.pid`), so follow Ctrl-C with `make stop` to clean it up too.
+In a container Ctrl-C tears down everything together; the EXIT trap in
+`start.sh` notices both ports are free and clears `.dev-server.lock`
+automatically — but only when the lock belongs to the same env (host vs.
+container), so a cross-env Ctrl-C can never wipe out a still-running
+session's lock.
 
 Open the app at `http://localhost:3006` (real backend, hot reload still works
 via shadow's cross-origin WS) or `http://localhost:9804` (shadow proxies API
