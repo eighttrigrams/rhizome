@@ -32,21 +32,9 @@ make start # to start the server again
 
 ## Onboard and Cleanup
 
-The command 
+The command `make onboard` writes a fresh `config.edn`, and a `files` directory in which files imported into Rhizome will be stored. The command `make start` creates a db with demo contexts and articles. These work inside and outside the container. The db and the configs are shared from both sides.
 
-```bash
-make onboard
-```
-
-- writes a fresh `config.edn` (with the chosen or default ports; and a `docker/.env` file, with ports information)
-- creates a db with demo contexts and articles. It works inside and outside the container, and the db and the configs are shared from both sides. 
-- creates the `files` directory in which files imported into Rhizome will be stored
-
-To *remove* configs and db again, use 
-
-```bash
-make clean
-```
+To *remove* configs and db again, use `make clean`. If you want to not seed items, use `:skip-seed?` option.
 
 ## Getting started on the host system
 
@@ -134,7 +122,7 @@ When `:semsearch` is configured in `config.edn` (with a `:vec-path` pointing at 
 E2E tests share the dev port from `config.edn` (3006 by default; override via `.envrc` or `PORT=…`). The lockfile (`.dev-server.lock`) makes dev and e2e mutually exclusive — start one and the other refuses with a diagnostic that includes mode, env, and (for e2e) headed.
 
 ```bash
-$ npx playwright install chromium  # first time only (on host system only)
+$ npx playwright install chromium                # first time only (on host system only)
 $ make e2e                                       # full headless run
 $ make e2e HEADED=1                              # show the browser window
 $ make e2e T="creates a context"                 # filter by scenario (playwright -g)
@@ -175,49 +163,18 @@ rhizome-stop
 
 ## Configuration Options
 
-The server reads its config from `./config.edn`. Example (dev):
-
-```clojure
-{:port #long #or [#env PORT 3006]
- :dev? true
- :semsearch {:vec-path #or [#env VEC_PATH "./.sqlite-vec/vec0"]
-             :ollama-url #or [#env VEC_URL "http://127.0.0.1:11434"]
-             :ollama-model "nomic-embed-text"}}
-```
-
-### Top-level keys
-
 | Key | Notes |
 |---|---|
 | `:port` | HTTP port. Numeric, accepts `#env`/`#or` readers. |
 | `:dev?` | Dev mode: REST API always open, `/test/reset` enabled, dev resource pipeline, hardcodes `:folders/:homefolder` and the sqlite db path. Also auto-seeds the dev db on first start (canonical contexts + demo articles) when items are empty — set `:skip-seed? true` to opt out. |
 | `:skip-seed?` | Skip the first-start auto-seed in dev mode. Useful when you want an empty dev db, or when you're restoring contexts/items from elsewhere. Ignored outside `:dev? true`. |
-| `:db-path` | Sqlite file path (string). Required in prod. **Must not be set when `:dev? true`** — dev/test/e2e modes hardcode their own paths (see below). |
+| `:db-path` | Sqlite file path (string). Required in prod. Must not be set when `:dev? true`. |
 | `:folders` `:homefolder` | Filesystem root for user files. Required in prod, **must not be set when `:dev? true`** (hardcoded to `./files/`). |
 | `:semsearch` `:vec-path`, `:ollama-url`, `:ollama-model` | Single switch for semantic search. Present → app loads the sqlite-vec extension from `:vec-path` (no `.dylib`/`.so` suffix) and embeds against the Ollama endpoint. Absent → vec extension is not loaded, embedder is inert, and the `:vector` test selector is skipped. |
 | `:substack` `:external-substacks` | List of external Substack hostnames (regex-matched on titles). |
 | `:private-addr`, `:private-user-agent` | Prod-only allowlist: `/api` is reachable only from this remote-addr + user-agent. Not used when `:dev? true`. |
 
-### `:db-path`
-
-Outside dev mode, set `:db-path "..."` to point at the sqlite file. In dev/test/e2e modes the path is hardcoded: `./rhizome.db` (dev), shared-cache in-memory (test), `./test/rhizome-e2e.db` (e2e).
-
-### Auto-seed in dev mode
-
-When `:dev? true` and the items table is empty (i.e. you just ran `make clean` or this is a fresh checkout), the JVM seeds the dev db on startup with the canonical contexts and the demo articles (`scripts/demo-articles.edn`). No more "did I run `make onboard`?" — `make start` is enough.
-
-Set `:skip-seed? true` in `config.edn` to opt out (e.g. if you're restoring data from a backup, or want to drive the empty db yourself):
-
-```clojure
-{:port #long #or [#env PORT 3006]
- :dev? true
- :skip-seed? true
- ...}
-```
-
-`:skip-seed?` is a no-op outside dev mode. Seeding never re-runs after the first start, since the trigger is "items table is empty" — once you have any items, dev-seed skips itself.
-
-### Running multiple checkouts side-by-side
+## Running multiple checkouts side-by-side
 
 You can clone or copy this repo to a sibling directory and run a second instance against different ports without touching shared state — both the host-side dev server and the docker containers are isolated automatically.
 
