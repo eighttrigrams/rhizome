@@ -62,4 +62,4 @@ VEC_LIB="./.sqlite-vec/vec0.$VEC_EXT"
 if [ -n "$VEC_EXT" ] && [ -f "$VEC_LIB" ]; then
     echo "  make backfill-embeddings   # embed the seeded articles"
 fi
-echo "Then visit http://localhost:${PORT:-3006}"
+echo "Then visit http://localhost:${PORT:-3140}"
