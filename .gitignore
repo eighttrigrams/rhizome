@@ -49,3 +49,4 @@ settings.local.json
 .shadow-cljs.pid
 docker/compose.ports.yml
 .envrc
+nohup.out

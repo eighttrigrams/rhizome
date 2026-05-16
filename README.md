@@ -103,6 +103,7 @@ by hand to `config.edn`. The aero `#or [#env ...]` form lets the same `config.ed
 After installing vec, embed the seeded demo articles, while Rhizome is running, run:
 
 ```bash
+nohup make start & # invoked that way that you can execute next line from the same shell
 make backfill-embeddings
 ```
 
