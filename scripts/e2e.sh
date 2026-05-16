@@ -26,13 +26,15 @@ T="${T:-}"
 # and steer the user at the image that has the browser stack -- otherwise
 # they hit a generic playwright error after a 10s shadow-cljs build.
 if [ -f /.dockerenv ] && [ ! -x /usr/bin/chromium ]; then
-  echo "Refusing: this container has no chromium installed." >&2
+  # Refusal is informational, not an error -- exit 0 so Make doesn't tack
+  # on a `*** [e2e] Error 1` tail. Same pattern as the lock/port refusal.
+  echo "Refusing: this container has no chromium installed."
   echo
-  echo "  You appear to be inside the 'box' dev shell, which intentionally" >&2
-  echo "  ships without the Playwright/Chromium stack. Run e2e either:" >&2
-  echo "    - on the host       (npx playwright install chromium once, then 'make e2e'), or" >&2
-  echo "    - inside 'yolo'     (exit this shell, then 'make yolo' on the host)." >&2
-  exit 1
+  echo "  You appear to be inside the 'box' dev shell, which intentionally"
+  echo "  ships without the Playwright/Chromium stack. Run e2e either:"
+  echo "    - on the host       (npx playwright install chromium once, then 'make e2e'), or"
+  echo "    - inside 'yolo'     (exit this shell, then 'make yolo' on the host)."
+  exit 0
 fi
 
 # Refusal is informational, not an error. Bail with exit 0 so callers
