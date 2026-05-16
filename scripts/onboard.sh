@@ -17,21 +17,18 @@ echo "Creating SQLite configuration..."
 # `WITH_VEC=1 ./scripts/onboard.sh` on the host). Without it, semsearch is
 # disabled, which is what we want for users who don't need vector search.
 if [ "${WITH_VEC:-0}" = "1" ]; then
-    # :vec-path is the sole source of truth for where the sqlite-vec
-    # extension lives. Linux/Docker installs to /usr/local/lib, Mac/host
-    # installs to ./.sqlite-vec via scripts/install-sqlite-vec.sh.
-    case "$(uname -s)" in
-        Linux) VEC_PATH="/usr/local/lib/sqlite-vec/vec0" ;;
-        *)     VEC_PATH="./.sqlite-vec/vec0" ;;
-    esac
-    SEMSEARCH_LINE=$'\n :semsearch {:vec-path "'${VEC_PATH}$'"\n             :ollama-url "http://127.0.0.1:11434"\n             :ollama-model "nomic-embed-text"}'
+    # :vec-path resolves through aero #or so the *same* config.edn works on
+    # host and inside docker without re-running onboard. $VEC_PATH wins (set
+    # by the Dockerfile to /usr/local/lib/sqlite-vec/vec0 in the container);
+    # otherwise it falls back to the host install path written by
+    # scripts/install-sqlite-vec.sh.
+    SEMSEARCH_LINE=$'\n :semsearch {:vec-path #or [#env VEC_PATH "./.sqlite-vec/vec0"]\n             :ollama-url #or [#env VEC_URL "http://127.0.0.1:11434"]\n             :ollama-model "nomic-embed-text"}'
 else
     SEMSEARCH_LINE=""
 fi
 cat > config.edn <<EOF
 {:port #long #or [#env PORT 3006]
- :dev? true
- :db {}${SEMSEARCH_LINE}}
+ :dev? true${SEMSEARCH_LINE}}
 EOF
 
 echo "Creating directories..."

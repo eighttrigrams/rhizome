@@ -105,12 +105,12 @@ make onboard
 or simply add
 
 ```clojure
-:semsearch {:vec-path "./.sqlite-vec/vec0"
-            :ollama-url "http://127.0.0.1:11434"
+:semsearch {:vec-path #or [#env VEC_PATH "./.sqlite-vec/vec0"]
+            :ollama-url #or [#env VEC_URL "http://127.0.0.1:11434"]
             :ollama-model "nomic-embed-text"}
 ```
 
-by hand to `config.edn`. Use `/usr/local/lib/sqlite-vec/vec0` instead of `./.sqlite-vec/vec0` for the Linux/Docker install path.
+by hand to `config.edn`. The aero `#or [#env ...]` form lets the same `config.edn` work on host and inside docker: the Dockerfile sets `VEC_PATH=/usr/local/lib/sqlite-vec/vec0` and `VEC_URL=http://127.0.0.1:11437` (a socat bridge `entrypoint.sh` opens onto the `ollama` sidecar); the host falls back to the local install path and `:11434`.
 
 After installing vec, embed the seeded demo articles, while Rhizome is running, run:
 
@@ -178,10 +178,10 @@ rhizome-stop
 The server reads its config from `./config.edn`. Example (dev):
 
 ```clojure
-{:port 3006
+{:port #long #or [#env PORT 3006]
  :dev? true
- :db {}
- :semsearch {:ollama-url "http://127.0.0.1:11434"
+ :semsearch {:vec-path #or [#env VEC_PATH "./.sqlite-vec/vec0"]
+             :ollama-url #or [#env VEC_URL "http://127.0.0.1:11434"]
              :ollama-model "nomic-embed-text"}}
 ```
 
@@ -190,17 +190,17 @@ The server reads its config from `./config.edn`. Example (dev):
 | Key | Notes |
 |---|---|
 | `:port` | HTTP port. Numeric, accepts `#env`/`#or` readers. |
-| `:dev?` | Dev mode: REST API always open, `/test/reset` enabled, dev resource pipeline, hardcodes `:folders/:homefolder` and `:db/:dbname`. Also auto-seeds the dev db on first start (canonical contexts + demo articles) when items are empty — set `:skip-seed? true` to opt out. |
+| `:dev?` | Dev mode: REST API always open, `/test/reset` enabled, dev resource pipeline, hardcodes `:folders/:homefolder` and the sqlite db path. Also auto-seeds the dev db on first start (canonical contexts + demo articles) when items are empty — set `:skip-seed? true` to opt out. |
 | `:skip-seed?` | Skip the first-start auto-seed in dev mode. Useful when you want an empty dev db, or when you're restoring contexts/items from elsewhere. Ignored outside `:dev? true`. |
-| `:db` | SQLite config (see below). |
+| `:db-path` | Sqlite file path (string). Required in prod. **Must not be set when `:dev? true`** — dev/test/e2e modes hardcode their own paths (see below). |
 | `:folders` `:homefolder` | Filesystem root for user files. Required in prod, **must not be set when `:dev? true`** (hardcoded to `./files/`). |
 | `:semsearch` `:vec-path`, `:ollama-url`, `:ollama-model` | Single switch for semantic search. Present → app loads the sqlite-vec extension from `:vec-path` (no `.dylib`/`.so` suffix) and embeds against the Ollama endpoint. Absent → vec extension is not loaded, embedder is inert, and the `:vector` test selector is skipped. |
 | `:substack` `:external-substacks` | List of external Substack hostnames (regex-matched on titles). |
 | `:private-addr`, `:private-user-agent` | Prod-only allowlist: `/api` is reachable only from this remote-addr + user-agent. Not used when `:dev? true`. |
 
-### `:db`
+### `:db-path`
 
-Outside dev mode, set `:db {:dbname "..."}` for the path to the sqlite file explicitly.
+Outside dev mode, set `:db-path "..."` to point at the sqlite file. In dev/test/e2e modes the path is hardcoded: `./rhizome.db` (dev), shared-cache in-memory (test), `./test/rhizome-e2e.db` (e2e).
 
 ### Auto-seed in dev mode
 
@@ -212,7 +212,6 @@ Set `:skip-seed? true` in `config.edn` to opt out (e.g. if you're restoring data
 {:port #long #or [#env PORT 3006]
  :dev? true
  :skip-seed? true
- :db {}
  ...}
 ```
 

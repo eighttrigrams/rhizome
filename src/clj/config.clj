@@ -53,16 +53,19 @@
       (assoc-in c [:folders :homefolder] dev-homefolder))
     c))
 
-(defn- apply-dev-dbname [c]
-  (if (:dev? c)
-    (let [hardcoded (dev-dbname-for c)]
-      (if (get-in c [:db :dbname])
-        (throw (ex-info
-                (str "config invalid: :db :dbname must not be set when :dev? is true "
-                     "(hardcoded to " hardcoded ")")
-                {:config c}))
-        (assoc-in c [:db :dbname] hardcoded)))
-    c))
+(defn- resolve-dbname [c]
+  (let [hardcoded (when (:dev? c) (dev-dbname-for c))]
+    (cond
+      hardcoded
+      (do (when (:db-path c)
+            (throw (ex-info
+                    (str "config invalid: :db-path must not be set when :dev? is true "
+                         "(hardcoded to " hardcoded ")")
+                    {:config c})))
+          hardcoded)
+      (:db-path c) (:db-path c)
+      :else (throw (ex-info "config invalid: :db-path is required in prod mode"
+                            {:config c})))))
 
 (defn ds []
   (let [c (aero/read-config config-path)
@@ -71,8 +74,9 @@
             (test-mode?) (merge test-overrides))
         c (check-mode-flags c)
         c (apply-dev-homefolder c)
-        c (apply-dev-dbname c)]
-    (cond-> c
-      (:db c) (update :db connection/make-datasource))))
+        dbname (resolve-dbname c)]
+    (-> c
+        (dissoc :db-path)
+        (assoc :db (connection/make-datasource {:dbname dbname})))))
 
 (def config (ds))
