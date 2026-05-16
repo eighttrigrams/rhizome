@@ -132,7 +132,6 @@
 
 (defn start-http-server!
   []
-  (prn "config valid??" config/config)
   (when (and (not (:dev? config/config))
              (or (nil? (:private-addr config/config))
                  (not (string? (:private-addr config/config)))))
