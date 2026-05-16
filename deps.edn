@@ -14,13 +14,23 @@
            cambium/cambium.core              {:mvn/version "1.1.1"}
            cambium/cambium.codec-simple      {:mvn/version "1.0.0"}
            cambium/cambium.logback.core      {:mvn/version "0.4.5"}
-           tick/tick                         {:mvn/version "1.0"}}
+           tick/tick                         {:mvn/version "1.0"}
+           aero/aero                         {:mvn/version "1.1.6"}}
  :aliases {:dev   {:extra-paths ["env/dev" "test/unit" "test/integration"]}
+           ;; e2e mode reuses config.edn (same port, same :semsearch). The
+           ;; sysprop signals config.clj to force :dev? :e2e? :bind-host and
+           ;; hardcode the db to ./test/rhizome-e2e.db.
+           :e2e   {:jvm-opts ["-Drhizome.e2e=1"]}
            :test  {:extra-paths ["test/unit" "test/integration" "env/test"]
                    :extra-deps  {io.github.cognitect-labs/test-runner {:git/tag "v0.5.1"
                                                                        :git/sha "dfb30dd"}
                                  ring/ring-mock                       {:mvn/version "0.4.0"}
                                  com.cognitect/transit-clj            {:mvn/version "1.0.333"}}
+                   ;; Mirrors the :e2e alias: the sysprop tells config.clj
+                   ;; to force :dev?/:test? and hardcode the db to
+                   ;; ./test/rhizome-test.db, so tests reuse main config.edn
+                   ;; (port, :semsearch) instead of a parallel test_config.edn.
+                   :jvm-opts    ["-Drhizome.test=1"]
                    :main-opts   ["-m" "cognitect.test-runner"
                                  "-d" "test/unit"
                                  "-d" "test/integration"]

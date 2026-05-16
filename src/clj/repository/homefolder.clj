@@ -1,12 +1,10 @@
 (ns repository.homefolder
   (:require [cambium.core :as log]
             [clojure.string :as str]
-            [clojure.java.io :as io]))
+            [clojure.java.io :as io]
+            [config :as config]))
 
-(def homefolder
-  (-> (read-string (slurp "./config.edn"))
-      :folders
-      :homefolder))
+(def homefolder (get-in config/config [:folders :homefolder]))
 
 (defn- get-suffix
   [file-name]

@@ -7,6 +7,7 @@
             [ring.middleware.json :as json]
             [env :refer [wrap-env-defaults]]
             [config :as config]
+            [dev-seed :as dev-seed]
             [datastore.schema :as schema]
             [next.jdbc :as jdbc]
             [repository :as r]
@@ -137,11 +138,12 @@
                  (not (string? (:private-addr config/config)))))
     (throw (Exception. "config invalid")))
   (schema/apply-schema! (:db config/config))
+  (dev-seed/maybe-seed! {:db         (:db config/config)
+                         :dev?       (:dev? config/config)
+                         :e2e?       (:e2e? config/config)
+                         :skip-seed? (:skip-seed? config/config)})
   (let [host (or (:bind-host config/config)
-                 (when (and (:dev? config/config)
-                            (= "1" (System/getenv "RHIZOME_BIND_ALL")))
-                   "0.0.0.0")
-                 "127.0.0.1")]
+                 (if (:dev? config/config) "0.0.0.0" "127.0.0.1"))]
     (future (j/run-jetty (app) {:port (:port config/config)
                                 :host host}))))
 

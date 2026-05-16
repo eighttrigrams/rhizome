@@ -1,15 +1,15 @@
 (ns et.vp.ds.search-test
   (:require
    [clojure.test :refer [deftest is testing]]
+   [config :as config]
    [et.vp.ds :as ds]
    [et.vp.ds.search :as search]
    [et.vp.ds.helpers :as helpers]
    [datastore.schema :as schema]
    [datastore.connection :as connection]
-   [next.jdbc :as jdbc]
-   [clojure.edn :as edn]))
+   [next.jdbc :as jdbc]))
 
-(defonce db (connection/make-datasource (:db (edn/read-string (slurp "./test/test_config.edn")))))
+(defonce db (:db config/config))
 
 (defonce ^:private _schema-init (do (schema/apply-schema! db) :ok))
 

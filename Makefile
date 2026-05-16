@@ -1,20 +1,21 @@
-PORT ?= 3006
-E2E_PORT ?= 3005
-SHADOW_PORT ?= 8020
-SHADOW_NREPL_PORT ?= 9630
+# Ports are resolved by scripts/detect-ports.sh: .envrc wins, then config.edn
+# / shadow-cljs.edn, then a hardcoded final fallback. Same values are used
+# for host-side `make start`/`stop` and for the generated docker overlay so
+# both sides agree without anyone retyping a port.
+PORT        ?= $(shell ./scripts/detect-ports.sh PORT)
+SHADOW_PORT ?= $(shell ./scripts/detect-ports.sh SHADOW_PORT)
 DEPLOY_TARGET ?= $(HOME)/Applications/rhizome
 
 .PHONY: start stop test e2e deploy install-sqlite-vec yolo box backfill-embeddings clean
 
 onboard:
-	PORT=$(PORT) SHADOW_PORT=$(SHADOW_PORT) SHADOW_NREPL_PORT=$(SHADOW_NREPL_PORT) ./scripts/onboard.sh
+	./scripts/onboard.sh
 
 clean:
-	rm -f config.edn 
+	rm -f config.edn
 	rm -f rhizome.db
 	rm -f test/rhizome-e2e.db
-	rm -f test/rhizome-test.db
-	rm -f docker/.env
+	rm -f docker/compose.ports.yml
 	rm -f *.db-journal *.db-wal *.db-shm
 	rm -f test/*.db-journal test/*.db-wal test/*.db-shm
 
@@ -23,11 +24,23 @@ clean:
 # never pay the 3 GB pull cost.
 COMPOSE_VEC = $(if $(filter 1,$(WITH_VEC)),COMPOSE_PROFILES=vec,)
 
+# Always layer docker-compose.yml with the generated compose.ports.yml so
+# the host bindings come from .envrc / config.edn / shadow-cljs.edn rather
+# than YAML fallbacks. COMPOSE_FILE uses ':' as separator (compose convention).
+COMPOSE_FILES = COMPOSE_FILE=docker-compose.yml:compose.ports.yml
+
+# Same PORT/SHADOW_PORT also flow into the container as env vars; aero in
+# config.clj and shadow-cljs honor them via #env so the JVM/shadow bind to
+# the host-bound port without us having to add direnv inside the container.
+COMPOSE_ENV = PORT=$(PORT) SHADOW_PORT=$(SHADOW_PORT) WITH_VEC=$(WITH_VEC) $(COMPOSE_VEC) $(COMPOSE_FILES)
+
 yolo:
-	WITH_VEC=$(WITH_VEC) $(COMPOSE_VEC) ./docker/run.sh
+	@./scripts/write-compose-ports.sh $(PORT) $(SHADOW_PORT)
+	$(COMPOSE_ENV) ./docker/run.sh
 
 box:
-	cd docker && $(COMPOSE_VEC) WITH_VEC=$(WITH_VEC) docker compose build box && $(COMPOSE_VEC) WITH_VEC=$(WITH_VEC) docker compose run --rm --service-ports box
+	@./scripts/write-compose-ports.sh $(PORT) $(SHADOW_PORT)
+	cd docker && $(COMPOSE_ENV) docker compose build box && $(COMPOSE_ENV) docker compose run --rm --service-ports box
 
 install-sqlite-vec:
 	@./scripts/install-sqlite-vec.sh
@@ -39,85 +52,31 @@ backfill-embeddings:
 	@echo
 
 start:
-	@if lsof -nP -iTCP:$(E2E_PORT) -sTCP:LISTEN >/dev/null 2>&1; then \
-	  echo "e2e server is running on :$(E2E_PORT) (pid $$(lsof -nP -iTCP:$(E2E_PORT) -sTCP:LISTEN -t)). Wait for it to finish, or stop it, before starting dev."; \
-	  exit 1; \
-	fi
-	@for p in $(PORT) $(SHADOW_PORT); do \
-	  if lsof -nP -iTCP:$$p -sTCP:LISTEN >/dev/null 2>&1; then \
-	    echo "already running on :$$p (pid $$(lsof -nP -iTCP:$$p -sTCP:LISTEN -t))"; \
-	    exit 1; \
-	  fi; \
-	done
-	@mkdir -p logs
-	@if [ -f /.dockerenv ]; then echo container > .dev-server.lock; else echo host > .dev-server.lock; fi
-	@echo "starting dev server on :$(PORT) (logs: logs/dev.out)"
-	@nohup clj -M:dev -m server > logs/dev.out 2>&1 &
-	@echo "starting shadow-cljs watch on :$(SHADOW_PORT) (logs: logs/shadow.out)"
-	@nohup npx shadow-cljs watch app > logs/shadow.out 2>&1 &
+	@./scripts/start.sh
 
-# Only kills what this project bound: the JVM on $(PORT) and the node process
-# holding $(SHADOW_PORT) (rhizome's :dev-http). That same node process also
-# holds shadow's primary port (default 9630), so killing it frees both —
-# without us probing 9630 and risking somebody else's shadow project.
-#
-# .dev-server.lock (written by `make start`) records which side -- host or
-# container -- owns the running server. Refuse to tear down a server started
-# from the other side: on macOS, `lsof -ti:$PORT` from the host returns
-# Docker's port-forward proxy PIDs, and killing those breaks the container's
-# networking; the reverse misses the real PID entirely.
 stop:
-	@listening=0; for p in $(PORT) $(SHADOW_PORT); do \
-	  if lsof -nP -iTCP:$$p -sTCP:LISTEN >/dev/null 2>&1; then listening=1; fi; \
-	done; \
-	if [ $$listening -eq 0 ]; then \
-	  echo "nothing to stop"; \
-	  rm -f .dev-server.lock; \
-	  exit 0; \
-	fi; \
-	if [ -f /.dockerenv ]; then here=container; else here=host; fi; \
-	owner=$$(cat .dev-server.lock 2>/dev/null); \
-	if [ -z "$$owner" ]; then \
-	  if [ ! -f /.dockerenv ]; then \
-	    echo "ports are held but no .dev-server.lock -- most likely Docker's port-forwarder for a running container. Exit the container (or 'docker compose down') and try again."; \
-	  else \
-	    echo "ports are held but .dev-server.lock is missing -- refusing to kill an unknown process. Investigate manually."; \
-	  fi; \
-	  exit 1; \
-	fi; \
-	if [ "$$owner" != "$$here" ]; then \
-	  echo "dev server was started from the $$owner; run 'make stop' there (you are on the $$here)"; \
-	  exit 1; \
-	fi; \
-	for p in $(PORT) $(SHADOW_PORT); do \
-	  pids=$$(lsof -nP -iTCP:$$p -sTCP:LISTEN -t 2>/dev/null); \
-	  if [ -n "$$pids" ]; then \
-	    echo "killing $$pids on :$$p"; \
-	    kill $$pids; \
-	  fi; \
-	done; \
-	rm -f .dev-server.lock
+	@./scripts/stop.sh
 
 test:
-	@vec_path="$${SQLITE_VEC_PATH:-./.sqlite-vec/vec0}"; \
-	case "$$(uname -s)" in Darwin) ext=dylib;; *) ext=so;; esac; \
-	if [ -f "$${vec_path}.$${ext}" ]; then \
-	  clj -M:test \
-	    && echo "tests passed (including :vector tests; sqlite-vec found at $${vec_path}.$${ext})"; \
-	else \
-	  echo "sqlite-vec not installed; excluding ^:vector tests"; \
-	  clj -M:test --exclude :vector \
-	    && echo "tests passed (WITHOUT :vector tests; sqlite-vec not installed)"; \
-	fi
+	@./scripts/run-tests.sh
 
-HEADED ?= 0
-# Build the cljs release bundle here, before playwright spawns its webServer.
-# Doing the release inside playwright's child can hang on a cold .shadow-cljs
-# cache (no output past the config banner), and either way the cache is reused
-# afterwards so this step is fast on subsequent runs.
+HEADED   ?= 0
+NO_BUILD ?=
+T        ?=
+# Usage:
+#   make e2e                              full headless run
+#   make e2e HEADED=1                     show the browser
+#   make e2e T="creates a context"        playwright -g filter (substring/regex)
+#   make e2e NO_BUILD=1                   skip shadow-cljs release build
+#                                         (reuses the cached main.js -- fine
+#                                         when no cljs changed since last run)
+#
+# scripts/e2e.sh claims .dev-server.lock before the slow shadow-cljs release
+# build so a concurrent `make start` gets refused immediately rather than
+# racing the JVM after the build completes. Lock is dropped on exit
+# (success / failure / Ctrl-C).
 e2e:
-	npx shadow-cljs release app
-	HEADED=$(HEADED) E2E_PORT=$(E2E_PORT) npm run e2e
+	@HEADED=$(HEADED) NO_BUILD=$(NO_BUILD) T='$(T)' ./scripts/e2e.sh
 
 deploy: test e2e
 	npm i

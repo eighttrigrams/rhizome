@@ -1,28 +1,33 @@
 (ns config
-  (:require [clojure.edn :as edn]
+  (:require [aero.core :as aero]
             [datastore.connection :as connection]))
 
-(defn- config-path [] (or (System/getenv "RHIZOME_CONFIG") "./config.edn"))
-
-(defn- coerce-numeric [s]
-  (if (and (string? s) (re-matches #"-?\d+" s))
-    (Long/parseLong s)
-    s))
-
-(defn- read-env [v]
-  (let [[name default] (if (vector? v) v [v nil])]
-    (coerce-numeric (or (System/getenv (str name)) default))))
-
-(defn- read-or [vs]
-  (some #(when (some? %) %) vs))
-
-(def ^:private readers {'env read-env
-                        'or  read-or})
+(def ^:private config-path "./config.edn")
 
 (def ^:private dev-homefolder "./files/")
 (def ^:private dev-dbname  "./rhizome.db")
-(def ^:private test-dbname "./test/rhizome-test.db")
+;; Unit / integration tests run against an in-memory SQLite — no file is
+;; created and nothing leaks between runs. Users cannot opt into this via
+;; config.edn; it's forced by the :test alias (see test-overrides). To
+;; share one in-memory db across multiple JDBC connections we need
+;; SQLite's shared-cache URI form rather than the bare ":memory:".
+(def ^:private test-dbname "file::memory:?cache=shared")
 (def ^:private e2e-dbname  "./test/rhizome-e2e.db")
+
+(defn- e2e-mode? []
+  (= "1" (System/getProperty "rhizome.e2e")))
+
+(defn- test-mode? []
+  (= "1" (System/getProperty "rhizome.test")))
+
+(def ^:private e2e-overrides
+  {:dev?      true
+   :e2e?      true
+   :bind-host "0.0.0.0"})
+
+(def ^:private test-overrides
+  {:dev?  true
+   :test? true})
 
 (defn- dev-dbname-for [c]
   (cond (:e2e? c)  e2e-dbname
@@ -60,7 +65,10 @@
     c))
 
 (defn ds []
-  (let [c (edn/read-string {:readers readers} (slurp (config-path)))
+  (let [c (aero/read-config config-path)
+        c (cond-> c
+            (e2e-mode?)  (merge e2e-overrides)
+            (test-mode?) (merge test-overrides))
         c (check-mode-flags c)
         c (apply-dev-homefolder c)
         c (apply-dev-dbname c)]

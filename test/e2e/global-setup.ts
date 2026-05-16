@@ -1,8 +1,8 @@
 import { chromium, request } from "@playwright/test";
+import { resolveE2EBaseURL } from "./port";
 
 export default async function globalSetup() {
-  const port = process.env.E2E_PORT || "3005";
-  const baseURL = `http://localhost:${port}`;
+  const baseURL = resolveE2EBaseURL();
   const start = Date.now();
 
   // Warm the JIT by exercising the actual code paths the tests hit:

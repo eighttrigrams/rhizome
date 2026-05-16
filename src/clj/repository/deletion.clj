@@ -1,12 +1,10 @@
 (ns repository.deletion
   (:require [clojure.java.io :as io]
             [cambium.core :as log]
+            [config :as config]
             [et.vp.ds :as datastore]))
 
-(def homefolder
-  (-> (read-string (slurp "./config.edn"))
-      :folders
-      :homefolder))
+(def homefolder (get-in config/config [:folders :homefolder]))
 
 (defn- get-files-count
   [db file]

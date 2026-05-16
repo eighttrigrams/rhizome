@@ -1,13 +1,11 @@
 (ns upload
   (:require [clojure.java.io :as io]
             [cambium.core :as log]
+            [config :as config]
             [et.vp.ds :as datastore]
             [clojure.java.shell :refer [sh]]))
 
-(def homefolder
-  (-> (read-string (slurp "./config.edn"))
-      :folders
-      :homefolder))
+(def homefolder (get-in config/config [:folders :homefolder]))
 
 (defn upload-preview-file
   [db uploaded-file id alternative-behaviour?]
