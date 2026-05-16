@@ -29,10 +29,17 @@ COMPOSE_VEC = $(if $(filter 1,$(WITH_VEC)),COMPOSE_PROFILES=vec,)
 # than YAML fallbacks. COMPOSE_FILE uses ':' as separator (compose convention).
 COMPOSE_FILES = COMPOSE_FILE=docker-compose.yml:compose.ports.yml
 
+# Compose project name is derived from this checkout's directory name so
+# two sibling clones get separate volumes (m2_cache, npm_cache, ...) and
+# container names. Compose project names must match [a-z0-9][a-z0-9_-]*
+# -- lowercase the basename and replace `.` with `-` (covers names like
+# "rhizome.alt"). Override at invocation time to pin a custom name.
+COMPOSE_PROJECT_NAME ?= $(subst .,-,$(shell echo $(notdir $(CURDIR)) | tr '[:upper:]' '[:lower:]'))
+
 # Same PORT/SHADOW_PORT also flow into the container as env vars; aero in
 # config.clj and shadow-cljs honor them via #env so the JVM/shadow bind to
 # the host-bound port without us having to add direnv inside the container.
-COMPOSE_ENV = PORT=$(PORT) SHADOW_PORT=$(SHADOW_PORT) WITH_VEC=$(WITH_VEC) $(COMPOSE_VEC) $(COMPOSE_FILES)
+COMPOSE_ENV = PORT=$(PORT) SHADOW_PORT=$(SHADOW_PORT) WITH_VEC=$(WITH_VEC) COMPOSE_PROJECT_NAME=$(COMPOSE_PROJECT_NAME) $(COMPOSE_VEC) $(COMPOSE_FILES)
 
 yolo:
 	@./scripts/write-compose-ports.sh $(PORT) $(SHADOW_PORT)
