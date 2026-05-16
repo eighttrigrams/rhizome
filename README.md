@@ -19,9 +19,6 @@ To start the app, use:
 root@dev-box:/workspace/rhizome# make start
 ```
 
-Not that the command comes back immediately, but that the build can take some time, so have a little patience
-(until the app comes up (~30-45s) and the stale build shadow cljs banner disappears (~45-75s).
-
 When the app is up: press 'c', then type "ar" and hit Enter and you should be in context "Articles", where you should see a couple
 of articles listed on the right hand side.
 
@@ -193,11 +190,8 @@ The server reads its config from `./config.edn`. Example (dev):
 | Key | Notes |
 |---|---|
 | `:port` | HTTP port. Numeric, accepts `#env`/`#or` readers. |
-| `:bind-host` | Optional explicit bind address. Defaults to `0.0.0.0` in dev mode, `127.0.0.1` otherwise. |
 | `:dev?` | Dev mode: REST API always open, `/test/reset` enabled, dev resource pipeline, hardcodes `:folders/:homefolder` and `:db/:dbname`. Also auto-seeds the dev db on first start (canonical contexts + demo articles) when items are empty — set `:skip-seed? true` to opt out. |
 | `:skip-seed?` | Skip the first-start auto-seed in dev mode. Useful when you want an empty dev db, or when you're restoring contexts/items from elsewhere. Ignored outside `:dev? true`. |
-| `:test?` | Dev sub-mode for unit / integration tests. Set by the `:test` deps alias (via `-Drhizome.test=1`), not by config.edn. Requires `:dev? true` (force-set). Mutually exclusive with `:e2e?`. Hardcodes db to an in-memory SQLite (`file::memory:?cache=shared`) — nothing is written to disk and there is no way to override this from config. |
-| `:e2e?` | Dev sub-mode for Playwright e2e. Set by the `:e2e` deps alias (via `-Drhizome.e2e=1`), not by config.edn. Requires `:dev? true` (force-set). Mutually exclusive with `:test?`. Hardcodes db to `./test/rhizome-e2e.db` and `:bind-host` to `0.0.0.0`. |
 | `:db` | SQLite config (see below). |
 | `:folders` `:homefolder` | Filesystem root for user files. Required in prod, **must not be set when `:dev? true`** (hardcoded to `./files/`). |
 | `:semsearch` `:vec-path`, `:ollama-url`, `:ollama-model` | Single switch for semantic search. Present → app loads the sqlite-vec extension from `:vec-path` (no `.dylib`/`.so` suffix) and embeds against the Ollama endpoint. Absent → vec extension is not loaded, embedder is inert, and the `:vector` test selector is skipped. |
@@ -206,18 +200,7 @@ The server reads its config from `./config.edn`. Example (dev):
 
 ### `:db`
 
-Only SQLite is supported. In `:dev?` mode `:dbname` is hardcoded (so leave `:db` as `{}`); the path depends on the sub-mode:
-
-- bare dev → `./rhizome.db`
-- `:test? true` → in-memory (`file::memory:?cache=shared`)
-- `:e2e? true` → `./test/rhizome-e2e.db`
-
-Outside dev mode, set `:db {:dbname "..."}` explicitly.
-
-
-Config is loaded with [juxt/aero](https://github.com/juxt/aero), so the full set of aero tag readers is available — most usefully `#env`, `#or`, `#long`, `#profile`.
-
-E2E mode is enabled with the `:e2e` deps alias (`clj -M:e2e -m server`), which sets the `rhizome.e2e=1` JVM system property. `config.clj` then force-sets `:dev?`, `:e2e?`, and `:bind-host "0.0.0.0"` and hardcodes the db to `./test/rhizome-e2e.db`. The port and `:semsearch` come from `config.edn` — there is no separate e2e config file. `make` derives `PORT` from `config.edn` so `make start`, `make stop`, and `make e2e` all share a single source of truth.
+Outside dev mode, set `:db {:dbname "..."}` for the path to the sqlite file explicitly.
 
 ### Auto-seed in dev mode
 
