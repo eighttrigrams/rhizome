@@ -33,8 +33,8 @@ COMPOSE_FILES = COMPOSE_FILE=docker-compose.yml:compose.ports.yml
 # two sibling clones get separate volumes (m2_cache, npm_cache, ...) and
 # container names. Compose project names must match [a-z0-9][a-z0-9_-]*
 # -- lowercase the basename and replace `.` with `-` (covers names like
-# "rhizome.alt"). Override at invocation time to pin a custom name.
-COMPOSE_PROJECT_NAME ?= $(subst .,-,$(shell echo $(notdir $(CURDIR)) | tr '[:upper:]' '[:lower:]'))
+# "rhizome.alt").
+COMPOSE_PROJECT_NAME := $(subst .,-,$(shell echo $(notdir $(CURDIR)) | tr '[:upper:]' '[:lower:]'))
 
 # Same PORT/SHADOW_PORT also flow into the container as env vars; aero in
 # config.clj and shadow-cljs honor them via #env so the JVM/shadow bind to

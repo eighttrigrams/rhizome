@@ -177,36 +177,9 @@ rhizome-stop
 
 ## Running multiple checkouts side-by-side
 
-You can clone or copy this repo to a sibling directory and run a second instance against different ports without touching shared state — both the host-side dev server and the docker containers are isolated automatically.
+Clone to a sibling directory and run a second instance — state is isolated automatically:
 
-Per-checkout isolation already in place:
+- Ports: drop an `.envrc` with `export PORT=...` / `export SHADOW_PORT=...`; the Makefile flows them into both host-side `make start` and the docker overlay. Without `.envrc`, ports come from `config.edn` / `shadow-cljs.edn`.
+- Docker volumes/containers: `COMPOSE_PROJECT_NAME` is derived from the directory basename so they don't share volumes.
 
-- `.dev-server.lock`, `rhizome.db`, `files/`, `config.edn`, and the generated `docker/compose.ports.yml` all live inside the repo, so each copy has its own.
-- Ports: drop an `.envrc` at the repo root with `export PORT=...` and/or `export SHADOW_PORT=...`. `scripts/detect-ports.sh` picks it up, and the Makefile flows the values into both host-side `make start` and the docker overlay. Without `.envrc`, ports come from `config.edn` / `shadow-cljs.edn`.
-- Docker volumes and container names: the Makefile derives `COMPOSE_PROJECT_NAME` from this checkout's directory basename (lowercased; `.` → `-`). Two clones called `rhizome` and `rhizome.alt` get `rhizome_*` and `rhizome-alt_*` volume prefixes, so the m2 / npm / shadow-cljs / cpcache / node_modules / workspace volumes don't collide.
-
-A typical second-checkout setup:
-
-```bash
-git clone <repo> ../rhizome.alt
-cd ../rhizome.alt
-cat > .envrc <<'EOF'
-export PORT=3007
-export SHADOW_PORT=9805
-EOF
-make onboard
-make start            # host-side, on :3007 / :9805
-# or, with full docker isolation:
-make box              # COMPOSE_PROJECT_NAME=rhizome-alt
-```
-
-Override the project name explicitly if you want to pin it independently of the directory name:
-
-```bash
-make box COMPOSE_PROJECT_NAME=my-rhizome-prototype
-```
-
-Caveats:
-
-- Renaming the checkout directory after first build changes `COMPOSE_PROJECT_NAME`, which makes docker see fresh empty volumes. To preserve the existing volumes, pass the old name explicitly with `COMPOSE_PROJECT_NAME=...` until you migrate.
-- The Ollama sidecar's model volume (`ollama_models`) is also per-project, so each checkout re-pulls `nomic-embed-text` (~3 GB) on first `WITH_VEC=1` run. Acceptable for occasional second-instance work; if you need to share, pin the same `COMPOSE_PROJECT_NAME` across checkouts.
+Caveats: renaming the checkout after first build orphans the old volumes (`docker volume rename` to migrate); the Ollama sidecar's `ollama_models` volume is per-project, so each checkout re-pulls `nomic-embed-text` (~3 GB) on first `WITH_VEC=1` run.
