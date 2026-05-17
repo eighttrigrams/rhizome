@@ -13,8 +13,11 @@ cd "$ROOT"
 
 LOCK="$ROOT/.dev-server.lock"
 
-PORT=$(./scripts/detect-ports.sh PORT)
-SHADOW_PORT=$(./scripts/detect-ports.sh SHADOW_PORT)
+# Env wins; only fall back to detect-ports.sh when nothing is set. Stop
+# must target the *same* port the matching start.sh actually bound to,
+# and that one honors $PORT/$SHADOW_PORT first too.
+PORT="${PORT:-$(./scripts/detect-ports.sh PORT)}"
+SHADOW_PORT="${SHADOW_PORT:-$(./scripts/detect-ports.sh SHADOW_PORT)}"
 
 if [ -f /.dockerenv ]; then here=container; else here=host; fi
 

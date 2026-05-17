@@ -120,7 +120,7 @@ When `:semsearch` is configured in `config.edn` (with a `:vec-path` pointing at 
 
 ## End-to-end (Playwright)
 
-E2E tests share the dev port from `config.edn` (3006 by default; override via `.envrc` or `PORT=…`). The lockfile (`.dev-server.lock`) makes dev and e2e mutually exclusive — start one and the other refuses with a diagnostic that includes mode, env, and (for e2e) headed.
+E2E tests share the dev port from `config.edn` (3140 by default; override by exporting `PORT=…` in your shell — via direnv, a manual `export`, or inline `PORT=… make e2e`). The lockfile (`.dev-server.lock`) makes dev and e2e mutually exclusive — start one and the other refuses with a diagnostic that includes mode, env, and (for e2e) headed.
 
 ```bash
 $ npx playwright install chromium                # first time only (on host system only)
@@ -179,7 +179,7 @@ rhizome-stop
 
 Clone to a sibling directory and run a second instance — state is isolated automatically:
 
-- Ports: drop an `.envrc` with `export PORT=...` / `export SHADOW_PORT=...`; the Makefile flows them into both host-side `make start` and the docker overlay. Without `.envrc`, ports come from `config.edn` / `shadow-cljs.edn`.
+- Ports: export `PORT=...` / `SHADOW_PORT=...` in your shell before running `make` (drop an `.envrc` for direnv, or `export` them manually, or prefix the make invocation). The Makefile flows the exported values into both host-side `make start` and the docker overlay. When nothing is exported, ports come from `config.edn` / `shadow-cljs.edn` defaults — note that an `.envrc` alone is not consulted, it needs to actually be loaded into the env.
 - Docker volumes/containers: `COMPOSE_PROJECT_NAME` is derived from the directory basename so they don't share volumes.
 
 Caveats: renaming the checkout after first build orphans the old volumes (`docker volume rename` to migrate); the Ollama sidecar's `ollama_models` volume is per-project, so each checkout re-pulls `nomic-embed-text` (~3 GB) on first `WITH_VEC=1` run.

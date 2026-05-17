@@ -24,8 +24,11 @@ cd "$ROOT"
 # the real PID entirely.
 ./scripts/write-lock.sh dev
 
-PORT=$(./scripts/detect-ports.sh PORT)
-SHADOW_PORT=$(./scripts/detect-ports.sh SHADOW_PORT)
+# Env wins (the Makefile/`make box` may already have propagated PORT and
+# SHADOW_PORT in from the host shell). Only fall back to detect-ports.sh
+# when nothing is set — matches the `?=` semantics in the Makefile.
+PORT="${PORT:-$(./scripts/detect-ports.sh PORT)}"
+SHADOW_PORT="${SHADOW_PORT:-$(./scripts/detect-ports.sh SHADOW_PORT)}"
 export PORT SHADOW_PORT
 
 # Only drop the lock if it belongs to *this* env and nothing is bound to

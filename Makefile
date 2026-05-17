@@ -1,7 +1,10 @@
-# Ports are resolved by scripts/detect-ports.sh: .envrc wins, then config.edn
-# / shadow-cljs.edn, then a hardcoded final fallback. Same values are used
-# for host-side `make start`/`stop` and for the generated docker overlay so
-# both sides agree without anyone retyping a port.
+# Ports: env wins (`?=` skips the $(shell ...) if PORT/SHADOW_PORT are
+# already exported — by direnv, the user's shell, the Makefile chain, CI,
+# etc.). Otherwise scripts/detect-ports.sh resolves them from config.edn /
+# shadow-cljs.edn, with a hardcoded final fallback. .envrc is NOT parsed;
+# if you want it to take effect you need direnv (or `export` it yourself)
+# before invoking make. Same values flow into host-side `make start`/`stop`
+# and the generated docker overlay so both sides agree.
 PORT        ?= $(shell ./scripts/detect-ports.sh PORT)
 SHADOW_PORT ?= $(shell ./scripts/detect-ports.sh SHADOW_PORT)
 DEPLOY_TARGET ?= $(HOME)/Applications/rhizome
@@ -38,7 +41,9 @@ COMPOSE_PROJECT_NAME := $(subst .,-,$(shell echo $(notdir $(CURDIR)) | tr '[:upp
 
 # Same PORT/SHADOW_PORT also flow into the container as env vars; aero in
 # config.clj and shadow-cljs honor them via #env so the JVM/shadow bind to
-# the host-bound port without us having to add direnv inside the container.
+# the host-bound port. Note: the container does not parse .envrc either —
+# the Makefile here is the single point that exports these vars across the
+# docker boundary.
 COMPOSE_ENV = PORT=$(PORT) SHADOW_PORT=$(SHADOW_PORT) WITH_VEC=$(WITH_VEC) COMPOSE_PROJECT_NAME=$(COMPOSE_PROJECT_NAME) $(COMPOSE_VEC) $(COMPOSE_FILES)
 
 # detect-ports.sh check, write-compose-ports.sh and the docker invocation

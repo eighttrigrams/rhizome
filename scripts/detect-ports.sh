@@ -2,10 +2,16 @@
 # Usage:
 #   detect-ports.sh PORT|SHADOW_PORT
 #     Print the resolved port value, checking in order:
-#       1. .envrc at the repo root (a `PORT=...` / `export PORT=...` line)
-#       2. for PORT: the :port fallback in config.edn
+#       1. for PORT: the :port fallback in config.edn
 #          for SHADOW_PORT: the :default in shadow-cljs.edn's :http :port
-#       3. hardcoded final fallback (3006 / 9804)
+#       2. hardcoded final fallback (3140 / 9804)
+#
+#     Note: this script does NOT read .envrc. Env-var overrides are the
+#     caller's responsibility — if PORT/SHADOW_PORT are exported (by
+#     direnv, manual export, the Makefile chain, CI, etc.) the Makefile's
+#     `?=` consumes them and never invokes this script. When the env is
+#     empty we fall straight through to the in-repo config defaults; a
+#     dropped-but-unloaded .envrc is treated as "not set."
 #
 #   detect-ports.sh check PORT [SHADOW_PORT ...]
 #     Report-only. For each var, resolve and then lsof-check the port. If
@@ -18,20 +24,10 @@ set -e
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-resolve_from_envrc() {
-  local var="$1"
-  [ -f "$ROOT/.envrc" ] || return 1
-  local val
-  val=$(grep -E "^(export +)?$var=" "$ROOT/.envrc" 2>/dev/null \
-        | tail -1 \
-        | sed -E "s/^(export +)?$var=//; s/[[:space:]]*#.*//; s/^['\"]//; s/['\"]$//")
-  [ -n "$val" ] && echo "$val"
-}
-
 resolve_from_config_edn() {
   [ -f "$ROOT/config.edn" ] || return 1
-  # Match either a literal int (`:port 3006`) or aero's fallback in
-  # `#or [#env PORT 3006]`; both end with the integer we want. Loose
+  # Match either a literal int (`:port 3140`) or aero's fallback in
+  # `#or [#env PORT 3140]`; both end with the integer we want. Loose
   # anchor so an opening `{` on the line doesn't break the match.
   grep -E '(^|[[:space:]{]):port' "$ROOT/config.edn" \
     | head -1 \
@@ -50,14 +46,10 @@ resolve_port() {
   local var="$1" val=""
   case "$var" in
     PORT)
-      val=$(resolve_from_envrc "$var") \
-        || val=$(resolve_from_config_edn) \
-        || val=3006
+      val=$(resolve_from_config_edn) || val=3140
       ;;
     SHADOW_PORT)
-      val=$(resolve_from_envrc "$var") \
-        || val=$(resolve_from_shadow_cljs) \
-        || val=9804
+      val=$(resolve_from_shadow_cljs) || val=9804
       ;;
     *)
       echo "unknown var: $var (expected PORT or SHADOW_PORT)" >&2

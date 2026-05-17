@@ -9,7 +9,9 @@ description: How to start, stop, and inspect the Rhizome dev environment (JVM ba
 
 ```bash
 make start    # boots JVM (foreground) + shadow-cljs watch; ports come from
-              # .envrc / config.edn / shadow-cljs.edn (defaults 3006 / 9804)
+              # exported $PORT/$SHADOW_PORT if set (via direnv loading
+              # .envrc, manual export, etc.); otherwise from config.edn /
+              # shadow-cljs.edn (defaults 3140 / 9804)
 make stop     # kills both (only what this project bound)
 ```
 
@@ -23,9 +25,9 @@ automatically — but only when the lock belongs to the same env (host vs.
 container), so a cross-env Ctrl-C can never wipe out a still-running
 session's lock.
 
-Open the app at `http://localhost:3006` (real backend, hot reload still works
+Open the app at `http://localhost:3140` (real backend, hot reload still works
 via shadow's cross-origin WS) or `http://localhost:9804` (shadow proxies API
-calls to :3006).
+calls to :3140).
 
 `make start` refuses to run when anything is already listening on `PORT` or
 `SHADOW_PORT` (e.g. another dev session, an in-flight `make e2e`, or
@@ -84,7 +86,7 @@ npx playwright test -c test/playwright.config.ts --grep "creates a context"
 ```
 
 `make e2e` runs `bddgen` then `shadow-cljs release app` first so the bundle
-under test has no dev runtime baked in. It refuses to run when `:3006` is
+under test has no dev runtime baked in. It refuses to run when `:3140` is
 up — same mutual-exclusion rule as `make start`.
 
 ## Ports at a glance
@@ -92,7 +94,7 @@ up — same mutual-exclusion rule as `make start`.
 | Port | Owner |
 |---|---|
 | 3005 | e2e JVM (Playwright) |
-| 3006 | dev JVM (`make start`) |
+| 3140 | dev JVM (`make start`) |
 | 3007 | personal prod instance — don't touch |
 | 8020 | shadow-cljs `:dev-http` |
 | 9630 | shadow-cljs primary (REPL/HMR/Inspect) |

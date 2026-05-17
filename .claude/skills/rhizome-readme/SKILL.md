@@ -34,13 +34,13 @@ Steps
 1. `make test` should work
 1. `make e2e` should work
 1. Developer starts application inside container with `make start`
-1. App should be reachable at 3006 (verify with Playwright), should show seed data
+1. App should be reachable at 3140 (verify with Playwright), should show seed data
 1. Developer exists container and switches to host system
 1. Developer runs `npm i`
 1. `make test` should work
 1. `make e2e` should work
 1. Developer starts the app from outside the container with `make start`
-1. App should be reachable at 3006 on the host (verify with Playwright), should show seed data
+1. App should be reachable at 3140 on the host (verify with Playwright), should show seed data
 1. Developer stops the app with `make stop`
 1. Developer runs `make yolo`
 1. Inside the container, run `claude` (bypass permissions mode is ok *inside* the container)

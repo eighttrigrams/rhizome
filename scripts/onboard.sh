@@ -10,8 +10,8 @@ fi
 
 echo "Creating SQLite configuration..."
 # :port reads from $PORT via aero's #env so the actual port is driven by
-# .envrc / Makefile / docker env at runtime, not baked into this file. 3006
-# is the fallback when nothing else is set.
+# whatever sets the env at runtime (Makefile, docker env, direnv-loaded
+# .envrc, manual export). 3140 is the fallback when $PORT is unset.
 # :semsearch is only written when this onboard was launched with WITH_VEC=1
 # (either `make box WITH_VEC=1 && make onboard` inside the container, or
 # `WITH_VEC=1 ./scripts/onboard.sh` on the host). Without it, semsearch is
@@ -27,7 +27,7 @@ else
     SEMSEARCH_LINE=""
 fi
 cat > config.edn <<EOF
-{:port #long #or [#env PORT 3006]
+{:port #long #or [#env PORT 3140]
  :dev? true${SEMSEARCH_LINE}}
 EOF
 
