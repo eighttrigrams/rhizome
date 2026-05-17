@@ -40,7 +40,6 @@ cambium → logback, daily-rolled:
 
 - `logs/tracker.log` — root logger (`ROLLING`)
 - `logs/rest-api.log` — REST API logger (`REST-API`)
-- `logs/hooks.log` — Claude Code hook output
 
 JVM and shadow-cljs stdout/stderr stream directly to your `make start`
 terminal — no longer written to `logs/dev.out` / `logs/shadow.out`.
@@ -93,8 +92,5 @@ up — same mutual-exclusion rule as `make start`.
 
 | Port | Owner |
 |---|---|
-| 3005 | e2e JVM (Playwright) |
 | 3140 | dev JVM (`make start`) |
-| 3007 | personal prod instance — don't touch |
-| 8020 | shadow-cljs `:dev-http` |
-| 9630 | shadow-cljs primary (REPL/HMR/Inspect) |
+| 9804 | shadow-cljs primary (REPL/HMR/Inspect) |
