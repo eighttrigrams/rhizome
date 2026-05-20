@@ -1,0 +1,153 @@
+[
+  {
+    "name": "Cascade deletion review",
+    "timestamp": 1779231907,
+    "description": "Review the danger-mode bulk delete + cascade/unlink work. Tabs are ordered for top-down reading: endpoint → planner → UI → tests. Bookmarks land on the load-bearing decisions.",
+    "editors": [
+      {
+        "path": "src/clj/rest_api/mutations.clj",
+        "name": "mutations.clj"
+      },
+      {
+        "path": "src/clj/repository/deletion.clj",
+        "name": "deletion.clj"
+      },
+      {
+        "path": "src/cljs/ui/danger_mode.cljs",
+        "name": "danger_mode.cljs"
+      },
+      {
+        "path": "test/integration/rest_api/mutations_test.clj",
+        "name": "mutations_test.clj"
+      }
+    ],
+    "bookmarks": [
+      {
+        "filePath": "src/clj/rest_api/mutations.clj",
+        "line": 228,
+        "timestamp": 1779231907,
+        "description": "candidates: pulls secondary-context filters from the context's stored view"
+      },
+      {
+        "filePath": "src/clj/rest_api/mutations.clj",
+        "line": 245,
+        "timestamp": 1779231907,
+        "description": "run-related-deletion! — docstring documents the response shape"
+      },
+      {
+        "filePath": "src/clj/rest_api/mutations.clj",
+        "line": 261,
+        "timestamp": 1779231907,
+        "description": "GET deletion-preview endpoint (dry-run? = true)"
+      },
+      {
+        "filePath": "src/clj/rest_api/mutations.clj",
+        "line": 279,
+        "timestamp": 1779231907,
+        "description": "POST delete endpoint (dry-run? = false, recording-mode gated)"
+      },
+      {
+        "filePath": "src/clj/repository/deletion.clj",
+        "line": 131,
+        "timestamp": 1779231907,
+        "description": "plan — pure analysis: relations → neighbors → keep/cascade buckets"
+      },
+      {
+        "filePath": "src/clj/repository/deletion.clj",
+        "line": 119,
+        "timestamp": 1779231907,
+        "description": "classify-neighbor — orphan check (is_context-flag, has-other-children, has-other-inbound)"
+      },
+      {
+        "filePath": "src/clj/repository/deletion.clj",
+        "line": 203,
+        "timestamp": 1779231907,
+        "description": "unlink-rows: drop the operating context from :unlinked so it never appears as a kept neighbor"
+      },
+      {
+        "filePath": "src/clj/repository/deletion.clj",
+        "line": 280,
+        "timestamp": 1779231907,
+        "description": "execute! — transactional body: data.contexts cleanup, then bulk relation delete, then item deletes"
+      },
+      {
+        "filePath": "src/clj/repository/deletion.clj",
+        "line": 308,
+        "timestamp": 1779231907,
+        "description": "plan-and-execute! — public entry point for both preview and delete"
+      },
+      {
+        "filePath": "src/clj/repository/deletion.clj",
+        "line": 321,
+        "timestamp": 1779231907,
+        "description": "Legacy single-item delete-item — kept for non-danger-mode callers"
+      },
+      {
+        "filePath": "src/cljs/ui/danger_mode.cljs",
+        "line": 88,
+        "timestamp": 1779231907,
+        "description": "keep-reason → human label mapping"
+      },
+      {
+        "filePath": "src/cljs/ui/danger_mode.cljs",
+        "line": 102,
+        "timestamp": 1779231907,
+        "description": "section helper — headline + why-line + list"
+      },
+      {
+        "filePath": "src/cljs/ui/danger_mode.cljs",
+        "line": 143,
+        "timestamp": 1779231907,
+        "description": "confirm-dialog — three sections (primary / cascade / unlinked), Enter to confirm"
+      },
+      {
+        "filePath": "test/integration/rest_api/mutations_test.clj",
+        "line": 280,
+        "timestamp": 1779231907,
+        "description": "Primary that is itself a context → deleted, its only-via-primary child cascades"
+      },
+      {
+        "filePath": "test/integration/rest_api/mutations_test.clj",
+        "line": 388,
+        "timestamp": 1779231907,
+        "description": "Neighbor orphaned → cascade-delete"
+      },
+      {
+        "filePath": "test/integration/rest_api/mutations_test.clj",
+        "line": 407,
+        "timestamp": 1779231907,
+        "description": "Neighbor with extra inbound → kept (has-other-inbound)"
+      },
+      {
+        "filePath": "test/integration/rest_api/mutations_test.clj",
+        "line": 432,
+        "timestamp": 1779231907,
+        "description": "Neighbor is_context=true → kept (is-context-flag)"
+      },
+      {
+        "filePath": "test/integration/rest_api/mutations_test.clj",
+        "line": 448,
+        "timestamp": 1779231907,
+        "description": "Neighbor owns other items → kept (has-other-children)"
+      },
+      {
+        "filePath": "test/integration/rest_api/mutations_test.clj",
+        "line": 466,
+        "timestamp": 1779231907,
+        "description": "Shared neighbor between two primaries → cascade via two-phase order"
+      },
+      {
+        "filePath": "test/integration/rest_api/mutations_test.clj",
+        "line": 500,
+        "timestamp": 1779231907,
+        "description": "Kept neighbor's data.contexts no longer references the deleted primary"
+      },
+      {
+        "filePath": "test/integration/rest_api/mutations_test.clj",
+        "line": 518,
+        "timestamp": 1779231907,
+        "description": "Primary B contains X → X cascades"
+      }
+    ]
+  }
+]
