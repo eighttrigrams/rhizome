@@ -82,17 +82,63 @@ if [ "$1" = "check" ]; then
     exit 1
   fi
 
-  blocked=0
+  # Cache `docker ps` once per check so we can tell, port by port, whether
+  # a running container is publishing it. When that's the case `make stop`
+  # inside the container won't free the host bind -- Docker keeps the
+  # forwarder up until the container itself stops -- so we steer the user
+  # at `docker stop` instead of the generic message. `|| true` swallows the
+  # case where docker isn't installed / the daemon isn't running.
+  docker_ports=$(docker ps --format '{{.Names}}'$'\t''{{.Ports}}' 2>/dev/null || true)
+
+  # First pass: collect blocked (port,var,container) triples without
+  # printing yet, so we can group multiple ports held by the same
+  # container into a single message instead of repeating the same
+  # "stop the container" paragraph per port.
+  blocked_rows=""
+  containers_seen=""
   for var in "$@"; do
     port=$(resolve_port "$var")
     pids=$(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | tr '\n' ' ' | sed 's/ $//' || true)
-    if [ -n "$pids" ]; then
-      echo "Something is listening on :$port (pid $pids; resolved from $var)." >&2
-      echo "Run 'make stop' (or shut down the other process) and re-try." >&2
-      blocked=1
+    [ -n "$pids" ] || continue
+    container=$(echo "$docker_ports" | awk -v p=":$port->" '$0 ~ p {print $1; exit}')
+    blocked_rows="$blocked_rows$port|$var|$pids|$container"$'\n'
+    if [ -n "$container" ]; then
+      case " $containers_seen " in *" $container "*) ;; *) containers_seen="$containers_seen $container" ;; esac
     fi
   done
-  exit "$blocked"
+
+  if [ -z "$blocked_rows" ]; then
+    exit 0
+  fi
+
+  # Output design: lead with the diagnosis (one short sentence), explain
+  # why the usual fix won't work, then put the actual command on its own
+  # indented line so the eye lands on it immediately. Blank lines separate
+  # independent failures so they don't visually merge into a wall of text;
+  # a leading + trailing blank frames the whole report so it doesn't
+  # collide with the user's prompt or the next caller's output.
+  echo >&2
+  first=1
+  for container in $containers_seen; do
+    [ $first -eq 1 ] || echo >&2
+    first=0
+    ports_for_container=$(echo "$blocked_rows" | awk -F'|' -v c="$container" '$4 == c {printf ":%s ", $1}' | sed 's/ $//' | tr ' ' ',' | sed 's/,/, /g')
+    echo "Container '$container' is publishing $ports_for_container." >&2
+    echo "'make stop' inside it won't free these -- stop the container itself:" >&2
+    echo >&2
+    echo "    docker stop $container" >&2
+  done
+
+  if echo "$blocked_rows" | awk -F'|' '$4 == "" && NF >= 3 {found=1} END {exit !found}'; then
+    [ $first -eq 1 ] || echo >&2
+    echo "$blocked_rows" | awk -F'|' '$4 == "" && NF >= 3 {
+      printf ":%s is held by pid %s.\n", $1, $3
+    }' >&2
+    echo "Run 'make stop' (or shut down the other process) and re-try." >&2
+  fi
+  echo >&2
+
+  exit 1
 fi
 
 VAR="${1:?usage: detect-ports.sh PORT|SHADOW_PORT  |  detect-ports.sh check PORT [...]}"

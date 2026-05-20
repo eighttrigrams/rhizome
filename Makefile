@@ -94,9 +94,16 @@ T        ?=
 # build so a concurrent `make start` gets refused immediately rather than
 # racing the JVM after the build completes. Lock is dropped on exit
 # (success / failure / Ctrl-C).
+# STRICT is propagated to scripts/e2e.sh. Defaults to 0 for interactive
+# `make e2e` (refusals stay friendly: exit 0, no `*** [e2e] Error 1` tail).
+# `deploy` flips it on via a target-specific override so a held lock or
+# missing chromium hard-fails the deploy chain instead of silently
+# skipping e2e and going on to ship a jar.
+STRICT ?= 0
 e2e:
-	@HEADED=$(HEADED) NO_BUILD=$(NO_BUILD) T='$(T)' ./scripts/e2e.sh
+	@HEADED=$(HEADED) NO_BUILD=$(NO_BUILD) T='$(T)' STRICT=$(STRICT) ./scripts/e2e.sh
 
+deploy: STRICT := 1
 deploy: test e2e
 	npm i
 	npx shadow-cljs release app
