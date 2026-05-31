@@ -8,20 +8,20 @@
             [datastore.dialect :as dialect]
             [et.vp.ds :as datastore]))
 
-(def homefolder (get-in config/config [:folders :homefolder]))
+(defn- folder [k] (get-in config/config [:folders k]))
 
 (defn- get-files-count
   [db file]
   (if file (count (datastore/get-items-by-path db "data->'resource-links'->>'file'" file)) 0))
 
-(defn- file-path [folder file] (str homefolder folder "/Tracked/" file))
+(defn- file-path [folder-key file] (str (io/file (folder folder-key) file)))
 
 (defn- found-files
   [file]
   (if-not file
     []
-    (filter (fn [folder] (.exists (io/file (file-path folder file))))
-      ["Pictures" "Music" "Documents"])))
+    (filter (fn [folder-key] (.exists (io/file (file-path folder-key file))))
+      [:images :audio :docs])))
 
 (defn- delete-file
   [found-files file]
@@ -34,8 +34,9 @@
 
 (defn- delete-preview-images
   [id]
-  (let [highres-path (str homefolder "Pictures/Tracked/Preview/" id ".png")
-        lowres-path (str homefolder "Pictures/Tracked/Preview/Lowres/" id ".png")]
+  (let [preview (folder :preview-images)
+        highres-path (str (io/file preview (str id ".png")))
+        lowres-path (str (io/file preview "Lowres" (str id ".png")))]
     (when (.exists (io/file highres-path))
       (log/info (str "Will remove " highres-path))
       (.delete (io/file highres-path)))

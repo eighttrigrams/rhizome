@@ -60,28 +60,34 @@
     ;; Process the uploaded file here. For example, save it to a directory.
     (response/response "File uploaded successfully!")))
 
-(def homefolder
-  (-> (config/ds)
-      :folders
-      :homefolder))
-
-;; In prod the directory configured under :folders :images is served at the
-;; /imgs URL prefix (validated to exist at config load time). In dev /imgs is
-;; served from the classpath via wrap-resource, so this is unused there.
+;; In prod the directories configured under :folders are served beneath the
+;; /imgs URL prefix (both validated to exist at config load time), so no
+;; symlinks are needed: :images backs /imgs/* (tracked originals) and
+;; :preview-images backs /imgs/Preview/* (generated previews). In dev /imgs is
+;; served from the classpath via wrap-resource, so these are unused there.
 (def ^:private images-folder
   (-> config/config :folders :images))
 
+(def ^:private preview-images-folder
+  (-> config/config :folders :preview-images))
+
 (defn- wrap-imgs
-  "Serve files under the /imgs/* URL prefix from images-folder on the
-  filesystem. file-response's :root guards against directory traversal."
-  [handler images-folder]
+  "Serve files under the /imgs/* URL prefix from the filesystem: /imgs/Preview/*
+  from preview-images-folder, everything else under /imgs/* from images-folder.
+  file-response's :root guards against directory traversal."
+  [handler images-folder preview-images-folder]
   (fn [req]
     (let [uri (:uri req)]
-      (if (str/starts-with? uri "/imgs/")
-        (or (response/file-response (subs uri (count "/imgs"))
-                                    {:root images-folder :allow-symlinks? true})
+      (cond
+        (str/starts-with? uri "/imgs/Preview/")
+        (or (response/file-response (subs uri (count "/imgs/Preview")) {:root preview-images-folder})
             {:status 404 :body "Not Found"})
-        (handler req)))))
+
+        (str/starts-with? uri "/imgs/")
+        (or (response/file-response (subs uri (count "/imgs")) {:root images-folder})
+            {:status 404 :body "Not Found"})
+
+        :else (handler req)))))
 
 (defn- img-by-id-handler
   [{{:keys [item-id]} :route-params}]
@@ -90,16 +96,14 @@
              title (:title item)
              resource-links (:resource-links data)]
          (cond (:image resource-links)
-                 (let [path (str homefolder "Pictures/Tracked/" (:image resource-links))
-                       file (io/file path)]
+                 (let [file (io/file images-folder (:image resource-links))]
                    (if (.exists file)
-                     (response/file-response path)
+                     (response/file-response (str file))
                      {:status 404 :body "Image file not found"}))
                (and title (re-matches #".*\.(png|jpg|jpeg|PNG|JPG|JPEG)$" title))
-                 (let [path (str homefolder "Pictures/Tracked/" title)
-                       file (io/file path)]
+                 (let [file (io/file images-folder title)]
                    (if (.exists file)
-                     (response/file-response path)
+                     (response/file-response (str file))
                      {:status 404 :body "Image file not found"}))
                :else {:status 404 :body "Item has no image"}))
        (catch Exception e
@@ -140,7 +144,7 @@
                         (wrap-resource "public" {:allow-symlinks? true}))
                    #(-> %
                         (wrap-resource "public")
-                        (wrap-imgs images-folder)))]
+                        (wrap-imgs images-folder preview-images-folder)))]
     (-> (routes)
         wrap-env-defaults
         pipeline

@@ -5,7 +5,10 @@
             [et.vp.ds :as datastore]
             [clojure.java.shell :refer [sh]]))
 
-(def homefolder (get-in config/config [:folders :homefolder]))
+;; Drag-and-drop preview uploads land in the configured preview-images folder
+;; (served at /imgs/Preview/*); the downscaled variant goes in its Lowres/
+;; subfolder (served at /imgs/Preview/Lowres/*).
+(def ^:private preview-images (get-in config/config [:folders :preview-images]))
 
 (defn upload-preview-file
   [db uploaded-file id alternative-behaviour?]
@@ -29,13 +32,13 @@
                           ;; this doesn't work properly as update-item will merge the data with
                           ;; the old data
                           (dissoc :preview-image-lowres)))
-               path (str homefolder "Pictures/Tracked/Preview/" id ".png")
-               lowres-path (str homefolder "Pictures/Tracked/Preview/Lowres/" id ".png")]
+               file (io/file preview-images (str id ".png"))
+               lowres-file (io/file preview-images "Lowres" (str id ".png"))]
            (datastore/update-item db (assoc item :data data))
-           (io/copy (:tempfile uploaded-file) (io/file path))
+           (io/copy (:tempfile uploaded-file) file)
            (when downscale-image?
              (log/info "Will downscale image now")
-             (sh "convert" path "-resize" "x200" lowres-path)
-             (io/delete-file (io/file path))))
+             (sh "convert" (str file) "-resize" "x200" (str lowres-file))
+             (io/delete-file file)))
          (catch Exception e
            (log/error (str "Problem with image upload. Message: " (.getMessage e)))))))

@@ -7,7 +7,8 @@
 
 (defn open
   [file-id]
-  (let [path (home/get-target file-id)] (when (.exists (io/file path)) (sh/sh "open" path))))
+  (when-let [path (home/get-target file-id)]
+    (when (.exists (io/file path)) (sh/sh "open" path))))
 
 (defn- open-in-obsidian
   [filepath]

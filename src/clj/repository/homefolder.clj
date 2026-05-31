@@ -4,7 +4,10 @@
             [clojure.java.io :as io]
             [config :as config]))
 
-(def homefolder (get-in config/config [:folders :homefolder]))
+(defn- folder
+  "Absolute path of the configured media folder `k` (e.g. :imports, :images)."
+  [k]
+  (get-in config/config [:folders k]))
 
 (defn- get-suffix
   [file-name]
@@ -27,44 +30,42 @@
       (str/ends-with? (str/lower-case file-name) ".png")
       (str/ends-with? (str/lower-case file-name) ".webp")))
 
+;; suffix → the configured folder a file of that type is filed under.
+;; when adding files, also see file.clj (this here is 1 of 3 places)
+(defn- folder-key-for
+  [file-name]
+  (case (get-suffix file-name)
+    ("mp3" "wav" "ogg" "m4a")   :audio
+    ("mp4" "flv" "mov")         :video
+    ("pdf" "tiff")              :docs
+    ("jpeg" "jpg" "png" "webp") :images
+    nil))
+
 (defn validate-not-exists
   [file-name]
-  (when (.exists (io/file (str homefolder "Music/Tracked/" file-name)))
-    (throw (Exception. (str "File already exists: " file-name))))
-  (when (.exists (io/file (str homefolder "Pictures/Tracked/" file-name)))
-    (throw (Exception. (str "File already exists: " file-name))))
-  (when (.exists (io/file (str homefolder "Documents/Tracked/" file-name)))
-    (throw (Exception. (str "File already exists: " file-name))))
-  (when (.exists (io/file (str homefolder "Movies/Tracked/" file-name)))
-    (throw (Exception. (str "File already exists: " file-name)))))
+  (doseq [k [:audio :images :docs :video]]
+    (when (.exists (io/file (folder k) file-name))
+      (throw (Exception. (str "File already exists: " file-name))))))
 
-;; when adding files, also see file.clj (this here is 1 of 3 places)
 (defn get-target
   [file-name]
-  (str homefolder
-       (case (get-suffix file-name)
-         ("mp3" "wav" "ogg" "m4a") "Music"
-         ("mp4" "flv" "mov") "Movies"
-         ("pdf" "tiff") "Documents"
-         ("jpeg" "jpg" "png" "webp") "Pictures"
-         nil)
-       "/Tracked/"
-       file-name))
+  (when-let [k (folder-key-for file-name)]
+    (str (io/file (folder k) file-name))))
 
 (defn ren
   [file-name target]
   (log/info (str "Will rename " file-name " to " target))
-  (.renameTo (io/file (str homefolder "Downloads/Tracked/" file-name))
-             (io/file (str homefolder "Downloads/Tracked/" target))))
+  (.renameTo (io/file (folder :imports) file-name)
+             (io/file (folder :imports) target)))
 
 (defn move-file
   [file-name]
   (let [target (get-target file-name)]
-    (log/info (str "Will move " file-name " to " (str/replace target file-name "")))
-    (.renameTo (io/file (str homefolder "Downloads/Tracked/" file-name)) (io/file target))))
+    (log/info (str "Will move " file-name " to " target))
+    (.renameTo (io/file (folder :imports) file-name) (io/file target))))
 
 (defn list-files
   []
-  (->> (vec (file-seq (io/file (str homefolder "Downloads/Tracked/"))))
+  (->> (vec (file-seq (io/file (folder :imports))))
        (filter #(not (.isDirectory %)))
        (map #(.getName %))))
