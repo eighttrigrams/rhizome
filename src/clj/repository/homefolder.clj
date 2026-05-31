@@ -9,6 +9,13 @@
   [k]
   (get-in config/config [:folders k]))
 
+(defn folder-exists?
+  "True when the configured folder `k` exists on disk. Folders are validated as
+   configured at config load and warned about at startup, but may still vanish
+   at runtime (e.g. an unmounted drive), so import/deletion re-check here."
+  [k]
+  (.isDirectory (io/file (folder k))))
+
 (defn- get-suffix
   [file-name]
   (let [idx (str/last-index-of file-name ".")] (str/lower-case (subs file-name (inc idx)))))
@@ -32,7 +39,7 @@
 
 ;; suffix → the configured folder a file of that type is filed under.
 ;; when adding files, also see file.clj (this here is 1 of 3 places)
-(defn- folder-key-for
+(defn folder-key-for
   [file-name]
   (case (get-suffix file-name)
     ("mp3" "wav" "ogg" "m4a")   :audio
@@ -40,6 +47,14 @@
     ("pdf" "tiff")              :docs
     ("jpeg" "jpg" "png" "webp") :images
     nil))
+
+(defn importable?
+  "True when the file's type maps to a configured destination folder that
+   exists. Files whose destination folder is missing are left untouched in
+   :imports on batch import (and a warn is logged by the caller)."
+  [file-name]
+  (boolean (when-let [k (folder-key-for file-name)]
+             (folder-exists? k))))
 
 (defn validate-not-exists
   [file-name]
@@ -66,6 +81,10 @@
 
 (defn list-files
   []
-  (->> (vec (file-seq (io/file (folder :imports))))
-       (filter #(not (.isDirectory %)))
-       (map #(.getName %))))
+  (if-not (folder-exists? :imports)
+    (do (log/warn (str "Imports folder does not exist: " (folder :imports)
+                       " -- cannot import anything."))
+        [])
+    (->> (vec (file-seq (io/file (folder :imports))))
+         (filter #(not (.isDirectory %)))
+         (map #(.getName %)))))

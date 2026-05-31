@@ -144,6 +144,28 @@
       wrap-params
       wrap-multipart-params))
 
+(defn check-folders-exist!
+  "Startup filesystem gate, run once logging is configured (config load itself
+   must stay logging-dependency-free -- see log-init -- so this lives here, not
+   in config). Walks every configured folder and:
+   - logs a warn for each one that is missing on disk;
+   - additionally refuses to start (error + throw) when :preview-images is
+     missing -- previews are written by uploads and scrapers and back
+     /imgs/Preview/*, so the app cannot function without it.
+   The other folders (:imports :audio :video :docs :images) are soft: a missing
+   one only disables the matching slice of import/deletion at runtime (each of
+   those paths logs its own warn), and may just be a temporarily-unmounted
+   drive, so we warn and carry on."
+  []
+  (doseq [k config/folder-keys]
+    (let [dir (get-in config/config [:folders k])]
+      (when-not (.isDirectory (io/file dir))
+        (log/warn (str "Configured folder " k " does not exist: " dir))
+        (when (= k :preview-images)
+          (let [msg (str "Refusing to start: :preview-images folder does not exist: " dir)]
+            (log/error msg)
+            (throw (ex-info msg {:folder dir}))))))))
+
 (defn start-http-server!
   []
   (when (and (not (:dev? config/config))
@@ -164,6 +186,11 @@
   (when-not (or (:e2e? config/config)
                 (dev-seed/items-empty? (:db config/config)))
     (file/ensure-contexts! (:db config/config)))
+  ;; Filesystem gate: warn on any missing folder, refuse to start without
+  ;; :preview-images. Skipped under e2e -- it runs in CI where the gitignored
+  ;; ./files/* dev folders don't exist (same exemption ensure-contexts! uses).
+  (when-not (:e2e? config/config)
+    (check-folders-exist!))
   (let [host (or (:bind-host config/config)
                  (if (:dev? config/config) "0.0.0.0" "127.0.0.1"))]
     (future (j/run-jetty (app) {:port (:port config/config)

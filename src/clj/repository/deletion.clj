@@ -6,6 +6,7 @@
             [cambium.core :as log]
             [config :as config]
             [datastore.dialect :as dialect]
+            [repository.homefolder :as home]
             [et.vp.ds :as datastore]))
 
 (defn- folder [k] (get-in config/config [:folders k]))
@@ -44,15 +45,31 @@
       (log/info (str "Will remove " lowres-path))
       (.delete (io/file lowres-path)))))
 
+(defn- media-folder-missing
+  "When the item's file maps to a deletable media folder (:images/:audio/:docs)
+   that does not currently exist -- most likely an unmounted/offline drive --
+   we must not delete: the file may still be on disk we simply can't see, and
+   dropping the DB row would orphan it. Returns the folder-key when it blocks
+   deletion, else nil. Scoped to the folders deletion actually touches (see
+   found-files); video disk-deletion is already a no-op, so it is unaffected."
+  [file]
+  (when file
+    (let [k (home/folder-key-for file)]
+      (when (and (#{:images :audio :docs} k) (not (home/folder-exists? k)))
+        k))))
+
 (defn- file-safety-skip
-  "Returns a {:status :skipped :reason …} map if file dedup safety would refuse
-   to delete this item (file referenced by multiple items, or found in multiple
-   locations on disk). Returns nil when safe to delete."
+  "Returns a {:status :skipped :reason …} map if it would be unsafe to delete
+   this item's file: its media folder is missing (offline drive), the file is
+   referenced by multiple items, or it is found in multiple locations on disk.
+   Returns nil when safe to delete."
   [db item]
   (let [file (get-in item [:data :resource-links :file])
         files-count (get-files-count db file)
         found (found-files file)]
     (cond
+      (media-folder-missing file)
+        {:status :skipped :reason :media-folder-missing}
       (> files-count 1)
         {:status :skipped :reason :multiple-file-references}
       (> (count found) 1)
@@ -314,6 +331,10 @@
   (let [plan-result (plan db primaries context-id)
         primary-ids (set (map :id primaries))]
     (when-not dry-run?
+      (doseq [{:keys [id title]} (->> (concat (:primary plan-result) (:cascade plan-result))
+                                      (filter #(= :media-folder-missing (:reason %))))]
+        (log/warn (str "Cannot delete file for item id=" id " '" title
+                       "' -- its media folder does not exist (item kept, skipped).")))
       (execute! db plan-result primary-ids))
     (assoc (public-shape plan-result) :dry-run dry-run?)))
 
@@ -337,7 +358,9 @@
      (cond (> contained-items-count 0)
              (do (log/warn "Doing nothing. Item to be deleted still contains items.")
                  {:status :skipped :reason :has-children})
-           skip skip
+           skip (do (log/warn (str "Doing nothing. Skipped deleting item id='" id
+                                   "' -- " (name (:reason skip)) "."))
+                    skip)
            :else (do (when-not dry-run?
                        (delete-item-and-files! db item))
                      {:status :deleted})))))

@@ -90,13 +90,19 @@
    "has-other-children" "owns other items"
    "has-other-inbound"  "still linked from elsewhere"})
 
+(def ^:private skip-reason-label
+  {"media-folder-missing"     "media folder offline"
+   "multiple-file-references" "file shared by other items"
+   "multiple-files-found"     "file in multiple folders"})
+
 (defn- status-label
   "Friendly label for primary/cascade row. Items marked :deleted carry no
   reason; :skipped rows carry one of the file-safety reasons."
   [{:keys [status reason]}]
   (cond
     (= "deleted" status) nil
-    (= "skipped" status) (str "skipped — " (or reason "unknown reason"))
+    (= "skipped" status) (str "skipped — "
+                              (or (skip-reason-label reason) reason "unknown reason"))
     :else status))
 
 (defn- section

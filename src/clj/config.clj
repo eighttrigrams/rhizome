@@ -12,9 +12,12 @@
 ;; shared root). :imports is the drop folder the import flow scans; audio/video/
 ;; docs/images receive files moved out of :imports, classified by suffix;
 ;; :preview-images receives the previews written by the upload drag-and-drop
-;; fields. In prod all are required and must exist (see check-folders); in dev
-;; they are hardcoded under ./files/ (see dev-folders).
-(def ^:private folder-keys [:imports :audio :video :docs :images :preview-images])
+;; fields. In prod all must be configured (see check-folders); in dev they are
+;; hardcoded under ./files/ (see dev-folders). On-disk existence is checked
+;; separately at startup, not here -- see server/check-folders-exist!, which
+;; runs once logging is configured (config load must stay logging-dependency-
+;; free, see log-init).
+(def folder-keys [:imports :audio :video :docs :images :preview-images])
 (def ^:private dev-files "./files/")
 (def ^:private dev-folders
   {:imports        (str dev-files "Downloads/Tracked/")
@@ -73,21 +76,19 @@
       (update c :folders merge dev-folders))
     c))
 
-;; In prod every media folder must be configured and must exist. :images backs
-;; /imgs/* (the tracked originals) and :preview-images backs /imgs/Preview/*
-;; (generated previews); audio/video/docs/images are the import destinations and
-;; :imports is the drop folder the import flow scans. No symlinks are needed.
+;; In prod every media folder must be configured. :images backs /imgs/* (the
+;; tracked originals) and :preview-images backs /imgs/Preview/* (generated
+;; previews); audio/video/docs/images are the import destinations and :imports
+;; is the drop folder the import flow scans. No symlinks are needed. This only
+;; validates that a path is configured -- on-disk existence is checked at
+;; startup by server/check-folders-exist! (after logging is up), so a missing
+;; folder can warn/fail with proper logging rather than blowing up config load.
 (defn- check-folders [c]
   (when-not (:dev? c)
     (doseq [k folder-keys]
-      (let [dir (get-in c [:folders k])]
-        (cond
-          (not (string? dir))
-          (throw (ex-info (str "config invalid: :folders " k " is required in prod mode")
-                          {:config c}))
-          (not (.isDirectory (io/file dir)))
-          (throw (ex-info (str "config invalid: :folders " k " directory does not exist: " dir)
-                          {:config c}))))))
+      (when-not (string? (get-in c [:folders k]))
+        (throw (ex-info (str "config invalid: :folders " k " is required in prod mode")
+                        {:config c})))))
   c)
 
 ;; The logs directory is the one folder that isn't a hard requirement: it's
