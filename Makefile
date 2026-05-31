@@ -7,7 +7,16 @@
 # and the generated docker overlay so both sides agree.
 PORT        ?= $(shell ./scripts/detect-ports.sh PORT)
 SHADOW_PORT ?= $(shell ./scripts/detect-ports.sh SHADOW_PORT)
-DEPLOY_TARGET ?= $(HOME)/Applications/rhizome
+# DEPLOY_TARGET has no default and is deliberately NOT read from the
+# environment: `deploy` requires it to be passed on the command line
+# (make deploy DEPLOY_TARGET=/path) so a stray exported value can't
+# silently redirect where the jar ships. Enforced by the origin check
+# below (scoped to the deploy goal so other targets are unaffected).
+ifeq (deploy,$(filter deploy,$(MAKECMDGOALS)))
+ifneq (command line,$(origin DEPLOY_TARGET))
+$(error DEPLOY_TARGET is required and must be passed on the command line: make deploy DEPLOY_TARGET=/path/to/dir)
+endif
+endif
 
 .PHONY: start stop test e2e deploy install-sqlite-vec yolo box backfill-embeddings clean
 

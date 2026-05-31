@@ -158,10 +158,13 @@ rhizome-stop() {
 and then use
 
 ```bash
-make deploy
+make deploy DEPLOY_TARGET=~/Applications/rhizome
 rhizome-start
 rhizome-stop
 ```
+
+`DEPLOY_TARGET` is required and must be passed on the command line — there is
+no default and it is deliberately not read from the environment.
 
 ## Configuration Options
 
