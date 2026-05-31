@@ -10,6 +10,14 @@
 ;; subfolder (served at /imgs/Preview/Lowres/*).
 (def ^:private preview-images (get-in config/config [:folders :preview-images]))
 
+(defn ensure-convert!
+  []
+  (when-not (try (zero? (:exit (sh "convert" "-version")))
+                 (catch Exception _ false))
+    (throw (Exception. (str "ImageMagick `convert` not found on PATH. "
+                            "Preview downscaling needs it; refusing to start. "
+                            "Install imagemagick (it ships in the docker image).")))))
+
 (defn upload-preview-file
   [db uploaded-file id alternative-behaviour?]
   (let [_ 1]

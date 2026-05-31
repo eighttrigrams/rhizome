@@ -157,6 +157,7 @@
              (or (nil? (:private-addr config/config))
                  (not (string? (:private-addr config/config)))))
     (throw (Exception. "config invalid")))
+  (upload/ensure-convert!)
   (schema/apply-schema! (:db config/config))
   (dev-seed/maybe-seed! {:db         (:db config/config)
                          :dev?       (:dev? config/config)

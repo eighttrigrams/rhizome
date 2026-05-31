@@ -45,6 +45,7 @@ Prerequisites are
 - Babashka (`bb`)
 - node 18+, npm
 - sqlite3 CLI
+- imagemagick
 
 ```bash
 npm i
