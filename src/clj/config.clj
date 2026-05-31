@@ -1,7 +1,10 @@
 (ns config
   (:require [aero.core :as aero]
             [clojure.java.io :as io]
-            [datastore.connection :as connection]))
+            [datastore.connection :as connection])
+  (:import [ch.qos.logback.classic LoggerContext]
+           [ch.qos.logback.classic.joran JoranConfigurator]
+           [org.slf4j LoggerFactory]))
 
 (def ^:private config-path "./config.edn")
 
@@ -87,6 +90,39 @@
                           {:config c}))))))
   c)
 
+;; The logs directory is the one folder that isn't a hard requirement: it's
+;; configurable in prod via :folders :logs, hardcoded in dev (like the media
+;; folders), and falls back to "logs" when unset. logback.xml reads it from the
+;; LOGS_DIR system property (${LOGS_DIR:-logs}).
+(def ^:private default-logs-dir "logs")
+
+(defn- configure-logging!
+  "Point logback at `logs-dir` via the LOGS_DIR property. Logging may already
+   have initialised against the default, so reset + re-read logback.xml to make
+   the property take effect regardless of init order."
+  [logs-dir]
+  (System/setProperty "LOGS_DIR" logs-dir)
+  (let [ctx (LoggerFactory/getILoggerFactory)]
+    (when (instance? LoggerContext ctx)
+      ;; reset + re-read is logback's own reconfigure idiom (same as auto-scan):
+      ;; .reset clears the appenders configured against the old dir, doConfigure
+      ;; rebuilds them with LOGS_DIR now set. Lines already written stay written.
+      (.reset ^LoggerContext ctx)
+      (doto (JoranConfigurator.)
+        (.setContext ctx)
+        (.doConfigure (io/resource "logback.xml"))))))
+
+(defn- apply-logs-dir [c]
+  (when (and (:dev? c) (get-in c [:folders :logs]))
+    (throw (ex-info (str "config invalid: :folders :logs must not be set when :dev? is true "
+                         "(dev mode hardcodes it to " default-logs-dir ")")
+                    {:config c})))
+  (let [dir (if (:dev? c)
+              default-logs-dir
+              (or (get-in c [:folders :logs]) default-logs-dir))]
+    (configure-logging! dir)
+    (assoc-in c [:folders :logs] dir)))
+
 (defn- resolve-dbname [c]
   (let [hardcoded (when (:dev? c) (dev-dbname-for c))]
     (cond
@@ -109,6 +145,7 @@
         c (check-mode-flags c)
         c (apply-dev-folders c)
         c (check-folders c)
+        c (apply-logs-dir c)
         dbname (resolve-dbname c)]
     (-> c
         (dissoc :db-path)

@@ -60,17 +60,26 @@
                (when human_readable_id [human_readable_id id])))
        (into {})))
 
-(defn warn-missing-contexts!
-  "Startup audit: warn for every file-type context whose named id is absent.
-   Ingestion matches contexts by these named ids, so a missing one means
-   files of that type get skipped on import. Returns the missing named ids."
+(defn missing-contexts
+  "Named ids of the file-type contexts that are absent from the db."
   [db]
-  (let [present (set (keys (ids-by-named-id db (vals file-contexts))))
-        missing (remove present (vals file-contexts))]
-    (doseq [named-id missing]
-      (log/warn (str "Missing file-type context with named id '" named-id
-                     "' — files needing it will be skipped on import.")))
-    missing))
+  (let [present (set (keys (ids-by-named-id db (vals file-contexts))))]
+    (remove present (vals file-contexts))))
+
+(defn ensure-contexts!
+  "Hard startup gate: every file-type context must carry its named id, or we
+   refuse to come up. A missing context means files of that type can't be
+   filed and get silently dropped on import, so we'd rather not start at all.
+   Callers exempt a completely empty db (it'll be seeded, or is e2e's
+   intentionally-empty db)."
+  [db]
+  (let [missing (missing-contexts db)]
+    (when (seq missing)
+      (doseq [named-id missing]
+        (log/error (str "Missing file-type context with named id '" named-id "'.")))
+      (throw (ex-info (str "Refusing to start: missing file-type contexts (named ids): "
+                           (str/join ", " missing))
+                      {:missing missing})))))
 
 (defn strip-suffix [title] (subs title 0 (str/last-index-of title ".")))
 

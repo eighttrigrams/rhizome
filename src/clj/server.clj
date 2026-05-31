@@ -155,10 +155,14 @@
                          :dev?       (:dev? config/config)
                          :e2e?       (:e2e? config/config)
                          :skip-seed? (:skip-seed? config/config)})
-  ;; Audit that the file-type contexts carry their named ids. Skipped in e2e,
-  ;; whose db is intentionally empty (not a misconfiguration to surface).
-  (when-not (:e2e? config/config)
-    (file/warn-missing-contexts! (:db config/config)))
+  ;; A missing file-type context silently drops files of that type on import,
+  ;; so refuse to come up unless every named id is present. The only exemption
+  ;; is a completely empty db: e2e runs against one by design, and a fresh
+  ;; prod/dev db was just seeded above (so it won't read as empty here unless
+  ;; seeding was deliberately skipped).
+  (when-not (or (:e2e? config/config)
+                (dev-seed/items-empty? (:db config/config)))
+    (file/ensure-contexts! (:db config/config)))
   (let [host (or (:bind-host config/config)
                  (if (:dev? config/config) "0.0.0.0" "127.0.0.1"))]
     (future (j/run-jetty (app) {:port (:port config/config)

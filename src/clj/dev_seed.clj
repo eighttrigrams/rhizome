@@ -1,8 +1,9 @@
 (ns dev-seed
-  "Dev-only auto-seeding: on startup, if :dev? true and the items table
-   is empty, populate the canonical contexts list and the demo articles
-   that used to be installed by `make onboard`. Opt out with
-   `:skip-seed? true` in config.edn.
+  "Auto-seeding on startup, keyed off a completely empty items table (a
+   \"fresh\" db, in prod or dev). The canonical contexts -- including the
+   file-type contexts' named ids -- are app structure and seed in both prod
+   and dev; the demo articles that used to be installed by `make onboard`
+   are dev-only. Opt out with `:skip-seed? true` in config.edn.
 
    This replaces the old babashka seed scripts so the dev experience is
    `make start` + nothing else."
@@ -24,7 +25,7 @@
 
 (def ^:private demo-articles-path "./scripts/demo-articles.edn")
 
-(defn- items-empty? [db]
+(defn items-empty? [db]
   (zero? (-> (jdbc/execute-one! db ["SELECT count(*) AS n FROM items"])
              :n)))
 
@@ -75,10 +76,11 @@
         (link! db ctx-id (insert-article! db a))))))
 
 (defn maybe-seed!
-  "Seed an empty dev db with canonical contexts + demo articles. Returns
-   :seeded, :skipped (per config), :e2e (never seeds e2e), :not-empty,
-   :not-dev, or :error. Never throws -- a seed failure logs and the
-   server still comes up.
+  "Seed an empty db. The canonical contexts (incl. the file-type contexts'
+   named ids) are app structure, so they seed in prod AND dev; the demo
+   articles are dev-only. Returns :seeded, :skipped (per config), :e2e
+   (never seeds e2e), :not-empty, or :error. Never throws -- a seed failure
+   logs and the server still comes up.
 
    :e2e? mode also implies :dev? true (see config.clj), but the e2e
    suite is built around an empty db, so we never seed it regardless
@@ -86,12 +88,11 @@
   [{:keys [db dev? e2e? skip-seed?]}]
   (try
     (cond
-      (not dev?)              :not-dev
       e2e?                    :e2e
       skip-seed?              (do (log/info "dev-seed: skipped (:skip-seed? true)") :skipped)
       (not (items-empty? db)) :not-empty
       :else (do (seed-contexts! db)
-                (seed-articles! db)
+                (when dev? (seed-articles! db))
                 (log/info "dev-seed: done")
                 :seeded))
     (catch Exception e

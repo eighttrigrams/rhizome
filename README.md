@@ -166,6 +166,10 @@ rhizome-stop
 `DEPLOY_TARGET` is required and must be passed on the command line — there is
 no default and it is deliberately not read from the environment.
 
+Comments
+- We use nativefier to serve the app via electron
+- A first time run will seed some necessary contexts
+
 ## Configuration Options
 
 | Key | Notes |
