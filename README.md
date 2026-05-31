@@ -171,6 +171,7 @@ rhizome-stop
 | `:skip-seed?` | Skip the first-start auto-seed in dev mode. Useful when you want an empty dev db, or when you're restoring contexts/items from elsewhere. Ignored outside `:dev? true`. |
 | `:db-path` | Sqlite file path (string). Required in prod. Must not be set when `:dev? true`. |
 | `:folders` `:homefolder` | Filesystem root for user files. Required in prod, **must not be set when `:dev? true`** (hardcoded to `./files/`). |
+| `:folders` `:images` | Filesystem directory served at the `/imgs` URL prefix. **Required in prod** — the app refuses to start if it is unset or the directory does not exist. Ignored when `:dev? true` (images are served from the classpath). |
 | `:semsearch` `:vec-path`, `:ollama-url`, `:ollama-model` | Single switch for semantic search. Present → app loads the sqlite-vec extension from `:vec-path` (no `.dylib`/`.so` suffix) and embeds against the Ollama endpoint. Absent → vec extension is not loaded, embedder is inert, and the `:vector` test selector is skipped. |
 | `:substack` `:external-substacks` | List of external Substack hostnames (regex-matched on titles). |
 | `:private-addr`, `:private-user-agent` | Prod-only allowlist: `/api` is reachable only from this remote-addr + user-agent. Not used when `:dev? true`. |

@@ -1,5 +1,6 @@
 (ns config
   (:require [aero.core :as aero]
+            [clojure.java.io :as io]
             [datastore.connection :as connection]))
 
 (def ^:private config-path "./config.edn")
@@ -53,6 +54,18 @@
       (assoc-in c [:folders :homefolder] dev-homefolder))
     c))
 
+(defn- check-images-folder [c]
+  (when-not (:dev? c)
+    (let [images (get-in c [:folders :images])]
+      (cond
+        (not (string? images))
+        (throw (ex-info "config invalid: :folders :images is required in prod mode (the directory served as /imgs)"
+                        {:config c}))
+        (not (.isDirectory (io/file images)))
+        (throw (ex-info (str "config invalid: :folders :images directory does not exist: " images)
+                        {:config c})))))
+  c)
+
 (defn- resolve-dbname [c]
   (let [hardcoded (when (:dev? c) (dev-dbname-for c))]
     (cond
@@ -74,6 +87,7 @@
             (test-mode?) (merge test-overrides))
         c (check-mode-flags c)
         c (apply-dev-homefolder c)
+        c (check-images-folder c)
         dbname (resolve-dbname c)]
     (-> c
         (dissoc :db-path)

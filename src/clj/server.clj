@@ -17,7 +17,6 @@
             rest-api
             [cambium.core :as log]
             [ring.middleware.resource :refer [wrap-resource]]
-            [ring.middleware.file :refer [wrap-file]]
             [ring.middleware.multipart-params :refer [wrap-multipart-params]]
             [ring.middleware.params :refer [wrap-params]]
             [clojure.java.io :as io])
@@ -65,6 +64,24 @@
   (-> (config/ds)
       :folders
       :homefolder))
+
+;; In prod the directory configured under :folders :images is served at the
+;; /imgs URL prefix (validated to exist at config load time). In dev /imgs is
+;; served from the classpath via wrap-resource, so this is unused there.
+(def ^:private images-folder
+  (-> config/config :folders :images))
+
+(defn- wrap-imgs
+  "Serve files under the /imgs/* URL prefix from images-folder on the
+  filesystem. file-response's :root guards against directory traversal."
+  [handler images-folder]
+  (fn [req]
+    (let [uri (:uri req)]
+      (if (str/starts-with? uri "/imgs/")
+        (or (response/file-response (subs uri (count "/imgs"))
+                                    {:root images-folder :allow-symlinks? true})
+            {:status 404 :body "Not Found"})
+        (handler req)))))
 
 (defn- img-by-id-handler
   [{{:keys [item-id]} :route-params}]
@@ -123,7 +140,7 @@
                         (wrap-resource "public" {:allow-symlinks? true}))
                    #(-> %
                         (wrap-resource "public")
-                        (wrap-file "./public" {:allow-symlinks? true})))]
+                        (wrap-imgs images-folder)))]
     (-> (routes)
         wrap-env-defaults
         pipeline
