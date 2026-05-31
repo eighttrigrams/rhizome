@@ -4,12 +4,12 @@
    that used to be installed by `make onboard`. Opt out with
    `:skip-seed? true` in config.edn.
 
-   Mirrors what scripts/setup-demo-contexts.bb and
-   scripts/setup-demo-articles.bb used to do, ported off bb so the dev
-   experience is `make start` + nothing else."
+   This replaces the old babashka seed scripts so the dev experience is
+   `make start` + nothing else."
   (:require [cambium.core :as log]
             [clojure.edn :as edn]
-            [next.jdbc :as jdbc]))
+            [next.jdbc :as jdbc]
+            [repository.insertion.file :as file]))
 
 (def ^:private contexts
   ["Imports"
@@ -29,12 +29,15 @@
              :n)))
 
 (defn- insert-context! [db title]
+  ;; File-type contexts get their stable named id (human_readable_id) so file
+  ;; ingestion can match them by id rather than title. Other contexts get NULL
+  ;; (the unique index is partial, so NULLs don't collide).
   (jdbc/execute-one!
    db
    ["INSERT INTO items
-       (title, short_title, data, is_context, inserted_at, updated_at, updated_at_ctx)
-     VALUES (?, '', '{}', 1, datetime('now'), datetime('now'), datetime('now'))"
-    title]))
+       (title, short_title, data, is_context, human_readable_id, inserted_at, updated_at, updated_at_ctx)
+     VALUES (?, '', '{}', 1, ?, datetime('now'), datetime('now'), datetime('now'))"
+    title (get file/file-contexts title)]))
 
 (defn- articles-context-id [db]
   (-> (jdbc/execute-one!

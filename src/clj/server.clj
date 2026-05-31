@@ -11,6 +11,7 @@
             [datastore.schema :as schema]
             [next.jdbc :as jdbc]
             [repository :as r]
+            [repository.insertion.file :as file]
             [et.vp.ds :as datastore]
             opener
             dispatch
@@ -154,6 +155,10 @@
                          :dev?       (:dev? config/config)
                          :e2e?       (:e2e? config/config)
                          :skip-seed? (:skip-seed? config/config)})
+  ;; Audit that the file-type contexts carry their named ids. Skipped in e2e,
+  ;; whose db is intentionally empty (not a misconfiguration to surface).
+  (when-not (:e2e? config/config)
+    (file/warn-missing-contexts! (:db config/config)))
   (let [host (or (:bind-host config/config)
                  (if (:dev? config/config) "0.0.0.0" "127.0.0.1"))]
     (future (j/run-jetty (app) {:port (:port config/config)
