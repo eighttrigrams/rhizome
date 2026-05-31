@@ -1,5 +1,6 @@
 (ns server
-  (:require [ring.adapter.jetty :as j]
+  (:require log-init ;; first: sets LOGS_DIR before any logging ns initialises logback
+            [ring.adapter.jetty :as j]
             upload
             [clojure.string :as str]
             [compojure.core :refer [context GET POST PUT]]
