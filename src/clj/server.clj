@@ -60,11 +60,11 @@
     ;; Process the uploaded file here. For example, save it to a directory.
     (response/response "File uploaded successfully!")))
 
-;; In prod the directories configured under :folders are served beneath the
-;; /imgs URL prefix (both validated to exist at config load time), so no
-;; symlinks are needed: :images backs /imgs/* (tracked originals) and
-;; :preview-images backs /imgs/Preview/* (generated previews). In dev /imgs is
-;; served from the classpath via wrap-resource, so these are unused there.
+;; The directories configured under :folders are served beneath the /imgs URL
+;; prefix by wrap-imgs (used in both dev and prod): :images backs /imgs/*
+;; (tracked originals) and :preview-images backs /imgs/Preview/* (generated
+;; previews), so no symlinks are needed. In prod both are validated to exist at
+;; config load time; in dev they are hardcoded under ./files/ (see config).
 (def ^:private images-folder
   (-> config/config :folders :images))
 
@@ -133,23 +133,14 @@
     (GET "/" [] (response/resource-response "public/index.html"))
     (fn [req] (log/warn (str "File not found:" (:uri req))) {:status 404 :body "Not Found"})))
 
-(def dev?
-  (true? (-> (config/ds)
-             :dev?)))
-
 (defn app
   []
-  (let [pipeline (if dev?
-                   #(-> %
-                        (wrap-resource "public" {:allow-symlinks? true}))
-                   #(-> %
-                        (wrap-resource "public")
-                        (wrap-imgs images-folder preview-images-folder)))]
-    (-> (routes)
-        wrap-env-defaults
-        pipeline
-        wrap-params
-        wrap-multipart-params)))
+  (-> (routes)
+      wrap-env-defaults
+      (wrap-resource "public")
+      (wrap-imgs images-folder preview-images-folder)
+      wrap-params
+      wrap-multipart-params))
 
 (defn start-http-server!
   []
