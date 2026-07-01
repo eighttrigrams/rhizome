@@ -29,7 +29,20 @@
                       :on-cut #(save-input-debounced! [*state %])
                       :on-blur #(when (:vector-search-mode? @*state)
                                   (swap! *state assoc :vector-search-mode? false)
-                                  (actions/search! *state))
+                                  ;; Revert the vector-ranked list back to a normal
+                                  ;; search when the user simply leaves the input.
+                                  ;; Clicking a hit also blurs the input, but is
+                                  ;; immediately followed by select-item! (which sets
+                                  ;; :active-search nil and fetches the hit's context).
+                                  ;; Running search! synchronously here would race with
+                                  ;; and clobber that selection, so defer and only revert
+                                  ;; when we're still in item-search once the click has
+                                  ;; settled.
+                                  (js/setTimeout
+                                    (fn []
+                                      (when (= :items (:active-search @*state))
+                                        (actions/search! *state)))
+                                    0))
                       :on-key-down #(if (= "Backspace" (.-code %))
                                       (save-input-debounced! [*state (key-handler/get-title-el)])
                                       ((key-handler/handle-keys *state) %))}])}))
