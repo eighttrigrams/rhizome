@@ -4,7 +4,7 @@
             [next.jdbc :as jdbc]
             [ring.mock.request :as mock]
             [ring.middleware.params :refer [wrap-params]]
-            [datastore.config :as config]
+            [config :as config]
             [rest-api :as rest-api]
             [rest-api.middleware :as mw]
             [et.vp.ds :as ds]
@@ -12,9 +12,8 @@
 
 (defn- with-recording-on
   [f]
-  (let [was-on? (mw/enabled?)]
-    (when-not was-on? (mw/toggle!))
-    (try (f) (finally (when-not was-on? (mw/toggle!))))))
+  (mw/set-recording! true)
+  (try (f) (finally (mw/set-recording! false))))
 
 (use-fixtures :once
   (fn [f] (with-recording-on f)))
@@ -99,6 +98,23 @@
       (is (= 201 (:status resp)))
       (is (= "PN" (:short_title stored)))
       (is (true? (:hide_in_global_search stored))))))
+
+(deftest create-context-with-human-readable-id-test
+  (test-with-fresh-db "stores :human-readable-id when provided"
+    (let [resp (POST* "/rest/contexts" {:title "Books" :human-readable-id "books"})
+          body (body-json resp)
+          stored (ds/get-item db {:id (:id body)})]
+      (is (= 201 (:status resp)))
+      (is (= "books" (:human-readable-id body)))
+      (is (= "books" (:human_readable_id stored)))))
+
+  (test-with-fresh-db "drops a digits-only :human-readable-id but still saves the rest"
+    (let [resp (POST* "/rest/contexts" {:title "Books" :human-readable-id "12345"})
+          body (body-json resp)
+          stored (ds/get-item db {:id (:id body)})]
+      (is (= 201 (:status resp)))
+      (is (= "Books" (:title stored)))
+      (is (nil? (:human_readable_id stored))))))
 
 (deftest create-context-with-sort-idx-test
   (test-with-fresh-db "stores :sort-idx when provided"
@@ -223,8 +239,15 @@
     (@handler (mock/request :get path))))
 
 (defn- ids-with-status
-  [body status]
-  (mapv :id (filter #(= status (:status %)) (:results body))))
+  "Return the ids of rows in the given bucket whose :status equals `status`."
+  [body bucket status]
+  (mapv :id (filter #(= status (:status %)) (get body bucket))))
+
+(defn- ids-in
+  [body bucket]
+  (mapv :id (get body bucket)))
+
+(defn- find-by-id [coll id] (first (filter #(= id (:id %)) coll)))
 
 (deftest delete-related-items-deletes-all-related-test
   (test-with-fresh-db "deletes every item related to the parent (q ignored)"
@@ -237,44 +260,45 @@
           body (body-json resp)]
       (is (= 200 (:status resp)))
       (is (false? (:dry-run body)))
-      (is (= 2 (:requested body)))
-      (is (= (set [(:id a) (:id b)]) (set (ids-with-status body "deleted"))))
-      (is (empty? (ids-with-status body "skipped")))
+      (is (= (set [(:id a) (:id b)]) (set (ids-with-status body :primary "deleted"))))
+      (is (empty? (ids-with-status body :primary "skipped")))
+      (is (= [] (:cascade body)))
       (is (nil? (:id (ds/get-item db {:id (:id a)}))))
       (is (nil? (:id (ds/get-item db {:id (:id b)}))))
       (is (= (:id c) (:id (ds/get-item db {:id (:id c)})))))))
 
 (deftest delete-related-items-no-related-test
-  (test-with-fresh-db "parent with no related items returns empty :results"
+  (test-with-fresh-db "parent with no related items returns empty buckets"
     (let [parent (ds/new-context db {:title "Books"})
           resp (POST-empty* (str "/rest/items/" (:id parent) "/related/delete"))
           body (body-json resp)]
       (is (= 200 (:status resp)))
-      (is (= 0 (:requested body)))
-      (is (= [] (:results body))))))
+      (is (= [] (:primary body)))
+      (is (= [] (:cascade body)))
+      (is (= [] (:unlinked body))))))
 
-(deftest delete-related-items-skipped-when-has-children-test
-  (test-with-fresh-db "items with contained children are reported :skipped"
+(deftest delete-related-items-primary-context-still-deletes-test
+  (test-with-fresh-db
+    "primary that is itself a context (is_context=true with children) is deleted, and its only-via-primary children cascade-delete"
     (let [parent (ds/new-context db {:title "Library"})
-          ;; mid is itself a context, so deletion/delete-item refuses to delete it
-          ;; (contained-items-count > 0). Link it as a related item of parent.
+          ;; mid is a sub-context with one child reachable only through mid.
           mid (ds/new-item db "Sub-context" "" #{(:id parent)} 1)
           _ (jdbc/execute-one! db ["update items set is_context = true where id = ?" (:id mid)])
-          _child (ds/new-item db "Child" "" #{(:id mid)} 1)
+          child (ds/new-item db "Child" "" #{(:id mid)} 1)
           resp (POST-empty* (str "/rest/items/" (:id parent) "/related/delete"))
-          body (body-json resp)
-          skipped (filter #(= "skipped" (:status %)) (:results body))]
+          body (body-json resp)]
       (is (= 200 (:status resp)))
-      (is (some #(= (:id mid) (:id %)) skipped))
-      (is (some #(= "has-children" (:reason %)) skipped))
-      (is (= (:id mid) (:id (ds/get-item db {:id (:id mid)})))))))
+      (is (= [(:id mid)] (ids-with-status body :primary "deleted")))
+      (is (= [(:id child)] (ids-with-status body :cascade "deleted")))
+      (is (nil? (:id (ds/get-item db {:id (:id mid)}))))
+      (is (nil? (:id (ds/get-item db {:id (:id child)})))))))
 
-(deftest delete-related-items-parent-not-found-test
-  (test-with-fresh-db "404s when the parent id has no corresponding item"
+(deftest delete-related-items-context-not-found-test
+  (test-with-fresh-db "404s when the context id has no corresponding item"
     (let [resp (POST-empty* "/rest/items/9999999/related/delete")]
       (is (= 404 (:status resp))))))
 
-(deftest delete-related-items-bad-parent-id-test
+(deftest delete-related-items-bad-context-id-test
   (test-with-fresh-db "400s when the path id is not an integer"
     (let [resp (POST-empty* "/rest/items/not-an-int/related/delete")]
       (is (= 400 (:status resp))))))
@@ -291,7 +315,9 @@
                 body (body-json resp)]
             (is (= 200 (:status resp)))
             (is (true? (:dropped body)))
-            (is (= [] (:results body)))
+            (is (= [] (:primary body)))
+            (is (= [] (:cascade body)))
+            (is (= [] (:unlinked body)))
             (is (= (:id a) (:id (ds/get-item db {:id (:id a)})))))
           (finally (mw/toggle!)))))))
 
@@ -304,8 +330,7 @@
           body (body-json resp)]
       (is (= 200 (:status resp)))
       (is (true? (:dry-run body)))
-      (is (= 2 (:requested body)))
-      (is (= (set [(:id a) (:id b)]) (set (ids-with-status body "deleted"))))
+      (is (= (set [(:id a) (:id b)]) (set (ids-with-status body :primary "deleted"))))
       ;; nothing was actually deleted
       (is (= (:id a) (:id (ds/get-item db {:id (:id a)}))))
       (is (= (:id b) (:id (ds/get-item db {:id (:id b)})))))))
@@ -323,22 +348,184 @@
             (is (= 200 (:status resp)))
             (is (true? (:dry-run body)))
             (is (false? (contains? body :dropped)))
-            (is (= [(:id a)] (ids-with-status body "deleted")))
+            (is (= [(:id a)] (ids-with-status body :primary "deleted")))
             (is (= (:id a) (:id (ds/get-item db {:id (:id a)})))))
           (finally (mw/toggle!)))))))
 
-(deftest deletion-preview-and-delete-agree-on-skipped-test
-  (test-with-fresh-db "preview's :skipped matches what an actual delete would skip"
+(deftest deletion-preview-and-delete-agree-test
+  (test-with-fresh-db "preview returns the same buckets an actual delete would produce"
     (let [parent (ds/new-context db {:title "Library"})
           mid (ds/new-item db "Sub-context" "" #{(:id parent)} 1)
           _ (jdbc/execute-one! db ["update items set is_context = true where id = ?" (:id mid)])
           _child (ds/new-item db "Child" "" #{(:id mid)} 1)
           preview (body-json (GET* (str "/rest/items/" (:id parent) "/related/deletion-preview")))
           actual (body-json (POST-empty* (str "/rest/items/" (:id parent) "/related/delete")))]
-      (is (= (set (ids-with-status preview "deleted"))
-             (set (ids-with-status actual "deleted"))))
-      (is (= (set (ids-with-status preview "skipped"))
-             (set (ids-with-status actual "skipped")))))))
+      (is (= (set (ids-in preview :primary)) (set (ids-in actual :primary))))
+      (is (= (set (ids-in preview :cascade)) (set (ids-in actual :cascade))))
+      (is (= (set (ids-in preview :unlinked)) (set (ids-in actual :unlinked)))))))
+
+;; -- cascade & unlink behavior -----------------------------------------------
+
+(defn- link!
+  "Add a relation owner→target (owner contains target) directly, and patch
+  the target's data.contexts so it stays in sync — that's what the rest of
+  the app reads. We bypass /rest/relations because its implementation
+  reshapes the target's contexts via a full delete+reinsert, which is more
+  side-effect than these tests want to model."
+  [owner-id target-id]
+  (jdbc/execute! db
+                 ["insert into relations (owner_id, target_id) values (?, ?)"
+                  owner-id target-id])
+  (let [{:items/keys [data]} (jdbc/execute-one! db ["select data from items where id = ?"
+                                                    target-id])
+        existing (if data (json/parse-string data true) {})
+        new-data (assoc-in existing [:contexts (str owner-id)]
+                           {:title (str "owner" owner-id) :show-badge? true})]
+    (jdbc/execute! db
+                   ["update items set data = ? where id = ?"
+                    (json/generate-string new-data) target-id])))
+
+(deftest neighbor-orphaned-and-deleted-test
+  (test-with-fresh-db
+    "after unlinking, a neighbor that has no other inbound and is not a context cascades-deletes"
+    (let [parent (ds/new-context db {:title "A"})
+          b (ds/new-item db "B" "" #{(:id parent)} 1)
+          e (ds/new-item db "E" "" #{(:id parent)} 2)
+          ;; b -> e (b owns e); e survives only by way of b
+          _ (link! (:id b) (:id e))
+          ;; unlink e from parent so its only inbound is via b
+          _ (jdbc/execute! db ["delete from relations where owner_id = ? and target_id = ?"
+                               (:id parent) (:id e)])
+          resp (POST-empty* (str "/rest/items/" (:id parent) "/related/delete"))
+          body (body-json resp)]
+      (is (= 200 (:status resp)))
+      (is (some #(= (:id b) (:id %)) (:primary body)))
+      (is (= [(:id e)] (ids-with-status body :cascade "deleted")))
+      (is (nil? (:id (ds/get-item db {:id (:id b)}))))
+      (is (nil? (:id (ds/get-item db {:id (:id e)})))))))
+
+(deftest neighbor-with-other-inbound-survives-test
+  (test-with-fresh-db
+    "neighbor with an additional inbound relation from outside the primary set is kept, with reason :has-other-inbound"
+    (let [parent (ds/new-context db {:title "A"})
+          other-parent (ds/new-context db {:title "X"})
+          b (ds/new-item db "B" "" #{(:id parent)} 1)
+          e (ds/new-item db "E" "" #{(:id parent) (:id other-parent)} 2)
+          _ (link! (:id b) (:id e))
+          ;; Remove the direct parent->e link so e is only connected to parent via b
+          _ (jdbc/execute! db ["delete from relations where owner_id = ? and target_id = ?"
+                               (:id parent) (:id e)])
+          body (body-json (POST-empty* (str "/rest/items/" (:id parent) "/related/delete")))
+          unlinked-e (find-by-id (:unlinked body) (:id e))]
+      (is (= [(:id b)] (ids-with-status body :primary "deleted")))
+      (is (empty? (:cascade body)))
+      (is (some? unlinked-e))
+      (is (some #(= "has-other-inbound" %) (:keep-reasons unlinked-e)))
+      ;; e survived
+      (is (= (:id e) (:id (ds/get-item db {:id (:id e)}))))
+      ;; b is gone
+      (is (nil? (:id (ds/get-item db {:id (:id b)}))))
+      ;; the b<->e relation is gone
+      (is (empty? (jdbc/execute! db ["select * from relations where owner_id = ? and target_id = ?"
+                                     (:id b) (:id e)]))))))
+
+(deftest neighbor-is-context-flag-survives-test
+  (test-with-fresh-db
+    "neighbor with is_context=true is kept even when it would otherwise be orphaned"
+    (let [parent (ds/new-context db {:title "A"})
+          b (ds/new-item db "B" "" #{(:id parent)} 1)
+          e (ds/new-item db "E" "" #{(:id parent)} 2)
+          _ (jdbc/execute-one! db ["update items set is_context = true where id = ?" (:id e)])
+          _ (link! (:id b) (:id e))
+          _ (jdbc/execute! db ["delete from relations where owner_id = ? and target_id = ?"
+                               (:id parent) (:id e)])
+          body (body-json (POST-empty* (str "/rest/items/" (:id parent) "/related/delete")))
+          unlinked-e (find-by-id (:unlinked body) (:id e))]
+      (is (some? unlinked-e))
+      (is (some #(= "is-context-flag" %) (:keep-reasons unlinked-e)))
+      (is (= (:id e) (:id (ds/get-item db {:id (:id e)})))))))
+
+(deftest neighbor-with-own-children-survives-test
+  (test-with-fresh-db
+    "neighbor that owns other items (a context by virtue of having children) is kept, reason :has-other-children"
+    (let [parent (ds/new-context db {:title "A"})
+          b (ds/new-item db "B" "" #{(:id parent)} 1)
+          e (ds/new-item db "E" "" #{(:id parent)} 2)
+          ;; e owns its own child y
+          y (ds/new-item db "Y" "" #{(:id e)} 1)
+          _ (link! (:id b) (:id e))
+          _ (jdbc/execute! db ["delete from relations where owner_id = ? and target_id = ?"
+                               (:id parent) (:id e)])
+          body (body-json (POST-empty* (str "/rest/items/" (:id parent) "/related/delete")))
+          unlinked-e (find-by-id (:unlinked body) (:id e))]
+      (is (some? unlinked-e))
+      (is (some #(= "has-other-children" %) (:keep-reasons unlinked-e)))
+      (is (= (:id e) (:id (ds/get-item db {:id (:id e)}))))
+      (is (= (:id y) (:id (ds/get-item db {:id (:id y)})))))))
+
+(deftest shared-neighbor-cascade-via-two-phase-test
+  (test-with-fresh-db
+    "shared neighbor between two primaries is cascade-deleted only after both unlinks; order-independent"
+    (let [parent (ds/new-context db {:title "A"})
+          b (ds/new-item db "B" "" #{(:id parent)} 1)
+          c (ds/new-item db "C" "" #{(:id parent)} 2)
+          e (ds/new-item db "E" "" #{(:id parent)} 3)
+          _ (link! (:id b) (:id e))
+          _ (link! (:id c) (:id e))
+          ;; e is only reachable via b and c (no other parent)
+          _ (jdbc/execute! db ["delete from relations where owner_id = ? and target_id = ?"
+                               (:id parent) (:id e)])
+          body (body-json (POST-empty* (str "/rest/items/" (:id parent) "/related/delete")))]
+      (is (= #{(:id b) (:id c)} (set (ids-with-status body :primary "deleted"))))
+      (is (= [(:id e)] (ids-with-status body :cascade "deleted")))
+      (is (nil? (:id (ds/get-item db {:id (:id e)})))))))
+
+(deftest unlink-relation-rows-fully-removed-test
+  (test-with-fresh-db "every relation touching a primary is gone from the relations table after delete"
+    (let [parent (ds/new-context db {:title "A"})
+          other (ds/new-context db {:title "X"})
+          b (ds/new-item db "B" "" #{(:id parent)} 1)
+          ;; e lives outside `parent`'s view (only in `other`) so it shows up as
+          ;; a neighbor, not a primary.
+          e (ds/new-item db "E" "" #{(:id other)} 2)
+          _ (link! (:id b) (:id e))   ; b owns e
+          _ (link! (:id e) (:id b))   ; e owns b — both directions
+          _ (POST-empty* (str "/rest/items/" (:id parent) "/related/delete"))
+          remaining (jdbc/execute! db ["select * from relations where owner_id = ? or target_id = ?"
+                                       (:id b) (:id b)])]
+      (is (empty? remaining))
+      ;; e survives because it is still linked to `other` parent
+      (is (= (:id e) (:id (ds/get-item db {:id (:id e)})))))))
+
+(deftest unlinked-neighbor-data-contexts-cleaned-up-test
+  (test-with-fresh-db
+    "kept-neighbor's data.contexts no longer references the deleted primary"
+    (let [parent (ds/new-context db {:title "A"})
+          other (ds/new-context db {:title "X"})
+          b (ds/new-item db "B" "" #{(:id parent)} 1)
+          e (ds/new-item db "E" "" #{(:id parent) (:id other)} 2)
+          _ (link! (:id b) (:id e))     ; b owns e — adds b to e's data.contexts
+          _ (jdbc/execute! db ["delete from relations where owner_id = ? and target_id = ?"
+                               (:id parent) (:id e)])
+          ;; sanity-check: b is in e's data.contexts before delete
+          pre-e (ds/get-item db {:id (:id e)})
+          _ (is (contains? (get-in pre-e [:data :contexts]) (:id b)))
+          _ (POST-empty* (str "/rest/items/" (:id parent) "/related/delete"))
+          post-e (ds/get-item db {:id (:id e)})]
+      (is (not (contains? (get-in post-e [:data :contexts]) (:id b))))
+      (is (not (contains? (get-in post-e [:data :contexts]) (str (:id b))))))))
+
+(deftest primary-with-grandchild-recursive-cascade-test
+  (test-with-fresh-db
+    "primary B contains X; X has no other inbound and is not a context → X cascade-deletes"
+    (let [parent (ds/new-context db {:title "A"})
+          b (ds/new-item db "B" "" #{(:id parent)} 1)
+          x (ds/new-item db "X" "" #{(:id b)} 1)
+          body (body-json (POST-empty* (str "/rest/items/" (:id parent) "/related/delete")))]
+      (is (= [(:id b)] (ids-with-status body :primary "deleted")))
+      (is (= [(:id x)] (ids-with-status body :cascade "deleted")))
+      (is (nil? (:id (ds/get-item db {:id (:id b)}))))
+      (is (nil? (:id (ds/get-item db {:id (:id x)})))))))
 
 (deftest delete-related-items-not-in-describe-test
   (testing "delete-related-items + deletion-preview are unlisted in /rest/describe"

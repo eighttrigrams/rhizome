@@ -1,21 +1,22 @@
 (ns et.vp.ds.search-test
   (:require
    [clojure.test :refer [deftest is testing]]
+   [config :as config]
    [et.vp.ds :as ds]
    [et.vp.ds.search :as search]
    [et.vp.ds.helpers :as helpers]
    [datastore.schema :as schema]
    [datastore.connection :as connection]
-   [next.jdbc :as jdbc]
-   [clojure.edn :as edn]))
+   [next.jdbc :as jdbc]))
 
-(defonce db (connection/make-datasource (:db (edn/read-string (slurp "./test/test_config.edn")))))
+(defonce db (:db config/config))
 
 (defonce ^:private _schema-init (do (schema/apply-schema! db) :ok))
 
 (defn reset-db []
   (when connection/vec-available?
     (jdbc/execute-one! db ["delete from items_vec"]))
+  (jdbc/execute-one! db ["delete from items_vec_skipped"])
   (jdbc/execute-one! db ["delete from relations"])
   (jdbc/execute-one! db ["delete from items"]))
 

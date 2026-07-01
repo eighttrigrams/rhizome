@@ -2,7 +2,6 @@
   (:require [et.vp.ds :as datastore]
             [cambium.core :as log]
             [repository.insertion.common :as common]
-            utils
             [utils.url :as url]
             [scrapers.substack :as substack]
             upload))
@@ -19,7 +18,6 @@
                                                                         substack/extract-content)
         articles-id (common/get-item-or-throw-error db "Articles")
         #_#_year-id (common/get-item-or-throw-error db year)
-        #_#_summary (and should-capture-summary? (chatgpt/get-summary content))
         #_#_substack-id
           (create-or-take-substack-id db
                                       (if external? (convert-external url) (convert url))

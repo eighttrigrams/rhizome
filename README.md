@@ -4,17 +4,12 @@ For the whitepaper, see here: [*Rhizome - A “total recall” note-taking and c
 
 ## Getting started - with Docker
 
-Prerequisites:
-- Docker
+Run
 
 ```bash
 make box
-root@dev-box:/workspace/rhizome# npm install
 root@dev-box:/workspace/rhizome# make onboard
 ```
-
-`make onboard` writes a fresh `config.edn`, applies the schema to
-`rhizome.db` / `rhizome-test.db`, and seeds the demo contexts and articles.
 
 To start the app, use:
 
@@ -24,18 +19,22 @@ To start the app, use:
 root@dev-box:/workspace/rhizome# make start
 ```
 
-Visit `localhost:3006` (on you host machine; you might want to give it some seconds, then refresh until you see items listed).
-
 When the app is up: press 'c', then type "ar" and hit Enter and you should be in context "Articles", where you should see a couple
 of articles listed on the right hand side.
 
 ![header](./header.png)
 
-```
+```bash
 make stop
 make test # if you want to run the tests
 make start # to start the server again
 ```
+
+## Onboard and Cleanup
+
+The command `make onboard` writes a fresh `config.edn`, and a `files` directory in which files imported into Rhizome will be stored. The command `make start` creates a db with demo contexts and articles. These work inside and outside the container. The db and the configs are shared from both sides.
+
+To *remove* configs and db again, use `make clean`. If you want to not seed items, use `:skip-seed?` option.
 
 ## Getting started on the host system
 
@@ -46,26 +45,14 @@ Prerequisites are
 - Babashka (`bb`)
 - node 18+, npm
 - sqlite3 CLI
+- imagemagick
 
 ```bash
 npm i
-make onboard # If you haven't done this already
-make start      
-```
-
-If you've already onboarded on the other side (host vs. container), skip
-`make onboard` — `rhizome.db` and `config.edn` are already there from the
-bind-mount (you still need `npm install` once on this side because each
-side has its own `node_modules`).
-
-There exists `make clean`, if something needs to be cleaned up. Switching 
-between working on the host system and inside Docker should work, but if there
-are problems, this command helps with removing the test dbs and the test configs.
-
-Then start the app (see above)
-
-```bash
+make onboard # If you haven't done already
+make test
 make start  
+make stop
 ```
 
 ## Docker - Claude YOLO
@@ -74,71 +61,80 @@ Sandboxed Claude (using Docker). Run
 
 ```bash
 make yolo
-claude@yolo-box:/workspace/rhizome$ npm install
 claude@yolo-box:/workspace/rhizome$ make onboard # if haven't done already
 claude@yolo-box:/workspace/rhizome$ claude # has playwright MCP, can start app etc.
 ```
 
-### With Vector DB
+## With Vector DB
 
-On host system you need that, independent of whether you develop then in your host system
-or inside a Docker
-
-```bash
-brew install ollama # or your platform's installer
-ollama pull nomic-embed-text
-ollama serve        # listens on http://127.0.0.1:11434
-```
-
-Use
-
-```bash
-make install-sqlite-vec
-```
-
-on the host system (should work both before or after a `make onboard`) or 
+**In Docker:** just add `WITH_VEC=1`. An `ollama` sidecar container is
+brought up automatically; the embedding model is pulled into a named volume
+on first run and cached afterwards. No host-side Ollama install required.
 
 ```bash
 make box WITH_VEC=1
 make yolo WITH_VEC=1
 ```
 
-to start the containers with vector support.
-
-After installing vec, embed the seeded demo articles (the JVM must be
-running):
+**On the host system:** you need Ollama yourself. On MacOS:
 
 ```bash
+brew install ollama # or your platform's installer
+ollama pull nomic-embed-text
+ollama serve        # listens on http://127.0.0.1:11434
+make install-sqlite-vec
+```
+
+In both cases, if you haven't yet onboarded, do so
+
+```bash
+make onboard
+```
+
+or simply add
+
+```clojure
+:semsearch {:vec-path #or [#env VEC_PATH "./.sqlite-vec/vec0"]
+            :ollama-url #or [#env VEC_URL "http://127.0.0.1:11434"]
+            :ollama-model "nomic-embed-text"}
+```
+
+by hand to `config.edn`. The aero `#or [#env ...]` form lets the same `config.edn` work on host and inside docker: the Dockerfile sets `VEC_PATH=/usr/local/lib/sqlite-vec/vec0` and `VEC_URL=http://127.0.0.1:11437` (a socat bridge `entrypoint.sh` opens onto the `ollama` sidecar); the host falls back to the local install path and `:11434`.
+
+After installing vec, embed the seeded demo articles, while Rhizome is running, run:
+
+```bash
+nohup make start & # invoked that way that you can execute next line from the same shell
 make backfill-embeddings
 ```
 
-#### Usage
+### Usage
 
 - Visit the Articles context
 - Press 'i' (input field on right hand side opens)
 - Press 'shift+option+v' (input field should become green)
 - Type in a search term
 
-##### Tests
+#### Tests
 
-When vector mode is enabled, some additional unit tests run,
-but can also be skipped with
-
-```bash
-SQLITE_VEC_PATH=/nope make test
-```
+When `:semsearch` is configured in `config.edn` (with a `:vec-path` pointing at a dylib that exists on disk), some additional unit tests run. To skip them, remove the `:semsearch` block from `config.edn` — there is no env-var override anymore.
 
 ## End-to-end (Playwright)
 
-E2E tests run at port 3005.
+E2E tests share the dev port from `config.edn` (3140 by default; override by exporting `PORT=…` in your shell — via direnv, a manual `export`, or inline `PORT=… make e2e`). The lockfile (`.dev-server.lock`) makes dev and e2e mutually exclusive — start one and the other refuses with a diagnostic that includes mode, env, and (for e2e) headed.
 
 ```bash
-$ npx playwright install chromium  # first time only (on host system only)
-$ make e2e               # headless (default)
-$ make e2e HEADED=1      # show the browser window
+$ npx playwright install chromium                # first time only (on host system only)
+$ make e2e                                       # full headless run
+$ make e2e HEADED=1                              # show the browser window
+$ make e2e T="creates a context"                 # filter by scenario (playwright -g)
+$ make e2e NO_BUILD=1                            # skip shadow-cljs release build
+                                                 # (reuses cached main.js — fine when
+                                                 # no cljs changed since last run)
+$ make e2e NO_BUILD=1 T="creates a context"      # iterate fast on one scenario
 ```
 
-This works on the host system as well as in the Docker containers.
+Both work on the host system and in the Docker containers.
 
 ## Package, deploy and run
 
@@ -162,7 +158,36 @@ rhizome-stop() {
 and then use
 
 ```bash
-make deploy
+make deploy DEPLOY_TARGET=~/Applications/rhizome
 rhizome-start
 rhizome-stop
 ```
+
+`DEPLOY_TARGET` is required and must be passed on the command line — there is
+no default and it is deliberately not read from the environment.
+
+Comments
+- We use nativefier to serve the app via electron
+- A first time run will seed some necessary contexts
+
+## Configuration Options
+
+| Key | Notes |
+|---|---|
+| `:port` | HTTP port. Numeric, accepts `#env`/`#or` readers. |
+| `:dev?` | Dev mode: REST API always open, `/test/reset` enabled, dev resource pipeline, hardcodes all `:folders` paths (under `./files/`) and the sqlite db path. Also auto-seeds the dev db on first start (canonical contexts + demo articles) when items are empty — set `:skip-seed? true` to opt out. |
+| `:skip-seed?` | Skip the first-start auto-seed in dev mode. Useful when you want an empty dev db, or when you're restoring contexts/items from elsewhere. Ignored outside `:dev? true`. |
+| `:db-path` | Sqlite file path (string). Required in prod. Must not be set when `:dev? true`. |
+| `:folders` | Map of the media directories. Every key is **required in prod** — the app refuses to start if any is unset or its directory does not exist — and **must not be set when `:dev? true`** (all hardcoded under `./files/`). There is no shared root; each is an independent absolute path, so no symlinks are needed. Keys: `:imports` — the drop folder the import flow scans (dev: `./files/Downloads/Tracked/`); `:audio`, `:video`, `:docs`, `:images` — import destinations files are moved into, classified by suffix (dev: `Music/`, `Movies/`, `Documents/`, `Pictures/` under `…/Tracked/`); `:images` also backs `/imgs/*` and `/img-by-id`; `:preview-images` — previews written by the upload drag-and-drop fields, served at `/imgs/Preview/*` with downscaled variants under its `Lowres/` subfolder at `/imgs/Preview/Lowres/*` (dev: `./files/Pictures/Tracked/Preview/`). |
+| `:semsearch` `:vec-path`, `:ollama-url`, `:ollama-model` | Single switch for semantic search. Present → app loads the sqlite-vec extension from `:vec-path` (no `.dylib`/`.so` suffix) and embeds against the Ollama endpoint. Absent → vec extension is not loaded, embedder is inert, and the `:vector` test selector is skipped. |
+| `:substack` `:external-substacks` | List of external Substack hostnames (regex-matched on titles). |
+| `:private-addr`, `:private-user-agent` | Prod-only allowlist: `/api` is reachable only from this remote-addr + user-agent. Not used when `:dev? true`. |
+
+## Running multiple checkouts side-by-side
+
+Clone to a sibling directory and run a second instance — state is isolated automatically:
+
+- Ports: export `PORT=...` / `SHADOW_PORT=...` in your shell before running `make` (drop an `.envrc` for direnv, or `export` them manually, or prefix the make invocation). The Makefile flows the exported values into both host-side `make start` and the docker overlay. When nothing is exported, ports come from `config.edn` / `shadow-cljs.edn` defaults — note that an `.envrc` alone is not consulted, it needs to actually be loaded into the env.
+- Docker volumes/containers: `COMPOSE_PROJECT_NAME` is derived from the directory basename so they don't share volumes.
+
+Caveats: renaming the checkout after first build orphans the old volumes (`docker volume rename` to migrate); the Ollama sidecar's `ollama_models` volume is per-project, so each checkout re-pulls `nomic-embed-text` (~3 GB) on first `WITH_VEC=1` run.

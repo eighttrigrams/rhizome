@@ -1,11 +1,57 @@
+# Compose project name is derived from the repo's parent-folder name by
+# the Makefile (COMPOSE_PROJECT_NAME), so a second checkout in a sibling
+# directory gets its own volumes/containers prefix and the two don't
+# collide on shared state. See the "Running multiple checkouts" section
+# in README.md.
+
+# Shared bits factored as YAML anchors. Both app services point at the same
+# Dockerfile and differ only in the `target:` stage (yolo vs box) plus the
+# user/MCP-specific bits the agent container needs. Ollama runs as a sidecar
+# (`ollama` service) that both app services talk to over the compose network,
+# so the binary + model live in one shared volume instead of being installed
+# per app container.
+x-build-args: &build-args
+  WITH_VEC: "${WITH_VEC:-0}"
+
+x-common-env: &common-env
+  # config.edn (bind-mounted from the repo) is the single source of truth for
+  # :ollama-url. It resolves via aero #or [#env VEC_URL "http://127.0.0.1:11434"];
+  # the Dockerfile sets VEC_URL=http://127.0.0.1:11437 and entrypoint.sh runs
+  # a socat bridge on :11437 -> sidecar :11434, so the same config.edn works
+  # on host (falls back to :11434) and in the container.
+  # PORT / SHADOW_PORT come from the Makefile (which itself reads .envrc /
+  # config.edn / shadow-cljs.edn -- see scripts/detect-ports.sh) and are
+  # forwarded straight through; aero / shadow-cljs read them via #env.
+  # sqlite-vec location: config.edn writes
+  # :vec-path #or [#env VEC_PATH "./.sqlite-vec/vec0"], and the Dockerfile
+  # sets VEC_PATH=/usr/local/lib/sqlite-vec/vec0 so the in-container path
+  # wins automatically. Nothing to wire here.
+  # The server binds 0.0.0.0 automatically when :dev? true (see server.clj),
+  # so no RHIZOME_BIND_ALL is needed in the container either.
+  PORT: "${PORT}"
+  SHADOW_PORT: "${SHADOW_PORT}"
+  WITH_VEC: "${WITH_VEC:-0}"
+
 services:
+  # Official Ollama image runs serve on entry. The first time the app starts
+  # it asks this sidecar to pull nomic-embed-text into ollama_models (see
+  # entrypoint.sh); subsequent runs find the model already cached. Gated by
+  # the `vec` compose profile -- only activated when WITH_VEC=1 (see Makefile)
+  # so users who don't need semsearch never pull this 3 GB image.
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["vec"]
+    volumes:
+      - ollama_models:/root/.ollama
+    restart: unless-stopped
+
   claude:
     hostname: yolo-box
     build:
       context: .
-      dockerfile: Dockerfile.yolo
-      args:
-        WITH_VEC: "${WITH_VEC:-0}"
+      dockerfile: Dockerfile
+      target: yolo
+      args: *build-args
     volumes:
       - workspace:/workspace
       - ../:/workspace/rhizome:rw
@@ -20,48 +66,27 @@ services:
       - node_modules:/workspace/rhizome/node_modules
     working_dir: /workspace/rhizome
     environment:
-      - CLAUDE_CODE_OAUTH_TOKEN
-      - PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
-      - SQLITE_VEC_PATH=/usr/local/lib/sqlite-vec/vec0
-      - OLLAMA_URL=http://ollama-proxy:11434
-      - RHIZOME_BIND_ALL=1
+      <<: *common-env
+      # yolo-only: lets the agent invoke `claude` and Playwright/Chromium.
+      CLAUDE_CODE_OAUTH_TOKEN:
+      PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: /usr/bin/chromium
+    # `required: false` lets the dependency be silently skipped when the
+    # `vec` profile isn't active (ollama service then isn't part of the
+    # project). Compose v2.20+.
     depends_on:
-      - ollama-proxy
-    extra_hosts:
-      - "host.docker.internal:0.0.0.0"
-    ports:
-      - "3006:3006"
-      - "9630:9630"
+      ollama:
+        condition: service_started
+        required: false
     stdin_open: true
     tty: true
-
-  ollama-proxy:
-    image: nginx:alpine
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-    command:
-      - sh
-      - -c
-      - |
-        cat > /etc/nginx/conf.d/default.conf <<'EOF'
-        server {
-          listen 11434;
-          location / {
-            proxy_pass http://host.docker.internal:11434;
-            proxy_set_header Host 127.0.0.1:11434;
-          }
-        }
-        EOF
-        exec nginx -g 'daemon off;'
 
   box:
     hostname: dev-box
     build:
       context: .
-      dockerfile: Dockerfile.box
-      args:
-        WITH_VEC: "${WITH_VEC:-0}"
+      dockerfile: Dockerfile
+      target: box
+      args: *build-args
     volumes:
       - box_workspace:/workspace
       - ../:/workspace/rhizome:rw
@@ -72,17 +97,14 @@ services:
       - box_node_modules:/workspace/rhizome/node_modules
     working_dir: /workspace/rhizome
     environment:
-      - PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
-      - SQLITE_VEC_PATH=/usr/local/lib/sqlite-vec/vec0
-      - OLLAMA_URL=http://ollama-proxy:11434
-      - RHIZOME_BIND_ALL=1
+      <<: *common-env
+    # `required: false` lets the dependency be silently skipped when the
+    # `vec` profile isn't active (ollama service then isn't part of the
+    # project). Compose v2.20+.
     depends_on:
-      - ollama-proxy
-    extra_hosts:
-      - "host.docker.internal:0.0.0.0"
-    ports:
-      - "3006:3006"
-      - "9630:9630"
+      ollama:
+        condition: service_started
+        required: false
     stdin_open: true
     tty: true
 
@@ -91,6 +113,7 @@ volumes:
   m2_cache:
   npm_cache:
   claude_home:
+  ollama_models:
   cpcache:
   shadow_cache:
   node_modules:

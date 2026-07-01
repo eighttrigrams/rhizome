@@ -113,10 +113,15 @@
        (catch NumberFormatException _ (json-response 400 {:error "Invalid item ID"}))))
 
 (defn- context-extras-set
-  [{:keys [short-title sort-idx hide-in-global-search]}]
+  [{:keys [short-title human-readable-id sort-idx hide-in-global-search]}]
   (cond-> {}
     short-title
       (assoc :short_title [:inline short-title])
+    ;; Silently drop a digits-only human-readable-id — the rest of the create
+    ;; still goes through. (Read-side dispatcher uses the digit/non-digit split
+    ;; to route ?id=… so an all-digits handle here would be unreachable.)
+    (and (string? human-readable-id) (re-find #"\D" human-readable-id))
+      (assoc :human_readable_id [:inline human-readable-id])
     sort-idx
       (assoc :sort_idx [:inline sort-idx])
     (true? hide-in-global-search)
@@ -135,6 +140,8 @@
 (defn create-context
   "POST /rest/contexts — create a new context (item with is_context=true).
   JSON body: {\"title\" (required), \"short-title\" (optional),
+  \"human-readable-id\" (optional string — stable handle for GET /rest/items?id=…;
+  must be unique and contain at least one non-digit character),
   \"sort-idx\" (optional int), \"hide-in-global-search\" (optional bool — when
   true, the context is excluded from global contexts search). Gated by
   recording mode."
@@ -144,7 +151,7 @@
       (json-response 400 {:error "title is required"})
       (mw/log-and-guard
         "create-context"
-        (select-keys body [:title :short-title :sort-idx :hide-in-global-search])
+        (select-keys body [:title :short-title :human-readable-id :sort-idx :hide-in-global-search])
         (json-response 201 {:id nil :title (:title body)})
         (fn [] (create-context-impl db body))))))
 
@@ -219,80 +226,81 @@
              (json-response 500 {:error (.getMessage e)}))))))
 
 (defn- candidates-for-related-deletion
-  "Items that danger-mode 'delete related' targets, given the parent
-  item. Mirrors the in-app related-items search but with q forced empty:
-  honours the parent's stored view filters (selected secondary contexts,
-  inverted/unassigned flags, search-mode, description filter)."
-  [db parent]
-  (let [view (-> parent :data :views :current)
+  "Items that danger-mode 'delete related' targets, given the context the
+  operation runs from. Mirrors the in-app related-items search but with q
+  forced empty: honours the context's stored view filters (selected
+  secondary contexts, inverted/unassigned flags, search-mode, description
+  filter)."
+  [db context]
+  (let [view (-> context :data :views :current)
         opts (assoc (select-keys view
                                  [:secondary-contexts-inverted
                                   :secondary-contexts-unassigned-selected
                                   :selected-secondary-contexts
                                   :search-mode
                                   :description-filter])
-               :selected-item-id (:id parent))]
-    (search/search-related-items db "" (:id parent) opts {})))
+               :selected-item-id (:id context))]
+    (search/search-related-items db "" (:id context) opts {})))
 
 (defn- run-related-deletion!
-  "Walk the candidate items and call repository.deletion/delete-item for
-  each (with dry-run? when previewing). Returns the assembled response
-  body — same shape for preview and real delete so both endpoints stay
-  in lock-step."
-  [db parent dry-run?]
-  (let [items (candidates-for-related-deletion db parent)
-        results (mapv (fn [{:keys [id title] :as item}]
-                        (let [{:keys [status reason]}
-                                (repository.deletion/delete-item db item dry-run?)]
-                          (cond-> {:id id :title title :status status}
-                            reason (assoc :reason reason))))
-                      items)]
-    {:requested (count items)
-     :parent-id (:id parent)
-     :parent-title (:title parent)
-     :dry-run dry-run?
-     :results results}))
+  "Compute a cascading deletion plan for the context's secondary-filtered
+  items and (unless dry-run?) execute it. Returns the assembled response
+  body — same shape for preview and real delete so the two stay in
+  lock-step. Shape:
+    {:context-id, :context-title, :dry-run,
+     :primary  [{:id :title :status (\"deleted\"|\"skipped\") :reason?}]
+     :cascade  [{:id :title :status (\"deleted\"|\"skipped\") :reason?}]
+     :unlinked [{:id :title :keep-reasons [...] :unlinked-from [...]}]}"
+  [db context dry-run?]
+  (let [items (candidates-for-related-deletion db context)
+        plan (repository.deletion/plan-and-execute! db items dry-run? (:id context))]
+    (merge {:context-id (:id context)
+            :context-title (:title context)}
+           plan)))
 
 (defn ^:no-describe deletion-preview-related-items
   "GET /rest/items/:id/related/deletion-preview — read-only preview of
-  what POST /rest/items/:id/related/delete would do. Walks the same
-  per-item code path as the real delete (with dry-run? = true), so the
-  preview's :results — including which items would be skipped because
-  they have children, multiply-referenced files, etc. — match what an
-  actual delete would produce. Not gated. Unlisted (no /rest/describe)."
+  what POST /rest/items/:id/related/delete would do. :id is the context
+  the operation runs from. Walks the same planner (with dry-run? = true)
+  so the preview's three buckets — :primary, :cascade, :unlinked — match
+  what an actual delete would produce. Not gated. Unlisted (no
+  /rest/describe)."
   [db id]
-  (try (let [parent-id (Integer/parseInt id)
-             parent (datastore/get-item db {:id parent-id})]
-         (if-not (:id parent)
-           (json-response 404 {:error "parent item not found"})
-           (json-response (run-related-deletion! db parent true))))
+  (try (let [context-id (Integer/parseInt id)
+             context (datastore/get-item db {:id context-id})]
+         (if-not (:id context)
+           (json-response 404 {:error "context not found"})
+           (json-response (run-related-deletion! db context true))))
        (catch NumberFormatException _ (json-response 400 {:error "Invalid item ID"}))
        (catch Exception e
          (log/error e "REST API: deletion-preview-related-items failed")
          (json-response 500 {:error (.getMessage e)}))))
 
 (defn ^:no-describe delete-related-items
-  "POST /rest/items/:id/related/delete — delete every item that
-  /related/deletion-preview returns for the same parent. The server
-  recomputes the candidate set from the parent's stored view (q forced
-  empty, secondary contexts honoured) and walks the SAME per-item path
-  as the preview (just with dry-run? = false), so the two cannot drift.
-  Gated by recording mode: when off, the request is dropped with
-  :dropped true and an empty :results. Unlisted (no /rest/describe)."
+  "POST /rest/items/:id/related/delete — runs the cascade plan for the
+  context's secondary-filtered items and executes it. :id is the
+  context the operation runs from. Each item in the :primary bucket
+  (matching the context's stored view) is unlinked from every relation
+  it touches; neighbors are then re-classified — orphaned ones
+  cascade-delete (bucket :cascade), surviving ones land in :unlinked
+  with the reasons they were kept. Gated by recording mode: when off,
+  returns :dropped true and empty buckets. Unlisted (no /rest/describe)."
   [db id]
-  (try (let [parent-id (Integer/parseInt id)
-             parent (datastore/get-item db {:id parent-id})]
-         (if-not (:id parent)
-           (json-response 404 {:error "parent item not found"})
+  (try (let [context-id (Integer/parseInt id)
+             context (datastore/get-item db {:id context-id})]
+         (if-not (:id context)
+           (json-response 404 {:error "context not found"})
            (mw/log-and-guard
              "delete-related-items"
-             {:parent-id parent-id :parent-title (:title parent)}
-             (json-response {:parent-id parent-id
-                             :parent-title (:title parent)
+             {:context-id context-id :context-title (:title context)}
+             (json-response {:context-id context-id
+                             :context-title (:title context)
                              :dry-run false
-                             :results []
+                             :primary []
+                             :cascade []
+                             :unlinked []
                              :dropped true})
-             (fn [] (json-response (run-related-deletion! db parent false))))))
+             (fn [] (json-response (run-related-deletion! db context false))))))
        (catch NumberFormatException _ (json-response 400 {:error "Invalid item ID"}))
        (catch Exception e
          (log/error e "REST API: delete-related-items failed")

@@ -10,6 +10,9 @@
 
 (defn- get-short-title-el [] (.getElementById js/document "item-short-title"))
 
+(defn- get-human-readable-id-el []
+  (.getElementById js/document "item-human-readable-id"))
+
 (defn- get-annotation-el [] (.getElementById js/document "item-annotation"))
 
 (defn- get-sort-idx-el [] (.getElementById js/document "item-sort-idx"))
@@ -81,6 +84,11 @@
            [:input#item-short-title.line
             {:autoComplete :off :defaultValue (:short_title item) :placeholder "Short title"}]]
           [:div
+           [:input#item-human-readable-id.line
+            {:autoComplete :off
+             :defaultValue (:human_readable_id item)
+             :placeholder "Human-readable id (must contain a non-digit)"}]]
+          [:div
            [:input#item-annotation.line
             {:autoComplete :off :defaultValue (:annotation item) :placeholder "Annotation"}]]
           [:div
@@ -133,6 +141,7 @@
   {:context (cond-> {:id id
                      :title (.-value (get-title-el))
                      :short_title (.-value (get-short-title-el))
+                     :human_readable_id (.-value (get-human-readable-id-el))
                      :sort_idx (utils/display->sort-idx (.-value (get-sort-idx-el)))
                      :annotation (.-value (get-annotation-el))
                      :tags (.-value (get-tags-el))

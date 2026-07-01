@@ -3,9 +3,19 @@
             [honey.sql :as sql]
             [cheshire.core :as json]
             [cambium.core :as log]
+            [datastore.connection :as connection]
             [et.vp.ds.relations :as datastore.relations]
             [et.vp.ds.helpers :refer [un-namespace-keys post-process-base] :as helpers]
             [datastore.dialect :as dialect]))
+
+(defn clear-item-embedding!
+  "Drop the stored embedding (and any 'skipped' marker) for an item, so the
+   next backfill treats it as unembedded. Called on every description version
+   bump so the embedding tracks the latest text."
+  [db id]
+  (when connection/vec-available?
+    (jdbc/execute-one! db ["DELETE FROM items_vec WHERE item_id = ?" id]))
+  (jdbc/execute-one! db ["DELETE FROM items_vec_skipped WHERE item_id = ?" id]))
 
 (defn delete-date
   [db item-id]
@@ -235,7 +245,8 @@
     {:versions all-versions :total (count all-versions)}))
 
 (defn- update-item'
-  [db {:keys [id title short_title annotation sort_idx tags data hide_in_global_search] :as item}]
+  [db {:keys [id title short_title annotation sort_idx tags data hide_in_global_search]
+       :as item}]
   (let [old-item (get-item db item)
         old-data (:data old-item)
         data (if data
@@ -257,6 +268,14 @@
                :tags [:inline tags]
                :data [:inline (json/generate-string data)]
                :hide_in_global_search [:inline (boolean hide_in_global_search)]}
+              ;; Only touch human_readable_id when the caller actually supplied
+              ;; the key. A digits-only value is silently dropped (the rest of
+              ;; the update still goes through); blank/nil clears the column.
+              (when (contains? item :human_readable_id)
+                (let [v (:human_readable_id item)]
+                  (cond
+                    (or (nil? v) (clojure.string/blank? v)) {:human_readable_id [:inline nil]}
+                    (re-find #"\D" v) {:human_readable_id [:inline v]})))
               (when (some? sort_idx)
                 {:sort_idx
                    [:inline
@@ -297,6 +316,7 @@
                                           :updated_at_ctx (dialect/now-sql)}
                                     :where [:= :id [:inline id]]})
                        {:return-keys true})
+    (clear-item-embedding! db id)
     (get-item db {:id id})))
 
 (defn store-current-view

@@ -21,47 +21,62 @@
          (log/error e "REST API: search-contexts failed")
          (json-response 500 {:error (.getMessage e)}))))
 
-(defn find-contexts
-  "GET /rest/contexts?by-exact=title&q=Foo&q=Bar%20Baz — exact-match lookup of
-  global contexts (is_context true, hide-in-global-search false) by title.
-  The q param may be repeated to match any of several titles. URL-encode each
-  value; emojis and whitespace work when properly encoded.
+(defn- numeric-id? [s] (boolean (re-matches #"\d+" s)))
 
-  Returns 400 if q is missing or contains duplicates. Returns 404 if any
-  requested title is missing from the result, or if any title matches more
-  than one item — the response body lists :missing and :duplicates so callers
-  can repair the input."
-  [db q by-exact]
-  (try (if-not (= by-exact "title")
-         (json-response 400 {:error "only by-exact=title is supported"})
-         (let [titles (cond (nil? q) [] (sequential? q) (vec q) :else [q])
-               distinct-titles (vec (distinct titles))
-               repeated-in-request (vec (distinct (for [[t xs] (group-by identity titles)
-                                                        :when (> (count xs) 1)]
-                                                    t)))]
-           (cond (empty? titles)
-                   (json-response 400 {:error "by-exact=title requires at least one q"})
-                 (seq repeated-in-request)
-                   (json-response 400
-                                  {:error "duplicate titles in request"
-                                   :repeated repeated-in-request})
-                 :else
-                   (let [items (search/find-items-by-exact-titles
-                                 db distinct-titles {:exclude-hidden? true})
-                         by-title (group-by :title items)
-                         missing (vec (remove by-title distinct-titles))
-                         duplicates (vec (keep (fn [[t xs]] (when (> (count xs) 1) t))
-                                           by-title))]
-                     (if (or (seq missing) (seq duplicates))
-                       (json-response 404
-                                      {:error "titles do not correspond 1-to-1 with items"
-                                       :requested-count (count distinct-titles)
-                                       :found-count (count items)
-                                       :missing missing
-                                       :duplicates duplicates})
-                       (json-response (map item->api items)))))))
+(defn find-items
+  "GET /rest/items?id=Foo&id=Bar&id=123 — lookup items by id. The id parameter
+  may be repeated. A value that is all digits is matched against the items
+  primary key (parsed as an integer); a value with at least one non-digit
+  character is matched against the human-readable-id column. The two id
+  categories are dispatched to the data layer independently, so a column the
+  caller didn't ask for is never scanned.
+
+  Returns 400 if id is missing or any value is repeated. Returns 404 when an
+  id has no match, or when an id matches more than one item — the response
+  body lists :missing and :duplicates so callers can repair the input."
+  [db id]
+  (try (let [ids (cond (nil? id) [] (sequential? id) (vec id) :else [id])
+             distinct-ids (vec (distinct ids))
+             repeated (vec (distinct (for [[v xs] (group-by identity ids)
+                                           :when (> (count xs) 1)]
+                                       v)))]
+         (cond (empty? ids)
+                 (json-response 400 {:error "id is required (at least one value)"})
+               (seq repeated)
+                 (json-response 400 {:error "duplicate ids in request" :repeated repeated})
+               :else
+                 (let [{numeric true human-readable false}
+                         (group-by numeric-id? distinct-ids)
+                       numeric-ints (mapv #(Integer/parseInt %) (or numeric []))
+                       items (search/find-items-by-ids
+                               db {:numeric-ids numeric-ints
+                                   :human-readable-ids (or human-readable [])})
+                       by-numeric (group-by :id items)
+                       by-human (group-by :human_readable_id items)
+                       missing (vec (remove (fn [v]
+                                              (if (numeric-id? v)
+                                                (by-numeric (Integer/parseInt v))
+                                                (by-human v)))
+                                            distinct-ids))
+                       duplicates (vec (distinct
+                                         (concat (keep (fn [[k xs]]
+                                                         (when (and k (> (count xs) 1))
+                                                           (str k)))
+                                                       by-numeric)
+                                                 (keep (fn [[k xs]]
+                                                         (when (and k (> (count xs) 1))
+                                                           k))
+                                                       by-human))))]
+                   (if (or (seq missing) (seq duplicates))
+                     (json-response 404
+                                    {:error "ids do not correspond 1-to-1 with items"
+                                     :requested-count (count distinct-ids)
+                                     :found-count (count items)
+                                     :missing missing
+                                     :duplicates duplicates})
+                     (json-response (map item->api items))))))
        (catch Exception e
-         (log/error e "REST API: find-contexts failed")
+         (log/error e "REST API: find-items failed")
          (json-response 500 {:error (.getMessage e)}))))
 
 (defn get-item

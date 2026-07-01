@@ -251,3 +251,34 @@
       (is (true? (:hide_in_global_search (ds/get-item db {:id (:id ctx)}))))
       (ds/update-item db (assoc ctx :hide_in_global_search false))
       (is (false? (:hide_in_global_search (ds/get-item db {:id (:id ctx)})))))))
+
+(deftest human-readable-id-test
+  (test-with-reset-db-and-time "update-item persists :human_readable_id round-trip"
+    (let [ctx (ds/new-context db {:title "Books"})]
+      (is (nil? (:human_readable_id (ds/get-item db {:id (:id ctx)}))))
+      (ds/update-item db (assoc ctx :human_readable_id "books"))
+      (is (= "books" (:human_readable_id (ds/get-item db {:id (:id ctx)}))))
+      (ds/update-item db (assoc ctx :human_readable_id ""))
+      (is (nil? (:human_readable_id (ds/get-item db {:id (:id ctx)}))))))
+
+  (test-with-reset-db-and-time
+    "a digits-only :human_readable_id is dropped on the floor; title etc. still save"
+    (let [ctx (ds/new-context db {:title "Books"})]
+      (ds/update-item db (assoc ctx :human_readable_id "books"))
+      (ds/update-item db (-> ctx
+                             (assoc :title "Renamed")
+                             (assoc :human_readable_id "12345")))
+      (let [reloaded (ds/get-item db {:id (:id ctx)})]
+        (is (= "Renamed" (:title reloaded)) "title change persisted")
+        (is (= "books" (:human_readable_id reloaded))
+            "previous valid id stays — the digits-only attempt was ignored"))))
+
+  (test-with-reset-db-and-time "callers that don't supply :human_readable_id leave it untouched"
+    (let [ctx (ds/new-context db {:title "Books"})]
+      (ds/update-item db (assoc ctx :human_readable_id "books"))
+      (ds/update-item db (-> ctx
+                             (dissoc :human_readable_id)
+                             (assoc :title "Renamed")))
+      (let [reloaded (ds/get-item db {:id (:id ctx)})]
+        (is (= "Renamed" (:title reloaded)))
+        (is (= "books" (:human_readable_id reloaded)))))))

@@ -1,6 +1,5 @@
 (ns repository
   (:require [clojure.string :as str]
-            [mount.core :as mount]
             [et.vp.ds :as datastore]
             [et.vp.ds.search :as search]
             [et.vp.ds.relations :as datastore.relations]
@@ -76,12 +75,6 @@
   ([db q selected-item opts]
    (let [[selected-item-id opts] (simplify-params (assoc opts :selected-item selected-item))]
      (search/search-related-items db q selected-item-id opts {}))))
-
-(mount/defstate repository
-                :start (do (tap> [:resources :up 2])
-                           [{:id 1 :name "one"} {:id 2 :name "two"}
-                            {:id 3 :name "three" :protected true}])
-                :stop (do (tap> [:resources :down]) nil))
 
 (defn- log-opts
   [{:keys [cmd q active-search] :as _opts}]

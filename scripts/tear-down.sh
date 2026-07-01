@@ -2,12 +2,12 @@
 
 echo "=== Tearing down Rhizome development instance ==="
 
-# Kill backend (port 3006)
-if lsof -ti:3006 > /dev/null 2>&1; then
-    echo "Stopping backend on port 3006..."
-    lsof -ti:3006 | xargs kill -9 2>/dev/null
+# Kill backend (port 3140)
+if lsof -ti:3140 > /dev/null 2>&1; then
+    echo "Stopping backend on port 3140..."
+    lsof -ti:3140 | xargs kill -9 2>/dev/null
 else
-    echo "No backend running on port 3006"
+    echo "No backend running on port 3140"
 fi
 
 # Kill shadow-cljs watch processes

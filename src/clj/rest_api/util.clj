@@ -18,14 +18,15 @@
 
 
 (defn item->api
-  [{:keys [id title short_title description is_context data inserted_at updated_at date
-           annotation hide_in_global_search]}]
+  [{:keys [id title short_title human_readable_id description is_context data inserted_at updated_at
+           date annotation hide_in_global_search]}]
   (cond-> {:id id
            :title title
            :short-title short_title
            :is-context (helpers/int->bool is_context)
            :inserted-at inserted_at
            :updated-at updated_at}
+    human_readable_id (assoc :human-readable-id human_readable_id)
     description (assoc :description description)
     date (assoc :date date)
     annotation (assoc :annotation annotation)

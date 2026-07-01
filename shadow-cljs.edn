@@ -8,10 +8,8 @@
   [reagent "2.0.1"]
   [net.eighttrigrams/defn-over-http "0.2.0"]]
  
- :dev-http
- {8020 {:root      "resources/public"
-        :proxy-url "http://localhost:3006"}}
-
+ :http {:port #shadow/env ["SHADOW_PORT" :as :int :default 9804]}
+ 
  :builds
  {:app
   {:target :browser

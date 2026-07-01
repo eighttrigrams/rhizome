@@ -1,6 +1,6 @@
 (ns repository.insertion.substack-external
   (:require [repository.insertion.substack :as substack]
-            [datastore.config :as config]))
+            [config :as config]))
 
 (defn match?
   [title]

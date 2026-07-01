@@ -16,8 +16,12 @@
              (let [orig-file-name file-name
                    file-name (if-not (empty? extra) (str extra " " orig-file-name) orig-file-name)]
                (when (home/supported-file-type? file-name)
-                 (when-not (empty? extra) (home/ren orig-file-name file-name))
-                 (log/info (str "Importing " file-name " ... "))
-                 (try (file/ingest db file-name #{import-id} nil)
-                      (home/move-file file-name)
-                      (catch Exception e (log/error (.getMessage e))))))))))
+                 (if-not (home/importable? file-name)
+                   (log/warn (str "Skipping " orig-file-name
+                                  " -- its destination folder does not exist; left in imports."))
+                   (do
+                     (when-not (empty? extra) (home/ren orig-file-name file-name))
+                     (log/info (str "Importing " file-name " ... "))
+                     (try (file/ingest db file-name #{import-id} nil)
+                          (home/move-file file-name)
+                          (catch Exception e (log/error (.getMessage e))))))))))))

@@ -1,23 +1,24 @@
 (ns server
-  (:require [ring.adapter.jetty :as j]
+  (:require log-init ;; first: sets LOGS_DIR before any logging ns initialises logback
+            [ring.adapter.jetty :as j]
             upload
             [clojure.string :as str]
             [compojure.core :refer [context GET POST PUT]]
             [ring.util.response :as response]
             [ring.middleware.json :as json]
             [env :refer [wrap-env-defaults]]
-            [mount.core :as mount]
-            [datastore.config :as config]
+            [config :as config]
+            [dev-seed :as dev-seed]
             [datastore.schema :as schema]
             [next.jdbc :as jdbc]
             [repository :as r]
+            [repository.insertion.file :as file]
             [et.vp.ds :as datastore]
             opener
             dispatch
             rest-api
             [cambium.core :as log]
             [ring.middleware.resource :refer [wrap-resource]]
-            [ring.middleware.file :refer [wrap-file]]
             [ring.middleware.multipart-params :refer [wrap-multipart-params]]
             [ring.middleware.params :refer [wrap-params]]
             [clojure.java.io :as io])
@@ -61,10 +62,34 @@
     ;; Process the uploaded file here. For example, save it to a directory.
     (response/response "File uploaded successfully!")))
 
-(def homefolder
-  (-> (config/ds)
-      :folders
-      :homefolder))
+;; The directories configured under :folders are served beneath the /imgs URL
+;; prefix by wrap-imgs (used in both dev and prod): :images backs /imgs/*
+;; (tracked originals) and :preview-images backs /imgs/Preview/* (generated
+;; previews), so no symlinks are needed. In prod both are validated to exist at
+;; config load time; in dev they are hardcoded under ./files/ (see config).
+(def ^:private images-folder
+  (-> config/config :folders :images))
+
+(def ^:private preview-images-folder
+  (-> config/config :folders :preview-images))
+
+(defn- wrap-imgs
+  "Serve files under the /imgs/* URL prefix from the filesystem: /imgs/Preview/*
+  from preview-images-folder, everything else under /imgs/* from images-folder.
+  file-response's :root guards against directory traversal."
+  [handler images-folder preview-images-folder]
+  (fn [req]
+    (let [uri (:uri req)]
+      (cond
+        (str/starts-with? uri "/imgs/Preview/")
+        (or (response/file-response (subs uri (count "/imgs/Preview")) {:root preview-images-folder})
+            {:status 404 :body "Not Found"})
+
+        (str/starts-with? uri "/imgs/")
+        (or (response/file-response (subs uri (count "/imgs")) {:root images-folder})
+            {:status 404 :body "Not Found"})
+
+        :else (handler req)))))
 
 (defn- img-by-id-handler
   [{{:keys [item-id]} :route-params}]
@@ -73,16 +98,14 @@
              title (:title item)
              resource-links (:resource-links data)]
          (cond (:image resource-links)
-                 (let [path (str homefolder "Pictures/Tracked/" (:image resource-links))
-                       file (io/file path)]
+                 (let [file (io/file images-folder (:image resource-links))]
                    (if (.exists file)
-                     (response/file-response path)
+                     (response/file-response (str file))
                      {:status 404 :body "Image file not found"}))
                (and title (re-matches #".*\.(png|jpg|jpeg|PNG|JPG|JPEG)$" title))
-                 (let [path (str homefolder "Pictures/Tracked/" title)
-                       file (io/file path)]
+                 (let [file (io/file images-folder title)]
                    (if (.exists file)
-                     (response/file-response path)
+                     (response/file-response (str file))
                      {:status 404 :body "Image file not found"}))
                :else {:status 404 :body "Item has no image"}))
        (catch Exception e
@@ -112,42 +135,67 @@
     (GET "/" [] (response/resource-response "public/index.html"))
     (fn [req] (log/warn (str "File not found:" (:uri req))) {:status 404 :body "Not Found"})))
 
-(def dev?
-  (true? (-> (config/ds)
-             :dev?)))
-
 (defn app
   []
-  (let [pipeline (if dev?
-                   #(-> %
-                        (wrap-resource "public" {:allow-symlinks? true}))
-                   #(-> %
-                        (wrap-resource "public")
-                        (wrap-file "./public" {:allow-symlinks? true})))]
-    (-> (routes)
-        wrap-env-defaults
-        pipeline
-        wrap-params
-        wrap-multipart-params)))
+  (-> (routes)
+      wrap-env-defaults
+      (wrap-resource "public")
+      (wrap-imgs images-folder preview-images-folder)
+      wrap-params
+      wrap-multipart-params))
 
-(mount/defstate ^{:on-reload :noop} http-server
-                :start (do (prn "config valid??" config/config)
-                           (when (and (not (:dev? config/config))
-                                      (or (nil? (:private-addr config/config))
-                                          (not (string? (:private-addr config/config)))))
-                             (throw (Exception. "config invalid")))
-                           (schema/apply-schema! (:db config/config))
-                           (let [host (or (:bind-host config/config)
-                                          (when (and (:dev? config/config)
-                                                     (= "1" (System/getenv "RHIZOME_BIND_ALL")))
-                                            "0.0.0.0")
-                                          "127.0.0.1")]
-                             (future (j/run-jetty (app) {:port (:port config/config)
-                                                         :host host}))))
-                :stop 0)
+(defn check-folders-exist!
+  "Startup filesystem gate, run once logging is configured (config load itself
+   must stay logging-dependency-free -- see log-init -- so this lives here, not
+   in config). Walks every configured folder and:
+   - logs a warn for each one that is missing on disk;
+   - additionally refuses to start (error + throw) when :preview-images is
+     missing -- previews are written by uploads and scrapers and back
+     /imgs/Preview/*, so the app cannot function without it.
+   The other folders (:imports :audio :video :docs :images) are soft: a missing
+   one only disables the matching slice of import/deletion at runtime (each of
+   those paths logs its own warn), and may just be a temporarily-unmounted
+   drive, so we warn and carry on."
+  []
+  (doseq [k config/folder-keys]
+    (let [dir (get-in config/config [:folders k])]
+      (when-not (.isDirectory (io/file dir))
+        (log/warn (str "Configured folder " k " does not exist: " dir))
+        (when (= k :preview-images)
+          (let [msg (str "Refusing to start: :preview-images folder does not exist: " dir)]
+            (log/error msg)
+            (throw (ex-info msg {:folder dir}))))))))
+
+(defn start-http-server!
+  []
+  (when (and (not (:dev? config/config))
+             (or (nil? (:private-addr config/config))
+                 (not (string? (:private-addr config/config)))))
+    (throw (Exception. "config invalid")))
+  (upload/ensure-convert!)
+  (schema/apply-schema! (:db config/config))
+  (dev-seed/maybe-seed! {:db         (:db config/config)
+                         :dev?       (:dev? config/config)
+                         :e2e?       (:e2e? config/config)
+                         :skip-seed? (:skip-seed? config/config)})
+  ;; A missing file-type context silently drops files of that type on import,
+  ;; so refuse to come up unless every named id is present. The only exemption
+  ;; is a completely empty db: e2e runs against one by design, and a fresh
+  ;; prod/dev db was just seeded above (so it won't read as empty here unless
+  ;; seeding was deliberately skipped).
+  (when-not (or (:e2e? config/config)
+                (dev-seed/items-empty? (:db config/config)))
+    (file/ensure-contexts! (:db config/config)))
+  ;; Filesystem gate: warn on any missing folder, refuse to start without
+  ;; :preview-images. Skipped under e2e -- it runs in CI where the gitignored
+  ;; ./files/* dev folders don't exist (same exemption ensure-contexts! uses).
+  (when-not (:e2e? config/config)
+    (check-folders-exist!))
+  (let [host (or (:bind-host config/config)
+                 (if (:dev? config/config) "0.0.0.0" "127.0.0.1"))]
+    (future (j/run-jetty (app) {:port (:port config/config)
+                                :host host}))))
 
 (defn -main
   [& _args]
-  (prn (mount/start))
-  (.addShutdownHook (Runtime/getRuntime) (Thread. #(prn (mount/stop))))
-  (deref http-server))
+  (deref (start-http-server!)))

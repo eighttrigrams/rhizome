@@ -8,9 +8,9 @@
     </encoder>
   </appender>
   <appender name="ROLLING" class="ch.qos.logback.core.rolling.RollingFileAppender">
-    <file>logs/tracker.log</file>
+    <file>${LOGS_DIR:-logs}/tracker.log</file>
     <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-      <fileNamePattern>logs/tracker-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+      <fileNamePattern>${LOGS_DIR:-logs}/tracker-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
        <maxFileSize>1MB</maxFileSize>
        <maxHistory>1</maxHistory>
        <totalSizeCap>2MB</totalSizeCap>
@@ -20,9 +20,9 @@
     </encoder>
   </appender>
   <appender name="REST-API" class="ch.qos.logback.core.rolling.RollingFileAppender">
-    <file>logs/rest-api.log</file>
+    <file>${LOGS_DIR:-logs}/rest-api.log</file>
     <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-      <fileNamePattern>logs/rest-api-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+      <fileNamePattern>${LOGS_DIR:-logs}/rest-api-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
        <maxFileSize>5MB</maxFileSize>
        <maxHistory>3</maxHistory>
        <totalSizeCap>20MB</totalSizeCap>

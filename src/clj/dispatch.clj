@@ -1,7 +1,7 @@
 (ns dispatch
   (:require [net.eighttrigrams.defn-over-http.core :refer [defdispatch]]
             [cambium.core :as log]
-            [datastore.config :as config]
+            [config :as config]
             [repository :refer
              [list-resources insert-item insert-context change-secondary-contexts-selection
               change-secondary-contexts-unassigned-selected change-secondary-contexts-inverted
