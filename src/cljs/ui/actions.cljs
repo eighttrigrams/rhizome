@@ -232,13 +232,19 @@
 (defn fetch-item-description!
   [*state item]
   ;; Reset description version index when fetching a new item
-  (js/console.log "fetch-item-description! called with item:" (clj->js item))
   (swap! *state assoc :description-version-idx 0)
-  (fetch-and-reset-with-method! *state
-                                @*state
-                                api/fetch-item-description
-                                item
-                                :dont-reset-preview-item))
+  ;; This runs on hover (on-mouse-enter). Merge ONLY the fetched description into the
+  ;; current preview-item; never reset! the whole app state from a now-snapshot. The
+  ;; fetch can resolve *after* the user has already clicked/selected another item, and
+  ;; a full reset from the stale hover snapshot would clobber that selection's :items /
+  ;; :selected-item (the observed racy empty/stale related-items list). Guarding on the
+  ;; preview-item id also drops a resolution for an item the pointer has since left.
+  (-> (api/fetch-item-description @*state item)
+      (.then (fn [result]
+               (when (and (not (:ignore-item-description result))
+                          (= (:id (:preview-item @*state)) (:id item)))
+                 (swap! *state assoc-in [:preview-item :description]
+                        (:item-description result)))))))
 
 (defn open-annotation-edit-modal!
   [*state item]
