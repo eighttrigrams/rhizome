@@ -10,7 +10,7 @@
 
 (defn reset-state!
   [new-state *state]
-  (when new-state ;; could be because ignore-item-description
+  (when new-state ;; defensive: nothing to install when there's no new state
     ;; Preserve modal state when resetting, but only if new-state doesn't explicitly close it
     (let [current-modal (:modal @*state)
           new-state-has-modal? (contains? new-state :modal)
@@ -23,17 +23,12 @@
                                    (assoc :annotation-edit-item current-annotation-edit-item)))))))
 
 (defn- update-state
-  [{:keys [items contexts aggregated-contexts item-description ignore-item-description] :as i}
-   state]
-  (cond ignore-item-description nil
-        item-description (let [state (if (map? state) state @state)
-                               state (assoc-in state [:preview-item :description] item-description)]
-                           state)
-        :else (merge (if (map? state) state @state)
-                     i
-                     {:items (if items items (:items state))
-                      :contexts (or contexts (:contexts state))}
-                     (when aggregated-contexts {:aggregated-contexts aggregated-contexts}))))
+  [{:keys [items contexts aggregated-contexts] :as i} state]
+  (merge (if (map? state) state @state)
+         i
+         {:items (if items items (:items state))
+          :contexts (or contexts (:contexts state))}
+         (when aggregated-contexts {:aggregated-contexts aggregated-contexts})))
 
 (defn- list-resources [state] (api/list-resources (dissoc state :items :contexts)))
 
@@ -67,15 +62,12 @@
 (defn fetch-and-reset-with-method!
   [*state state method & args]
   (let [state''' (if (map? state) state @state)
-        state' (assoc state'''
-                 :loading (if (= :dont-reset-preview-item (last args)) (:loading state''') true)
-                 :preview-item
-                   (if (= :dont-reset-preview-item (last args)) (:preview-item state''') nil))]
+        state' (assoc state''' :loading true :preview-item nil)]
     (reset! *state state')
     (go (-> (apply fetch-resources-with-method
                    (if (map? state) state' state)
                    method
-                   (if (= :dont-reset-preview-item (last args)) (drop-last args) args))
+                   args)
             <!
             (reset-state! *state)
             (dissoc-loading *state)))))
