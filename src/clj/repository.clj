@@ -336,6 +336,22 @@
         {:items (semsearch/search-related-items-vector
                   db q selected-item-id (assoc search-opts :limit limit))}))))
 
+(defn vector-threshold-search-related-items
+  "Blue-mode: original-order related items filtered by a cosine-similarity
+   threshold, computed entirely in the backend. Reads :vector-threshold from
+   state (nil -> snap to the query's max similarity, only top ties). Returns
+   {:items ... :vector-threshold ... :vector-max-similarity ...
+    :vector-min-similarity ...} so the slider can position itself."
+  [{:keys [db]}]
+  (fn [{:keys [selected-item q vector-threshold] :as opts}]
+    (if (or (nil? q) (str/blank? q))
+      {:items [] :vector-threshold nil :vector-max-similarity nil :vector-min-similarity nil}
+      (let [[selected-item-id search-opts]
+              (simplify-params (assoc opts :selected-item selected-item))]
+        (semsearch/search-related-items-vector-threshold
+          db q selected-item-id
+          (assoc search-opts :threshold vector-threshold :limit limit))))))
+
 (defn start-linking-selected-item-to-context-with-local-search
   [db opts]
   (log/info "start-linking-selected-item-to-context-with-local-search ")

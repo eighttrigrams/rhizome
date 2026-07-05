@@ -114,29 +114,65 @@
          [:items.sort_idx (if (= 2 search-mode) :asc :desc)]
          [:items.updated_at (if (= 1 search-mode) :asc :desc)])))])
 
-(defn search-related-items
+(defn- related-items-query-map
+  "HoneySQL map for related-items retrieval.
+
+   Vector opts (all optional, only meaningful when :vector-qjson is set):
+   - :vector-qjson              INNER JOIN items_vec + enable the cosine
+                                distance expression (green/blue).
+   - :vector-keep-order?        keep the search-mode ordering instead of
+                                ranking by cosine distance (blue mode:
+                                original order, no re-rank).
+   - :vector-select-similarity? add a `1 - cosine_distance AS similarity`
+                                column to the projection.
+   - :vector-max-distance       only return rows whose cosine distance is
+                                <= this value (i.e. similarity >= threshold)."
   [q
    {:keys [selected-item-id join-ids search-mode unassigned-mode? inverted-mode?
-           description-filter vector-qjson]
+           description-filter vector-qjson vector-keep-order? vector-select-similarity?
+           vector-max-distance]
     :as _opts} {:keys [limit] :as _ctx}]
   (let [or-mode? (when join-ids inverted-mode?)
+        distance [:vec_distance_cosine :items_vec.embedding vector-qjson]
         joins (cond-> [:relations [:= :items.id :relations.target_id]]
                 vector-qjson (into [:items_vec [:= :items.id :items_vec.item_id]]))
-        ordering (if vector-qjson
-                   [[[:vec_distance_cosine :items_vec.embedding vector-qjson] :asc]]
-                   (order-by search-mode))]
-    (-> (merge {:select (vec (concat select [:relations.annotation]))
-                :from :items
-                :where [:and
-                        (when (or join-ids unassigned-mode?)
-                          (if or-mode?
-                            (or-query join-ids unassigned-mode?)
-                            (and-query join-ids unassigned-mode? inverted-mode?)))
-                        (get-search-clause q) (get-events-exist-clause search-mode)
-                        (get-description-filter-clause description-filter)
-                        [:= :relations.owner_id [:raw selected-item-id]]
-                        (when (or (= 2 search-mode) (= 3 search-mode)) [:<> :sort_idx -1])]}
-               {:order-by ordering}
-               (when limit {:limit limit})
-               {:join joins})
+        ordering (if (and vector-qjson (not vector-keep-order?))
+                   [[distance :asc]]
+                   (order-by search-mode))
+        projection (cond-> (vec (concat select [:relations.annotation]))
+                     (and vector-qjson vector-select-similarity?)
+                     (conj [[:- 1 distance] :similarity]))]
+    (merge {:select projection
+            :from :items
+            :where [:and
+                    (when (or join-ids unassigned-mode?)
+                      (if or-mode?
+                        (or-query join-ids unassigned-mode?)
+                        (and-query join-ids unassigned-mode? inverted-mode?)))
+                    (get-search-clause q) (get-events-exist-clause search-mode)
+                    (get-description-filter-clause description-filter)
+                    [:= :relations.owner_id [:raw selected-item-id]]
+                    (when (or (= 2 search-mode) (= 3 search-mode)) [:<> :sort_idx -1])
+                    (when (and vector-qjson vector-max-distance)
+                      [:<= distance vector-max-distance])]}
+           {:order-by ordering}
+           (when limit {:limit limit})
+           {:join joins})))
+
+(defn search-related-items
+  [q opts ctx]
+  (sql/format (related-items-query-map q opts ctx)))
+
+(defn vector-similarity-bounds
+  "SQL for the MIN and MAX cosine distance over the embedded related items,
+   reusing the exact relational filters of the related-items query (so the
+   bounds match the set the threshold query filters). Distances map to
+   similarities via similarity = 1 - distance; hence min distance -> max
+   similarity and max distance -> min similarity. Over an empty set both
+   aggregates are NULL."
+  [q {:keys [vector-qjson] :as opts}]
+  (let [distance [:vec_distance_cosine :items_vec.embedding vector-qjson]]
+    (-> (related-items-query-map q (dissoc opts :vector-max-distance) {})
+        (assoc :select [[[:min distance] :min_distance] [[:max distance] :max_distance]])
+        (dissoc :order-by :limit)
         sql/format)))

@@ -47,7 +47,8 @@
                  (re-focus)
                  (swap! *state dissoc :q))
                (when (and (:active-search old-state) (not (:active-search new-state)))
-                 (swap! *state dissoc :vector-search-mode?)))))
+                 (swap! *state dissoc :vector-mode :vector-threshold
+                        :vector-max-similarity :vector-min-similarity)))))
 
 (defn component
   []

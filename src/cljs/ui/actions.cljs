@@ -3,6 +3,7 @@
              [fetch-and-reset! fetch-and-reset-with-method! fetch-and-reset-with-method-2!]]
             api
             [goog.async.Debouncer]
+            utils
             [ui.main.rhs.modifiers :as modifiers]))
 
 (defn fetch! [*state] (fetch-and-reset! *state @*state))
@@ -198,12 +199,41 @@
 (defn vector-search! [*state]
   (fetch-and-reset-with-method! *state @*state api/vector-search-related-items))
 
-(defn toggle-vector-search-mode!
+(defn vector-threshold-search!
+  "Blue-mode fetch triggered by entering the mode or changing the query.
+   Snaps the threshold to the query's max similarity by clearing
+   :vector-threshold; the backend returns the effective threshold and the
+   similarity bounds, which merge back into state (positioning the slider)."
   [*state]
-  (swap! *state update :vector-search-mode? not)
-  (if (:vector-search-mode? @*state)
-    (vector-search! *state)
-    (search! *state)))
+  (swap! *state assoc :vector-threshold nil)
+  (fetch-and-reset-with-method! *state @*state api/vector-threshold-search-related-items))
+
+(defn- vector-threshold-fetch! [*state]
+  (fetch-and-reset-with-method! *state @*state api/vector-threshold-search-related-items))
+
+(def ^:private vector-threshold-fetch-debounced! (utils/debounce vector-threshold-fetch! 120))
+
+(defn set-vector-threshold!
+  "Slider handler: set the threshold immediately (so the thumb tracks) and
+   issue a debounced backend query with it. Filtering happens server-side."
+  [*state v]
+  (swap! *state assoc :vector-threshold v)
+  (vector-threshold-fetch-debounced! *state))
+
+(defn toggle-vector-search-mode!
+  "Cycle the vector search mode: off -> green (re-rank by similarity) ->
+   blue (original order + similarity threshold filter) -> off."
+  [*state]
+  (let [next-mode (case (:vector-mode @*state)
+                    :green :blue
+                    :blue  nil
+                    :green)]
+    (swap! *state assoc :vector-mode next-mode)
+    (case next-mode
+      :green (vector-search! *state)
+      :blue  (vector-threshold-search! *state)
+      (do (swap! *state dissoc :vector-threshold :vector-max-similarity :vector-min-similarity)
+          (search! *state)))))
 
 (defn change-secondary-contexts-selection!
   [*state]

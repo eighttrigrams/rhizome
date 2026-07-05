@@ -102,6 +102,22 @@
          (not (:secondary-contexts-inverted opts)))
       (assoc :secondary-contexts-unassigned-selected nil)))
 
+(defn- ->core-opts
+  "Translate a (already modify'd) repository opts map into the shape
+   core/related-items-query-map expects. Vector keys pass through untouched
+   (nil for non-vector callers -> identical SQL to before)."
+  [selected-item-id search-mode opts]
+  {:selected-item-id selected-item-id
+   :search-mode search-mode
+   :unassigned-mode? (:secondary-contexts-unassigned-selected opts)
+   :join-ids (join-ids opts)
+   :inverted-mode? (:secondary-contexts-inverted opts)
+   :description-filter (:description-filter opts)
+   :vector-qjson (:vector-qjson opts)
+   :vector-keep-order? (:vector-keep-order? opts)
+   :vector-select-similarity? (:vector-select-similarity? opts)
+   :vector-max-distance (:vector-max-distance opts)})
+
 (defn search-related-items
   [db q selected-item-id {:keys [link-item search-mode] :as opts} {:keys [limit] :as ctx}]
   (when link-item
@@ -109,23 +125,42 @@
   (when-not selected-item-id
     (throw (IllegalArgumentException. "selected-context-id must not be nil")))
   (let [opts (modify opts)
-        items (do-query db
-                        (core/search-related-items
-                          q
-                          {:selected-item-id selected-item-id
-                           :search-mode search-mode
-                           :unassigned-mode? (:secondary-contexts-unassigned-selected opts)
-                           :join-ids (join-ids opts)
-                           :inverted-mode? (:secondary-contexts-inverted opts)
-                           :description-filter (:description-filter opts)
-                           :vector-qjson (:vector-qjson opts)}
-                          ctx))
+        items (do-query db (core/search-related-items q (->core-opts selected-item-id search-mode opts) ctx))
         results (->> (seq items)
                      (map post-process)
                      (map post-process-contexts))]
     (when (and limit (> (count results) limit))
       (throw (Exception. "got more results than 'limit' allows. impl broken!")))
     results))
+
+(defn search-related-items-vector-threshold
+  "Blue-mode retrieval. Same relational filters + INNER JOIN items_vec as
+   search-related-items, but keeps the original (search-mode) ordering,
+   annotates each row with cosine :similarity, and returns only rows whose
+   cosine distance is <= (:vector-max-distance opts) (i.e. similarity above
+   the threshold). Requires :vector-qjson in opts."
+  [db q selected-item-id {:keys [search-mode] :as opts} {:keys [limit] :as ctx}]
+  (when-not selected-item-id
+    (throw (IllegalArgumentException. "selected-context-id must not be nil")))
+  (let [opts (-> (modify opts)
+                 (assoc :vector-keep-order? true :vector-select-similarity? true))
+        rows (do-query db (core/search-related-items q (->core-opts selected-item-id search-mode opts) ctx))
+        results (->> (seq rows)
+                     (map post-process)
+                     (map post-process-contexts))]
+    (when (and limit (> (count results) limit))
+      (throw (Exception. "got more results than 'limit' allows. impl broken!")))
+    results))
+
+(defn vector-similarity-bounds
+  "Return {:min_distance <d-or-nil> :max_distance <d-or-nil>}: the cosine
+   distance extent over the embedded related items (identical filters to
+   search-related-items). Both nil when no related item is embedded.
+   Requires :vector-qjson in opts."
+  [db q selected-item-id {:keys [search-mode] :as opts}]
+  (let [opts (modify opts)
+        row (jdbc/execute-one! db (core/vector-similarity-bounds q (->core-opts selected-item-id search-mode opts)))]
+    (un-namespace-keys row)))
 
 (defn- try-parse [item] (try (Integer/parseInt item) (catch Exception _e nil)))
 

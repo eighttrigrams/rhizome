@@ -8,8 +8,9 @@
 (defn save-input!
   [[*state evt]]
   (swap! *state assoc :q (.-value (or (.-target evt) evt)))
-  (if (:vector-search-mode? @*state)
-    (actions/vector-search! *state)
+  (case (:vector-mode @*state)
+    :green (actions/vector-search! *state)
+    :blue  (actions/vector-threshold-search! *state)
     (actions/search! *state)))
 
 (def save-input-debounced! (utils/debounce save-input! 180))
@@ -22,7 +23,10 @@
                              (.focus (key-handler/get-title-el)))
      :render (fn [] [:input#search-input
                      {:autoComplete :off
-                      :class (when (:vector-search-mode? @*state) "vector-search-mode")
+                      :class (case (:vector-mode @*state)
+                               :green "vector-search-mode"
+                               :blue "vector-search-mode blue"
+                               nil)
                       :spellCheck false
                       :on-change #(save-input-debounced! [*state %])
                       :on-paste #(save-input-debounced! [*state %])
@@ -35,7 +39,7 @@
                       ;; hit never becomes the selected item. Doing nothing on blur lets
                       ;; select-item! run uncontested — exactly like a normal item-search
                       ;; click. The :active-search->nil transition that selecting causes
-                      ;; already clears :vector-search-mode? via the add-watch in ui.cljs;
+                      ;; already clears :vector-mode via the add-watch in ui.cljs;
                       ;; a blur that doesn't select leaves the mode intact (vector list +
                       ;; vector label stay consistent).
                       :on-key-down #(if (= "Backspace" (.-code %))

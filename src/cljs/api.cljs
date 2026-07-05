@@ -71,3 +71,5 @@
 (defn-over-http update-annotations :return-value {})
 
 (defn-over-http vector-search-related-items :return-value {})
+
+(defn-over-http vector-threshold-search-related-items :return-value {})

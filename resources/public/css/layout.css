@@ -50,3 +50,42 @@ html, body {
     outline: 2px solid #2ecc71;
     outline-offset: -2px;
 }
+
+#search-input.vector-search-mode.blue {
+    outline-color: #3498db;
+}
+
+#vector-threshold-panel {
+    /* fixed (not absolute): #sides-container is a centered fixed-width block
+       whose left edge goes negative when the viewport is < 1440px, which
+       would push an absolutely-positioned child off the left edge. Anchor to
+       the viewport so the panel is always fully in view over the LHS. */
+    position: fixed;
+    left: 8px;
+    top: 8px;
+    width: 260px;
+    z-index: 1006;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    background: rgba(20, 20, 20, 0.92);
+    border: 2px solid #3498db;
+    border-radius: 6px;
+    color: #cbc9b5;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.vector-threshold-readout {
+    font-size: 13px;
+    margin-bottom: 8px;
+    font-variant-numeric: tabular-nums;
+}
+
+.vector-threshold-value {
+    color: #5dade2;
+    font-weight: 600;
+}
+
+#vector-threshold-slider {
+    width: 100%;
+    accent-color: #3498db;
+}
