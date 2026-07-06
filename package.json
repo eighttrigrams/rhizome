@@ -5,7 +5,7 @@
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "playwright-bdd": "^8.4.2",
-    "shadow-cljs": "2.20.15"
+    "shadow-cljs": "3.4.11"
   },
   "scripts": {
     "e2e": "bddgen --config test/playwright.config.ts && playwright test -c test/playwright.config.ts"
