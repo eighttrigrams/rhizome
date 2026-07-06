@@ -3,7 +3,7 @@
   "permissions": {
     "allow": [
       "Read(//var/folders/**/NSIRD_screencaptureui_*/**)",
-      "Bash(curl -sf http://127.0.0.1:3006/rest/describe)",
+      "Bash(curl -sf http://127.0.0.1:3140/rest/describe)",
       "Bash(clj -M:test:*)",
       "Bash(clojure -X:test:*)",
       "Bash(psql cometoid_dev *)",
