@@ -239,17 +239,17 @@
         (is (some #(= "The Prize" (:title %)) body))))))
 
 (defn- unit-vec
-  "Returns a 768-dim vector that is 1.0 at position `i` and 0 elsewhere.
-   Each i gives an axis orthogonal to the others."
+  "Returns an embedding-dim vector that is 1.0 at position `i` and 0
+   elsewhere. Each i gives an axis orthogonal to the others."
   [i]
-  (into [] (for [k (range 768)] (if (= k i) 1.0 0.0))))
+  (into [] (for [k (range embedder/embedding-dim)] (if (= k i) 1.0 0.0))))
 
 (deftest ^:vector get-related-items-vector-test
     (test-with-fresh-db "ranks items by cosine distance to the embedded query"
       (let [texts-to-vecs {"The Prize"             (unit-vec 0)
                            "Sapiens"               (unit-vec 1)
                            "Cartesian Linguistics" (unit-vec 2)
-                           "history of oil"        (unit-vec 0)}
+                           (str embedder/query-prefix "history of oil") (unit-vec 0)}
             stub-embed (fn [text]
                          (or (get texts-to-vecs text)
                              (throw (ex-info "unexpected embed input" {:text text}))))]

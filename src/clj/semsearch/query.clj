@@ -13,7 +13,7 @@
   [db q selected-id {:keys [limit] :as opts}]
   (when (str/blank? q)
     (throw (IllegalArgumentException. "vector search requires non-empty q")))
-  (let [qjson (embedder/vec->json (embedder/embed-text q))]
+  (let [qjson (embedder/vec->json (embedder/embed-query q))]
     (search/search-related-items
       db "" selected-id
       (assoc opts :vector-qjson qjson)
@@ -51,7 +51,7 @@
   [db q selected-id {:keys [threshold limit] :as opts}]
   (if (str/blank? q)
     empty-threshold-result
-    (let [qjson (embedder/vec->json (embedder/embed-text q))
+    (let [qjson (embedder/vec->json (embedder/embed-query q))
           opts (-> opts (dissoc :threshold :limit) (assoc :vector-qjson qjson))
           {:keys [min_distance max_distance]} (search/vector-similarity-bounds db "" selected-id opts)]
       (if (nil? min_distance)

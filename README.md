@@ -80,7 +80,7 @@ make yolo WITH_VEC=1
 
 ```bash
 brew install ollama # or your platform's installer
-ollama pull nomic-embed-text
+ollama pull qwen3-embedding:0.6b
 ollama serve        # listens on http://127.0.0.1:11434
 make install-sqlite-vec
 ```
@@ -96,7 +96,7 @@ or simply add
 ```clojure
 :semsearch {:vec-path #or [#env VEC_PATH "./.sqlite-vec/vec0"]
             :ollama-url #or [#env VEC_URL "http://127.0.0.1:11434"]
-            :ollama-model "nomic-embed-text"}
+            :ollama-model "qwen3-embedding:0.6b"}
 ```
 
 by hand to `config.edn`. The aero `#or [#env ...]` form lets the same `config.edn` work on host and inside docker: the Dockerfile sets `VEC_PATH=/usr/local/lib/sqlite-vec/vec0` and `VEC_URL=http://127.0.0.1:11437` (a socat bridge `entrypoint.sh` opens onto the `ollama` sidecar); the host falls back to the local install path and `:11434`.
@@ -190,4 +190,4 @@ Clone to a sibling directory and run a second instance — state is isolated aut
 - Ports: export `PORT=...` / `SHADOW_PORT=...` in your shell before running `make` (drop an `.envrc` for direnv, or `export` them manually, or prefix the make invocation). The Makefile flows the exported values into both host-side `make start` and the docker overlay. When nothing is exported, ports come from `config.edn` / `shadow-cljs.edn` defaults — note that an `.envrc` alone is not consulted, it needs to actually be loaded into the env.
 - Docker volumes/containers: `COMPOSE_PROJECT_NAME` is derived from the directory basename so they don't share volumes.
 
-Caveats: renaming the checkout after first build orphans the old volumes (`docker volume rename` to migrate); the Ollama sidecar's `ollama_models` volume is per-project, so each checkout re-pulls `nomic-embed-text` (~3 GB) on first `WITH_VEC=1` run.
+Caveats: renaming the checkout after first build orphans the old volumes (`docker volume rename` to migrate); the Ollama sidecar's `ollama_models` volume is per-project, so each checkout re-pulls `qwen3-embedding:0.6b` (~639 MB) on first `WITH_VEC=1` run.

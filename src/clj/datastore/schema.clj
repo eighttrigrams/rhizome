@@ -78,15 +78,40 @@
   (when (and (table-exists? db table) (not (column-exists? db table column)))
     (jdbc/execute-one! db [(str "ALTER TABLE " table " ADD COLUMN " column " " decl)])))
 
+(defn- vec-dim
+  "FLOAT[N] dimension declared in a CREATE statement (or whole schema —
+   items_vec is the only FLOAT[] user). nil when absent."
+  [^String sql]
+  (some->> sql (re-find #"(?i)FLOAT\[(\d+)\]") second Long/parseLong))
+
+(defn- ensure-vec-dim!
+  "Drop items_vec (and forget skips) when its declared dimension differs
+   from the schema file's, so the CREATE that follows rebuilds it at the
+   new dimension. Rows come back via the next embeddings backfill."
+  [db schema-sql]
+  (let [target (vec-dim schema-sql)
+        current (some-> (jdbc/execute-one! db
+                          ["SELECT sql FROM sqlite_master WHERE type='table' AND name='items_vec'"])
+                        :sqlite_master/sql
+                        vec-dim)]
+    (when (and target current (not= target current))
+      (jdbc/execute-one! db ["DROP TABLE items_vec"])
+      (when (table-exists? db "items_vec_skipped")
+        (jdbc/execute-one! db ["DELETE FROM items_vec_skipped"])))))
+
 (defn apply-schema!
   "Apply schema-sqlite.sql to the given db spec. All CREATEs use
    IF NOT EXISTS, so this is idempotent. Statements that depend on the
    sqlite-vec extension are skipped when the extension is unavailable.
    Additive column migrations run first so the schema file can reference
-   the new columns from indexes and triggers."
+   the new columns from indexes and triggers; an items_vec dimension
+   change drops the table for the CREATE to rebuild."
   ([db] (apply-schema! db schema-path))
   ([db path]
-   (ensure-column! db "items" "human_readable_id" "TEXT")
-   (doseq [stmt (split-statements (slurp path))
-           :when (or connection/vec-available? (not (vec-statement? stmt)))]
-     (jdbc/execute-one! db [stmt]))))
+   (let [sql (slurp path)]
+     (ensure-column! db "items" "human_readable_id" "TEXT")
+     (when connection/vec-available?
+       (ensure-vec-dim! db sql))
+     (doseq [stmt (split-statements sql)
+             :when (or connection/vec-available? (not (vec-statement? stmt)))]
+       (jdbc/execute-one! db [stmt])))))

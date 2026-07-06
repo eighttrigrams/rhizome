@@ -5,10 +5,16 @@
 
 (defn- configuration [] (:semsearch config/config))
 
-(def embedding-dim 768)
+(def embedding-dim 1024)
+
+(def query-prefix
+  "Qwen3-Embedding retrieval convention: documents are embedded raw, queries
+   carry this instruction prefix. Deviating from the trained instruction
+   costs retrieval quality, so keep it verbatim."
+  "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery: ")
 
 (defn embed-text
-  "Embed a string via Ollama. Returns a 768-dim vector of floats.
+  "Embed a string via Ollama. Returns an embedding-dim vector of floats.
    Redef this var in tests to avoid hitting the network.
 
    On failure, throws an ex-info whose ex-data has :transient? — true for
@@ -39,6 +45,12 @@
         (throw (ex-info (str "embed-text failed: " (.getMessage e))
                         {:transient? true}
                         e))))))
+
+(defn embed-query
+  "Embed a search query: prepend the retrieval instruction, then embed.
+   Documents go through embed-text directly (no prefix)."
+  [q]
+  (embed-text (str query-prefix q)))
 
 (defn vec->json
   "Format a Clojure seq of numbers as a JSON array string. sqlite-vec

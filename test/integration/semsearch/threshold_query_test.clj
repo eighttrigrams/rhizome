@@ -16,10 +16,11 @@
             [et.vp.ds.search-test :refer [reset-db with-time db]]))
 
 (defn- vec-2d
-  "768-dim unit vector with `x` on axis 0 and `y` on axis 1, rest 0. Cosine
-   similarity to (vec-2d 1.0 0.0) equals x when x^2 + y^2 = 1."
+  "embedding-dim unit vector with `x` on axis 0 and `y` on axis 1, rest 0.
+   Cosine similarity to (vec-2d 1.0 0.0) equals x when x^2 + y^2 = 1."
   [x y]
-  (into [] (for [k (range 768)] (case k 0 (double x) 1 (double y) 0.0))))
+  (into [] (for [k (range embedder/embedding-dim)]
+             (case k 0 (double x) 1 (double y) 0.0))))
 
 (def ^:private q-vec (vec-2d 1.0 0.0))
 

@@ -68,7 +68,7 @@ END;
 
 CREATE VIRTUAL TABLE IF NOT EXISTS items_vec USING vec0(
     item_id INTEGER PRIMARY KEY,
-    embedding FLOAT[768]
+    embedding FLOAT[1024]
 );
 
 CREATE TABLE IF NOT EXISTS items_vec_skipped (

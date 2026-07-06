@@ -134,7 +134,7 @@
   5000), 5 = most recently added first.
 
   vector=true switches to semantic search: q is embedded via Ollama
-  (nomic-embed-text) and items are ranked by cosine similarity. Requires a
+  (qwen3-embedding) and items are ranked by cosine similarity. Requires a
   non-empty q. Only items with a non-empty description are embedded — both
   on ingestion (POST /rest/items, PUT /rest/items/:id) and by the REPL
   backfill — so title-only items never appear in vector results."

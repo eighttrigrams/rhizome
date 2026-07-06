@@ -22,7 +22,7 @@ if [ "${WITH_VEC:-0}" = "1" ]; then
     # by the Dockerfile to /usr/local/lib/sqlite-vec/vec0 in the container);
     # otherwise it falls back to the host install path written by
     # scripts/install-sqlite-vec.sh.
-    SEMSEARCH_LINE=$'\n :semsearch {:vec-path #or [#env VEC_PATH "./.sqlite-vec/vec0"]\n             :ollama-url #or [#env VEC_URL "http://127.0.0.1:11434"]\n             :ollama-model "nomic-embed-text"}'
+    SEMSEARCH_LINE=$'\n :semsearch {:vec-path #or [#env VEC_PATH "./.sqlite-vec/vec0"]\n             :ollama-url #or [#env VEC_URL "http://127.0.0.1:11434"]\n             :ollama-model "qwen3-embedding:0.6b"}'
 else
     SEMSEARCH_LINE=""
 fi
