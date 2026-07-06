@@ -4,6 +4,7 @@
             upload
             [clojure.string :as str]
             [compojure.core :refer [context GET POST PUT]]
+            [ring.util.codec :as codec]
             [ring.util.response :as response]
             [ring.middleware.json :as json]
             [env :refer [wrap-env-defaults]]
@@ -76,17 +77,19 @@
 (defn- wrap-imgs
   "Serve files under the /imgs/* URL prefix from the filesystem: /imgs/Preview/*
   from preview-images-folder, everything else under /imgs/* from images-folder.
-  file-response's :root guards against directory traversal."
+  Ring's :uri is still percent-encoded, so the path is url-decoded before the
+  file lookup -- without this, filenames containing spaces 404. file-response's
+  :root guards against directory traversal (also for decoded ..)."
   [handler images-folder preview-images-folder]
   (fn [req]
     (let [uri (:uri req)]
       (cond
         (str/starts-with? uri "/imgs/Preview/")
-        (or (response/file-response (subs uri (count "/imgs/Preview")) {:root preview-images-folder})
+        (or (response/file-response (codec/url-decode (subs uri (count "/imgs/Preview"))) {:root preview-images-folder})
             {:status 404 :body "Not Found"})
 
         (str/starts-with? uri "/imgs/")
-        (or (response/file-response (subs uri (count "/imgs")) {:root images-folder})
+        (or (response/file-response (codec/url-decode (subs uri (count "/imgs"))) {:root images-folder})
             {:status 404 :body "Not Found"})
 
         :else (handler req)))))
