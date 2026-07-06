@@ -120,5 +120,6 @@ deploy: test e2e
 	@if [ ! -d "$(DEPLOY_TARGET)" ]; then echo "deploy target not found: $(DEPLOY_TARGET)"; exit 1; fi
 	@if [ -f "$(DEPLOY_TARGET)/server.jar" ]; then cp "$(DEPLOY_TARGET)/server.jar" "$(DEPLOY_TARGET)/server.jar.bkp"; fi
 	cp server.jar "$(DEPLOY_TARGET)/server.jar"
+	cp schema-sqlite.sql "$(DEPLOY_TARGET)/schema-sqlite.sql"
 	rm server.jar
-	@echo "deployed server.jar -> $(DEPLOY_TARGET)"
+	@echo "deployed server.jar + schema-sqlite.sql -> $(DEPLOY_TARGET)"
