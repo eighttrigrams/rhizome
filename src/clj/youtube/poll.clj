@@ -58,11 +58,19 @@
                                         :where [:= :id [:inline id]]}))
         id)))
 
-(defn- already-imported?
-  [db url]
-  (boolean (seq (datastore/get-items-by-path db
-                                             "data->'resource-links'->>'youtube-video'"
-                                             url))))
+(defn- seen?
+  [db video-id]
+  (boolean (seq (jdbc/execute! db
+                               (sql/format {:select [:video_id]
+                                            :from [:youtube_poll_seen]
+                                            :where [:= :video_id [:inline video-id]]})))))
+
+(defn- mark-seen!
+  [db video-id]
+  (jdbc/execute-one! db
+                     (sql/format {:insert-into [:youtube_poll_seen]
+                                  :columns [:video_id]
+                                  :values [[[:inline video-id]]]})))
 
 (defn poll-once!
   [db]
@@ -72,9 +80,10 @@
         (doseq [{:keys [video-id]} (:videos (feed/fetch-channel channel-id))]
           (let [url (str "https://www.youtube.com/watch?v=" video-id)]
             (try
-              (when-not (already-imported? db url)
+              (when-not (seen? db video-id)
                 (log/info (str "youtube-poll: importing " url " from " (or name channel-id)))
-                (youtube/ingest db url #{imports-id} nil))
+                (youtube/ingest db url #{imports-id} nil)
+                (mark-seen! db video-id))
               (catch Exception e
                 (log/error e (str "youtube-poll: failed importing " url))))))
         (catch Exception e

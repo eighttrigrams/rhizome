@@ -82,3 +82,8 @@ CREATE TABLE IF NOT EXISTS youtube_poll_channels (
     name TEXT,
     added_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS youtube_poll_seen (
+    video_id TEXT PRIMARY KEY,
+    seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
