@@ -9,7 +9,9 @@
   (handle-keys*
     (fn [code ctrl-pressed? meta-pressed? alt-pressed? shift-pressed? _e]
       (let [{:keys [selected-item item-view?]} @*state]
-        (cond (and alt-pressed? shift-pressed? (= "KeyW" code))
+        (cond (and alt-pressed? shift-pressed? (= "KeyS" code))
+                (swap! *state assoc :config-page? true)
+              (and alt-pressed? shift-pressed? (= "KeyW" code))
                 (recording-mode/toggle! *state)
               (and alt-pressed? shift-pressed? (= "KeyD" code))
                 (danger-mode/toggle! *state)

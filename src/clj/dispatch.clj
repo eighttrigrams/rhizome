@@ -12,7 +12,9 @@
               link-selected-context-to-context select-last-context fetch-context deselect-context
               fetch-aggregated-contexts delete-context fetch-item-description edit-item-in-obsidian
               sync-obsidian-changes discard-obsidian-changes get-obsidian-file-content update-annotations
-              vector-search-related-items vector-threshold-search-related-items]]))
+              vector-search-related-items vector-threshold-search-related-items]]
+            [youtube.poll :refer
+             [list-youtube-poll-channels add-youtube-poll-channel delete-youtube-poll-channel]]))
 
 (defn- handle-error [e] (log/error {:error-handler :handle-error} e "an error occured"))
 
@@ -50,4 +52,7 @@
              get-obsidian-file-content
              update-annotations
              vector-search-related-items
-             vector-threshold-search-related-items)
+             vector-threshold-search-related-items
+             list-youtube-poll-channels
+             add-youtube-poll-channel
+             delete-youtube-poll-channel)

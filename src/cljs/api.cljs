@@ -73,3 +73,9 @@
 (defn-over-http vector-search-related-items :return-value {})
 
 (defn-over-http vector-threshold-search-related-items :return-value {})
+
+(defn-over-http list-youtube-poll-channels :return-value {})
+
+(defn-over-http add-youtube-poll-channel :return-value {})
+
+(defn-over-http delete-youtube-poll-channel :return-value {})

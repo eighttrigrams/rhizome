@@ -75,3 +75,10 @@ CREATE TABLE IF NOT EXISTS items_vec_skipped (
     item_id INTEGER PRIMARY KEY,
     FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS youtube_poll_channels (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    channel_id TEXT NOT NULL UNIQUE,
+    name TEXT,
+    added_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

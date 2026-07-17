@@ -208,3 +208,78 @@ ul.cards {
 }
 
 /* CodeMirror selection highlighting - remove conflicting CSS */
+
+#config-page {
+    position: absolute;
+    inset: 0;
+    width: 900px;
+    max-width: 100%;
+    margin: auto;
+    height: 100vh;
+    background-color: rgb(30, 28, 28);
+    color: #cbc9b5;
+    overflow-y: auto;
+    padding: 0 24px 24px;
+    box-sizing: border-box;
+}
+
+.config-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 0;
+}
+
+.config-close {
+    background: none;
+    border: 1px solid #cbc9b5;
+    color: #cbc9b5;
+    border-radius: 4px;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+}
+
+.config-close:hover {
+    background-color: #3d3838;
+}
+
+.config-add {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.config-add input {
+    flex: 1;
+    padding: 6px 8px;
+}
+
+.config-channels {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.config-channel {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid #4a4444;
+}
+
+.config-channel-name {
+    flex: 1;
+}
+
+.config-channel-id {
+    opacity: 0.6;
+    font-size: 12px;
+}
+
+.config-channel-delete {
+    cursor: pointer;
+}
