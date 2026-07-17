@@ -10,7 +10,8 @@
   [:ul.cards
    (doall (for [context (:contexts @*state)]
             ^{:key (:id context)}
-            [items-list-items/regular-items-list-item-component *state context nil nil {}]))])
+            [items-list-items/regular-items-list-item-component *state context nil nil
+             {:select-as-context? true}]))])
 
 (defn- backlinks-component
   [*state {{:keys [contexts] {current :current} :views} :data}]

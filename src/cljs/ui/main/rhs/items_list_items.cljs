@@ -96,7 +96,7 @@
 (defn regular-items-list-item-component
   [*state item idx
    {:keys [allow-delete-on-right-click? show-relation-annotation? select-fn show-context-selector?
-           rhs?]
+           rhs? select-as-context?]
     :as _opts}]
   [:li.item-card
    (merge
@@ -122,7 +122,9 @@
                       (do (swap! *state (fn [state]
                                           (-> state
                                               (dissoc :preview-item))))
-                          (actions/select-item! *state item)))))
+                          (if select-as-context?
+                            (actions/select-context! *state item)
+                            (actions/select-item! *state item))))))
       :on-mouse-enter (when idx (on-mouse-enter *state item))
       :on-mouse-leave (when idx (on-mouse-leave *state))}
      (when (and idx
