@@ -5,7 +5,7 @@
    utility module kept under its old name to avoid touching every caller."
   (:require [clojure.string :as str]))
 
-(defn now-sql [] [:raw "datetime('now')"])
+(defn now-sql [] [:raw "strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')"])
 
 (defn array-agg-sql
   [col]
