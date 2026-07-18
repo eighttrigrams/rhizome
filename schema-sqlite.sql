@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS youtube_poll_channels (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     channel_id TEXT NOT NULL UNIQUE,
     name TEXT,
+    min_duration_minutes INTEGER,
     added_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

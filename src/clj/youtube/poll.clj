@@ -13,13 +13,14 @@
 (defn list-channels
   [db]
   (->> (jdbc/execute! db
-                      (sql/format {:select [:id :channel_id :name]
+                      (sql/format {:select [:id :channel_id :name :min_duration_minutes]
                                    :from [:youtube_poll_channels]
                                    :order-by [[:added_at :desc]]}))
        (mapv (fn [row]
                {:id (:youtube_poll_channels/id row)
                 :channel-id (:youtube_poll_channels/channel_id row)
-                :name (:youtube_poll_channels/name row)}))))
+                :name (:youtube_poll_channels/name row)
+                :min-duration (:youtube_poll_channels/min_duration_minutes row)}))))
 
 (defn- channel-exists?
   [db channel-id]
@@ -29,14 +30,22 @@
                                             :where [:= :channel_id [:inline channel-id]]})))))
 
 (defn add-channel!
-  [db input]
+  [db input min-duration]
   (when-let [channel-id (feed/resolve-channel-id input)]
     (when-not (channel-exists? db channel-id)
       (let [title (try (:title (feed/fetch-channel channel-id)) (catch Exception _ nil))]
         (jdbc/execute-one! db
                            (sql/format {:insert-into [:youtube_poll_channels]
-                                        :columns [:channel_id :name]
-                                        :values [[[:inline channel-id] [:inline title]]]}))))))
+                                        :columns [:channel_id :name :min_duration_minutes]
+                                        :values [[[:inline channel-id] [:inline title]
+                                                  [:inline min-duration]]]}))))))
+
+(defn update-channel-duration!
+  [db id min-duration]
+  (jdbc/execute-one! db
+                     (sql/format {:update [:youtube_poll_channels]
+                                  :set {:min_duration_minutes [:inline min-duration]}
+                                  :where [:= :id [:inline id]]})))
 
 (defn delete-channel!
   [db id]
@@ -72,18 +81,27 @@
                                   :columns [:video_id]
                                   :values [[[:inline video-id]]]})))
 
+(defn- too-short?
+  [url min-duration]
+  (when (and min-duration (pos? min-duration))
+    (when-let [minutes (feed/video-duration-minutes url)]
+      (< minutes min-duration))))
+
 (defn poll-once!
   [db]
   (let [imports-id (ensure-imports-context! db)]
-    (doseq [{:keys [channel-id name]} (list-channels db)]
+    (doseq [{:keys [channel-id name min-duration]} (list-channels db)]
       (try
         (doseq [{:keys [video-id]} (:videos (feed/fetch-channel channel-id))]
           (let [url (str "https://www.youtube.com/watch?v=" video-id)]
             (try
               (when-not (seen? db video-id)
-                (log/info (str "youtube-poll: importing " url " from " (or name channel-id)))
-                (youtube/ingest db url #{imports-id} nil)
-                (mark-seen! db video-id))
+                (if (too-short? url min-duration)
+                  (do (log/info (str "youtube-poll: skipping short video " url))
+                      (mark-seen! db video-id))
+                  (do (log/info (str "youtube-poll: importing " url " from " (or name channel-id)))
+                      (youtube/ingest db url #{imports-id} nil)
+                      (mark-seen! db video-id))))
               (catch Exception e
                 (log/error e (str "youtube-poll: failed importing " url))))))
         (catch Exception e
@@ -118,8 +136,14 @@
 
 (defn add-youtube-poll-channel
   [{:keys [db]}]
-  (fn [_state input]
-    (add-channel! db input)
+  (fn [_state input min-duration]
+    (add-channel! db input min-duration)
+    {:youtube-poll-channels (list-channels db)}))
+
+(defn update-youtube-poll-channel
+  [{:keys [db]}]
+  (fn [_state id min-duration]
+    (update-channel-duration! db id min-duration)
     {:youtube-poll-channels (list-channels db)}))
 
 (defn delete-youtube-poll-channel

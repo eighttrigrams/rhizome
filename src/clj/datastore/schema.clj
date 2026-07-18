@@ -110,6 +110,7 @@
   ([db path]
    (let [sql (slurp path)]
      (ensure-column! db "items" "human_readable_id" "TEXT")
+     (ensure-column! db "youtube_poll_channels" "min_duration_minutes" "INTEGER")
      (when connection/vec-available?
        (ensure-vec-dim! db sql))
      (doseq [stmt (split-statements sql)

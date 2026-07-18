@@ -283,3 +283,20 @@ ul.cards {
 .config-channel-delete {
     cursor: pointer;
 }
+
+.config-min-input {
+    width: 90px;
+    padding: 6px 8px;
+}
+
+.config-channel-min {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+.config-channel-min .config-min-input {
+    width: 70px;
+}

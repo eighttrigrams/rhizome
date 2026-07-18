@@ -34,6 +34,20 @@
     (when (= 200 (:status resp))
       (parse-feed (:body resp)))))
 
+(defn video-duration-minutes
+  [url]
+  (let [resp (http/get url {:as :string
+                            :throw-exceptions false
+                            :headers {"User-Agent" "Mozilla/5.0"}})]
+    (when (= 200 (:status resp))
+      (let [body (:body resp)
+            secs (or (some-> (re-find #"\"lengthSeconds\":\"(\d+)\"" body) second Long/parseLong)
+                     (some-> (re-find #"\"approxDurationMs\":\"(\d+)\"" body)
+                             second
+                             Long/parseLong
+                             (quot 1000)))]
+        (when secs (/ secs 60.0))))))
+
 (defn resolve-channel-id
   [input]
   (let [input (str/trim (or input ""))]

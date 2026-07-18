@@ -79,3 +79,5 @@
 (defn-over-http add-youtube-poll-channel :return-value {})
 
 (defn-over-http delete-youtube-poll-channel :return-value {})
+
+(defn-over-http update-youtube-poll-channel :return-value {})

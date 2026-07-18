@@ -14,7 +14,8 @@
               sync-obsidian-changes discard-obsidian-changes get-obsidian-file-content update-annotations
               vector-search-related-items vector-threshold-search-related-items]]
             [youtube.poll :refer
-             [list-youtube-poll-channels add-youtube-poll-channel delete-youtube-poll-channel]]))
+             [list-youtube-poll-channels add-youtube-poll-channel delete-youtube-poll-channel
+              update-youtube-poll-channel]]))
 
 (defn- handle-error [e] (log/error {:error-handler :handle-error} e "an error occured"))
 
@@ -55,4 +56,5 @@
              vector-threshold-search-related-items
              list-youtube-poll-channels
              add-youtube-poll-channel
-             delete-youtube-poll-channel)
+             delete-youtube-poll-channel
+             update-youtube-poll-channel)
