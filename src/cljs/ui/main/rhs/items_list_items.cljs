@@ -133,7 +133,7 @@
        {:id (str "item-card-" idx)
         :on-context-menu (fn [e]
                            (.preventDefault e)
-                           (if @modifiers/*alt-pressed?
+                           (if (.-altKey e)
                              (actions/delete-item! *state item)
                              (actions/unlink-item! *state item)))}))
    (when show-relation-annotation?

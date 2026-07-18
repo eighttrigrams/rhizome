@@ -55,20 +55,26 @@
   (let [*state (r/atom original-state)]
     (add-state-watch *state)
     (r/create-class
-      {:component-did-mount (fn [] (re-focus))
+      {:component-did-mount (fn []
+                              (re-focus)
+                              ;; A blocking native dialog (window.confirm on
+                              ;; delete/unlink) swallows the Alt keyup, which
+                              ;; used to leave *alt-pressed? stuck true. Resetting
+                              ;; on window blur clears it whenever focus leaves.
+                              (.addEventListener js/window "blur"
+                                                 #(reset! modifiers/*alt-pressed? false)))
        :render ;
          (fn [] [:div#ui
-                 {:on-mouse-leave #(reset! modifiers/*alt-pressed? false)
-                  :on-mouse-enter #(reset! modifiers/*alt-pressed? false)}
                  [recording-mode/indicator *state]
                  [danger-mode/indicator *state]
                  [danger-mode/confirm-modal *state]
+                 [modifiers/indicator]
                  [:div#main-layer
                   {;; TODO document recipe to make the div able to listen to key events,
                    ;; https://stackoverflow.com/a/3149416
                    :tabIndex 0
-                   :on-key-up #(when true (reset! modifiers/*alt-pressed? false))
-                   :on-key-down #(do (when (.-altKey %) (reset! modifiers/*alt-pressed? true))
+                   :on-key-up #(reset! modifiers/*alt-pressed? (.-altKey %))
+                   :on-key-down #(do (reset! modifiers/*alt-pressed? (.-altKey %))
                                      ((key-handler/handle-keys *state) %))} [main/component *state]]
                  [:div#modals-layer
                   (when (:modal @*state)
