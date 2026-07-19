@@ -171,7 +171,13 @@
     (if item-descriptions
       (let [db-version (:version item-at-idx)]
         (str "Version " (or db-version (inc version-idx)) (when (= version-idx 0) " (current)")))
-      "Version 1 (current)")]])
+      "Version 1 (current)")]
+   [:button
+    {:on-click #(swap! *state assoc
+                  :diff-view? true
+                  :description-version-idx (min version-idx (- (count item-descriptions) 2)))
+     :disabled (< (count item-descriptions) 2)
+     :style {:cursor (if (< (count item-descriptions) 2) "not-allowed" "pointer")}} "Diff"]])
 
 (defn component
   [*state]
