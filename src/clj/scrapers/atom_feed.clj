@@ -31,6 +31,14 @@
           (:strong :b) (str "**" inner "**")
           (:em :i) (str "*" inner "*")
           :code (str "`" inner "`")
+          :img (let [src (get-in node [:attrs :src])
+                     alt (or (get-in node [:attrs :alt]) "")]
+                 (if (seq src) (str "\n\n![" alt "](" src ")\n\n") ""))
+          :video (let [src (or (get-in node [:attrs :src])
+                               (some (fn [c]
+                                       (when (= :source (:tag c)) (get-in c [:attrs :src])))
+                                     (:content node)))]
+                   (if (seq src) (str "\n\n[video](" src ")\n\n") ""))
           :br "\n"
           (:p :div) (str "\n\n" inner "\n\n")
           :blockquote (str "\n\n"

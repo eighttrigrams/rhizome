@@ -17,7 +17,8 @@
        "<id>https://example.net/2026/Jul/19/first/#atom-everything</id>"
        "<summary type=\"html\">&lt;p&gt;Read &lt;a href=\"https://example.org/x\"&gt;this&lt;/a&gt;"
        " with &lt;strong&gt;emphasis&lt;/strong&gt;.&lt;/p&gt;"
-       "&lt;blockquote&gt;&lt;p&gt;quoted&lt;/p&gt;&lt;/blockquote&gt;</summary>"
+       "&lt;blockquote&gt;&lt;p&gt;quoted&lt;/p&gt;&lt;/blockquote&gt;"
+       "&lt;p&gt;&lt;img src=\"https://example.org/pic.gif\" alt=\"a pic\"&gt;&lt;/p&gt;</summary>"
        "</entry>"
        "<entry>"
        "<title>Second Post</title>"
@@ -37,7 +38,8 @@
               :link "https://example.net/2026/Jul/19/first/#atom-everything"
               :published "2026-07-19T05:06:21+00:00"
               :summary (str "Read [this](https://example.org/x) with **emphasis**.\n\n"
-                            "> quoted")}
+                            "> quoted\n\n"
+                            "![a pic](https://example.org/pic.gif)")}
              (first entries)))))
   (testing "falls back to updated when published is missing"
     (let [{:keys [entries]} (feed/parse-feed sample-feed)]
