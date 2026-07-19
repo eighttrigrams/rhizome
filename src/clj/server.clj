@@ -15,6 +15,7 @@
             [repository :as r]
             [repository.insertion.file :as file]
             [youtube.poll :as youtube-poll]
+            [atom-feed.poll :as atom-poll]
             [et.vp.ds :as datastore]
             opener
             dispatch
@@ -122,6 +123,11 @@
     (let [db (:db config/config)]
       (jdbc/execute-one! db ["DELETE FROM relations"])
       (jdbc/execute-one! db ["DELETE FROM items"])
+      (jdbc/execute-one! db ["DELETE FROM history"])
+      (jdbc/execute-one! db ["DELETE FROM youtube_poll_channels"])
+      (jdbc/execute-one! db ["DELETE FROM youtube_poll_seen"])
+      (jdbc/execute-one! db ["DELETE FROM atom_poll_feeds"])
+      (jdbc/execute-one! db ["DELETE FROM atom_poll_seen"])
       {:status 200 :body "ok"})
     {:status 403 :body "not in dev mode"}))
 
@@ -198,7 +204,8 @@
   (let [host (or (:bind-host config/config)
                  (if (:dev? config/config) "0.0.0.0" "127.0.0.1"))]
     (when-not (:e2e? config/config)
-      (youtube-poll/start-scheduler! (:db config/config)))
+      (youtube-poll/start-scheduler! (:db config/config))
+      (atom-poll/start-scheduler! (:db config/config)))
     (future (j/run-jetty (app) {:port (:port config/config)
                                 :host host}))))
 

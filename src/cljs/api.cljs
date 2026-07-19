@@ -81,3 +81,9 @@
 (defn-over-http delete-youtube-poll-channel :return-value {})
 
 (defn-over-http update-youtube-poll-channel :return-value {})
+
+(defn-over-http list-atom-poll-feeds :return-value {})
+
+(defn-over-http add-atom-poll-feed :return-value {})
+
+(defn-over-http delete-atom-poll-feed :return-value {})

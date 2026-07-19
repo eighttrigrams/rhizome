@@ -15,7 +15,9 @@
               vector-search-related-items vector-threshold-search-related-items]]
             [youtube.poll :refer
              [list-youtube-poll-channels add-youtube-poll-channel delete-youtube-poll-channel
-              update-youtube-poll-channel]]))
+              update-youtube-poll-channel]]
+            [atom-feed.poll :refer
+             [list-atom-poll-feeds add-atom-poll-feed delete-atom-poll-feed]]))
 
 (defn- handle-error [e] (log/error {:error-handler :handle-error} e "an error occured"))
 
@@ -57,4 +59,7 @@
              list-youtube-poll-channels
              add-youtube-poll-channel
              delete-youtube-poll-channel
-             update-youtube-poll-channel)
+             update-youtube-poll-channel
+             list-atom-poll-feeds
+             add-atom-poll-feed
+             delete-atom-poll-feed)
