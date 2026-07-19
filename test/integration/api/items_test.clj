@@ -88,6 +88,17 @@
       (is (true? (:ignore-item-description resp))
           "no description set yet, so the flag is true"))))
 
+(deftest description-history-keeps-all-revisions-test
+  (with-fresh-db "keeps every revision instead of trimming to the newest 5"
+    (let [{ctx :selected-item} (call! :insert-context nil {:title "Books"})
+          item (ds/new-item db "Sapiens" "s" #{(:id ctx)} 1)]
+      (doseq [n (range 1 8)]
+        (ds/update-context-description db {:id (:id item) :description (str "d" n)}))
+      (let [{:keys [versions total]} (ds/get-description-history db {:id (:id item)})]
+        (is (= 7 total))
+        (is (= "d7" (:text (first versions))))
+        (is (= "d1" (:text (last versions))))))))
+
 (deftest update-annotations-global-test
   (with-fresh-db "writes :annotation onto the item"
     (let [{ctx :selected-item} (call! :insert-context nil {:title "Books"})

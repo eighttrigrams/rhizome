@@ -196,28 +196,13 @@
                                                              :from [:history]
                                                              :where [:= :id [:inline id]]})
                                                 {:return-keys true})
-          new-version (inc (:max_version max-version-result))
-          _ (jdbc/execute-one! db
-                               (sql/format {:insert-into [:history]
-                                            :values [{:id [:inline id]
-                                                      :text [:inline description]
-                                                      :version [:inline new-version]}]})
-                               {:return-keys true})
-          history-count (:count (jdbc/execute-one! db
-                                                   (sql/format {:select [[[:count :*] :count]]
-                                                                :from [:history]
-                                                                :where [:= :id [:inline id]]})
-                                                   {:return-keys true}))]
-      (when (> history-count 5)
-        (jdbc/execute! db
-                       (sql/format {:delete-from [:history]
-                                    :where [:and [:= :id [:inline id]]
-                                            [:in :version
-                                             {:select [:version]
-                                              :from [:history]
-                                              :where [:= :id [:inline id]]
-                                              :order-by [[:version :asc]]
-                                              :limit (- history-count 5)}]]})))))
+          new-version (inc (:max_version max-version-result))]
+      (jdbc/execute-one! db
+                         (sql/format {:insert-into [:history]
+                                      :values [{:id [:inline id]
+                                                :text [:inline description]
+                                                :version [:inline new-version]}]})
+                         {:return-keys true})))
   nil)
 
 (defn get-description-history
