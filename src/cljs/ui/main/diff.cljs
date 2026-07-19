@@ -64,9 +64,11 @@
         :disabled (<= version-idx 0)} "→"]
       [:span.diff-version-label
        (when (and older newer)
-         (str "Version " (:version older)
-              " → Version " (:version newer)
-              (when (zero? version-idx) " (current)")))]
+         (let [version-label (fn [{:keys [version source]}]
+                               (str "Version " version (when source (str " · " source))))]
+           (str (version-label older)
+                " → " (version-label newer)
+                (when (zero? version-idx) " (current)"))))]
       [:button.diff-mode-toggle
        {:on-click #(swap! *state update :diff-unified? not)}
        (if diff-unified? "Split" "Unified")]]

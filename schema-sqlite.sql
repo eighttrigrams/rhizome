@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS items (
     annotation TEXT,
     hide_in_global_search INTEGER NOT NULL DEFAULT 0,
     human_readable_id TEXT,
-    embedding TEXT
+    embedding TEXT,
+    description_source TEXT
 );
 
 CREATE TABLE IF NOT EXISTS relations (
@@ -32,6 +33,7 @@ CREATE TABLE IF NOT EXISTS history (
     text TEXT,
     version INTEGER NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    source TEXT,
     PRIMARY KEY (id, version),
     FOREIGN KEY (id) REFERENCES items(id) ON DELETE CASCADE
 );

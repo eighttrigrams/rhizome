@@ -275,7 +275,7 @@
              (log/info (str "Synced changes from Obsidian for item" item-id
                             "- saved:" (pr-str description)))
              ;; Use the same update method as regular description updates
-             (datastore/update-context-description db {:id item-id :description description}))))
+             (datastore/update-context-description db {:id item-id :description description} "obsidian"))))
        (catch Exception e
          (log/error {:error-context :obsidian-sync} e "Failed to sync from Obsidian")
          nil)))
@@ -501,7 +501,7 @@
         :start-linking-selected-item-to-context
           (start-linking-selected-item-to-context-with-local-search db opts)
         :start-context-search (start-context-search db opts)
-        :update-context-description (let [updated-item (datastore/update-context-description db arg)
+        :update-context-description (let [updated-item (datastore/update-context-description db arg "app")
                                           history (datastore/get-description-history db arg)
                                           descriptions (:versions history)]
                                       {:selected-item updated-item

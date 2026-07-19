@@ -39,7 +39,7 @@
 (defn- apply-description
   [db item description]
   (if (and (map? item) description)
-    (datastore/update-context-description db {:id (:id item) :description description})
+    (datastore/update-context-description db {:id (:id item) :description description} "api")
     item))
 
 (defn- create-item-impl
@@ -85,7 +85,8 @@
   [db id description]
   (try (let [updated (datastore/update-context-description
                        db
-                       {:id id :description description})]
+                       {:id id :description description}
+                       "api")]
          (embed-item-best-effort! db updated)
          (json-response (item->api updated)))
        (catch Exception e

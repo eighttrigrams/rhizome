@@ -170,7 +170,9 @@
    [:span {:style {:font-weight "bold"}}
     (if item-descriptions
       (let [db-version (:version item-at-idx)]
-        (str "Version " (or db-version (inc version-idx)) (when (= version-idx 0) " (current)")))
+        (str "Version " (or db-version (inc version-idx))
+             (when (= version-idx 0) " (current)")
+             (when-let [source (:source item-at-idx)] (str " · " source))))
       "Version 1 (current)")]
    [:button
     {:on-click #(swap! *state assoc

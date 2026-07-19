@@ -44,7 +44,9 @@
                  ""
                  (conj context-ids-set poasts-id substack-platform-id author-id year-id)
                  {:substack-note note-id})
-          item (datastore/update-context-description db (assoc item :description description))]
+          item (datastore/update-context-description db
+                                                     (assoc item :description description)
+                                                     "scraper")]
       (when image
         (try (upload/upload-preview-file db {:tempfile image} (:id item) "false")
              (catch Exception e

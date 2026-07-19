@@ -93,11 +93,21 @@
     (let [{ctx :selected-item} (call! :insert-context nil {:title "Books"})
           item (ds/new-item db "Sapiens" "s" #{(:id ctx)} 1)]
       (doseq [n (range 1 8)]
-        (ds/update-context-description db {:id (:id item) :description (str "d" n)}))
+        (ds/update-context-description db {:id (:id item) :description (str "d" n)} "app"))
       (let [{:keys [versions total]} (ds/get-description-history db {:id (:id item)})]
         (is (= 7 total))
         (is (= "d7" (:text (first versions))))
         (is (= "d1" (:text (last versions))))))))
+
+(deftest description-history-tracks-source-test
+  (with-fresh-db "records the provenance of each revision"
+    (let [{ctx :selected-item} (call! :insert-context nil {:title "Books"})
+          item (ds/new-item db "Sapiens" "s" #{(:id ctx)} 1)]
+      (ds/update-context-description db {:id (:id item) :description "d1"} "app")
+      (ds/update-context-description db {:id (:id item) :description "d2"} "api")
+      (ds/update-context-description db {:id (:id item) :description "d3"} "scraper")
+      (let [{:keys [versions]} (ds/get-description-history db {:id (:id item)})]
+        (is (= ["scraper" "api" "app"] (map :source versions)))))))
 
 (deftest update-annotations-global-test
   (with-fresh-db "writes :annotation onto the item"
