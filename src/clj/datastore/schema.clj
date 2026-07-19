@@ -112,6 +112,7 @@
      (ensure-column! db "items" "human_readable_id" "TEXT")
      (ensure-column! db "items" "description_source" "TEXT")
      (ensure-column! db "history" "source" "TEXT")
+     (ensure-column! db "history" "title" "TEXT")
      (ensure-column! db "youtube_poll_channels" "min_duration_minutes" "INTEGER")
      (when connection/vec-available?
        (ensure-vec-dim! db sql))

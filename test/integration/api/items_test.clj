@@ -109,6 +109,19 @@
       (let [{:keys [versions]} (ds/get-description-history db {:id (:id item)})]
         (is (= ["scraper" "api" "app"] (map :source versions)))))))
 
+(deftest description-history-tracks-title-test
+  (with-fresh-db "snapshots the title alongside each archived revision"
+    (let [{ctx :selected-item} (call! :insert-context nil {:title "Books"})
+          item (ds/new-item db "Old Title" "s" #{(:id ctx)} 1)]
+      (ds/update-context-description db {:id (:id item) :description "d1"} "app")
+      (ds/update-context-description db {:id (:id item) :description "d2"} "app")
+      (call! :update-item {} {:context (assoc (ds/get-item db {:id (:id item)})
+                                         :title "New Title")
+                              :item-contexts {(:id ctx) {:show-badge? true}}})
+      (ds/update-context-description db {:id (:id item) :description "d3"} "app")
+      (let [{:keys [versions]} (ds/get-description-history db {:id (:id item)})]
+        (is (= ["New Title" "New Title" "Old Title"] (map :title versions)))))))
+
 (deftest update-annotations-global-test
   (with-fresh-db "writes :annotation onto the item"
     (let [{ctx :selected-item} (call! :insert-context nil {:title "Books"})

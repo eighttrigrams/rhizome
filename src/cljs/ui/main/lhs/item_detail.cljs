@@ -187,9 +187,9 @@
         version-idx (or description-version-idx 0)
         item-at-idx (when item-descriptions (nth item-descriptions version-idx nil))
         current-description (:text item-at-idx)
-        selected-item (if current-description
-                        (assoc selected-item :description current-description)
-                        selected-item)
+        selected-item (cond-> selected-item
+                        current-description (assoc :description current-description)
+                        (:title item-at-idx) (assoc :title (:title item-at-idx)))
         show-drop-area? (not (or (-> selected-item
                                      :data
                                      :resource-links

@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS relations (
 CREATE TABLE IF NOT EXISTS history (
     id INTEGER NOT NULL,
     text TEXT,
+    title TEXT,
     version INTEGER NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     source TEXT,

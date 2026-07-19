@@ -188,7 +188,7 @@
       (#(jdbc/execute! db % {:return-keys true}))))
 
 (defn- save-description-to-history
-  [db id description source]
+  [db id description title source]
   (when (and description (not (clojure.string/blank? description)))
     (let [max-version-result (jdbc/execute-one! db
                                                 (sql/format {:select [[[:coalesce [:max :version] 0]
@@ -201,6 +201,7 @@
                          (sql/format {:insert-into [:history]
                                       :values [{:id [:inline id]
                                                 :text [:inline description]
+                                                :title [:inline title]
                                                 :version [:inline new-version]
                                                 :source [:inline source]}]})
                          {:return-keys true})))
@@ -211,19 +212,22 @@
   (let [current-item (get-item db {:id id})
         current-description (:description current-item)
         history-items (jdbc/execute! db
-                                     (sql/format {:select [:text :version :created_at :source]
+                                     (sql/format {:select [:text :title :version :created_at
+                                                           :source]
                                                   :from [:history]
                                                   :where [:= :id [:inline id]]
                                                   :order-by [[:version :desc]]})
                                      {:return-keys true})
         history-items-as-maps (map (fn [row]
                                      {:text (:history/text row)
+                                      :title (:history/title row)
                                       :version (:history/version row)
                                       :created_at (:history/created_at row)
                                       :source (:history/source row)})
                                 history-items)
         all-versions (if (and current-description (not (clojure.string/blank? current-description)))
                        (concat [{:text current-description
+                                 :title (:title current-item)
                                  :version (inc (or (:history/version (first history-items)) 0))
                                  :created_at (:updated_at_ctx current-item)
                                  :source (:description_source current-item)
@@ -297,7 +301,8 @@
   [db {:keys [id description]} source]
   (let [old-item (get-item db {:id id})
         old-description (:description old-item)]
-    (save-description-to-history db id old-description (:description_source old-item))
+    (save-description-to-history db id old-description (:title old-item)
+                                 (:description_source old-item))
     (jdbc/execute-one! db
                        (sql/format {:update [:items]
                                     :set {:description [:inline description]
