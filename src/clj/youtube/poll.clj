@@ -60,7 +60,8 @@
 (defn ensure-imports-context!
   [db]
   (or (:id (first (search/find-items-by-ids db {:human-readable-ids ["imports"]})))
-      (let [id (or (imports-by-title db) (:id (datastore/new-context db {:title "Imports"})))]
+      (let [id (or (imports-by-title db)
+                   (:id (datastore/new-context db {:title "Imports"} "scraper")))]
         (jdbc/execute-one! db
                            (sql/format {:update [:items]
                                         :set {:human_readable_id [:inline "imports"]}

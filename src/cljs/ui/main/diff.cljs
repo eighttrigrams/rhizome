@@ -4,7 +4,24 @@
             ["@codemirror/view" :refer [EditorView]]
             ["@codemirror/lang-markdown" :refer [markdown]]))
 
-(defn- close! [*state] (swap! *state #(dissoc % :diff-view? :diff-unified?)))
+(defn- close!
+  [*state]
+  (swap! *state #(dissoc % :diff-view? :diff-unified? :diff-version-idx)))
+
+(defn description-revisions
+  "Revisions worth diffing, newest first. Runs of consecutive versions sharing the
+   same text are pure title changes, so each run collapses to its newest entry."
+  [versions]
+  (->> versions
+       (partition-by :text)
+       (mapv first)))
+
+(defn version-idx->diff-idx
+  "Index into `description-revisions` of the run that holds `version`."
+  [revisions version]
+  (let [max-idx (max 0 (- (count revisions) 2))
+        idx (or (last (keep-indexed (fn [i {v :version}] (when (>= v version) i)) revisions)) 0)]
+    (min idx max-idx)))
 
 (def ^:private editor-theme
   (.theme EditorView
@@ -46,21 +63,22 @@
 
 (defn component
   [*state]
-  (let [{:keys [selected-item item-descriptions description-version-idx diff-unified?]} @*state
-        total (count item-descriptions)
+  (let [{:keys [selected-item item-descriptions diff-version-idx diff-unified?]} @*state
+        revisions (description-revisions item-descriptions)
+        total (count revisions)
         max-idx (- total 2)
-        version-idx (max 0 (min (or description-version-idx 0) max-idx))
-        newer (nth item-descriptions version-idx nil)
-        older (nth item-descriptions (inc version-idx) nil)]
+        version-idx (max 0 (min (or diff-version-idx 0) max-idx))
+        newer (nth revisions version-idx nil)
+        older (nth revisions (inc version-idx) nil)]
     [:div#diff-page
      [:div.config-header
       [:button.config-close {:on-click #(close! *state) :title "Close"} "✕"]
       [:h2 "Diff"]
       [:button
-       {:on-click #(swap! *state assoc :description-version-idx (inc version-idx))
+       {:on-click #(swap! *state assoc :diff-version-idx (inc version-idx))
         :disabled (>= version-idx max-idx)} "←"]
       [:button
-       {:on-click #(swap! *state assoc :description-version-idx (dec version-idx))
+       {:on-click #(swap! *state assoc :diff-version-idx (dec version-idx))
         :disabled (<= version-idx 0)} "→"]
       [:span.diff-version-label
        (when (and older newer)

@@ -47,7 +47,7 @@
   (try (let [context-ids (set context-ids)
              primary-id (first context-ids)
              rest-ids (disj context-ids primary-id)
-             item (insertion/insert-item db title {:id primary-id} rest-ids)
+             item (insertion/insert-item db title {:id primary-id} rest-ids "api")
              item (apply-sort-idx db item sort-idx)
              item (apply-description db item description)]
          (when (map? item)
@@ -130,7 +130,7 @@
 
 (defn- create-context-impl
   [db {:keys [title] :as body}]
-  (try (let [ctx (datastore/new-context db {:title title})
+  (try (let [ctx (datastore/new-context db {:title title} "api")
              context-extras-set (context-extras-set body)
              ctx (if (seq context-extras-set) (patch-item! db (:id ctx) context-extras-set) ctx)]
          (json-response 201 (item->api ctx)))

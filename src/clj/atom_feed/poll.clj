@@ -78,7 +78,7 @@
           (try
             (when (and link (not (seen? db entry-id)))
               (log/info (str "atom-poll: importing " link " from " (or name feed-url)))
-              (let [item (insertion/insert-item db link {:id imports-id} nil)]
+              (let [item (insertion/insert-item db link {:id imports-id} nil "scraper")]
                 (fill-description! db item summary))
               (mark-seen! db entry-id))
             (catch Exception e

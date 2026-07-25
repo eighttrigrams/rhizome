@@ -95,9 +95,10 @@
       (doseq [n (range 1 8)]
         (ds/update-context-description db {:id (:id item) :description (str "d" n)} "app"))
       (let [{:keys [versions total]} (ds/get-description-history db {:id (:id item)})]
-        (is (= 7 total))
+        (is (= 8 total) "7 descriptions plus the title-only revision the item started as")
         (is (= "d7" (:text (first versions))))
-        (is (= "d1" (:text (last versions))))))))
+        (is (= "d1" (:text (last (butlast versions)))))
+        (is (nil? (:text (last versions))))))))
 
 (deftest description-history-tracks-source-test
   (with-fresh-db "records the provenance of each revision"
@@ -107,7 +108,8 @@
       (ds/update-context-description db {:id (:id item) :description "d2"} "api")
       (ds/update-context-description db {:id (:id item) :description "d3"} "scraper")
       (let [{:keys [versions]} (ds/get-description-history db {:id (:id item)})]
-        (is (= ["scraper" "api" "app"] (map :source versions)))))))
+        (is (= ["scraper" "api" "app" "app"] (map :source versions))
+            "the trailing app is the item's creation")))))
 
 (deftest description-history-tracks-title-test
   (with-fresh-db "snapshots the title alongside each archived revision"
@@ -120,7 +122,35 @@
                               :item-contexts {(:id ctx) {:show-badge? true}}})
       (ds/update-context-description db {:id (:id item) :description "d3"} "app")
       (let [{:keys [versions]} (ds/get-description-history db {:id (:id item)})]
-        (is (= ["New Title" "New Title" "Old Title"] (map :title versions)))))))
+        (is (= ["New Title" "New Title" "Old Title" "Old Title" "Old Title"]
+               (map :title versions)))))))
+
+(deftest description-history-of-title-only-item-test
+  (with-fresh-db "an item without a description still has a current revision"
+    (let [{ctx :selected-item} (call! :insert-context nil {:title "Books"})
+          resp (call! :insert-item {:selected-item ctx} {:title "Sapiens"})
+          item (first (filter #(= "Sapiens" (:title %)) (:items resp)))
+          {:keys [versions total]} (ds/get-description-history db {:id (:id item)})]
+      (is (= 1 total))
+      (is (= "Sapiens" (:title (first versions))))
+      (is (nil? (:text (first versions))))
+      (is (= "app" (:source (first versions)))
+          "created through the app, so the revision is attributed to the app"))))
+
+(deftest title-change-creates-a-revision-test
+  (with-fresh-db "renaming archives the previous title and re-attributes the current revision"
+    (let [{ctx :selected-item} (call! :insert-context nil {:title "Books"})
+          item (ds/new-item db "Old Title" "s" #{(:id ctx)} 1 "scraper")]
+      (ds/update-context-description db {:id (:id item) :description "d1"} "scraper")
+      (call! :update-item {} {:context (assoc (ds/get-item db {:id (:id item)})
+                                         :title "New Title")
+                              :item-contexts {(:id ctx) {:show-badge? true}}})
+      (let [{:keys [versions total]} (ds/get-description-history db {:id (:id item)})]
+        (is (= 3 total))
+        (is (= ["New Title" "Old Title" "Old Title"] (map :title versions)))
+        (is (= ["d1" "d1" nil] (map :text versions)))
+        (is (= ["app" "scraper" "scraper"] (map :source versions))
+            "the rename is the app's revision; the archived ones stay the scraper's")))))
 
 (deftest update-annotations-global-test
   (with-fresh-db "writes :annotation onto the item"

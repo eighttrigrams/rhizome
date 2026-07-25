@@ -69,6 +69,14 @@
         (is (nil? (:short_title stored)))
         (is (false? (:hide_in_global_search stored)))))))
 
+(deftest create-item-attributes-the-revision-to-the-api-test
+  (test-with-fresh-db "a title-only item created over REST has an api-sourced first revision"
+    (let [ctx (body-json (POST* "/rest/contexts" {:title "Books"}))
+          item (body-json (POST* "/rest/items" {:title "Sapiens" :context-ids [(:id ctx)]}))
+          {:keys [versions total]} (ds/get-description-history db {:id (:id item)})]
+      (is (= 1 total))
+      (is (= "api" (:source (first versions)))))))
+
 (deftest create-context-with-short-title-test
   (test-with-fresh-db "stores :short-title when provided"
     (let [resp (POST* "/rest/contexts" {:title "Second World War" :short-title "WW2"})

@@ -187,9 +187,11 @@
       sql/format
       (#(jdbc/execute! db % {:return-keys true}))))
 
-(defn- save-description-to-history
+(defn- present? [s] (and s (not (clojure.string/blank? s))))
+
+(defn- save-revision-to-history!
   [db id description title source]
-  (when (and description (not (clojure.string/blank? description)))
+  (when (or (present? description) (present? title))
     (let [max-version-result (jdbc/execute-one! db
                                                 (sql/format {:select [[[:coalesce [:max :version] 0]
                                                                        :max_version]]
@@ -225,7 +227,7 @@
                                       :created_at (:history/created_at row)
                                       :source (:history/source row)})
                                 history-items)
-        all-versions (if (and current-description (not (clojure.string/blank? current-description)))
+        all-versions (if (or (present? current-description) (present? (:title current-item)))
                        (concat [{:text current-description
                                  :title (:title current-item)
                                  :version (inc (or (:history/version (first history-items)) 0))
@@ -237,9 +239,11 @@
     {:versions all-versions :total (count all-versions)}))
 
 (defn- update-item'
-  [db {:keys [id title short_title annotation sort_idx tags data hide_in_global_search]
-       :as item}]
+  [db
+   {:keys [id title short_title annotation sort_idx tags data hide_in_global_search] :as item}
+   source]
   (let [old-item (get-item db item)
+        title-changed? (not= (:title old-item) title)
         old-data (:data old-item)
         data (if data
                ;; This will prevent any attempts of a dissoc, btw. Not sure if I wanted that.
@@ -260,6 +264,7 @@
                :tags [:inline tags]
                :data [:inline (json/generate-string data)]
                :hide_in_global_search [:inline (boolean hide_in_global_search)]}
+              (when title-changed? {:description_source [:inline source]})
               ;; Only touch human_readable_id when the caller actually supplied
               ;; the key. A digits-only value is silently dropped (the rest of
               ;; the update still goes through); blank/nil clears the column.
@@ -280,29 +285,38 @@
                              (if (integer? (:sort_idx old-item)) (:sort_idx old-item) -1))))]}))
         formatted-sql (sql/format {:update [:items] :where [:= :id [:inline id]] :set set})
         _result (jdbc/execute-one! db formatted-sql {:return-keys true})]
-    (or (not= (:title old-item) title) (not= (:short_title old-item) short_title))))
+    {:old-item old-item
+     :title-changed? title-changed?
+     :display-title-changed? (or title-changed? (not= (:short_title old-item) short_title))}))
 
 (defn update-item
   "NOTE that dissoc on data items won't work as there is a merge of the old with the new data going on."
-  [db {:keys [id title short_title date] :as item}]
-  (delete-date db id)
-  (when date (insert-date db id date))
-  (let [has-title-changed? (update-item' db item)]
-    (when has-title-changed?
-      (future (try (datastore.relations/update-collection-title-in-collection-items-for-children
-                     db
-                     id
-                     title
-                     short_title)
-                   (catch Exception e (log/error (.getMessage e)))))))
-  (get-item db item))
+  ([db item] (update-item db item "app"))
+  ([db {:keys [id title short_title date] :as item} source]
+   (delete-date db id)
+   (when date (insert-date db id date))
+   (let [{:keys [old-item title-changed? display-title-changed?]} (update-item' db item source)]
+     (when title-changed?
+       (save-revision-to-history! db
+                                  id
+                                  (:description old-item)
+                                  (:title old-item)
+                                  (:description_source old-item)))
+     (when display-title-changed?
+       (future (try (datastore.relations/update-collection-title-in-collection-items-for-children
+                      db
+                      id
+                      title
+                      short_title)
+                    (catch Exception e (log/error (.getMessage e)))))))
+   (get-item db item)))
 
 (defn update-context-description
   [db {:keys [id description]} source]
   (let [old-item (get-item db {:id id})
         old-description (:description old-item)]
-    (save-description-to-history db id old-description (:title old-item)
-                                 (:description_source old-item))
+    (save-revision-to-history! db id old-description (:title old-item)
+                               (:description_source old-item))
     (jdbc/execute-one! db
                        (sql/format {:update [:items]
                                     :set {:description [:inline description]
@@ -381,20 +395,19 @@
                               :where [:= :id [:inline id]]})))
 
 (defn- create-new-item!
-  ([db title short_title] (create-new-item! db title short_title nil))
-  ([db title short_title sort_idx]
-   (let [now (helpers/gen-date)
-         id (helpers/insert-and-get-id! db
-              (sql/format
-                {:insert-into [:items]
-                 :columns (concat [:inserted_at :updated_at
-                                   :updated_at_ctx :title :short_title]
-                                  (if sort_idx [:sort_idx] []))
-                 :values [(concat [[:raw now] [:raw now] [:raw now]
-                                   title short_title]
-                                  (if sort_idx [sort_idx] []))]}))]
-     (when (empty? title) (insert-date db id (helpers/gen-iso-simple-date-str)))
-     id)))
+  [db title short_title sort_idx source]
+  (let [now (helpers/gen-date)
+        id (helpers/insert-and-get-id! db
+             (sql/format
+               {:insert-into [:items]
+                :columns (concat [:inserted_at :updated_at
+                                  :updated_at_ctx :title :short_title :description_source]
+                                 (if sort_idx [:sort_idx] []))
+                :values [(concat [[:raw now] [:raw now] [:raw now]
+                                  title short_title source]
+                                 (if sort_idx [sort_idx] []))]}))]
+    (when (empty? title) (insert-date db id (helpers/gen-iso-simple-date-str)))
+    id))
 
 (defn- insert-item-relations!
   [db values]
@@ -403,24 +416,29 @@
                    {:insert-into [:relations] :columns [:owner_id :target_id] :values values})))
 
 (defn new-item
-  [db title short-title context-ids-set sort-idx]
-  (when-not (seq context-ids-set) (throw (Exception. "won't create a new-item when no contexts")))
-  (let [item-id (create-new-item! db title short-title sort-idx)
-        values (vec (doall (map (fn [ctx-id] [[:inline ctx-id] [:inline item-id]])
-                             context-ids-set)))]
-    (insert-item-relations! db values)
-    (datastore.relations/set-collection-titles-of-new-item db item-id)
-    (get-item db {:id item-id})))
+  ([db title short-title context-ids-set sort-idx]
+   (new-item db title short-title context-ids-set sort-idx "app"))
+  ([db title short-title context-ids-set sort-idx source]
+   (when-not (seq context-ids-set)
+     (throw (Exception. "won't create a new-item when no contexts")))
+   (let [item-id (create-new-item! db title short-title sort-idx source)
+         values (vec (doall (map (fn [ctx-id] [[:inline ctx-id] [:inline item-id]])
+                              context-ids-set)))]
+     (insert-item-relations! db values)
+     (datastore.relations/set-collection-titles-of-new-item db item-id)
+     (get-item db {:id item-id}))))
 
 (defn new-context
-  [db {title :title}]
-  (let [now (helpers/gen-date)
-        id (helpers/insert-and-get-id! db
-             (sql/format {:insert-into [:items]
-                          :columns [:inserted_at :updated_at :updated_at_ctx :title
-                                    :is_context]
-                          :values [[[:raw now]
-                                    [:raw now] [:raw now] [:inline title] true]]}))]
-    (-> (jdbc/execute-one! db
-          (sql/format {:select [:*] :from [:items] :where [:= :id [:inline id]]}))
-        post-process-base)))
+  ([db item] (new-context db item "app"))
+  ([db {title :title} source]
+   (let [now (helpers/gen-date)
+         id (helpers/insert-and-get-id! db
+              (sql/format {:insert-into [:items]
+                           :columns [:inserted_at :updated_at :updated_at_ctx :title
+                                     :is_context :description_source]
+                           :values [[[:raw now]
+                                     [:raw now] [:raw now] [:inline title] true
+                                     [:inline source]]]}))]
+     (-> (jdbc/execute-one! db
+           (sql/format {:select [:*] :from [:items] :where [:= :id [:inline id]]}))
+         post-process-base))))
