@@ -45,9 +45,29 @@
 ;; borrow connections.
 (defonce ^:private anchor-connections (atom []))
 
-(defn- pin-in-memory-anchor! [^SQLiteDataSource ds ^String dbname]
+(defn- pin-in-memory-anchor! [^DataSource ds ^String dbname]
   (when (str/starts-with? dbname "file::memory:")
     (swap! anchor-connections conj (.getConnection ds))))
+
+(defn- vec-loading-datasource
+  "Delegating wrapper that loads the vec extension on every borrowed
+   connection. Must not be a `proxy`: `proxy-super` strips the overridden
+   method off the shared proxy instance and restores it in a `finally`, so
+   two threads borrowing at once can leave the override permanently nil,
+   after which all items_vec SQL fails with \"no such module: vec0\" until
+   the process restarts."
+  ^DataSource [^SQLiteDataSource inner]
+  (reify DataSource
+    (getConnection [_] (load-vec! (.getConnection inner)))
+    (getConnection [_ u p] (load-vec! (.getConnection inner u p)))
+    (getLogWriter [_] (.getLogWriter inner))
+    (setLogWriter [_ out] (.setLogWriter inner out))
+    (getLoginTimeout [_] (.getLoginTimeout inner))
+    (setLoginTimeout [_ seconds] (.setLoginTimeout inner seconds))
+    (getParentLogger [_] (.getParentLogger inner))
+    (unwrap [_ iface] (if (.isInstance ^Class iface inner) inner (.unwrap inner iface)))
+    (isWrapperFor [_ iface] (or (.isInstance ^Class iface inner)
+                                (.isWrapperFor inner iface)))))
 
 (defn make-datasource
   "Wrap a SQLite db spec as a DataSource that loads the sqlite-vec
@@ -56,14 +76,12 @@
    absent or the dylib is missing, the datasource still works but
    vector-search features (items_vec / vec_distance_*) are unavailable."
   ^DataSource [{:keys [dbname]}]
-  (let [cfg (doto (SQLiteConfig.)
-              (.enableLoadExtension vec-available?))
-        ds  (if vec-available?
-              (proxy [SQLiteDataSource] [cfg]
-                (getConnection
-                  ([] (load-vec! (proxy-super getConnection)))
-                  ([u p] (load-vec! (proxy-super getConnection u p)))))
-              (SQLiteDataSource. cfg))]
-    (.setUrl ^SQLiteDataSource ds (str "jdbc:sqlite:" dbname))
+  (let [cfg   (doto (SQLiteConfig.)
+                (.enableLoadExtension vec-available?))
+        inner (doto (SQLiteDataSource. cfg)
+                (.setUrl (str "jdbc:sqlite:" dbname)))
+        ds    (if vec-available?
+                (vec-loading-datasource inner)
+                inner)]
     (pin-in-memory-anchor! ds dbname)
     ds))
