@@ -50,3 +50,4 @@ settings.local.json
 docker/compose.ports.yml
 .envrc
 nohup.out
+CLAUDE.md
