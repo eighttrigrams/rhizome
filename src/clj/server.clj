@@ -135,7 +135,7 @@
   (context
     "/"
     []
-    (context "/api" [] (POST "/" [] (api)))
+    (context "/ui" [] (POST "/" [] (api)))
     (rest-api/rest-routes)
     (POST "/test/reset" [] reset-handler)
     (GET "/open/:file-id" [] open)

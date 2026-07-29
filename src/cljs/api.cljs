@@ -3,7 +3,7 @@
   (:require ajax.core))
 
 #_{:clj-kondo/ignore [:clojure-lsp/unused-public-var]}
-(def config {:api-path "/api" :error-handler #(prn "error caught by base error handler:" %)})
+(def config {:api-path "/ui" :error-handler #(prn "error caught by base error handler:" %)})
 
 #_{:clj-kondo/ignore [:unresolved-symbol]}
 (defn-over-http list-resources :return-value {})

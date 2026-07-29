@@ -1,5 +1,5 @@
 (ns api.harness
-  "Test harness for the /api endpoint consumed by the UI.
+  "Test harness for the /ui endpoint consumed by the UI.
 
    Tests should call `call!` with plain Clojure data; this namespace owns
    the wire format (currently: JSON envelope wrapping transit-encoded args
@@ -42,7 +42,7 @@
   (let [body (json/generate-string
                {:fn   (name fn-name)
                 :args (transit-write (vec args))})
-        req  (-> (mock/request :post "/api")
+        req  (-> (mock/request :post "/ui")
                  (mock/content-type "application/json")
                  (mock/body body))
         resp (app req)
