@@ -9,9 +9,11 @@
 (defn rest-routes
   []
   (mw/wrap-logging
-   (mw/wrap-require-reason
-    (context "/api" []
+   (mw/wrap-refuse-writes
+    (mw/wrap-require-reason
+     (context "/api" []
            (GET "/describe" [] (queries/describe))
+           (GET "/status" [] (queries/status))
            (POST "/recording-mode/toggle" [] (mutations/toggle-recording-mode))
            (POST "/backfill/embeddings" [] (mutations/backfill-embeddings (:db config/config)))
            (GET "/contexts" [q limit]
@@ -44,4 +46,4 @@
                 (mutations/deletion-preview-related-items (:db config/config) id))
            (POST "/items/:id/related/delete" [id]
                  (mutations/delete-related-items (:db config/config) id))
-           (PUT "/relations" req (mutations/upsert-relation (:db config/config) req))))))
+           (PUT "/relations" req (mutations/upsert-relation (:db config/config) req)))))))

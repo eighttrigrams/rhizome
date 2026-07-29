@@ -6,6 +6,7 @@
             [cambium.core :as log]
             [et.vp.ds :as datastore]
             [et.vp.ds.search :as search]
+            [replica :as replica]
             [semsearch.query :as semsearch]
             [rest-api.util :refer [json-response item->api parse-int-opt parse-ids-csv]]))
 
@@ -184,9 +185,20 @@
          (log/error e "REST API: get-item-with-related failed")
          (json-response 500 {:error (.getMessage e)}))))
 
+(defn status
+  "GET /api/status — this instance's role: {\"read-only-replica\": true|false}.
+  True when it booted as a read-only replica (prod mode, no primary.nosync
+  marker in its start directory): every mutating request is refused with 403 and
+  its db is open read-only. False when writes are possible at all (recording
+  mode still gates them). Decided once at startup, so it cannot change while the
+  process runs."
+  []
+  (json-response {:read-only-replica (replica/read-only?)}))
+
 (def ^:private global-conventions
   ["Every mutation (POST/PUT/PATCH/DELETE) MUST include a non-blank \"reason\" field in its JSON body explaining why the change is being made. Requests without one are rejected with 400. The reason is recorded in server logs and is not repeated in individual endpoint docstrings."
-   "Mutations are gated by recording mode: while OFF they are logged as intent and dropped (a stub response is returned). Toggle with POST /api/recording-mode/toggle, or in-app with Option+Shift+W."])
+   "Mutations are gated by recording mode: while OFF they are logged as intent and dropped (a stub response is returned). Toggle with POST /api/recording-mode/toggle, or in-app with Option+Shift+W."
+   "A read-only replica refuses writes: an instance that booted without its primary.nosync marker (prod mode) answers every mutating request -- recording-mode toggle and embeddings backfill included -- with 403 {\"read-only-replica\": true} and writes nothing; reads are unaffected. GET /api/status reports the role, and the role is fixed for the lifetime of the process."])
 
 (def ^:private skill-resource "rhizome-user/SKILL.md")
 

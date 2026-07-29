@@ -2,7 +2,8 @@
   (:require [cambium.core :as log]
             [cheshire.core :as json]
             [clojure.string :as str]
-            [config :as config]))
+            [config :as config]
+            [replica :as replica]))
 
 (defonce ^:private *recording? (atom false))
 
@@ -130,6 +131,24 @@
   (fn [req]
     (if (and (rest-uri? req) (mutation-methods (:request-method req)))
       (require-reason handler req)
+      (handler req))))
+
+(defn wrap-refuse-writes
+  "On a read-only replica, answer every mutating /api request (POST/PUT/PATCH/
+  DELETE) with the graceful refusal instead of calling the handler -- the
+  recording-mode toggle and the embeddings backfill included. GETs (and every
+  other read-only method) are untouched, and so is a primary. Wraps
+  wrap-require-reason rather than the other way round: on a replica the write is
+  refused whether or not it carried a reason."
+  [handler]
+  (fn [req]
+    (if (and (rest-uri? req)
+             (mutation-methods (:request-method req))
+             (replica/read-only?))
+      (let [method (some-> req :request-method name str/upper-case)]
+        (log/warn {:event "replica-refusal" :method method :uri (:uri req)}
+                  (str "read-only replica: refused " method " " (:uri req)))
+        (replica/refusal-response))
       (handler req))))
 
 (defn- log-request

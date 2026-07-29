@@ -166,7 +166,7 @@ explicitly asks**. Reads are free; a write puts machine-authored text into a
 store whose value rests on its provenance.
 
 When asked, the write endpoints are `POST /contexts`, `POST /items` and
-`PUT /items/:id`. Two rules govern every one of them.
+`PUT /items/:id`. Three rules govern every one of them.
 
 **A mutation must say why it is happening.** Every POST/PUT/PATCH/DELETE body
 needs a non-blank `"reason"` field explaining the change; it is recorded in the
@@ -182,6 +182,14 @@ curl -s -X POST "$RHIZOME/items" -H 'Content-Type: application/json' \
 back `403 {"dropped":true,"recording":false,"intent":"..."}` and nothing is
 stored; the attempt is logged either way. Never ask for the gate to be
 bypassed — report the drop and let the human decide.
+
+**Some instances take no writes at all.** The human's rhizome directory is
+synced across machines, and only the one holding the `primary.nosync` marker may
+write; every other copy runs as a read-only replica and answers each mutation
+with `403 {"read-only-replica":true}` (its database is open read-only, so
+nothing can slip through). `GET /status` tells you which one you are talking to.
+Reads work exactly as everywhere else — report the refusal and let the human
+write on their primary.
 
 URLs (YouTube, GitHub, Substack, …) passed as `title` on `POST /items` are
 auto-detected and enriched by the insertion pipeline.
