@@ -1,18 +1,18 @@
 ---
 name: rhizome-rest-api
-description: Hitting a locally running Rhizome's REST API during development, with the bundled rhizome-cli.sh curl wrapper — /api/describe, the write gate and recording mode, embedding backfill, response shapes. For querying the human's live rhizome, use the rhizome-user skill (plurama-cli) instead.
+description: Hitting a locally running Rhizome's REST API during development, with the bundled rhizome-cli.sh curl wrapper — /api/describe, the write gate and recording mode, embedding backfill, response shapes. The full query guidance (the rhizome-user skill) is served by the API itself, as the skill key of GET /api/describe.
 ---
 
 # Rhizome REST API (development)
 
 This skill is for **development against a locally running Rhizome** — you
 started it yourself, you know the port, and you are exercising or changing the
-API. To query the human's real rhizome, use the `rhizome-user` skill, which
-goes through `plurama-cli`.
+API.
 
 How to search well — the item/context model, intersection search, kind
-filters, search modes, vector search — is in `rhizome-user` and applies
-unchanged here; only the transport differs.
+filters, search modes, vector search — is the `rhizome-user` guidance, which
+the API serves about itself: the `skill` key of `GET /api/describe`. It
+applies unchanged here.
 
 Rhizome exposes its REST API at `http://127.0.0.1:<port>/api/`. Dev port is
 `3006`. Request/response bodies are JSON. Rhizome must be running locally
