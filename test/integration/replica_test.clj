@@ -1,9 +1,13 @@
 (ns replica-test
-  "The replica guards that live in `server`: the polling job and /upload."
+  "The replica guards that live in `server`: the startup steps, the polling job
+   and /upload."
   (:require [clojure.test :refer [deftest is testing]]
             [config :as config]
+            [datastore.schema :as schema]
+            [dev-seed :as dev-seed]
             [poll :as poll]
-            [server :as server]))
+            [server :as server]
+            [upload :as upload]))
 
 (def ^:private replica-config {:read-only-replica? true})
 (def ^:private primary-config {:read-only-replica? false})
@@ -32,6 +36,26 @@
                     poll/start-scheduler! record!]
         (#'server/start-pollers!)
         (is (= [::db] @started))))))
+
+(deftest write-side-startup-skipped-on-a-replica-test
+  (let [called (atom [])
+        record! (fn [k] (fn [& _] (swap! called conj k) nil))]
+    (testing "a replica runs none of it -- not the schema, not the seed, and not the
+              ImageMagick gate, which would refuse it a boot over preview
+              downscaling it can never do"
+      (with-redefs [config/config replica-config
+                    upload/ensure-convert! (record! :ensure-convert)
+                    schema/apply-schema! (record! :apply-schema)
+                    dev-seed/maybe-seed! (record! :maybe-seed)]
+        (#'server/prepare-for-writing!)
+        (is (empty? @called))))
+    (testing "a primary runs all three"
+      (with-redefs [config/config (assoc primary-config :db ::db)
+                    upload/ensure-convert! (record! :ensure-convert)
+                    schema/apply-schema! (record! :apply-schema)
+                    dev-seed/maybe-seed! (record! :maybe-seed)]
+        (#'server/prepare-for-writing!)
+        (is (= [:ensure-convert :apply-schema :maybe-seed] @called))))))
 
 (deftest upload-refused-on-a-replica-test
   (testing "/upload is a write, so it gets the graceful refusal"

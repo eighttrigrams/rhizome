@@ -212,6 +212,25 @@
   (when (poll-scheduling-enabled?)
     (poll/start-scheduler! (:db config/config))))
 
+(defn- prepare-for-writing!
+  "The startup steps that only make sense where this instance may write, skipped
+  wholesale on a read-only replica:
+  - the schema and the seed write. A replica's db is owned by the primary and
+    arrives through the sync with its schema already applied; its datasource
+    would refuse them anyway.
+  - `ensure-convert!` gates startup on ImageMagick, which only preview
+    downscaling needs. A replica can never convert anything -- /upload is
+    refused and the pollers are not scheduled -- so gating it there would refuse
+    to boot over a capability it cannot use."
+  []
+  (when-not (replica/read-only?)
+    (upload/ensure-convert!)
+    (schema/apply-schema! (:db config/config))
+    (dev-seed/maybe-seed! {:db         (:db config/config)
+                           :dev?       (:dev? config/config)
+                           :e2e?       (:e2e? config/config)
+                           :skip-seed? (:skip-seed? config/config)})))
+
 (defn start-http-server!
   []
   (when (and (not (:dev? config/config))
@@ -219,16 +238,7 @@
                  (not (string? (:private-addr config/config)))))
     (throw (Exception. "config invalid")))
   (log-instance-role!)
-  (upload/ensure-convert!)
-  ;; Both of these write. A replica's db is owned by the primary and arrives
-  ;; through the sync with its schema already applied, so it skips them; its
-  ;; datasource would refuse them anyway.
-  (when-not (replica/read-only?)
-    (schema/apply-schema! (:db config/config))
-    (dev-seed/maybe-seed! {:db         (:db config/config)
-                           :dev?       (:dev? config/config)
-                           :e2e?       (:e2e? config/config)
-                           :skip-seed? (:skip-seed? config/config)}))
+  (prepare-for-writing!)
   ;; A missing file-type context silently drops files of that type on import,
   ;; so refuse to come up unless every named id is present. The only exemption
   ;; is a completely empty db: e2e runs against one by design, and a fresh
