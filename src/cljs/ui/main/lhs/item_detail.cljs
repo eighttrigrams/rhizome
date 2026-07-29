@@ -4,6 +4,7 @@
             [ajax.core :as ajax]
             [ui.actions :as actions]
             [ui.main.diff :as diff]
+            [ui.replica :as replica]
             [reagent.core :as r]))
 
 (defn- display-youtube-video
@@ -109,6 +110,17 @@
      {:children description
       :components {:a (custom-link-component *state) :img (custom-image-component *state)}}]]])
 
+(defn- upload-error-handler
+  "A read-only replica refuses /upload, and there a refusal is normal operation
+   rather than an anomaly: reporting it only to the console would leave the drop
+   looking like it worked. Alerting is how a refused write is already reported in
+   this UI (see ui.recording-mode, ui.replica); other failures keep going to the
+   console alone, as before."
+  [error]
+  (println "Error:" error)
+  (when-let [msg (replica/refused-write-message (:response error))]
+    (js/window.alert msg)))
+
 (defn send-file-to-backend
   [file id mode]
   (let [form-data (js/FormData.)]
@@ -122,7 +134,7 @@
                       :response-format (ajax.core/raw-response-format)
                       :headers {"Accept" "application/json"}
                       :handler (fn [response] (println "Success:" response))
-                      :error-handler (fn [error] (println "Error:" error))})))))
+                      :error-handler upload-error-handler})))))
 
 (defn drop-target
   [id]

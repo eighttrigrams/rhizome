@@ -24,6 +24,16 @@
                (reset! *read-only?
                        (boolean (:read-only-replica (js->clj data :keywordize-keys true))))))))
 
+(defn refused-write-message
+  "The refusal sentence out of a raw JSON error body, or nil when the failure was
+   something else. The HTTP writes (/upload, /api) answer a refusal as
+   403 {\"read-only-replica\":true,\"error\":…} -- see replica/refusal-response."
+  [body]
+  (try (let [{:keys [read-only-replica error]}
+               (js->clj (js/JSON.parse body) :keywordize-keys true)]
+         (when read-only-replica error))
+       (catch :default _ nil)))
+
 (defn refusal-notice!
   "Report a refused write and hand back the response without the refusal key, so
    it does not travel on in app state. Alerting is how a dropped write is already
