@@ -60,7 +60,7 @@
          (json-response 500 {:error (.getMessage e)}))))
 
 (defn create-item
-  "POST /rest/items — create a new item. JSON body: {\"title\" (required),
+  "POST /api/items — create a new item. JSON body: {\"title\" (required),
   \"context-ids\" (required, at least one), \"description\" (optional),
   \"sort-idx\" (optional int, e.g. a page number). Gated by recording mode: when
   off, the write is logged and dropped with 201 {:created true} stub."
@@ -94,7 +94,7 @@
          (json-response 500 {:error (.getMessage e)}))))
 
 (defn update-item-description
-  "PUT /rest/items/:id — replace an item's description. JSON body: {\"description\"}.
+  "PUT /api/items/:id — replace an item's description. JSON body: {\"description\"}.
   Gated by recording mode. 404 if the item does not exist."
   [db id req]
   (try (let [id (Integer/parseInt id)
@@ -139,9 +139,9 @@
          (json-response 500 {:error (.getMessage e)}))))
 
 (defn create-context
-  "POST /rest/contexts — create a new context (item with is_context=true).
+  "POST /api/contexts — create a new context (item with is_context=true).
   JSON body: {\"title\" (required), \"short-title\" (optional),
-  \"human-readable-id\" (optional string — stable handle for GET /rest/items?id=…;
+  \"human-readable-id\" (optional string — stable handle for GET /api/items?id=…;
   must be unique and contain at least one non-digit character),
   \"sort-idx\" (optional int), \"hide-in-global-search\" (optional bool — when
   true, the context is excluded from global contexts search). Gated by
@@ -179,7 +179,7 @@
          (json-response 500 {:error (.getMessage e)}))))
 
 (defn upsert-relation
-  "PUT /rest/relations — upsert a relation between two items. JSON body:
+  "PUT /api/relations — upsert a relation between two items. JSON body:
   {\"source-id\" (required int), \"target-id\" (required int),
   \"show-badge\" (optional bool, default true — controls whether the badge for
   this relation is shown in the source item's context list)}. The relation is
@@ -208,7 +208,7 @@
                 (fn [] (upsert-relation-impl db source-item target-item show-badge?))))))))
 
 (defn backfill-embeddings
-  "POST /rest/backfill/embeddings — embed every item that has a non-empty
+  "POST /api/backfill/embeddings — embed every item that has a non-empty
   description and a NULL embedding. Idempotent: items that already have an
   embedding are skipped, so it's safe to re-run (e.g. after Ollama was down
   during writes, or after UI-created items bypassed the ingestion hook).
@@ -260,12 +260,12 @@
            plan)))
 
 (defn ^:no-describe deletion-preview-related-items
-  "GET /rest/items/:id/related/deletion-preview — read-only preview of
-  what POST /rest/items/:id/related/delete would do. :id is the context
+  "GET /api/items/:id/related/deletion-preview — read-only preview of
+  what POST /api/items/:id/related/delete would do. :id is the context
   the operation runs from. Walks the same planner (with dry-run? = true)
   so the preview's three buckets — :primary, :cascade, :unlinked — match
   what an actual delete would produce. Not gated. Unlisted (no
-  /rest/describe)."
+  /api/describe)."
   [db id]
   (try (let [context-id (Integer/parseInt id)
              context (datastore/get-item db {:id context-id})]
@@ -278,14 +278,14 @@
          (json-response 500 {:error (.getMessage e)}))))
 
 (defn ^:no-describe delete-related-items
-  "POST /rest/items/:id/related/delete — runs the cascade plan for the
+  "POST /api/items/:id/related/delete — runs the cascade plan for the
   context's secondary-filtered items and executes it. :id is the
   context the operation runs from. Each item in the :primary bucket
   (matching the context's stored view) is unlinked from every relation
   it touches; neighbors are then re-classified — orphaned ones
   cascade-delete (bucket :cascade), surviving ones land in :unlinked
   with the reasons they were kept. Gated by recording mode: when off,
-  returns :dropped true and empty buckets. Unlisted (no /rest/describe)."
+  returns :dropped true and empty buckets. Unlisted (no /api/describe)."
   [db id]
   (try (let [context-id (Integer/parseInt id)
              context (datastore/get-item db {:id context-id})]
@@ -308,7 +308,7 @@
          (json-response 500 {:error (.getMessage e)}))))
 
 (defn ^:no-describe toggle-recording-mode
-  "POST /rest/recording-mode/toggle — toggle the write-gate. While ON, mutating
+  "POST /api/recording-mode/toggle — toggle the write-gate. While ON, mutating
   endpoints execute; while OFF they log intent and return 403 {:dropped true}.
   Prefer the in-app shortcut Option+Shift+W for day-to-day toggling."
   []

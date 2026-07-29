@@ -74,7 +74,7 @@ install-sqlite-vec:
 	@./scripts/install-sqlite-vec.sh
 
 backfill-embeddings:
-	@curl -sS -X POST http://127.0.0.1:$(PORT)/rest/backfill/embeddings \
+	@curl -sS -X POST http://127.0.0.1:$(PORT)/api/backfill/embeddings \
 	  -H 'Content-Type: application/json' \
 	  -d '{"reason":"make backfill-embeddings"}'
 	@echo

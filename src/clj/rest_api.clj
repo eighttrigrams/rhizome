@@ -10,7 +10,7 @@
   []
   (mw/wrap-logging
    (mw/wrap-require-reason
-    (context "/rest" []
+    (context "/api" []
            (GET "/describe" [] (queries/describe))
            (POST "/recording-mode/toggle" [] (mutations/toggle-recording-mode))
            (POST "/backfill/embeddings" [] (mutations/backfill-embeddings (:db config/config)))

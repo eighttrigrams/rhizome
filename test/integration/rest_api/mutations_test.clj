@@ -58,7 +58,7 @@
 
 (deftest create-context-minimal-test
   (test-with-fresh-db "creates a context with only :title"
-    (let [resp (POST* "/rest/contexts" {:title "Books"})
+    (let [resp (POST* "/api/contexts" {:title "Books"})
           body (body-json resp)]
       (is (= 201 (:status resp)))
       (is (= "Books" (:title body)))
@@ -71,15 +71,15 @@
 
 (deftest create-item-attributes-the-revision-to-the-api-test
   (test-with-fresh-db "a title-only item created over REST has an api-sourced first revision"
-    (let [ctx (body-json (POST* "/rest/contexts" {:title "Books"}))
-          item (body-json (POST* "/rest/items" {:title "Sapiens" :context-ids [(:id ctx)]}))
+    (let [ctx (body-json (POST* "/api/contexts" {:title "Books"}))
+          item (body-json (POST* "/api/items" {:title "Sapiens" :context-ids [(:id ctx)]}))
           {:keys [versions total]} (ds/get-description-history db {:id (:id item)})]
       (is (= 1 total))
       (is (= "api" (:source (first versions)))))))
 
 (deftest create-context-with-short-title-test
   (test-with-fresh-db "stores :short-title when provided"
-    (let [resp (POST* "/rest/contexts" {:title "Second World War" :short-title "WW2"})
+    (let [resp (POST* "/api/contexts" {:title "Second World War" :short-title "WW2"})
           body (body-json resp)
           stored (ds/get-item db {:id (:id body)})]
       (is (= 201 (:status resp)))
@@ -88,7 +88,7 @@
 
 (deftest create-context-with-hide-in-global-search-test
   (test-with-fresh-db "stores :hide-in-global-search as a top-level column"
-    (let [resp (POST* "/rest/contexts" {:title "Hidden" :hide-in-global-search true})
+    (let [resp (POST* "/api/contexts" {:title "Hidden" :hide-in-global-search true})
           body (body-json resp)
           stored (ds/get-item db {:id (:id body)})]
       (is (= 201 (:status resp)))
@@ -97,7 +97,7 @@
 
 (deftest create-context-with-both-extras-test
   (test-with-fresh-db "applies short-title and hide-in-global-search together"
-    (let [resp (POST* "/rest/contexts"
+    (let [resp (POST* "/api/contexts"
                       {:title "Private notes"
                        :short-title "PN"
                        :hide-in-global-search true})
@@ -109,7 +109,7 @@
 
 (deftest create-context-with-human-readable-id-test
   (test-with-fresh-db "stores :human-readable-id when provided"
-    (let [resp (POST* "/rest/contexts" {:title "Books" :human-readable-id "books"})
+    (let [resp (POST* "/api/contexts" {:title "Books" :human-readable-id "books"})
           body (body-json resp)
           stored (ds/get-item db {:id (:id body)})]
       (is (= 201 (:status resp)))
@@ -117,7 +117,7 @@
       (is (= "books" (:human_readable_id stored)))))
 
   (test-with-fresh-db "drops a digits-only :human-readable-id but still saves the rest"
-    (let [resp (POST* "/rest/contexts" {:title "Books" :human-readable-id "12345"})
+    (let [resp (POST* "/api/contexts" {:title "Books" :human-readable-id "12345"})
           body (body-json resp)
           stored (ds/get-item db {:id (:id body)})]
       (is (= 201 (:status resp)))
@@ -126,7 +126,7 @@
 
 (deftest create-context-with-sort-idx-test
   (test-with-fresh-db "stores :sort-idx when provided"
-    (let [resp (POST* "/rest/contexts" {:title "Chapter 3" :sort-idx 3})
+    (let [resp (POST* "/api/contexts" {:title "Chapter 3" :sort-idx 3})
           body (body-json resp)
           stored (ds/get-item db {:id (:id body)})]
       (is (= 201 (:status resp)))
@@ -134,7 +134,7 @@
 
 (deftest create-context-hide-false-noop-test
   (test-with-fresh-db ":hide-in-global-search=false leaves column at its default"
-    (let [resp (POST* "/rest/contexts" {:title "Public" :hide-in-global-search false})
+    (let [resp (POST* "/api/contexts" {:title "Public" :hide-in-global-search false})
           body (body-json resp)
           stored (ds/get-item db {:id (:id body)})]
       (is (= 201 (:status resp)))
@@ -143,7 +143,7 @@
 
 (deftest create-context-missing-title-test
   (test-with-fresh-db "rejects requests without :title"
-    (let [resp (POST* "/rest/contexts" {:short-title "x"})]
+    (let [resp (POST* "/api/contexts" {:short-title "x"})]
       (is (= 400 (:status resp)))
       (is (= "title is required" (:error (body-json resp)))))))
 
@@ -152,7 +152,7 @@
     (let [ctx (ds/new-context db {:title "Books"})
           src (ds/new-item db "Source item" "src" #{(:id ctx)} 1)
           tgt (ds/new-item db "Target item" "tgt" #{(:id ctx)} 2)
-          resp (PUT* "/rest/relations" {:source-id (:id src) :target-id (:id tgt)})
+          resp (PUT* "/api/relations" {:source-id (:id src) :target-id (:id tgt)})
           stored (ds/get-item db {:id (:id src)})]
       (is (= 200 (:status resp)))
       (is (contains? (get-in stored [:data :contexts]) (:id tgt)))
@@ -163,7 +163,7 @@
     (let [ctx (ds/new-context db {:title "Books"})
           src (ds/new-item db "Source" "src" #{(:id ctx)} 1)
           tgt (ds/new-item db "Target" "tgt" #{(:id ctx)} 2)
-          resp (PUT* "/rest/relations"
+          resp (PUT* "/api/relations"
                      {:source-id (:id src) :target-id (:id tgt) :show-badge false})
           stored (ds/get-item db {:id (:id src)})]
       (is (= 200 (:status resp)))
@@ -174,14 +174,14 @@
     (let [ctx (ds/new-context db {:title "Books"})
           src (ds/new-item db "Source" "src" #{(:id ctx)} 1)
           tgt (ds/new-item db "Target" "tgt" #{(:id ctx)} 2)]
-      (PUT* "/rest/relations" {:source-id (:id src) :target-id (:id tgt) :show-badge true})
-      (PUT* "/rest/relations" {:source-id (:id src) :target-id (:id tgt) :show-badge false})
+      (PUT* "/api/relations" {:source-id (:id src) :target-id (:id tgt) :show-badge true})
+      (PUT* "/api/relations" {:source-id (:id src) :target-id (:id tgt) :show-badge false})
       (let [stored (ds/get-item db {:id (:id src)})]
         (is (false? (get-in stored [:data :contexts (:id tgt) :show-badge?])))))))
 
 (deftest upsert-relation-missing-ids-test
   (test-with-fresh-db "rejects missing/non-integer ids"
-    (let [resp (PUT* "/rest/relations" {:source-id 1})]
+    (let [resp (PUT* "/api/relations" {:source-id 1})]
       (is (= 400 (:status resp)))
       (is (= "source-id and target-id are required integers" (:error (body-json resp)))))))
 
@@ -189,7 +189,7 @@
   (test-with-fresh-db "rejects source-id == target-id"
     (let [ctx (ds/new-context db {:title "Books"})
           item (ds/new-item db "X" "x" #{(:id ctx)} 1)
-          resp (PUT* "/rest/relations" {:source-id (:id item) :target-id (:id item)})]
+          resp (PUT* "/api/relations" {:source-id (:id item) :target-id (:id item)})]
       (is (= 400 (:status resp)))
       (is (= "source-id and target-id must differ" (:error (body-json resp)))))))
 
@@ -198,8 +198,8 @@
     (let [ctx (ds/new-context db {:title "Books"})
           item (ds/new-item db "X" "x" #{(:id ctx)} 1)
           missing 9999999
-          resp1 (PUT* "/rest/relations" {:source-id missing :target-id (:id item)})
-          resp2 (PUT* "/rest/relations" {:source-id (:id item) :target-id missing})]
+          resp1 (PUT* "/api/relations" {:source-id missing :target-id (:id item)})
+          resp2 (PUT* "/api/relations" {:source-id (:id item) :target-id missing})]
       (is (= 404 (:status resp1)))
       (is (= "source item not found" (:error (body-json resp1))))
       (is (= 404 (:status resp2)))
@@ -211,7 +211,7 @@
     (with-time
       (mw/toggle!)
       (try
-        (let [resp (POST* "/rest/contexts" {:title "ShouldNotPersist"})
+        (let [resp (POST* "/api/contexts" {:title "ShouldNotPersist"})
               body (body-json resp)]
           (is (= 201 (:status resp)))
           (is (nil? (:id body)))
@@ -220,10 +220,10 @@
 
 (deftest reason-required-on-mutations-test
   (test-with-fresh-db "POST/PUT without a reason in the JSON body is rejected with 400"
-    (let [r1 (POST-raw* "/rest/contexts" {:title "X"})
-          r2 (POST-raw* "/rest/contexts" {:title "X" :reason ""})
-          r3 (POST-raw* "/rest/contexts" {:title "X" :reason "  "})
-          r4 (POST-raw* "/rest/items/1/related/delete" nil)]
+    (let [r1 (POST-raw* "/api/contexts" {:title "X"})
+          r2 (POST-raw* "/api/contexts" {:title "X" :reason ""})
+          r3 (POST-raw* "/api/contexts" {:title "X" :reason "  "})
+          r4 (POST-raw* "/api/items/1/related/delete" nil)]
       (is (= 400 (:status r1)))
       (is (= 400 (:status r2)))
       (is (= 400 (:status r3)))
@@ -234,7 +234,7 @@
 (deftest reason-not-required-on-reads-test
   (test-with-fresh-db "GETs (read-only) are unaffected by the reason rule"
     (let [resp (with-redefs [config/config {:db db}]
-                 (@handler (mock/request :get "/rest/describe")))]
+                 (@handler (mock/request :get "/api/describe")))]
       (is (= 200 (:status resp))))))
 
 (defn- POST-empty*
@@ -264,7 +264,7 @@
           b (ds/new-item db "Item B" "" #{(:id parent)} 2)
           unrelated (ds/new-context db {:title "Other"})
           c (ds/new-item db "Item C" "" #{(:id unrelated)} 3)
-          resp (POST-empty* (str "/rest/items/" (:id parent) "/related/delete"))
+          resp (POST-empty* (str "/api/items/" (:id parent) "/related/delete"))
           body (body-json resp)]
       (is (= 200 (:status resp)))
       (is (false? (:dry-run body)))
@@ -278,7 +278,7 @@
 (deftest delete-related-items-no-related-test
   (test-with-fresh-db "parent with no related items returns empty buckets"
     (let [parent (ds/new-context db {:title "Books"})
-          resp (POST-empty* (str "/rest/items/" (:id parent) "/related/delete"))
+          resp (POST-empty* (str "/api/items/" (:id parent) "/related/delete"))
           body (body-json resp)]
       (is (= 200 (:status resp)))
       (is (= [] (:primary body)))
@@ -293,7 +293,7 @@
           mid (ds/new-item db "Sub-context" "" #{(:id parent)} 1)
           _ (jdbc/execute-one! db ["update items set is_context = true where id = ?" (:id mid)])
           child (ds/new-item db "Child" "" #{(:id mid)} 1)
-          resp (POST-empty* (str "/rest/items/" (:id parent) "/related/delete"))
+          resp (POST-empty* (str "/api/items/" (:id parent) "/related/delete"))
           body (body-json resp)]
       (is (= 200 (:status resp)))
       (is (= [(:id mid)] (ids-with-status body :primary "deleted")))
@@ -303,12 +303,12 @@
 
 (deftest delete-related-items-context-not-found-test
   (test-with-fresh-db "404s when the context id has no corresponding item"
-    (let [resp (POST-empty* "/rest/items/9999999/related/delete")]
+    (let [resp (POST-empty* "/api/items/9999999/related/delete")]
       (is (= 404 (:status resp))))))
 
 (deftest delete-related-items-bad-context-id-test
   (test-with-fresh-db "400s when the path id is not an integer"
-    (let [resp (POST-empty* "/rest/items/not-an-int/related/delete")]
+    (let [resp (POST-empty* "/api/items/not-an-int/related/delete")]
       (is (= 400 (:status resp))))))
 
 (deftest delete-related-items-recording-off-test
@@ -319,7 +319,7 @@
             a (ds/new-item db "Item A" "" #{(:id parent)} 1)]
         (mw/toggle!)
         (try
-          (let [resp (POST-empty* (str "/rest/items/" (:id parent) "/related/delete"))
+          (let [resp (POST-empty* (str "/api/items/" (:id parent) "/related/delete"))
                 body (body-json resp)]
             (is (= 200 (:status resp)))
             (is (true? (:dropped body)))
@@ -334,7 +334,7 @@
     (let [parent (ds/new-context db {:title "Books"})
           a (ds/new-item db "Item A" "" #{(:id parent)} 1)
           b (ds/new-item db "Item B" "" #{(:id parent)} 2)
-          resp (GET* (str "/rest/items/" (:id parent) "/related/deletion-preview"))
+          resp (GET* (str "/api/items/" (:id parent) "/related/deletion-preview"))
           body (body-json resp)]
       (is (= 200 (:status resp)))
       (is (true? (:dry-run body)))
@@ -351,7 +351,7 @@
             a (ds/new-item db "Item A" "" #{(:id parent)} 1)]
         (mw/toggle!)
         (try
-          (let [resp (GET* (str "/rest/items/" (:id parent) "/related/deletion-preview"))
+          (let [resp (GET* (str "/api/items/" (:id parent) "/related/deletion-preview"))
                 body (body-json resp)]
             (is (= 200 (:status resp)))
             (is (true? (:dry-run body)))
@@ -366,8 +366,8 @@
           mid (ds/new-item db "Sub-context" "" #{(:id parent)} 1)
           _ (jdbc/execute-one! db ["update items set is_context = true where id = ?" (:id mid)])
           _child (ds/new-item db "Child" "" #{(:id mid)} 1)
-          preview (body-json (GET* (str "/rest/items/" (:id parent) "/related/deletion-preview")))
-          actual (body-json (POST-empty* (str "/rest/items/" (:id parent) "/related/delete")))]
+          preview (body-json (GET* (str "/api/items/" (:id parent) "/related/deletion-preview")))
+          actual (body-json (POST-empty* (str "/api/items/" (:id parent) "/related/delete")))]
       (is (= (set (ids-in preview :primary)) (set (ids-in actual :primary))))
       (is (= (set (ids-in preview :cascade)) (set (ids-in actual :cascade))))
       (is (= (set (ids-in preview :unlinked)) (set (ids-in actual :unlinked)))))))
@@ -377,7 +377,7 @@
 (defn- link!
   "Add a relation owner→target (owner contains target) directly, and patch
   the target's data.contexts so it stays in sync — that's what the rest of
-  the app reads. We bypass /rest/relations because its implementation
+  the app reads. We bypass /api/relations because its implementation
   reshapes the target's contexts via a full delete+reinsert, which is more
   side-effect than these tests want to model."
   [owner-id target-id]
@@ -404,7 +404,7 @@
           ;; unlink e from parent so its only inbound is via b
           _ (jdbc/execute! db ["delete from relations where owner_id = ? and target_id = ?"
                                (:id parent) (:id e)])
-          resp (POST-empty* (str "/rest/items/" (:id parent) "/related/delete"))
+          resp (POST-empty* (str "/api/items/" (:id parent) "/related/delete"))
           body (body-json resp)]
       (is (= 200 (:status resp)))
       (is (some #(= (:id b) (:id %)) (:primary body)))
@@ -423,7 +423,7 @@
           ;; Remove the direct parent->e link so e is only connected to parent via b
           _ (jdbc/execute! db ["delete from relations where owner_id = ? and target_id = ?"
                                (:id parent) (:id e)])
-          body (body-json (POST-empty* (str "/rest/items/" (:id parent) "/related/delete")))
+          body (body-json (POST-empty* (str "/api/items/" (:id parent) "/related/delete")))
           unlinked-e (find-by-id (:unlinked body) (:id e))]
       (is (= [(:id b)] (ids-with-status body :primary "deleted")))
       (is (empty? (:cascade body)))
@@ -447,7 +447,7 @@
           _ (link! (:id b) (:id e))
           _ (jdbc/execute! db ["delete from relations where owner_id = ? and target_id = ?"
                                (:id parent) (:id e)])
-          body (body-json (POST-empty* (str "/rest/items/" (:id parent) "/related/delete")))
+          body (body-json (POST-empty* (str "/api/items/" (:id parent) "/related/delete")))
           unlinked-e (find-by-id (:unlinked body) (:id e))]
       (is (some? unlinked-e))
       (is (some #(= "is-context-flag" %) (:keep-reasons unlinked-e)))
@@ -464,7 +464,7 @@
           _ (link! (:id b) (:id e))
           _ (jdbc/execute! db ["delete from relations where owner_id = ? and target_id = ?"
                                (:id parent) (:id e)])
-          body (body-json (POST-empty* (str "/rest/items/" (:id parent) "/related/delete")))
+          body (body-json (POST-empty* (str "/api/items/" (:id parent) "/related/delete")))
           unlinked-e (find-by-id (:unlinked body) (:id e))]
       (is (some? unlinked-e))
       (is (some #(= "has-other-children" %) (:keep-reasons unlinked-e)))
@@ -483,7 +483,7 @@
           ;; e is only reachable via b and c (no other parent)
           _ (jdbc/execute! db ["delete from relations where owner_id = ? and target_id = ?"
                                (:id parent) (:id e)])
-          body (body-json (POST-empty* (str "/rest/items/" (:id parent) "/related/delete")))]
+          body (body-json (POST-empty* (str "/api/items/" (:id parent) "/related/delete")))]
       (is (= #{(:id b) (:id c)} (set (ids-with-status body :primary "deleted"))))
       (is (= [(:id e)] (ids-with-status body :cascade "deleted")))
       (is (nil? (:id (ds/get-item db {:id (:id e)})))))))
@@ -498,7 +498,7 @@
           e (ds/new-item db "E" "" #{(:id other)} 2)
           _ (link! (:id b) (:id e))   ; b owns e
           _ (link! (:id e) (:id b))   ; e owns b — both directions
-          _ (POST-empty* (str "/rest/items/" (:id parent) "/related/delete"))
+          _ (POST-empty* (str "/api/items/" (:id parent) "/related/delete"))
           remaining (jdbc/execute! db ["select * from relations where owner_id = ? or target_id = ?"
                                        (:id b) (:id b)])]
       (is (empty? remaining))
@@ -518,7 +518,7 @@
           ;; sanity-check: b is in e's data.contexts before delete
           pre-e (ds/get-item db {:id (:id e)})
           _ (is (contains? (get-in pre-e [:data :contexts]) (:id b)))
-          _ (POST-empty* (str "/rest/items/" (:id parent) "/related/delete"))
+          _ (POST-empty* (str "/api/items/" (:id parent) "/related/delete"))
           post-e (ds/get-item db {:id (:id e)})]
       (is (not (contains? (get-in post-e [:data :contexts]) (:id b))))
       (is (not (contains? (get-in post-e [:data :contexts]) (str (:id b))))))))
@@ -529,16 +529,16 @@
     (let [parent (ds/new-context db {:title "A"})
           b (ds/new-item db "B" "" #{(:id parent)} 1)
           x (ds/new-item db "X" "" #{(:id b)} 1)
-          body (body-json (POST-empty* (str "/rest/items/" (:id parent) "/related/delete")))]
+          body (body-json (POST-empty* (str "/api/items/" (:id parent) "/related/delete")))]
       (is (= [(:id b)] (ids-with-status body :primary "deleted")))
       (is (= [(:id x)] (ids-with-status body :cascade "deleted")))
       (is (nil? (:id (ds/get-item db {:id (:id b)}))))
       (is (nil? (:id (ds/get-item db {:id (:id x)})))))))
 
 (deftest delete-related-items-not-in-describe-test
-  (testing "delete-related-items + deletion-preview are unlisted in /rest/describe"
+  (testing "delete-related-items + deletion-preview are unlisted in /api/describe"
     (let [resp (with-redefs [config/config {:db db}]
-                 (@handler (mock/request :get "/rest/describe")))
+                 (@handler (mock/request :get "/api/describe")))
           endpoints (:endpoints (body-json resp))
           names (set (map :name endpoints))]
       (is (not (contains? names "delete-related-items")))

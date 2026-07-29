@@ -9,7 +9,7 @@
             [rest-api.util :refer [json-response item->api parse-int-opt parse-ids-csv]]))
 
 (defn search-contexts
-  "GET /rest/contexts?q=<query>[&limit=N] — searches **global** contexts
+  "GET /api/contexts?q=<query>[&limit=N] — searches **global** contexts
   (that is, those which have is_context true and hide-in-global-search false)
   by title, short-title & tags, prefix search. Limit defaults to 10, most
   recently touched first."
@@ -24,7 +24,7 @@
 (defn- numeric-id? [s] (boolean (re-matches #"\d+" s)))
 
 (defn find-items
-  "GET /rest/items?id=Foo&id=Bar&id=123 — lookup items by id. The id parameter
+  "GET /api/items?id=Foo&id=Bar&id=123 — lookup items by id. The id parameter
   may be repeated. A value that is all digits is matched against the items
   primary key (parsed as an integer); a value with at least one non-digit
   character is matched against the human-readable-id column. The two id
@@ -80,7 +80,7 @@
          (json-response 500 {:error (.getMessage e)}))))
 
 (defn get-item
-  "GET /rest/items/:id — fetch a single item (context or leaf) by numeric id,
+  "GET /api/items/:id — fetch a single item (context or leaf) by numeric id,
   including its description. 400 if id is not an integer. Note: currently
   returns 200 with an empty shell ({:id nil, :title nil, ...}) when no item
   exists for the id; callers should check `:id`."
@@ -90,7 +90,7 @@
        (catch NumberFormatException _ (json-response 400 {:error "Invalid item ID"}))))
 
 (defn find-by-sort-idx
-  "GET /rest/items/by-sort-idx?sort_idx=N&context_ids=a,b,c — find the item whose
+  "GET /api/items/by-sort-idx?sort_idx=N&context_ids=a,b,c — find the item whose
   sort_idx equals N and which belongs to ALL listed contexts (intersection).
   Typical use: locate a page inside its book + chapter. 404 if no such item."
   [db sort-idx context-ids-str]
@@ -116,7 +116,7 @@
        (catch NumberFormatException _ (json-response 400 {:error "Invalid parameters"}))))
 
 (defn search-items
-  "GET /rest/items?q=<query> — free-text search across all items (context and
+  "GET /api/items?q=<query> — free-text search across all items (context and
   leaf). Returns up to 10 hits. Prefer context/intersection lookups via
   /items/:id/related when you can narrow by context."
   [db q]
@@ -127,7 +127,7 @@
          (json-response 500 {:error (.getMessage e)}))))
 
 (defn get-related-items
-  "GET /rest/items/:id/related?q=&secondary_ids=&search_mode=&vector= — list
+  "GET /api/items/:id/related?q=&secondary_ids=&search_mode=&vector= — list
   items related to the context :id. Optional free-text q; CSV secondary_ids
   enables intersection search (raises limit from 10 to 100). search_mode:
   0 = most recently touched first (default), 2 = ordered by sort_idx (limit
@@ -136,7 +136,7 @@
   vector=true switches to semantic search: q is embedded via Ollama
   (qwen3-embedding) and items are ranked by cosine similarity. Requires a
   non-empty q. Only items with a non-empty description are embedded — both
-  on ingestion (POST /rest/items, PUT /rest/items/:id) and by the REPL
+  on ingestion (POST /api/items, PUT /api/items/:id) and by the REPL
   backfill — so title-only items never appear in vector results."
   [db id-str {:keys [q secondary-ids search-mode vector?]}]
   (try (let [selected-id (Integer/parseInt id-str)
@@ -162,7 +162,7 @@
          (json-response 500 {:error (.getMessage e)}))))
 
 (defn get-item-with-related
-  "GET /rest/items/:id/with-related?search_mode= — for a non-context (leaf)
+  "GET /api/items/:id/with-related?search_mode= — for a non-context (leaf)
   item, returns {:item :related}. 400 if :id is a context, 404 if not found."
   [db id-str {:keys [search-mode]}]
   (try (let [id (Integer/parseInt id-str)
@@ -185,10 +185,10 @@
 
 (def ^:private global-conventions
   ["Every mutation (POST/PUT/PATCH/DELETE) MUST include a non-blank \"reason\" field in its JSON body explaining why the change is being made. Requests without one are rejected with 400. The reason is recorded in server logs and is not repeated in individual endpoint docstrings."
-   "Mutations are gated by recording mode: while OFF they are logged as intent and dropped (a stub response is returned). Toggle with POST /rest/recording-mode/toggle, or in-app with Option+Shift+W."])
+   "Mutations are gated by recording mode: while OFF they are logged as intent and dropped (a stub response is returned). Toggle with POST /api/recording-mode/toggle, or in-app with Option+Shift+W."])
 
 (defn ^:no-describe describe
-  "GET /rest/describe — self-description of the REST API. Returns
+  "GET /api/describe — self-description of the REST API. Returns
   {:conventions [...]  :endpoints [{:name :doc} ...]}. The :conventions
   list captures rules that apply to every mutation so individual endpoint
   docstrings don't have to repeat them. Endpoints come from public vars

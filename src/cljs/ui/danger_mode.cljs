@@ -15,7 +15,7 @@
 (defn- open-confirm!
   [*state]
   (when-let [context-id (:id (:selected-item @*state))]
-    (-> (js/fetch (str "/rest/items/" context-id "/related/deletion-preview"))
+    (-> (js/fetch (str "/api/items/" context-id "/related/deletion-preview"))
         (.then (fn [^js resp] (.json resp)))
         (.then (fn [^js data]
                  (let [preview (js->clj data :keywordize-keys true)]
@@ -35,7 +35,7 @@
     (swap! *state #(-> %
                        (dissoc :modal)
                        (dissoc :danger-preview)))
-    (-> (js/fetch (str "/rest/items/" context-id "/related/delete")
+    (-> (js/fetch (str "/api/items/" context-id "/related/delete")
                   #js {:method "POST"
                        :headers #js {"Content-Type" "application/json"}
                        :body (js/JSON.stringify

@@ -10,7 +10,7 @@
 
 (defn toggle!
   [*state]
-  (-> (js/fetch "/rest/recording-mode/toggle"
+  (-> (js/fetch "/api/recording-mode/toggle"
                 #js {:method "POST"
                      :headers #js {"Content-Type" "application/json"}
                      :body (js/JSON.stringify

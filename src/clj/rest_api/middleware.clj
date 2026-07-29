@@ -91,7 +91,7 @@
 (defn- rest-uri?
   [req]
   (let [uri (or (:uri req) "")]
-    (or (= uri "/rest") (str/starts-with? uri "/rest/"))))
+    (or (= uri "/api") (str/starts-with? uri "/api/"))))
 
 (defn- missing-reason-response
   []
@@ -100,7 +100,7 @@
    :body (json/generate-string
            {:error
               (str "\"reason\" is required in the JSON body "
-                   "(non-empty string). See GET /rest/describe.")})})
+                   "(non-empty string). See GET /api/describe.")})})
 
 (defn- parse-reason
   [body-str]
@@ -119,12 +119,12 @@
       (missing-reason-response))))
 
 (defn wrap-require-reason
-  "For mutation requests (POST/PUT/PATCH/DELETE) under /rest, require a
+  "For mutation requests (POST/PUT/PATCH/DELETE) under /api, require a
   non-blank \"reason\" field in the JSON body. Reads the body once,
   validates, then restores it as a ByteArrayInputStream so downstream
   handlers can re-slurp normally. Read-only methods (GET, HEAD, OPTIONS)
-  and non-/rest URIs pass through untouched. The rule is documented
-  globally in /rest/describe so individual handlers don't have to
+  and non-/api URIs pass through untouched. The rule is documented
+  globally in /api/describe so individual handlers don't have to
   mention it."
   [handler]
   (fn [req]
@@ -174,10 +174,10 @@
       response)))
 
 (defn wrap-logging
-  "Ring middleware that logs every /rest interaction (request + response)
+  "Ring middleware that logs every /api interaction (request + response)
    under the `rest-api.middleware` logger. Captures method, URI, query
    string, request body (truncated), response status, response body
-   (truncated) and duration. Non-/rest URIs pass through untouched.
+   (truncated) and duration. Non-/api URIs pass through untouched.
    Bodies are restored as ByteArrayInputStreams so downstream handlers
    can still slurp them."
   [handler]
