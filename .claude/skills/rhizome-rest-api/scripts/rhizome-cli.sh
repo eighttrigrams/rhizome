@@ -6,7 +6,7 @@ set -euo pipefail
 #   rhizome-cli.sh <port> <path>                        # GET
 #   rhizome-cli.sh <port> <method> <path> [json-body]   # any method, optional body
 #
-# <path> is everything after /rest, including the leading slash,
+# <path> is everything after /api, including the leading slash,
 # e.g. "/contexts?q=Books".
 
 if [ $# -lt 2 ]; then
@@ -15,7 +15,7 @@ if [ $# -lt 2 ]; then
 fi
 
 port="$1"; shift
-base="http://127.0.0.1:${port}/rest"
+base="http://127.0.0.1:${port}/api"
 
 if [ $# -eq 1 ]; then
   curl -sf "${base}$1"

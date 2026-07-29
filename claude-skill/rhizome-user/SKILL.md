@@ -7,11 +7,11 @@ description: How to search and read the human's rhizome (their long-term memory 
 
 Rhizome is the human's long-term memory / second brain and idea store. Talk to
 it with `plurama-cli` (see the `plurama-cli` skill); its API lives under
-`/rest/`:
+`/api/`:
 
 ```bash
-plurama-cli rhizome '/rest/contexts?q=Books'
-plurama-cli rhizome '/rest/items/10935/related?secondary_ids=11041&search_mode=2'
+plurama-cli rhizome '/api/contexts?q=Books'
+plurama-cli rhizome '/api/items/10935/related?secondary_ids=11041&search_mode=2'
 ```
 
 Quote the path so the shell keeps `?` and `&`.
@@ -41,13 +41,13 @@ intersect topic ∩ kind. See the recipe below.
 
 ## Endpoint catalogue — ask the server
 
-`GET /rest/describe` returns a self-description of every handler (name,
+`GET /api/describe` returns a self-description of every handler (name,
 arglists, docstring with method, path, params, and status codes). That endpoint
 is the authoritative reference — this skill covers *how* to search, not the
 catalogue.
 
 ```bash
-plurama-cli rhizome /rest/describe | jq
+plurama-cli rhizome /api/describe | jq
 ```
 
 ## Search recipes
@@ -55,8 +55,8 @@ plurama-cli rhizome /rest/describe | jq
 ### Find the right context first, then drill down
 
 ```bash
-plurama-cli rhizome '/rest/contexts?q=Books'
-plurama-cli rhizome '/rest/items/10935/related'
+plurama-cli rhizome '/api/contexts?q=Books'
+plurama-cli rhizome '/api/items/10935/related'
 ```
 
 ### Intersection search (preferred strategy)
@@ -69,7 +69,7 @@ With secondary ids present the limit rises from 10 to 100.
 ```bash
 # Quotes that also belong to "Second World War"
 # (Second World War is narrower → selected; Quotes is the kind filter → secondary)
-plurama-cli rhizome '/rest/items/10935/related?secondary_ids=11041'
+plurama-cli rhizome '/api/items/10935/related?secondary_ids=11041'
 ```
 
 **Kind filter recipe.** When the human asks for "<kind> of/in/about <topic>"
@@ -82,7 +82,7 @@ plurama-cli rhizome '/rest/items/10935/related?secondary_ids=11041'
 
 ```bash
 # "pages of the Preface" → Preface (topic) ∩ Page (kind)
-plurama-cli rhizome '/rest/items/49041/related?secondary_ids=48601&search_mode=2'
+plurama-cli rhizome '/api/items/49041/related?secondary_ids=48601&search_mode=2'
 ```
 
 **Prefer the minimal intersection that captures the human's intent.** Adding
@@ -105,16 +105,16 @@ secondary id if the query actually constrains on it.
 Only for *non-context* items (leaf notes with longer titles).
 
 ```bash
-plurama-cli rhizome '/rest/items/34696/with-related'
+plurama-cli rhizome '/api/items/34696/with-related'
 ```
 
 ### Free-text item search (use sparingly)
 
 Prefer the context/intersection approach above. Fall back to `q` on
-`/rest/items` only when you can't narrow by context.
+`/api/items` only when you can't narrow by context.
 
 ```bash
-plurama-cli rhizome '/rest/items?q=Wittgenstein'
+plurama-cli rhizome '/api/items?q=Wittgenstein'
 ```
 
 ### Finding people
@@ -123,16 +123,16 @@ People are items under a dedicated "People" context. Once you have that
 context's id, use `/related`:
 
 ```bash
-plurama-cli rhizome '/rest/items/<people-ctx-id>/related?q=Daniel'
+plurama-cli rhizome '/api/items/<people-ctx-id>/related?q=Daniel'
 ```
 
 ### Semantic / vector search
 
-`/rest/items/:id/related` takes `vector=true` to switch from SQL LIKE to
+`/api/items/:id/related` takes `vector=true` to switch from SQL LIKE to
 cosine similarity on embeddings.
 
 ```bash
-plurama-cli rhizome '/rest/items/9659/related?vector=true&q=history%20of%20oil'
+plurama-cli rhizome '/api/items/9659/related?vector=true&q=history%20of%20oil'
 ```
 
 Important: **only items with a non-empty description get embedded**.
@@ -164,23 +164,23 @@ Rhizome is the human's memory — **do not write to it unless the human
 explicitly asks**. Reads are free; a write puts machine-authored text into a
 store whose value rests on its provenance.
 
-When asked: `POST /rest/contexts`, `POST /rest/items` and `PUT /rest/items/:id`
+When asked: `POST /api/contexts`, `POST /api/items` and `PUT /api/items/:id`
 are gated by rhizome's **recording mode**, which the human toggles in the app
 (a red ⚠ REC badge shows while it is on). With recording off the request comes
 back `403 {"dropped":true,"recording":false,"intent":"..."}` and nothing is
 stored; the attempt is logged either way. Never ask for the gate to be
 bypassed — report the drop and let the human decide.
 
-URLs (YouTube, GitHub, Substack, …) passed as `title` on `POST /rest/items` are
+URLs (YouTube, GitHub, Substack, …) passed as `title` on `POST /api/items` are
 auto-detected and enriched by the insertion pipeline.
 
 ## Search strategy — when using rhizome for research
 
 1. Break queries into likely categories. Prefer two short searches on separate
    terms over one long multi-word query.
-2. `GET /rest/contexts?q=…` first, to find the relevant context ids.
-3. `GET /rest/items/:id/related?secondary_ids=…` for intersection search —
-   much better than free-text `q` on `/rest/items`.
+2. `GET /api/contexts?q=…` first, to find the relevant context ids.
+3. `GET /api/items/:id/related?secondary_ids=…` for intersection search —
+   much better than free-text `q` on `/api/items`.
 4. Only use free-text `q` when you cannot narrow by context.
 5. Result lists are "most recently touched first" by default — top results
    are literally "top of mind" and should be weighted higher.
