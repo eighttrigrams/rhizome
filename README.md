@@ -170,6 +170,35 @@ Comments
 - We use nativefier to serve the app via electron
 - A first time run will seed some necessary contexts
 
+## Primary and replica
+
+The rhizome directory is synced between machines, and only one copy may write to
+the db. Files ending in `.nosync` are excluded from that sync, so a marker named
+`primary.nosync` — in the directory the app starts from, next to `config.edn` —
+exists on exactly one machine: the **primary**.
+
+An instance that starts in prod mode (`:dev?` false) *without* that marker is a
+**read-only replica**:
+
+- its sqlite db is opened read-only, so no code path can write to it — forgotten
+  ones included;
+- writes are refused gracefully in front of that: `/api` mutations, `/ui`
+  mutating commands (queries pass), `/upload`, the recording-mode toggle and the
+  embeddings backfill all answer `403 {"read-only-replica": true}`;
+- the youtube/atom pollers are not scheduled at all;
+- the UI carries a standing red badge, and `GET /api/status` reports the role.
+
+Startup logs the role it booted with as one line (`INSTANCE ROLE: PRIMARY` /
+`INSTANCE ROLE: READ-ONLY REPLICA`, with the reason). The role is decided once
+and held for the life of the process, so promoting a replica means placing the
+marker and restarting:
+
+```bash
+touch primary.nosync   # next to config.edn, then restart the app
+```
+
+Dev mode is unaffected — no marker needed, no guards, no badge.
+
 ## Configuration Options
 
 | Key | Notes |
