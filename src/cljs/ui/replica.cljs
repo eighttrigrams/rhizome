@@ -16,13 +16,22 @@
 
 (defn load!
   "Ask the server which kind of instance this is, once, at mount. Dev instances
-   always answer false, so nothing shows up there."
+   always answer false, so nothing shows up there.
+
+   A failed probe leaves the banner off -- it cannot be helped from here, the
+   role is the server's to report -- but it must not fail silently: without the
+   log line the UI's only standing signal of the mode would just be missing, with
+   nothing to diagnose it by."
   []
   (-> (js/fetch "/api/status")
       (.then (fn [^js resp] (.json resp)))
       (.then (fn [^js data]
                (reset! *read-only?
-                       (boolean (:read-only-replica (js->clj data :keywordize-keys true))))))))
+                       (boolean (:read-only-replica (js->clj data :keywordize-keys true))))))
+      (.catch (fn [err]
+                (js/console.error
+                  "Could not read /api/status — the read-only replica banner stays off:"
+                  err)))))
 
 (defn refused-write-message
   "The refusal sentence out of a raw JSON error body, or nil when the failure was
