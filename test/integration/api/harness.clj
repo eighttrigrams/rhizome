@@ -24,30 +24,39 @@
   (let [is (ByteArrayInputStream. (.getBytes s "UTF-8"))]
     (transit/read (transit/reader is :json))))
 
-(defn- inner-handler [req]
-  (response/response
-    (dispatch/handler
-      (assoc-in req [:body :server-args :db] db))))
-
-(def app
-  (-> inner-handler
+(defn- app-for
+  "The /ui app, serving `db` as the dispatcher's server-args. Parameterised
+   because a read-only replica's datasource is a different one (see
+   api.replica-query-sweep-test)."
+  [db]
+  (-> (fn [req]
+        (response/response
+          (dispatch/handler
+            (assoc-in req [:body :server-args :db] db))))
       ring-json/wrap-json-response
       (ring-json/wrap-json-body {:keywords? true})))
 
-(defn call!
-  "Invoke a dispatch function as the UI would. Args are positional Clojure
-   values; the return value is the dispatched fn's return as plain data.
-   Throws ex-info when the server reports `:thrown`."
-  [fn-name & args]
+(def app (app-for db))
+
+(defn call-on!
+  "Like `call!`, but against a caller-supplied datasource."
+  [db fn-name & args]
   (let [body (json/generate-string
                {:fn   (name fn-name)
                 :args (transit-write (vec args))})
         req  (-> (mock/request :post "/ui")
                  (mock/content-type "application/json")
                  (mock/body body))
-        resp (app req)
+        resp ((app-for db) req)
         parsed (json/parse-string (:body resp) true)]
     (when-let [thrown (:thrown parsed)]
       (throw (ex-info (str "API error: " thrown)
                       {:fn fn-name :args args :status (:status resp)})))
     (transit-read (:return parsed))))
+
+(defn call!
+  "Invoke a dispatch function as the UI would. Args are positional Clojure
+   values; the return value is the dispatched fn's return as plain data.
+   Throws ex-info when the server reports `:thrown`."
+  [fn-name & args]
+  (apply call-on! db fn-name args))
