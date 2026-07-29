@@ -42,9 +42,13 @@
                                #js {:reason "in-app danger-mode bulk delete of related items"})})
         (.then (fn [^js resp] (.json resp)))
         (.then (fn [^js data]
-                 (when (.-dropped data)
-                   (js/window.alert
-                     "Recording mode is OFF — deletion was dropped."))
+                 (let [{:keys [dropped read-only-replica error]}
+                         (js->clj data :keywordize-keys true)]
+                   (cond
+                     ;; A replica refuses the request outright (403), so the
+                     ;; reason to report is the instance, not the gate.
+                     read-only-replica (js/window.alert error)
+                     dropped (js/window.alert "Recording mode is OFF — deletion was dropped.")))
                  (fetch-and-reset! *state (assoc @*state :q nil)))))))
 
 (defn indicator

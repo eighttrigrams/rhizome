@@ -2,6 +2,7 @@
   (:require [cljs.core.async :refer [go]]
             [cljs.core.async.interop :refer-macros [<p!]]
             api
+            [ui.replica :as replica]
             utils))
 
 (defn save-input! [*state] (swap! *state assoc :loading false))
@@ -23,12 +24,15 @@
                                    (assoc :annotation-edit-item current-annotation-edit-item)))))))
 
 (defn- update-state
-  [{:keys [items contexts aggregated-contexts] :as i} state]
-  (merge (if (map? state) state @state)
-         i
-         {:items (if items items (:items state))
-          :contexts (or contexts (:contexts state))}
-         (when aggregated-contexts {:aggregated-contexts aggregated-contexts})))
+  [response state]
+  ;; A read-only replica answers a refused write in the normal envelope, so the
+  ;; notice is taken off here -- once, for every command that flows through.
+  (let [{:keys [items contexts aggregated-contexts] :as i} (replica/refusal-notice! response)]
+    (merge (if (map? state) state @state)
+           i
+           {:items (if items items (:items state))
+            :contexts (or contexts (:contexts state))}
+           (when aggregated-contexts {:aggregated-contexts aggregated-contexts}))))
 
 (defn- list-resources [state] (api/list-resources (dissoc state :items :contexts)))
 
@@ -83,7 +87,9 @@
 ;; separately
 ;; for quicker response times
 
-(defn- update-state-2 [new-state *state] (reset! *state (merge @*state new-state)))
+(defn- update-state-2
+  [new-state *state]
+  (reset! *state (merge @*state (replica/refusal-notice! new-state))))
 
 (defn- fetch-resources-with-method-2
   [*state method & args]

@@ -5,6 +5,7 @@
             [ui.modals :as modals]
             [ui.modals.actions :as modal-actions]
             [ui.recording-mode :as recording-mode]
+            [ui.replica :as replica]
             [ui.danger-mode :as danger-mode]
             [ui.main.rhs.modifiers :as modifiers]))
 
@@ -57,6 +58,10 @@
     (r/create-class
       {:component-did-mount (fn []
                               (re-focus)
+                              ;; Learn once whether this instance is a read-only
+                              ;; replica, so the banner can stand for as long as
+                              ;; the process runs.
+                              (replica/load!)
                               ;; A blocking native dialog (window.confirm on
                               ;; delete/unlink) swallows the Alt keyup, which
                               ;; used to leave *alt-pressed? stuck true. Resetting
@@ -65,6 +70,7 @@
                                                  #(reset! modifiers/*alt-pressed? false)))
        :render ;
          (fn [] [:div#ui
+                 [replica/banner]
                  [recording-mode/indicator *state]
                  [danger-mode/indicator *state]
                  [danger-mode/confirm-modal *state]
