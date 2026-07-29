@@ -1,6 +1,7 @@
 (ns rest-api.queries
   (:require [next.jdbc :as jdbc]
             [honey.sql :as sql]
+            [clojure.java.io :as io]
             [clojure.string :as str]
             [cambium.core :as log]
             [et.vp.ds :as datastore]
@@ -187,16 +188,32 @@
   ["Every mutation (POST/PUT/PATCH/DELETE) MUST include a non-blank \"reason\" field in its JSON body explaining why the change is being made. Requests without one are rejected with 400. The reason is recorded in server logs and is not repeated in individual endpoint docstrings."
    "Mutations are gated by recording mode: while OFF they are logged as intent and dropped (a stub response is returned). Toggle with POST /api/recording-mode/toggle, or in-app with Option+Shift+W."])
 
+(def ^:private skill-resource "rhizome-user/SKILL.md")
+
+(defn- strip-frontmatter
+  "Drop a leading YAML frontmatter block, so what /api/describe serves starts
+  at the markdown itself."
+  [md]
+  (str/replace-first md #"(?s)\A---\n.*?\n---\n" ""))
+
+(def ^:private skill-md
+  (delay
+    (when-let [r (io/resource skill-resource)]
+      (str/trim (strip-frontmatter (slurp r))))))
+
 (defn ^:no-describe describe
   "GET /api/describe — self-description of the REST API. Returns
-  {:conventions [...]  :endpoints [{:name :doc} ...]}. The :conventions
-  list captures rules that apply to every mutation so individual endpoint
-  docstrings don't have to repeat them. Endpoints come from public vars
-  in rest-api.queries and rest-api.mutations that carry a docstring; vars
-  marked ^:no-describe are excluded."
+  {:conventions [...]  :endpoints [{:name :doc} ...]  :skill \"...\"}. The
+  :conventions list captures rules that apply to every mutation so individual
+  endpoint docstrings don't have to repeat them. Endpoints come from public
+  vars in rest-api.queries and rest-api.mutations that carry a docstring; vars
+  marked ^:no-describe are excluded. :skill is the rhizome-user skill markdown
+  (resources/rhizome-user/SKILL.md, frontmatter stripped), which teaches how
+  to search and read rhizome well."
   []
   (json-response
     {:conventions global-conventions
+     :skill @skill-md
      :endpoints (->> ['rest-api.queries 'rest-api.mutations]
                      (mapcat (fn [ns-sym] (when-let [n (find-ns ns-sym)] (ns-publics n))))
                      (keep (fn [[sym v]]

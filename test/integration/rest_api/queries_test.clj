@@ -1,5 +1,6 @@
 (ns rest-api.queries-test
   (:require [clojure.test :refer [deftest is testing]]
+            [clojure.string :as str]
             [cheshire.core :as json]
             [next.jdbc :as jdbc]
             [ring.mock.request :as mock]
@@ -43,13 +44,18 @@
 (defn- body-json [resp] (json/parse-string (:body resp) true))
 
 (deftest describe-test
-  (test-with-fresh-db "returns conventions + endpoint docs"
+  (test-with-fresh-db "returns conventions + endpoint docs + the skill"
     (let [resp (GET* "/api/describe")
           body (body-json resp)
           endpoints (:endpoints body)
           names (set (map :name endpoints))
-          conventions (:conventions body)]
+          conventions (:conventions body)
+          skill (:skill body)]
       (is (= 200 (:status resp)))
+      (is (string? skill) "the rhizome-user skill markdown is served as :skill")
+      (is (re-find #"^# " skill)
+          "the skill starts at the markdown — the YAML frontmatter is stripped")
+      (is (not (str/includes? skill "name: rhizome-user")))
       (is (sequential? endpoints))
       (is (sequential? conventions))
       (is (some #(re-find #"reason" %) conventions)
