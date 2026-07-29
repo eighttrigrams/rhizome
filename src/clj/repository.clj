@@ -4,6 +4,7 @@
             [et.vp.ds.search :as search]
             [et.vp.ds.relations :as datastore.relations]
             [cambium.core :as log]
+            [replica :as replica]
             [repository.insertion :as insertion]
             [repository.deletion :as deletion]
             [semsearch.query :as semsearch]
@@ -106,9 +107,14 @@
                      (:title selected-item)
                      "\""))
       (log/info (str "Fetched " (count descriptions) " description versions"))
-      (if fetch-as-item?
-        (datastore/reprioritize-item db arg)
-        (datastore/reprioritize-context db arg))
+      ;; Selecting something is a read for the user, but it touches the row's
+      ;; ordering timestamps. On a read-only replica that touch is skipped so
+      ;; navigation keeps working -- it is the one write on a query path, which
+      ;; is why fetch-context is classified as a query in dispatch.
+      (when-not (replica/read-only?)
+        (if fetch-as-item?
+          (datastore/reprioritize-item db arg)
+          (datastore/reprioritize-context db arg)))
       (merge opts
              {:selected-item selected-item
               :items (search-related-items db "" selected-item)

@@ -207,6 +207,11 @@
   (and (not (:e2e? config/config))
        (not (replica/read-only?))))
 
+(defn- start-pollers!
+  []
+  (when (poll-scheduling-enabled?)
+    (poll/start-scheduler! (:db config/config))))
+
 (defn start-http-server!
   []
   (when (and (not (:dev? config/config))
@@ -239,8 +244,7 @@
     (check-folders-exist!))
   (let [host (or (:bind-host config/config)
                  (if (:dev? config/config) "0.0.0.0" "127.0.0.1"))]
-    (when (poll-scheduling-enabled?)
-      (poll/start-scheduler! (:db config/config)))
+    (start-pollers!)
     (future (j/run-jetty (app) {:port (:port config/config)
                                 :host host}))))
 

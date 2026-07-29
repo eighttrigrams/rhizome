@@ -1,7 +1,9 @@
 (ns dispatch
   (:require [net.eighttrigrams.defn-over-http.core :refer [defdispatch]]
             [cambium.core :as log]
+            [cognitect.transit :as transit]
             [config :as config]
+            [replica :as replica]
             [repository :refer
              [list-resources insert-item insert-context change-secondary-contexts-selection
               change-secondary-contexts-unassigned-selected change-secondary-contexts-inverted
@@ -20,7 +22,7 @@
 
 (defn- handle-error [e] (log/error {:error-handler :handle-error} e "an error occured"))
 
-(defdispatch handler
+(defdispatch handler*
              {:error-handler handle-error :pass-server-args? true}
              list-resources
              insert-item
@@ -62,3 +64,81 @@
              list-atom-poll-feeds
              add-atom-poll-feed
              delete-atom-poll-feed)
+
+;; --- read-only replica guard ------------------------------------------------
+
+(def ^:private read-only-commands
+  "The commands above that cannot write the db. Everything else counts as a
+   write, so a command added to the dispatch list without being classified here
+   is refused on a replica rather than let through -- the guard fails closed.
+
+   Three entries need a word:
+   - `list-resources` is both: a search on its own, but one of its :cmd branches
+     saves a description (see writing-list-resources-cmds).
+   - `fetch-context` is a read that touches the row's ordering timestamps; on a
+     replica the touch is skipped (see repository/fetch-context) so that opening
+     a context keeps working.
+   - `discard-obsidian-changes` only deletes a temp file. `edit-item-in-obsidian`
+     is deliberately NOT here although it writes no db row either: it is the
+     entry point of a write flow, and refusing it up front beats stranding the
+     human's edit in a temp file that sync-obsidian-changes then refuses."
+  #{"list-resources"
+    "fetch-aggregated-contexts"
+    "fetch-context"
+    "deselect-context"
+    "select-last-context"
+    "fetch-item-description"
+    "get-obsidian-file-content"
+    "discard-obsidian-changes"
+    "vector-search-related-items"
+    "vector-threshold-search-related-items"
+    "list-youtube-poll-channels"
+    "list-atom-poll-feeds"})
+
+(def ^:private writing-list-resources-cmds
+  "The :cmd values that make a list-resources call a write."
+  #{:update-context-description})
+
+(defn- read-args
+  "Decode the transit-encoded args. Only list-resources needs this to be
+   classified; nil (unparseable args) makes the classification fall back to
+   treating the call as a write."
+  [args]
+  (try (-> (java.io.ByteArrayInputStream. (.getBytes ^String args "UTF-8"))
+           (transit/reader :json)
+           transit/read)
+       (catch Exception _ nil)))
+
+(defn- write-command?
+  [fn-name args]
+  (cond
+    (not (contains? read-only-commands fn-name)) true
+    (= "list-resources" fn-name) (let [decoded (read-args args)]
+                                   (or (nil? decoded)
+                                       (boolean (some-> decoded
+                                                        first
+                                                        :cmd
+                                                        writing-list-resources-cmds))))
+    :else false))
+
+(defn- refusal
+  "A refusal in the envelope the SPA already reads, carrying :read-only-refused
+   for the UI to surface (see ui.replica). Answering in-band keeps the response
+   a normal one: the list the user is looking at stays on screen."
+  []
+  (let [os (java.io.ByteArrayOutputStream. 512)]
+    (transit/write (transit/writer os :json) {:read-only-refused replica/message})
+    {:return (.toString os "UTF-8") :thrown nil}))
+
+(defn handler
+  "The /ui entry point. The SPA carries queries AND mutations through this one
+   POST, so a read-only replica cannot refuse by HTTP method without breaking
+   reading: it refuses per command instead, here at the dispatch level. Query
+   commands pass through untouched -- see read-only-commands for the
+   classification, and `replica` for the rest of the guards."
+  [{{fn-name :fn args :args} :body :as req}]
+  (if (and (replica/read-only?) (write-command? fn-name args))
+    (do (log/warn {:event "replica-refusal" :uri "/ui" :fn fn-name}
+                  (str "read-only replica: refused /ui command " fn-name))
+        (refusal))
+    (handler* req)))
