@@ -146,7 +146,11 @@
    classification, and `replica` for the rest of the guards."
   [{{fn-name :fn args :args} :body :as req}]
   (if (and (replica/read-only?) (write-command? fn-name args))
-    (do (log/warn {:event "replica-refusal" :uri "/ui" :fn fn-name}
+    ;; INFO, not WARN like the /api refusal: on a replica plain browsing keys are
+    ;; write commands (s -> cycle-search-mode, the secondary-context badges ->
+    ;; change-secondary-contexts-*), so a refusal here is ordinary operation
+    ;; rather than the anomaly an /api write attempt is.
+    (do (log/info {:event "replica-refusal" :uri "/ui" :fn fn-name}
                   (str "read-only replica: refused /ui command " fn-name))
         (refusal))
     (handler* req)))
