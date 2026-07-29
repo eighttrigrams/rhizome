@@ -74,10 +74,19 @@
    extension on every connection (when present). The extension path is
    read from `:semsearch :vec-path` in config.edn; if `:semsearch` is
    absent or the dylib is missing, the datasource still works but
-   vector-search features (items_vec / vec_distance_*) are unavailable."
-  ^DataSource [{:keys [dbname]}]
+   vector-search features (items_vec / vec_distance_*) are unavailable.
+
+   With `:read-only? true` the db file is opened in SQLite's read-only open
+   mode (sqlite-jdbc's SQLiteConfig/setReadOnly, i.e. SQLITE_OPEN_READONLY
+   rather than a query_only pragma the connection could clear): reads work,
+   every INSERT/UPDATE/DELETE fails with SQLITE_READONLY, on every connection
+   borrowed from this datasource. That is how a read-only replica's write ban
+   is made structural -- see config/read-only-replica?. Note that read-only
+   mode never creates the file, so the db has to exist already."
+  ^DataSource [{:keys [dbname read-only?]}]
   (let [cfg   (doto (SQLiteConfig.)
-                (.enableLoadExtension vec-available?))
+                (.enableLoadExtension vec-available?)
+                (.setReadOnly (boolean read-only?)))
         inner (doto (SQLiteDataSource. cfg)
                 (.setUrl (str "jdbc:sqlite:" dbname)))
         ds    (if vec-available?

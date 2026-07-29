@@ -124,6 +124,40 @@
     (configure-logging! dir)
     (assoc-in c [:folders :logs] dir)))
 
+;; --- primary vs replica -----------------------------------------------------
+;; The owner syncs the rhizome directory between machines, and the sync
+;; excludes files ending in `.nosync`. A marker named `primary.nosync` in the
+;; directory the app starts from (sibling to config.edn) therefore exists on
+;; exactly one machine -- the primary. Every other, synced copy is a replica
+;; and must never write to the db.
+(def primary-marker
+  "File name of the primary marker, looked up in the start directory."
+  "primary.nosync")
+
+(defn primary-marker-present?
+  "Is the primary marker in the directory the app was started from? The path is
+   relative (like config-path), so it resolves against the process's working
+   directory."
+  ([] (primary-marker-present? (str "./" primary-marker)))
+  ([path] (.exists (io/file path))))
+
+(defn read-only-replica?
+  "Must this instance run as a read-only replica? True in prod mode when the
+   primary marker is absent.
+
+   Evaluated exactly ONCE per process -- in `ds` below, which `config` calls at
+   namespace load -- and then held for the process lifetime: an instance's role
+   does not flip mid-run. Nothing re-reads the filesystem afterwards, so a sync
+   that adds or drops the marker underneath a running app cannot silently change
+   what that process may do. Promoting a replica to primary means placing
+   `primary.nosync` next to config.edn and RESTARTING; a primary likewise stays
+   one until it is restarted without the marker.
+
+   Dev mode (including :test? / :e2e?, which force :dev? true) is never a
+   replica: no marker needed, no guards, no banner."
+  [c marker-present?]
+  (and (not (:dev? c)) (not marker-present?)))
+
 (defn- resolve-dbname [c]
   (let [hardcoded (when (:dev? c) (dev-dbname-for c))]
     (cond
@@ -147,9 +181,15 @@
         c (apply-dev-folders c)
         c (check-folders c)
         c (apply-logs-dir c)
-        dbname (resolve-dbname c)]
+        dbname (resolve-dbname c)
+        replica? (read-only-replica? c (primary-marker-present?))]
     (-> c
         (dissoc :db-path)
-        (assoc :db (connection/make-datasource {:dbname dbname})))))
+        (assoc :read-only-replica? replica?)
+        ;; The write ban is structural, not just behavioural: a replica's
+        ;; datasource is opened in SQLite's read-only mode, so even a code path
+        ;; that forgot to check cannot write. The graceful refusals (see the
+        ;; `replica` ns) sit in front of it.
+        (assoc :db (connection/make-datasource {:dbname dbname :read-only? replica?})))))
 
 (def config (ds))

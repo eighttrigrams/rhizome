@@ -15,6 +15,7 @@
             [repository :as r]
             [repository.insertion.file :as file]
             [poll :as poll]
+            [replica :as replica]
             [et.vp.ds :as datastore]
             opener
             dispatch
@@ -50,19 +51,25 @@
         req))))
 
 (defn upload-handler
+  "POST /upload — store a dropped preview image. A write, so a read-only replica
+  refuses it gracefully instead of letting the read-only datasource throw."
   [request]
-  (let [uploaded-file (get (-> request
-                               :multipart-params)
-                           "file")
-        id (get (-> request
-                    :multipart-params)
-                "id")
-        alternative-behaviour? (get (-> request
-                                        :multipart-params)
-                                    "alternative-behaviour")]
-    (upload/upload-preview-file (:db config/config) uploaded-file id alternative-behaviour?)
-    ;; Process the uploaded file here. For example, save it to a directory.
-    (response/response "File uploaded successfully!")))
+  (if (replica/read-only?)
+    (do (log/warn {:event "replica-refusal" :uri "/upload"}
+                  "read-only replica: refused /upload")
+        (replica/refusal-response))
+    (let [uploaded-file (get (-> request
+                                 :multipart-params)
+                             "file")
+          id (get (-> request
+                      :multipart-params)
+                  "id")
+          alternative-behaviour? (get (-> request
+                                          :multipart-params)
+                                      "alternative-behaviour")]
+      (upload/upload-preview-file (:db config/config) uploaded-file id alternative-behaviour?)
+      ;; Process the uploaded file here. For example, save it to a directory.
+      (response/response "File uploaded successfully!"))))
 
 ;; The directories configured under :folders are served beneath the /imgs URL
 ;; prefix by wrap-imgs (used in both dev and prod): :images backs /imgs/*
@@ -175,18 +182,48 @@
             (log/error msg)
             (throw (ex-info msg {:folder dir}))))))))
 
+(defn- log-instance-role!
+  "One unmissable startup line naming the role this process booted with, and why.
+  Prod only -- dev mode has no primary/replica distinction (see
+  config/read-only-replica?)."
+  []
+  (when-not (:dev? config/config)
+    (let [dir (System/getProperty "user.dir")]
+      (if (replica/read-only?)
+        (log/warn {:instance-role "read-only-replica"}
+                  (str "INSTANCE ROLE: READ-ONLY REPLICA -- prod mode and no "
+                       config/primary-marker " in " dir
+                       ": db opened read-only, every write refused, pollers not scheduled"))
+        (log/info {:instance-role "primary"}
+                  (str "INSTANCE ROLE: PRIMARY -- " config/primary-marker
+                       " present in " dir ": writes enabled"))))))
+
+(defn poll-scheduling-enabled?
+  "The youtube/atom pollers write (imported items plus the seen tables), so they
+  are only scheduled where writing is possible: never under e2e, and never on a
+  read-only replica -- there the job must not exist at all rather than fail on
+  every tick."
+  []
+  (and (not (:e2e? config/config))
+       (not (replica/read-only?))))
+
 (defn start-http-server!
   []
   (when (and (not (:dev? config/config))
              (or (nil? (:private-addr config/config))
                  (not (string? (:private-addr config/config)))))
     (throw (Exception. "config invalid")))
+  (log-instance-role!)
   (upload/ensure-convert!)
-  (schema/apply-schema! (:db config/config))
-  (dev-seed/maybe-seed! {:db         (:db config/config)
-                         :dev?       (:dev? config/config)
-                         :e2e?       (:e2e? config/config)
-                         :skip-seed? (:skip-seed? config/config)})
+  ;; Both of these write. A replica's db is owned by the primary and arrives
+  ;; through the sync with its schema already applied, so it skips them; its
+  ;; datasource would refuse them anyway.
+  (when-not (replica/read-only?)
+    (schema/apply-schema! (:db config/config))
+    (dev-seed/maybe-seed! {:db         (:db config/config)
+                           :dev?       (:dev? config/config)
+                           :e2e?       (:e2e? config/config)
+                           :skip-seed? (:skip-seed? config/config)}))
   ;; A missing file-type context silently drops files of that type on import,
   ;; so refuse to come up unless every named id is present. The only exemption
   ;; is a completely empty db: e2e runs against one by design, and a fresh
@@ -202,7 +239,7 @@
     (check-folders-exist!))
   (let [host (or (:bind-host config/config)
                  (if (:dev? config/config) "0.0.0.0" "127.0.0.1"))]
-    (when-not (:e2e? config/config)
+    (when (poll-scheduling-enabled?)
       (poll/start-scheduler! (:db config/config)))
     (future (j/run-jetty (app) {:port (:port config/config)
                                 :host host}))))

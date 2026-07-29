@@ -50,4 +50,8 @@ settings.local.json
 docker/compose.ports.yml
 .envrc
 nohup.out
+# Per-machine marker: its presence makes this checkout the primary (the one
+# instance allowed to write). Excluded from the owner's sync by the .nosync
+# suffix, and never committed -- see config/read-only-replica?.
+primary.nosync
 CLAUDE.md
