@@ -182,9 +182,12 @@ An instance that starts in prod mode (`:dev?` false) *without* that marker is a
 
 - its sqlite db is opened read-only, so no code path can write to it — forgotten
   ones included;
-- writes are refused gracefully in front of that: `/api` mutations, `/ui`
-  mutating commands (queries pass), `/upload`, the recording-mode toggle and the
-  embeddings backfill all answer `403 {"read-only-replica": true}`;
+- writes are refused gracefully in front of that: `/api` mutations
+  (recording-mode toggle and embeddings backfill included) and `/upload` answer
+  `403 {"read-only-replica": true}`; `/ui` carries queries and mutations through
+  one POST, so it refuses per command and in band — a normal `200` whose transit
+  body is `{:read-only-refused "…"}`, leaving the list on screen — and queries
+  pass;
 - the youtube/atom pollers are not scheduled at all;
 - the UI carries a standing red badge, and `GET /api/status` reports the role.
 
