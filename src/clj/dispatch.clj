@@ -124,10 +124,18 @@
 (defn- refusal
   "A refusal in the envelope the SPA already reads, carrying :read-only-refused
    for the UI to surface (see ui.replica). Answering in-band keeps the response
-   a normal one: the list the user is looking at stays on screen."
+   a normal one: the list the user is looking at stays on screen.
+
+   It clears :cmd and :arg exactly as a successful call does (see
+   repository/list-resources, which merges {:cmd nil :arg nil} over every
+   result). The SPA merges the response over the state it sent and reset!s its
+   atom from that, so without the clear a refused description save would leave
+   :cmd :update-context-description latched in state -- and every later feed or
+   search request would re-send that write cmd and be refused in turn."
   []
   (let [os (java.io.ByteArrayOutputStream. 512)]
-    (transit/write (transit/writer os :json) {:read-only-refused replica/message})
+    (transit/write (transit/writer os :json)
+                   {:read-only-refused replica/message :cmd nil :arg nil})
     {:return (.toString os "UTF-8") :thrown nil}))
 
 (defn handler

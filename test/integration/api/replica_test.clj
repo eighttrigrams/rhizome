@@ -91,6 +91,30 @@
       (is (refused? resp))
       (is (str/blank? (str (:description (ds/get-item db {:id (:id ctx)}))))))))
 
+(deftest refusal-does-not-latch-the-write-cmd-test
+  (with-fresh-db "the refusal clears :cmd/:arg, so a refused write cannot latch in SPA state"
+    (let [ctx (ds/new-context db {:title "Books"})
+          sent {:cmd :update-context-description
+                :arg {:id (:id ctx) :description "nope"}
+                :q "oil"}
+          refusal (as-replica (call! :list-resources sent))
+          success (as-replica (call! :list-resources {}))]
+      (is (refused? refusal))
+      (testing "both envelopes carry the same cleared :cmd/:arg"
+        (doseq [[label resp] [["refusal" refusal] ["success" success]]]
+          (is (contains? resp :cmd) label)
+          (is (contains? resp :arg) label)
+          (is (nil? (:cmd resp)) label)
+          (is (nil? (:arg resp)) label)))
+      (testing "so the state the SPA installs afterwards carries no write cmd"
+        ;; ui.actions.common/update-state merges the response over the state the
+        ;; request was sent with, and reset!s the app atom from the result. A
+        ;; refusal that left :cmd in place would make every later feed/search
+        ;; request re-send this write -- and be refused in turn.
+        (let [installed (merge sent refusal)]
+          (is (nil? (:cmd installed)))
+          (is (nil? (:arg installed))))))))
+
 (deftest unclassified-command-is-refused-test
   (with-fresh-db "the classification fails closed: what is not a known query counts as a write"
     (is (refused? (as-replica (call! :no-such-command))))))
