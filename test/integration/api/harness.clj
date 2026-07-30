@@ -36,8 +36,6 @@
       ring-json/wrap-json-response
       (ring-json/wrap-json-body {:keywords? true})))
 
-(def app (app-for db))
-
 (defn call-on!
   "Like `call!`, but against a caller-supplied datasource."
   [db fn-name & args]
