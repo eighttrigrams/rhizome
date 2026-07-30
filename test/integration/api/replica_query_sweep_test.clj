@@ -22,6 +22,7 @@
             [datastore.schema :as schema]
             [dispatch :as dispatch]
             [et.vp.ds :as ds]
+            [opener :as opener]
             [semsearch.backfill :as backfill]
             [semsearch.embedder :as embedder])
   (:import [java.io File]))
@@ -114,7 +115,16 @@
             ro (connection/make-datasource {:dbname path :read-only? true})]
         ;; Only the db and the role change: the rest of the config stays as the
         ;; test env has it, so the query paths see what they normally do.
-        (with-redefs [config/config (assoc config/config :db ro :read-only-replica? true)]
+        ;;
+        ;; The one exception is the Obsidian temp file: `discard-obsidian-changes`
+        ;; calls opener/delete-obsidian-temp-file, which deletes a path hardcoded
+        ;; into the owner's vault -- on the owner's machine that is a real in-flight
+        ;; edit, so a test run must not be able to reach it. Stubbing the delete
+        ;; keeps what this sweep is about (the command still runs against the
+        ;; read-only db) and drops only the filesystem side effect, which could not
+        ;; write a db row anyway.
+        (with-redefs [config/config (assoc config/config :db ro :read-only-replica? true)
+                      opener/delete-obsidian-temp-file (fn [] nil)]
           (doall
             (for [[command arg-vectors] (query-calls seeded)
                   :when (contains? names command)
