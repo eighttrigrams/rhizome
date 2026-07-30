@@ -134,13 +134,25 @@
 
 (defn- report [command args] (str command " " (pr-str args)))
 
+(defn- unknown-function?
+  "Whether the dispatcher has no such command. Asks by calling it deliberately
+   without args: an unknown command answers \"Unknown function: '…'\", a known one
+   an arity error, and nothing gets executed either way.
+
+   The dispatcher logs every error it answers with at ERROR
+   (dispatch/handle-error), so the arity errors provoked here -- one per
+   classified query -- would print a stack trace each into every `make test` run
+   and bury a real one. The log call is stubbed out for the duration; the
+   :thrown envelope `call-error` reads is built by the dispatcher regardless of
+   whether the handler logs, so what this test sees is unchanged."
+  [command]
+  (with-redefs [dispatch/handle-error (fn [_] nil)]
+    (boolean (re-find #"Unknown function" (str (call-error nil command []))))))
+
 (deftest classified-queries-are-dispatch-commands-test
   (testing "the whitelist names commands the dispatcher answers to -- no stale entries"
     (doseq [command classified-queries]
-      ;; Deliberately without args: an unknown command answers "Unknown
-      ;; function", a known one an arity error, and nothing gets executed.
-      (is (not (re-find #"Unknown function" (str (call-error nil command []))))
-          command)))
+      (is (not (unknown-function? command)) command)))
   (testing "and the sweep below covers every one of them"
     (is (empty? (set/difference classified-queries (set (keys (query-calls {})))))
         "a command added to dispatch/read-only-commands needs an entry in query-calls")
