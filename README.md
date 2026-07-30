@@ -186,8 +186,9 @@ An instance that starts in prod mode (`:dev?` false) *without* that marker is a
   (recording-mode toggle and embeddings backfill included) and `/upload` answer
   `403 {"read-only-replica": true}`; `/ui` carries queries and mutations through
   one POST, so it refuses per command and in band — a normal `200` whose transit
-  body is `{:read-only-refused "…"}`, leaving the list on screen — and queries
-  pass;
+  body is `{:read-only-refused "…" :cmd nil :arg nil}`, leaving the list on
+  screen (the cleared `:cmd`/`:arg` keep the refused command from staying latched
+  in the SPA state it is merged into) — and queries pass;
 - the youtube/atom pollers are not scheduled at all;
 - the UI carries a standing red badge, and `GET /api/status` reports the role.
 
