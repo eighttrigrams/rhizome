@@ -39,7 +39,13 @@ COMPOSE_VEC = $(if $(filter 1,$(WITH_VEC)),COMPOSE_PROFILES=vec,)
 # Always layer docker-compose.yml with the generated compose.ports.yml so
 # the host bindings come from .envrc / config.edn / shadow-cljs.edn rather
 # than YAML fallbacks. COMPOSE_FILE uses ':' as separator (compose convention).
-COMPOSE_FILES = COMPOSE_FILE=docker-compose.yml:compose.ports.yml
+#
+# docker/docker-compose.override.yml is the gitignored, per-machine layer
+# (this checkout's owner mounts an in-box CLAUDE.md through it). Compose only
+# auto-loads an override file when COMPOSE_FILE is unset -- and we always set
+# it -- so it has to be named here, last, to win.
+COMPOSE_OVERRIDE = docker-compose.override.yml
+COMPOSE_FILES = COMPOSE_FILE=docker-compose.yml:compose.ports.yml:$(COMPOSE_OVERRIDE)
 
 # Compose project name is derived from this checkout's directory name so
 # two sibling clones get separate volumes (m2_cache, npm_cache, ...) and

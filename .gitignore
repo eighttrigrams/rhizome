@@ -48,6 +48,12 @@ settings.local.json
 .dev-server.lock
 .shadow-cljs.pid
 docker/compose.ports.yml
+# Optional per-machine compose layer (see COMPOSE_OVERRIDE in the Makefile),
+# plus the credentials it feeds the box. Keep secrets in tracker.env, not in
+# the override -- this checkout's owner symlinks the override out to a synced
+# dotfiles repo.
+docker/docker-compose.override.yml
+docker/tracker.env
 .envrc
 nohup.out
 # Per-machine marker: its presence makes this checkout the primary (the one
