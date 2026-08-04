@@ -53,7 +53,7 @@ docker/compose.ports.yml
 # the override -- this checkout's owner symlinks the override out to a synced
 # dotfiles repo.
 docker/docker-compose.override.yml
-docker/tracker.env
+docker/env-vars
 .envrc
 nohup.out
 # Per-machine marker: its presence makes this checkout the primary (the one
