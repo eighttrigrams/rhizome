@@ -222,18 +222,25 @@
 
 (defn toggle-vector-search-mode!
   "Cycle the vector search mode: off -> green (re-rank by similarity) ->
-   blue (original order + similarity threshold filter) -> off."
+   blue (original order + similarity threshold filter) -> off.
+
+   Not available in hierarchy mode: that list is a structure the human placed,
+   in the order they placed it, and there is no useful reading of it re-ranked
+   by similarity. The backend answers the hierarchy list whatever the vector
+   mode says (see repository/vector-search-in-hierarchy-mode); refusing the
+   keypress keeps the green outline from promising a ranking that is not there."
   [*state]
-  (let [next-mode (case (:vector-mode @*state)
-                    :green :blue
-                    :blue  nil
-                    :green)]
-    (swap! *state assoc :vector-mode next-mode)
-    (case next-mode
-      :green (vector-search! *state)
-      :blue  (vector-threshold-search! *state)
-      (do (swap! *state dissoc :vector-threshold :vector-max-similarity :vector-min-similarity)
-          (search! *state)))))
+  (when-not (:hierarchy-mode? @*state)
+    (let [next-mode (case (:vector-mode @*state)
+                      :green :blue
+                      :blue  nil
+                      :green)]
+      (swap! *state assoc :vector-mode next-mode)
+      (case next-mode
+        :green (vector-search! *state)
+        :blue (vector-threshold-search! *state)
+        (do (swap! *state dissoc :vector-threshold :vector-max-similarity :vector-min-similarity)
+            (search! *state))))))
 
 (defn change-secondary-contexts-selection!
   [*state]

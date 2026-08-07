@@ -17,7 +17,14 @@
   (fetch-and-reset! *state
                     (if (:hierarchy-mode? @*state)
                       (dissoc @*state :hierarchy-mode?)
-                      (assoc @*state :hierarchy-mode? true))))
+                      ;; Entering the mode drops any vector search that was on:
+                      ;; the two cannot both describe the list, and the strip is
+                      ;; the claim that wins. See
+                      ;; ui.actions/toggle-vector-search-mode!.
+                      (-> @*state
+                          (assoc :hierarchy-mode? true)
+                          (dissoc :vector-mode :vector-threshold
+                                  :vector-max-similarity :vector-min-similarity)))))
 
 (defn strip
   "The status bar. Unlike the REC and DANGER badges it is not an overlay: it

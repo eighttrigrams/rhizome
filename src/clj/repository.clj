@@ -345,15 +345,39 @@
 
 (defn search-contexts [db opts] {:contexts (search-context-items db (:q opts) (dissoc opts :q))})
 
+(defn- vector-search-in-hierarchy-mode
+  "Hierarchy mode lists a structure -- the parts of the selected item, in the
+   order the human put them in -- and semantic similarity has nothing to say
+   about that order. So the vector modes are not available while the mode is on,
+   and this is what they answer instead: the hierarchy list, with the vector
+   state cleared, so the UI cannot go on wearing a green outline or a threshold
+   slider over a list that was never ranked.
+
+   Refused here and not only in the keybinding, because the strip is a claim
+   about what the list is -- and that claim has to hold whatever a client
+   asks for."
+  [db opts]
+  {:items (search-related-items db (:q opts) (:selected-item opts) (hierarchy-opts opts))
+   :vector-mode nil
+   :vector-threshold nil
+   :vector-max-similarity nil
+   :vector-min-similarity nil})
+
+(defn- hierarchy-list?
+  [{:keys [hierarchy-mode? selected-item]}]
+  (boolean (and hierarchy-mode? selected-item)))
+
 (defn vector-search-related-items
   [{:keys [db]}]
   (fn [{:keys [selected-item q] :as opts}]
-    (if (or (nil? q) (str/blank? q))
-      {:items []}
-      (let [[selected-item-id search-opts]
-              (simplify-params (assoc opts :selected-item selected-item))]
-        {:items (semsearch/search-related-items-vector
-                  db q selected-item-id (assoc search-opts :limit limit))}))))
+    (cond
+      (hierarchy-list? opts) (vector-search-in-hierarchy-mode db opts)
+      (or (nil? q) (str/blank? q)) {:items []}
+      :else
+        (let [[selected-item-id search-opts]
+                (simplify-params (assoc opts :selected-item selected-item))]
+          {:items (semsearch/search-related-items-vector
+                    db q selected-item-id (assoc search-opts :limit limit))}))))
 
 (defn vector-threshold-search-related-items
   "Blue-mode: original-order related items filtered by a cosine-similarity
@@ -363,13 +387,16 @@
     :vector-min-similarity ...} so the slider can position itself."
   [{:keys [db]}]
   (fn [{:keys [selected-item q vector-threshold] :as opts}]
-    (if (or (nil? q) (str/blank? q))
-      {:items [] :vector-threshold nil :vector-max-similarity nil :vector-min-similarity nil}
-      (let [[selected-item-id search-opts]
-              (simplify-params (assoc opts :selected-item selected-item))]
-        (semsearch/search-related-items-vector-threshold
-          db q selected-item-id
-          (assoc search-opts :threshold vector-threshold :limit limit))))))
+    (cond
+      (hierarchy-list? opts) (vector-search-in-hierarchy-mode db opts)
+      (or (nil? q) (str/blank? q))
+        {:items [] :vector-threshold nil :vector-max-similarity nil :vector-min-similarity nil}
+      :else
+        (let [[selected-item-id search-opts]
+                (simplify-params (assoc opts :selected-item selected-item))]
+          (semsearch/search-related-items-vector-threshold
+            db q selected-item-id
+            (assoc search-opts :threshold vector-threshold :limit limit))))))
 
 (defn start-linking-selected-item-to-context-with-local-search
   [db opts]
