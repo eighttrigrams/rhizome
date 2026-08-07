@@ -90,7 +90,8 @@ html, body {
        the viewport so the panel is always fully in view over the LHS. */
     position: fixed;
     left: 8px;
-    top: 8px;
+    /* Below the top strip, not over it -- 0px when no strip is up. */
+    top: calc(8px + var(--top-strip-height));
     width: 260px;
     z-index: 1006;
     box-sizing: border-box;

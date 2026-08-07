@@ -67,3 +67,10 @@ Feature: Hierarchy mode
     And I press the "v" key with shift and alt in the search input
     Then I should not see the top strip
     And the search input should be in vector mode
+
+  Scenario: The badges sit below the strip rather than on top of its label
+    Given I am on the app
+    When I press the "w" key with shift and alt
+    And I press the "h" key with shift and alt
+    Then I should see "Hierarchy mode" in the top strip
+    And no badge should overlap the top strip

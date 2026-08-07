@@ -212,9 +212,9 @@ chapter *of* a book, rather than a note *about* it. Two columns on `relations`
 carry it, `is_part_of` and `part_of_sort_idx`, the latter being the position
 among the siblings under one whole.
 
-That index is independent of the relation's normal sort index and of
-`items.sort_idx`, because it belongs to the edge and not to the item: a part may
-sit under several wholes and take a different position under each.
+That index is independent of `items.sort_idx`, because it belongs to the edge
+and not to the item: a part may sit under several wholes and take a different
+position under each.
 
 Both are edited per relation line in the item edit modal (`e`). The index field
 takes a plain integer, and only that — the roman numerals the "Sort index" field

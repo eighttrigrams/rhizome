@@ -121,3 +121,19 @@ When(
 Then("the search input should be in vector mode", async ({ page }) => {
   await expect(page.locator("#search-input")).toHaveClass(/vector-search-mode/);
 });
+
+// The REC, DANGER and replica badges are position: fixed and float over the
+// app. The strip is not the app — it takes its own row above it — so a badge
+// that stays at top: 6px lands on the strip's own label.
+Then("no badge should overlap the top strip", async ({ page }) => {
+  const strip = await page.locator("#hierarchy-strip").boundingBox();
+  expect(strip).not.toBeNull();
+  const badges = page.locator("#recording-indicator, #danger-indicator, #read-only-indicator");
+  const count = await badges.count();
+  expect(count, "no badge was up, so this proves nothing").toBeGreaterThan(0);
+  for (let i = 0; i < count; i++) {
+    const box = await badges.nth(i).boundingBox();
+    expect(box!.y, `badge ${i} starts above the strip's bottom edge`)
+      .toBeGreaterThanOrEqual(strip!.y + strip!.height);
+  }
+});

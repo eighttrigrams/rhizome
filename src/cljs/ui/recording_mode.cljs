@@ -30,7 +30,11 @@
     [:div#recording-indicator
      {:title "Recording mode — REST writes are enabled"
       :style {:position "fixed"
-              :top "6px"
+              ;; Below the top strip, not over it: the strip takes a row of its
+              ;; own (see layout.css) and these float over the app, which starts
+              ;; underneath it. --top-strip-height is 0px when no strip is up,
+              ;; so this is plain 6px the rest of the time.
+              :top "calc(6px + var(--top-strip-height))"
               :left "6px"
               :z-index 10000
               :background "#c0392b"
