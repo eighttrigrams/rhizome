@@ -23,6 +23,19 @@
         (string? v) (try (Long/parseLong (clojure.string/trim v)) (catch Exception _ -1))
         :else -1))
 
+(defn- part-of-of-row
+  "The part-of standing of one relation, read off the row it is stored in.
+   Missing row, or a relation that was never part-of, both read as not-part-of
+   and unplaced, which are the column defaults."
+  [db whole-id part-id]
+  (let [r (jdbc/execute-one! db
+                             (sql/format {:select [:is_part_of :part_of_sort_idx]
+                                          :from [:relations]
+                                          :where [:and [:= :owner_id [:inline whole-id]]
+                                                  [:= :target_id [:inline part-id]]]}))]
+    {:is-part-of? (boolean (helpers/int->bool (:relations/is_part_of r)))
+     :part-of-sort-idx (->part-of-sort-idx (:relations/part_of_sort_idx r))}))
+
 (defn set-collection-titles-of-new-item
   [db item-id]
   (let [data (:items/data (jdbc/execute-one! db
@@ -102,18 +115,29 @@
                                                    (assoc-in [(str id) "part-of-sort-idx"]
                                                              (->part-of-sort-idx
                                                                part-of-sort-idx))))
-                                     (assoc contexts
-                                       (str id) (cond-> {:show-badge? show-badge?
-                                                         :title
-                                                           (if (seq short_title) short_title title)}
-                                                  (not (nil? is-context?)) (assoc :is-context?
-                                                                             is-context?)
-                                                  (some? is-part-of?) (assoc :is-part-of?
-                                                                        (boolean is-part-of?))
-                                                  (some? part-of-sort-idx)
-                                                    (assoc :part-of-sort-idx
-                                                      (->part-of-sort-idx
-                                                        part-of-sort-idx))))))))]
+                                     ;; No entry to patch: this rebuilds one the
+                                     ;; mirror had lost. What the caller did not
+                                     ;; supply comes off the relation row rather
+                                     ;; than being assumed away -- a rebuilt
+                                     ;; entry saying not-part-of would clear the
+                                     ;; column on the next save, which rebuilds
+                                     ;; the table out of the mirror.
+                                     (let [row (part-of-of-row db id item-id)]
+                                       (assoc contexts
+                                         (str id) (cond-> {:show-badge? show-badge?
+                                                           :title (if (seq short_title)
+                                                                    short_title
+                                                                    title)
+                                                           :is-part-of?
+                                                             (if (some? is-part-of?)
+                                                               (boolean is-part-of?)
+                                                               (:is-part-of? row))
+                                                           :part-of-sort-idx
+                                                             (if (some? part-of-sort-idx)
+                                                               (->part-of-sort-idx part-of-sort-idx)
+                                                               (:part-of-sort-idx row))}
+                                                    (not (nil? is-context?))
+                                                      (assoc :is-context? is-context?))))))))]
     (jdbc/execute-one! db
                        (sql/format {:update [:items]
                                     :where [:= :id [:inline item-id]]

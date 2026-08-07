@@ -122,6 +122,26 @@
       (relations/set-collection-titles-of-new-item db (:id chapter))
       (is (= {:is-part-of? true :part-of-sort-idx 4} (mirror (:id book) (:id chapter)))))))
 
+(deftest a-rebuilt-mirror-entry-takes-its-standing-off-the-row
+  (test-with-reset-db-and-time
+    "an item can have relation rows and no mirror entries for them at all --
+     dev-seed inserts relations with raw SQL and never writes the mirror, and the
+     human's dev db is full of items in exactly that shape. A title propagation
+     rebuilds the missing entry, and must not rebuild it as not-part-of"
+    (let [[book chapter] (book-with-chapter 6)]
+      (jdbc/execute-one! db
+                         ["UPDATE items SET data = '{\"contexts\":{}}' WHERE id = ?" (:id chapter)])
+      (relations/update-collection-title-in-collection-items-for-children db
+                                                                          (:id book)
+                                                                          "Book, renamed"
+                                                                          nil)
+      (is (= {:is-part-of? true :part-of-sort-idx 6} (mirror (:id book) (:id chapter)))
+          "the rebuilt entry says what the row says")
+      (let [fresh (ds/get-item db {:id (:id chapter)})]
+        (relations/set-the-containers-of-item! db fresh (get-in fresh [:data :contexts]) false))
+      (is (= {:is-part-of? true :part-of-sort-idx 6} (row (:id book) (:id chapter)))
+          "so the next save, which rebuilds the rows out of the mirror, keeps it"))))
+
 (defn- make-part-of!
   "Make `part` a part of `whole` at sort index `idx`, the way a save from the
    edit modal does."
