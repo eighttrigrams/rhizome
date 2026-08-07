@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS relations (
     target_id INTEGER NOT NULL,
     show_badge INTEGER DEFAULT 1,
     annotation TEXT,
+    is_part_of INTEGER NOT NULL DEFAULT 0,
+    part_of_sort_idx INTEGER NOT NULL DEFAULT -1,
     FOREIGN KEY (owner_id) REFERENCES items(id),
     FOREIGN KEY (target_id) REFERENCES items(id)
 );
@@ -45,6 +47,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_items_human_readable_id
   ON items(human_readable_id) WHERE human_readable_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_relations_owner_id ON relations(owner_id);
 CREATE INDEX IF NOT EXISTS idx_relations_target_id ON relations(target_id);
+-- Part-of is a sparse layer over the relations: a partial index covers the two
+-- questions asked of it -- a whole's parts in sibling order, and the walk up
+-- from a part when checking for a cycle -- without carrying the other rows.
+CREATE INDEX IF NOT EXISTS idx_relations_part_of_owner
+  ON relations(owner_id, part_of_sort_idx) WHERE is_part_of = 1;
+CREATE INDEX IF NOT EXISTS idx_relations_part_of_target
+  ON relations(target_id) WHERE is_part_of = 1;
 
 CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
     title, short_title, tags,
