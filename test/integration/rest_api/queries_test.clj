@@ -10,6 +10,7 @@
             [semsearch.embedder :as embedder]
             [semsearch.backfill :as backfill]
             [et.vp.ds :as ds]
+            [et.vp.ds.relations :as relations]
             [et.vp.ds.search-test :refer [reset-db with-time db]]))
 
 (def baseline-contexts
@@ -292,3 +293,42 @@
         (let [ctx (ds/new-context db {:title "Books"})
               resp (GET* (str "/api/items/" (:id ctx) "/related?vector=true&q="))]
           (is (= 400 (:status resp)))))))
+
+(deftest part-of-read-side-test
+  (test-with-fresh-db "the parts of a whole, in sibling order, each with its index"
+    (let [whole (ds/new-context db {:title "Book"})
+          one (ds/new-item db "One" "" #{(:id whole)} nil)
+          two (ds/new-item db "Two" "" #{(:id whole)} nil)
+          loose (ds/new-item db "Merely related" "" #{(:id whole)} nil)
+          place! (fn [part idx]
+                   (relations/set-the-containers-of-item!
+                     db
+                     (ds/get-item db {:id (:id part)})
+                     {(:id whole) {:title "Book" :show-badge? true :is-context? true
+                                   :is-part-of? true :part-of-sort-idx idx}}
+                     false))]
+      (place! two 2)
+      (place! one 1)
+      (let [parts (body-json (GET* (str "/api/items/" (:id whole) "/related?part_of=true")))]
+        (is (= ["One" "Two"] (mapv :title parts))
+            "the parts only, in sibling order")
+        (is (= [1 2] (mapv :part-of-sort-idx parts))
+            "each carrying its index under this whole, so a caller can see which is free"))
+      (is (= ["Merely related" "One" "Two"]
+             (sort (mapv :title (body-json (GET* (str "/api/items/" (:id whole) "/related"))))))
+          "while the ordinary related list is unchanged")))
+  (test-with-fresh-db "an item names the wholes it is a part of"
+    (let [whole (ds/new-context db {:title "Book"})
+          part (ds/new-item db "One" "" #{(:id whole)} nil)
+          loose (ds/new-item db "Merely related" "" #{(:id whole)} nil)]
+      (relations/set-the-containers-of-item!
+        db
+        (ds/get-item db {:id (:id part)})
+        {(:id whole) {:title "Book" :show-badge? true :is-context? true
+                      :is-part-of? true :part-of-sort-idx 4}}
+        false)
+      (is (= {(keyword (str (:id whole))) 4}
+             (:part-of (body-json (GET* (str "/api/items/" (:id part))))))
+          "so a caller can tell whether something is already filed")
+      (is (nil? (:part-of (body-json (GET* (str "/api/items/" (:id loose))))))
+          "an item that is part of nothing says nothing"))))

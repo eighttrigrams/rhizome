@@ -129,34 +129,49 @@
          (json-response 500 {:error (.getMessage e)}))))
 
 (defn get-related-items
-  "GET /api/items/:id/related?q=&secondary_ids=&search_mode=&vector= — list
-  items related to the context :id. Optional free-text q; CSV secondary_ids
+  "GET /api/items/:id/related?q=&secondary_ids=&search_mode=&vector=&part_of= —
+  list items related to the context :id. Optional free-text q; CSV secondary_ids
   enables intersection search (raises limit from 10 to 100). search_mode:
   0 = most recently touched first (default), 2 = ordered by sort_idx (limit
   5000), 5 = most recently added first.
+
+  part_of=true narrows to the **parts** of :id — the relations marked as
+  part-of edges — in sibling order: part_of_sort_idx ascending, the ones left
+  unplaced (-1) after them, most recently touched first within each group.
+  Limit 5000. Each item comes back with its \"part-of-sort-idx\" under this
+  whole, so a caller can see which sibling index is free before writing one.
+  Items merely related to :id are not listed. Ignores secondary_ids and
+  search_mode, which have no meaning inside a hierarchy.
 
   vector=true switches to semantic search: q is embedded via Ollama
   (qwen3-embedding) and items are ranked by cosine similarity. Requires a
   non-empty q. Only items with a non-empty description are embedded — both
   on ingestion (POST /api/items, PUT /api/items/:id) and by the REPL
   backfill — so title-only items never appear in vector results."
-  [db id-str {:keys [q secondary-ids search-mode vector?]}]
+  [db id-str {:keys [q secondary-ids search-mode vector? part-of?]}]
   (try (let [selected-id (Integer/parseInt id-str)
              secondary (parse-ids-csv secondary-ids)]
-         (if vector?
-           (let [items (semsearch/search-related-items-vector
-                         db q selected-id
-                         {:selected-secondary-contexts secondary :limit 20})]
-             (json-response (map item->api items)))
-           (let [mode (parse-int-opt search-mode)
-                 limit (cond (= 2 mode) 5000
-                             (seq secondary) 100
-                             :else 10)
-                 items (search/search-related-items
-                         db (or q "") selected-id
-                         {:selected-secondary-contexts secondary :search-mode mode}
-                         {:limit limit})]
-             (json-response (map item->api items)))))
+         (cond
+           part-of?
+             (let [items (search/search-related-items db (or q "") selected-id
+                                                      {:hierarchy-mode? true}
+                                                      {:limit 5000})]
+               (json-response (map item->api items)))
+           vector?
+             (let [items (semsearch/search-related-items-vector
+                           db q selected-id
+                           {:selected-secondary-contexts secondary :limit 20})]
+               (json-response (map item->api items)))
+           :else
+             (let [mode (parse-int-opt search-mode)
+                   limit (cond (= 2 mode) 5000
+                               (seq secondary) 100
+                               :else 10)
+                   items (search/search-related-items
+                           db (or q "") selected-id
+                           {:selected-secondary-contexts secondary :search-mode mode}
+                           {:limit limit})]
+               (json-response (map item->api items)))))
        (catch NumberFormatException _ (json-response 400 {:error "Invalid item ID"}))
        (catch IllegalArgumentException e (json-response 400 {:error (.getMessage e)}))
        (catch Exception e
@@ -200,7 +215,8 @@
    "Mutations are gated by recording mode: while OFF they are logged as intent and dropped (a stub response is returned). Toggle with POST /api/recording-mode/toggle, or in-app with Option+Shift+W."
    "A read-only replica refuses writes: an instance that booted without its primary.nosync marker (prod mode) answers every mutating request -- recording-mode toggle and embeddings backfill included -- with 403 {\"read-only-replica\": true} and writes nothing; reads are unaffected. GET /api/status reports the role, and the role is fixed for the lifetime of the process."
    "A relation may additionally be a part-of edge (PUT /relations with \"is-part-of\": the target item is the whole, the source item one of its parts), ordered among its siblings by \"part-of-sort-idx\". That is a plain integer, ascending, with -1 (the default) meaning the part has no place yet -- those sort after every sibling that carries an index. The index belongs to the edge and not to the item, so a part that sits under several wholes can take a different position under each; it is independent of every other sort index in the system."
-   "The part-of edges form a directed acyclic graph, not a tree: a node may be part of several wholes, and nothing should assume a unique parent or a unique path to a root. A cycle is not allowed. Any write that would close one is refused with 409 and the response names the path that would close it, both in \"error\" and as ids in \"part-of-cycle\". Plain relations are not constrained this way."])
+   "The part-of edges form a directed acyclic graph, not a tree: a node may be part of several wholes, and nothing should assume a unique parent or a unique path to a root. A cycle is not allowed. Any write that would close one is refused with 409 and the response names the path that would close it, both in \"error\" and as ids in \"part-of-cycle\". Plain relations are not constrained this way."
+   "The part-of layer is readable, and should be read before it is written to: part_of=true on GET /items/:id/related lists the parts of that whole in sibling order, each carrying its own \"part-of-sort-idx\", so a caller can see whether something is already filed and which index is free. From the other end, every item carries a \"part-of\" map of {whole-id: index} for the wholes it is a part of, alongside \"contexts\"."])
 
 (def ^:private skill-resource "rhizome-user/SKILL.md")
 

@@ -17,9 +17,24 @@
        (catch Exception _ nil)))
 
 
+(defn- part-of-wholes
+  "The wholes this item is a part of, as {whole-id sibling-index}. Read off the
+   same contexts map `:contexts` is flattened from — the part-of standing of a
+   relation is mirrored on the part, so an item already carries it.
+
+   Kept as its own key rather than folded into `:contexts`, whose {id → title}
+   shape callers already read."
+  [data]
+  (into {}
+        (keep (fn [[k v]]
+                (when (and (map? v) (:is-part-of? v))
+                  [(str k) (or (:part-of-sort-idx v) -1)])))
+        (:contexts data)))
+
 (defn item->api
   [{:keys [id title short_title human_readable_id description is_context data inserted_at updated_at
-           date annotation hide_in_global_search]}]
+           date annotation hide_in_global_search part_of_sort_idx]
+    :as item}]
   (cond-> {:id id
            :title title
            :short-title short_title
@@ -31,6 +46,11 @@
     date (assoc :date date)
     annotation (assoc :annotation annotation)
     (helpers/int->bool hide_in_global_search) (assoc :hide-in-global-search true)
+    ;; Only rows that came out of the parts query carry this: it is the item's
+    ;; index under the one whole that was asked about, which is not a property
+    ;; of the item and cannot be answered anywhere else.
+    (contains? item :part_of_sort_idx) (assoc :part-of-sort-idx part_of_sort_idx)
+    (seq (part-of-wholes data)) (assoc :part-of (part-of-wholes data))
     (-> data
         :contexts)
       (assoc :contexts

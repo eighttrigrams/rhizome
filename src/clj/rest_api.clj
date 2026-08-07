@@ -29,12 +29,13 @@
            (GET "/items" [q id]
                 (cond id (queries/find-items (:db config/config) id)
                       :else (queries/search-items (:db config/config) q)))
-           (GET "/items/:id/related" [id q secondary_ids search_mode vector]
+           (GET "/items/:id/related" [id q secondary_ids search_mode vector part_of]
                 (queries/get-related-items (:db config/config) id
                                            {:q q
                                             :secondary-ids secondary_ids
                                             :search-mode search_mode
-                                            :vector? (= "true" vector)}))
+                                            :vector? (= "true" vector)
+                                            :part-of? (= "true" part_of)}))
            (GET "/items/:id/with-related" [id search_mode]
                 (queries/get-item-with-related (:db config/config) id
                                                {:search-mode search_mode}))

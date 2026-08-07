@@ -218,6 +218,23 @@ What is not allowed is a cycle: a write that would close one comes back `409`
 with the path that would have closed it, in `error` and as ids in
 `part-of-cycle`. Plain relations are not constrained this way.
 
+**Read the layer before you write to it.** `part_of=true` on
+`GET /items/:id/related` lists the parts of that whole, in sibling order, each
+carrying its own `part-of-sort-idx` — so you can see whether something is
+already filed and which index is free before claiming one. Items merely
+related to `:id` are not listed.
+
+```bash
+curl -s "$RHIZOME/items/12/related?part_of=true"
+```
+
+From the other end, any item carries a `part-of` map of `{whole-id: index}` for
+the wholes it is a part of, alongside its `contexts`:
+
+```json
+{ "id": 13, "title": "…", "contexts": {"12": "The book"}, "part-of": {"12": 1} }
+```
+
 ## Search strategy — when using rhizome for research
 
 1. Break queries into likely categories. Prefer two short searches on separate
