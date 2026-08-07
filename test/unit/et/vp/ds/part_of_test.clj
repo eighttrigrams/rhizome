@@ -5,6 +5,7 @@
   (:require [clojure.test :refer [deftest is]]
             [et.vp.ds :as ds]
             [et.vp.ds.relations :as relations]
+            [et.vp.ds.search :as search]
             [et.vp.ds.search-test :refer [test-with-reset-db-and-time db]]
             [next.jdbc :as jdbc]))
 
@@ -183,3 +184,42 @@
       (is (= {:is-part-of? true :part-of-sort-idx -1} (row (:id book) (:id chapter))))
       (is (= {:is-part-of? true :part-of-sort-idx -1} (mirror (:id book) (:id chapter)))
           "reading the mirror back at all means the JSON survived the round trip"))))
+
+;; --- what hierarchy mode lists ----------------------------------------------
+
+(defn- titles-under
+  [whole opts]
+  (mapv :title (search/search-related-items db "" (:id whole) opts {})))
+
+(deftest hierarchy-mode-lists-the-parts-in-sibling-order
+  (test-with-reset-db-and-time "children come out by part_of_sort_idx, non-children not at all"
+    (let [book (ds/new-context db {:title "Book"})
+          two (ds/new-item db "Two" "" #{(:id book)} nil)
+          one (ds/new-item db "One" "" #{(:id book)} nil)
+          _loose (ds/new-item db "Merely related" "" #{(:id book)} nil)]
+      (make-part-of! book two 2)
+      (make-part-of! book one 1)
+      (is (= ["One" "Two"] (titles-under book {:hierarchy-mode? true}))
+          "in sibling order, and without the item that is only related")
+      (is (= #{"One" "Two" "Merely related"} (set (titles-under book {})))
+          "while the ordinary list still shows all three"))))
+
+(deftest a-part-sits-differently-under-each-of-its-wholes
+  (test-with-reset-db-and-time "the sibling index belongs to the edge, not to the node"
+    (let [a (ds/new-context db {:title "A"})
+          b (ds/new-context db {:title "B"})
+          x (ds/new-item db "X" "" #{(:id a) (:id b)} nil)
+          y (ds/new-item db "Y" "" #{(:id a) (:id b)} nil)
+          under (fn [item a-idx b-idx]
+                  (relations/set-the-containers-of-item!
+                    db
+                    (ds/get-item db {:id (:id item)})
+                    {(:id a) {:title "A" :show-badge? true :is-context? true
+                              :is-part-of? true :part-of-sort-idx a-idx}
+                     (:id b) {:title "B" :show-badge? true :is-context? true
+                              :is-part-of? true :part-of-sort-idx b-idx}}
+                    false))]
+      (under x 1 2)
+      (under y 2 1)
+      (is (= ["X" "Y"] (titles-under a {:hierarchy-mode? true})))
+      (is (= ["Y" "X"] (titles-under b {:hierarchy-mode? true}))))))

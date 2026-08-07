@@ -119,13 +119,26 @@
    :vector-max-distance (:vector-max-distance opts)})
 
 (defn search-related-items
-  [db q selected-item-id {:keys [link-item search-mode] :as opts} {:keys [limit] :as ctx}]
+  "The items to list under the selected item.
+
+   In hierarchy mode that is a different question -- its parts, in sibling order
+   -- so it is a different query rather than the usual one with a filter bolted
+   on: none of the intersection machinery (secondary contexts, invert, search
+   modes, description filter) means anything in a hierarchy, and the mode hides
+   the section that drives it."
+  [db q selected-item-id {:keys [link-item search-mode hierarchy-mode?] :as opts}
+   {:keys [limit] :as ctx}]
   (when link-item
     (throw (IllegalArgumentException. "'link-item' shouldn't be supplied here any longer")))
   (when-not selected-item-id
     (throw (IllegalArgumentException. "selected-context-id must not be nil")))
   (let [opts (modify opts)
-        items (do-query db (core/search-related-items q (->core-opts selected-item-id search-mode opts) ctx))
+        items (do-query db
+                        (if hierarchy-mode?
+                          (core/part-of-children q {:selected-item-id selected-item-id} ctx)
+                          (core/search-related-items q
+                                                     (->core-opts selected-item-id search-mode opts)
+                                                     ctx)))
         results (->> (seq items)
                      (map post-process)
                      (map post-process-contexts))]

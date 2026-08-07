@@ -163,6 +163,30 @@
   [q opts ctx]
   (sql/format (related-items-query-map q opts ctx)))
 
+(defn part-of-children
+  "The parts of one whole, in sibling order — what hierarchy mode lists.
+
+   Only the part-of edges out of the selected item: an item merely related to it
+   is not one of its parts, and leaving those out is the point of the mode. The
+   ordering is `part_of_sort_idx` alone, ascending, which is the same convention
+   `items.sort_idx` follows elsewhere (roman numerals below the unset -1, the
+   unset below the numbers). Siblings sharing an index fall back on the app's
+   usual most-recently-touched-first.
+
+   The sibling index is projected, not only ordered by, because it is the number
+   the human typed into the edit modal and the one navigation will re-root on."
+  [q {:keys [selected-item-id]} {:keys [limit] :as _ctx}]
+  (sql/format
+    (merge {:select (vec (concat select
+                                 [:relations.annotation
+                                  [:relations.part_of_sort_idx :part_of_sort_idx]]))
+            :from :items
+            :join [:relations [:= :items.id :relations.target_id]]
+            :where [:and [:= :relations.owner_id [:inline selected-item-id]]
+                    [:= :relations.is_part_of true] (get-search-clause q)]
+            :order-by [[:relations.part_of_sort_idx :asc] [:items.updated_at :desc]]}
+           (when limit {:limit limit}))))
+
 (defn vector-similarity-bounds
   "SQL for the MIN and MAX cosine distance over the embedded related items,
    reusing the exact relational filters of the related-items query (so the

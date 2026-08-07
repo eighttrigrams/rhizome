@@ -7,6 +7,7 @@
             [ui.recording-mode :as recording-mode]
             [ui.replica :as replica]
             [ui.danger-mode :as danger-mode]
+            [ui.hierarchy-mode :as hierarchy-mode]
             [ui.main.rhs.modifiers :as modifiers]))
 
 (def original-state {:items [] :contexts [] :selected-item nil :active-search nil :modal nil})
@@ -70,11 +71,16 @@
                                                  #(reset! modifiers/*alt-pressed? false)))
        :render ;
          (fn [] [:div#ui
+                 ;; The class is what gives the strip its space: layout.css
+                 ;; hangs the strip's height off it and takes the same height
+                 ;; off everything that is sized against the viewport.
+                 {:class (when (:hierarchy-mode? @*state) "hierarchy-mode")}
                  [replica/banner]
                  [recording-mode/indicator *state]
                  [danger-mode/indicator *state]
                  [danger-mode/confirm-modal *state]
                  [modifiers/indicator]
+                 [hierarchy-mode/strip *state]
                  [:div#main-layer
                   {;; TODO document recipe to make the div able to listen to key events,
                    ;; https://stackoverflow.com/a/3149416

@@ -6,10 +6,11 @@ a {
     display: none;
 }
 
+/* --top-strip-height is 0px unless a top strip is shown; see layout.css. */
 .scrollable {
     position: absolute;
     top: 0px;
-    height: 100vh;
+    height: calc(100vh - var(--top-strip-height));
     width: 100%;
     overflow: scroll;
 	overflow-x: hidden;
@@ -18,12 +19,12 @@ a {
 
 .scrollable.search-active {
     top: 30px;
-    height: calc(100vh - 30px);
+    height: calc(100vh - var(--top-strip-height) - 30px);
 }
 
 .scrollable.card-shown {
     top: 183px;
-    height: calc(100vh - 150px);
+    height: calc(100vh - var(--top-strip-height) - 150px);
 }
 
 .details-component {

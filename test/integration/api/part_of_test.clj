@@ -46,6 +46,23 @@
                  (get-in [:data :contexts (:id book)])
                  (select-keys [:is-part-of? :part-of-sort-idx])))))))
 
+(deftest hierarchy-mode-lists-only-the-parts-test
+  (with-fresh-db "selecting a context in hierarchy mode answers with its parts, in sibling order"
+    (let [{book :selected-item} (call! :insert-context nil {:title "Book"})
+          two (ds/new-item db "Two" "" #{(:id book)} nil)
+          one (ds/new-item db "One" "" #{(:id book)} nil)
+          _loose (ds/new-item db "Merely related" "" #{(:id book)} nil)]
+      (save-relations! two (part-of-entry book 2))
+      (save-relations! one (part-of-entry book 1))
+      (is (= ["One" "Two"]
+             (mapv :title (:items (call! :fetch-context
+                                         {:hierarchy-mode? true}
+                                         [{:id (:id book)} false]))))
+          "hierarchy mode is session state, so it rides in on the request")
+      (is (= #{"One" "Two" "Merely related"}
+             (set (mapv :title (:items (call! :fetch-context {} [{:id (:id book)} false])))))
+          "and without it the ordinary related-items list is unchanged"))))
+
 (deftest a-cycle-is-refused-on-ui-test
   (with-fresh-db "the refusal names the path and reopens the modal"
     (let [{book :selected-item} (call! :insert-context nil {:title "Book"})

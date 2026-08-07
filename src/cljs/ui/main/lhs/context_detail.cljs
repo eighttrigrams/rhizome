@@ -146,14 +146,19 @@
 
 (defn component
   [_*state]
-  (fn [*state] [:<>
-                [:h4 "Search mode: "
-                 (case (:search-mode (:current (:views (:data (:selected-item @*state)))))
-                   0 "Normal"
-                   1 "Reverse"
-                   2 "0->9"
-                   3 "9->0"
-                   4 "Events"
-                   5 "Added"
-                   nil "Normal")] [views-component *state] [description-filter-component *state]
-                [:br] [:br] [invert-component *state] [secondary-contexts-component *state]]))
+  ;; Intersection and filtering -- search mode, stored views, the description
+  ;; filter, invert, the secondary contexts -- is the whole of what this
+  ;; renders, and none of it means anything in a hierarchy. So in hierarchy
+  ;; mode it is not there at all.
+  (fn [*state] (when-not (:hierarchy-mode? @*state)
+                 [:<>
+                  [:h4 "Search mode: "
+                   (case (:search-mode (:current (:views (:data (:selected-item @*state)))))
+                     0 "Normal"
+                     1 "Reverse"
+                     2 "0->9"
+                     3 "9->0"
+                     4 "Events"
+                     5 "Added"
+                     nil "Normal")] [views-component *state] [description-filter-component *state]
+                  [:br] [:br] [invert-component *state] [secondary-contexts-component *state]])))

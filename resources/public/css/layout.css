@@ -15,11 +15,39 @@ html, body {
     position: absolute;
 }
 
+/* The top strip is not an overlay. The REC, DANGER and replica badges are
+   position: fixed and sit *over* the app; this one takes a row of its own at
+   the top of the page and the app below it is shorter by exactly its height.
+   So the height is one number, kept here, that the strip and everything sized
+   against the viewport both read -- 0 while no strip is shown, which leaves
+   every calc() below equal to what it used to be. */
+:root {
+    --top-strip-height: 0px;
+}
+
+#ui.hierarchy-mode {
+    --top-strip-height: 26px;
+}
+
+#hierarchy-strip {
+    height: var(--top-strip-height);
+    line-height: var(--top-strip-height);
+    box-sizing: border-box;
+    padding: 0 10px;
+    background-color: rgb(20, 20, 20);
+    color: #cbc9b5;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    overflow: hidden;
+    user-select: none;
+}
+
 #sides-container {
     position: relative;
     width: 1440px;
     margin: auto;
-    height: 100vh;
+    height: calc(100vh - var(--top-strip-height));
     /* background-color:rgb(61, 14, 14); */
     /* background-color: rgb(69, 56, 56); */
     background-color: rgb(136, 131, 131);
@@ -31,14 +59,14 @@ html, body {
     left: 0;
     top: 0;
     width: 720px;
-    height: 100vh;
+    height: calc(100vh - var(--top-strip-height));
 }
 
 #rhs-component {
     position: absolute;
     left: 720px;
     top: 0;
-    height: 100vh;
+    height: calc(100vh - var(--top-strip-height));
     width: 720px;
 }
 

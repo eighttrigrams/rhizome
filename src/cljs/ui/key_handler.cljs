@@ -2,6 +2,7 @@
   (:require [ui.actions :as actions]
             [ui.recording-mode :as recording-mode]
             [ui.danger-mode :as danger-mode]
+            [ui.hierarchy-mode :as hierarchy-mode]
             [ui.key-handler.common :refer [handle-keys*] :as common]))
 
 (defn handle-keys
@@ -15,6 +16,8 @@
                 (recording-mode/toggle! *state)
               (and alt-pressed? shift-pressed? (= "KeyD" code))
                 (danger-mode/toggle! *state)
+              (and alt-pressed? shift-pressed? (= "KeyH" code))
+                (hierarchy-mode/toggle! *state)
               (= "Escape" code)
                 (cond (and (:active-search @*state) (not alt-pressed?)) (actions/quit-search!
                                                                           *state)
