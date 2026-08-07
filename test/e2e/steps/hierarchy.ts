@@ -100,3 +100,24 @@ Then("the bulk delete button should be {word}", async ({ page }, state: string) 
   if (state === "enabled") await expect(button).toBeEnabled();
   else await expect(button).toBeDisabled();
 });
+
+// Vector mode is only reachable from the item search, and the search input
+// swallows every key it sees, so this one has to be pressed there rather than
+// on #main-layer.
+When(
+  "I press the {string} key with shift and alt in the search input",
+  async ({ page }, key: string) => {
+    await page.locator("#search-input").press(`Alt+Shift+Key${key.toUpperCase()}`);
+    await page.waitForTimeout(100);
+    await page.waitForLoadState("networkidle");
+    await page.evaluate(
+      () => new Promise<void>((r) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => r())),
+      ),
+    );
+  },
+);
+
+Then("the search input should be in vector mode", async ({ page }) => {
+  await expect(page.locator("#search-input")).toHaveClass(/vector-search-mode/);
+});

@@ -65,22 +65,6 @@
              (set (mapv :title (:items (call! :fetch-context {} [{:id (:id book)} false])))))
           "and without it the ordinary related-items list is unchanged"))))
 
-(deftest vector-search-does-not-leak-past-hierarchy-mode-test
-  (with-fresh-db "both vector modes answer the hierarchy list, and clear themselves"
-    (let [{book :selected-item} (call! :insert-context nil {:title "Book"})
-          one (ds/new-item db "One" "" #{(:id book)} nil)
-          _loose (ds/new-item db "Merely related" "" #{(:id book)} nil)]
-      (save-relations! one (part-of-entry book 1))
-      (doseq [cmd [:vector-search-related-items :vector-threshold-search-related-items]]
-        (let [resp (call! cmd
-                          {:hierarchy-mode? true
-                           :selected-item (ds/get-item db {:id (:id book)})
-                           :q "One"})]
-          (is (= ["One"] (mapv :title (:items resp)))
-              (str cmd " lists the parts, not every related item over a threshold"))
-          (is (and (contains? resp :vector-mode) (nil? (:vector-mode resp)))
-              (str cmd " clears the mode, so the UI cannot keep claiming a ranking")))))))
-
 (deftest a-cycle-is-refused-on-ui-test
   (with-fresh-db "the refusal names the path and reopens the modal"
     (let [{book :selected-item} (call! :insert-context nil {:title "Book"})

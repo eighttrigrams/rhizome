@@ -17,9 +17,9 @@
   (fetch-and-reset! *state
                     (if (:hierarchy-mode? @*state)
                       (dissoc @*state :hierarchy-mode?)
-                      ;; Entering the mode drops any vector search that was on:
-                      ;; the two cannot both describe the list, and the strip is
-                      ;; the claim that wins. See
+                      ;; The other half of the mutual exclusion: entering this
+                      ;; mode leaves any vector search, exactly as entering a
+                      ;; vector search leaves this one. See
                       ;; ui.actions/toggle-vector-search-mode!.
                       (-> @*state
                           (assoc :hierarchy-mode? true)
