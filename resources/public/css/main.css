@@ -193,6 +193,11 @@ ul.cards {
     font-size: 12px;
 }
 
+#modal-component .part-of-refusal-hint {
+    margin-top: 4px;
+    font-weight: bold;
+}
+
 #title {
     width: 600px;
 }

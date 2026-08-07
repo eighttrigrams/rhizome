@@ -41,6 +41,8 @@
           chapter (ds/new-item db "Chapter" "" #{(:id book)} nil)
           resp (save-relations! chapter (part-of-entry book 2))]
       (is (nil? (:part-of-refused resp)))
+      (is (and (contains? resp :modal) (nil? (:modal resp)))
+          "a save that went through closes the modal it came from")
       (is (= {:is-part-of? true :part-of-sort-idx 2}
              (-> (:selected-item resp)
                  (get-in [:data :contexts (:id book)])

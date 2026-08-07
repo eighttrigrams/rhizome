@@ -482,15 +482,21 @@
         (let [is_context (:is_context (datastore/get-item db context))]
           (datastore.relations/set-the-containers-of-item! db context item-contexts is_context))
         (let [selected-item (datastore/update-item db context)]
+          ;; The edit modal stays open until this answers -- see
+          ;; ui.modals.actions/update-context! -- so closing it is this
+          ;; function's to say, and only on the path that saved something.
           (merge {:selected-item selected-item
                   :items (search-related-items db "" selected-item (hierarchy-opts state))
+                  :modal nil
                   :q nil}))
         (catch clojure.lang.ExceptionInfo e
           (if-let [msg (part-of/cycle-refusal e)]
             ;; Answer in band, the way a refused write on a replica is answered:
             ;; nothing else in the response, so the list the user is looking at
-            ;; stays as it was, plus the modal they made the edit in -- a
-            ;; checkbox that silently fails to stick is worse than an error.
+            ;; stays as it was, and the modal they made the edit in stays open
+            ;; with everything they typed still in it -- a checkbox that silently
+            ;; fails to stick is worse than an error, and a refusal that throws
+            ;; the rest of the edit away is worse than both.
             (do (log/info {:event "part-of-cycle-refused" :item-id (:id context)} msg)
                 {:part-of-refused msg :modal :edit-context})
             (throw e)))))))

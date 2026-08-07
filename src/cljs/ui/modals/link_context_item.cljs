@@ -59,11 +59,22 @@
      :on-change (fn [evt]
                   (swap! *selectable-contexts assoc-in [idx :annotation] (.-value (.-target evt))))}]])
 
+(defn- refusal-component
+  "A refused save writes nothing at all -- not the relations, and not the item's
+   own fields either, since the refusal is thrown before they are written. The
+   modal stays open with everything still in it, so say plainly that it is still
+   unsaved rather than leaving the user to assume the rest went through."
+  [refusal]
+  [:div.part-of-refusal [:div refusal]
+   [:div.part-of-refusal-hint "Nothing was saved. Correct the marked relation and save again."]])
+
 (defn component
   [item refusal]
   (let [remove-context (fn [idx] #(swap! *selectable-contexts dissoc idx))]
-    ;; A refusal means this modal is coming back up over a save that did not go
-    ;; through, so what the user had typed is left standing for them to correct.
+    ;; A refusal means the save did not go through and the modal is still the one
+    ;; the user was typing in, so it must not be reset from the stored item.
+    ;; Belt and braces: the modal now stays mounted across a save, so this outer
+    ;; fn does not run again on a refusal in the first place.
     (when-not refusal
       (reset! *selectable-contexts (:contexts (:data item))))
     (r/create-class
@@ -71,7 +82,7 @@
        :reagent-render ;
          (fn [_item refusal]
            #_(prn @*selectable-contexts)
-           [:<> (when refusal [:div.part-of-refusal refusal]) [:h4 "Related contexts"]
+           [:<> (when refusal [refusal-component refusal]) [:h4 "Related contexts"]
             [:div#link-context-item-component {:tabIndex 0}
              (map (fn [[idx relation]]
                     ^{:key idx} [relation-component idx relation remove-context])

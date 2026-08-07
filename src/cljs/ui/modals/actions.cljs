@@ -19,11 +19,19 @@
 
 (defn update-context!
   [*state context item-contexts]
-  ;; :part-of-refused goes out with the save, so a save that succeeds clears the
-  ;; refusal the previous one left standing. A save that is refused again gets it
+  ;; The modal stays open across the save, and the server closes it: the response
+  ;; carries :modal nil when the save went through and :modal :edit-context when
+  ;; it was refused. Taking :modal out here instead would unmount the modal the
+  ;; moment the request goes out, and a refusal would remount it -- rebuilding
+  ;; every uncontrolled input in it from :defaultValue, which is to say throwing
+  ;; away the title, the tags, the sibling index and everything else the user had
+  ;; typed. None of it was saved either, since a refused save writes nothing.
+  ;;
+  ;; :part-of-refused does go out with the save, so a save that succeeds clears
+  ;; the refusal the previous one left standing. A save refused again gets it
   ;; back from the response.
   (fetch-and-reset-with-method! *state
-                                (dissoc @*state :modal :part-of-refused)
+                                (dissoc @*state :part-of-refused)
                                 api/update-item
                                 {:context context :item-contexts item-contexts}))
 
