@@ -18,20 +18,29 @@ async function idOfItem(request: any, title: string): Promise<number> {
   return hit.id;
 }
 
+// Leaving the index out is what the modal sends for an empty field: the part
+// is a part, it just has no place among its siblings yet.
+async function makePartOf(request: any, part: string, whole: string, idx?: number) {
+  const data: Record<string, unknown> = {
+    "source-id": await idOfItem(request, part),
+    "target-id": await idOfItem(request, whole),
+    "is-part-of": true,
+    reason: "e2e test setup",
+  };
+  if (idx !== undefined) data["part-of-sort-idx"] = idx;
+  const resp = await request.put("/api/relations", { data });
+  expect(resp.status(), await resp.text()).toBe(200);
+}
+
 When(
   "I make {string} part of {string} at index {int}",
-  async ({ request }, part: string, whole: string, idx: number) => {
-    const resp = await request.put("/api/relations", {
-      data: {
-        "source-id": await idOfItem(request, part),
-        "target-id": await idOfItem(request, whole),
-        "is-part-of": true,
-        "part-of-sort-idx": idx,
-        reason: "e2e test setup",
-      },
-    });
-    expect(resp.status(), await resp.text()).toBe(200);
-  },
+  async ({ request }, part: string, whole: string, idx: number) =>
+    makePartOf(request, part, whole, idx),
+);
+
+When(
+  "I make {string} part of {string} with no index",
+  async ({ request }, part: string, whole: string) => makePartOf(request, part, whole),
 );
 
 // Same drain pattern as the plain keypress step in contexts.ts: the mode

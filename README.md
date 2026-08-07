@@ -240,7 +240,9 @@ appears at the top of the page — taking its own row, so the app below it is
 shorter by exactly its height rather than being covered by it — and with a
 context selected:
 
-- the item list is that context's parts, in `part_of_sort_idx` order;
+- the item list is that context's parts: the ones carrying a
+  `part_of_sort_idx` first, ascending, then the ones left unset — a part nobody
+  placed does not push ahead of the parts somebody did, and it is still listed;
 - items merely related to the context are not listed at all — that exclusion is
   the point of the mode;
 - the intersection and filtering section disappears, since none of it means

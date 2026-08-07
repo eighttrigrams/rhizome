@@ -225,6 +225,22 @@
       (is (= #{"One" "Two" "Merely related"} (set (titles-under book {})))
           "while the ordinary list still shows all three"))))
 
+(deftest a-part-nobody-placed-comes-last
+  (test-with-reset-db-and-time
+    "the unset -1 sorts behind every placed sibling, not ahead of 0"
+    (let [book (ds/new-context db {:title "Book"})
+          zero (ds/new-item db "Zero" "" #{(:id book)} nil)
+          one (ds/new-item db "One" "" #{(:id book)} nil)
+          older (ds/new-item db "Unplaced, older" "" #{(:id book)} nil)
+          newer (ds/new-item db "Unplaced, newer" "" #{(:id book)} nil)]
+      (make-part-of! book one 1)
+      (make-part-of! book zero 0)
+      (make-part-of! book older -1)
+      (make-part-of! book newer -1)
+      (is (= ["Zero" "One" "Unplaced, newer" "Unplaced, older"]
+             (titles-under book {:hierarchy-mode? true}))
+          "the placed ones ascending, then the unplaced ones, most recently touched first"))))
+
 (deftest a-part-sits-differently-under-each-of-its-wholes
   (test-with-reset-db-and-time "the sibling index belongs to the edge, not to the node"
     (let [a (ds/new-context db {:title "A"})

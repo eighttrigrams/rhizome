@@ -168,10 +168,13 @@
 
    Only the part-of edges out of the selected item: an item merely related to it
    is not one of its parts, and leaving those out is the point of the mode. The
-   ordering is `part_of_sort_idx` alone, ascending, which is the same convention
-   `items.sort_idx` follows elsewhere (roman numerals below the unset -1, the
-   unset below the numbers). Siblings sharing an index fall back on the app's
-   usual most-recently-touched-first.
+   parts that carry an index come first, by `part_of_sort_idx` ascending; the
+   ones left unset -- the -1 the column defaults to -- come after them, and not
+   ahead of 0 as a plain ascending sort would have it: a part nobody placed does
+   not belong in front of every part somebody did. It is still listed, though --
+   it is a part, it just has no place yet. Siblings sharing an index, the unset
+   ones among themselves included, fall back on the app's usual
+   most-recently-touched-first.
 
    The sibling index is projected, not only ordered by, because it is the number
    the human typed into the edit modal and the one navigation will re-root on."
@@ -184,7 +187,8 @@
             :join [:relations [:= :items.id :relations.target_id]]
             :where [:and [:= :relations.owner_id [:inline selected-item-id]]
                     [:= :relations.is_part_of true] (get-search-clause q)]
-            :order-by [[:relations.part_of_sort_idx :asc] [:items.updated_at :desc]]}
+            :order-by [[[:= :relations.part_of_sort_idx [:inline -1]] :asc]
+                       [:relations.part_of_sort_idx :asc] [:items.updated_at :desc]]}
            (when limit {:limit limit}))))
 
 (defn vector-similarity-bounds

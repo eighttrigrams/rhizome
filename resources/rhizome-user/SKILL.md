@@ -200,9 +200,11 @@ auto-detected and enriched by the insertion pipeline.
 Marked with `"is-part-of": true`, a relation says the **target** item is the
 whole and the **source** item one of its parts — a chapter of a book rather
 than merely a note about it — and `"part-of-sort-idx"` places it among the
-other parts of that whole. That index belongs to the edge, not to the item: a
-part sitting under several wholes takes a different position under each, and it
-is independent of every other sort index.
+other parts of that whole. That index is a plain integer and the parts are
+listed by it ascending; left at `-1`, the default, the part has no place yet and
+sorts after every sibling that has one. The index belongs to the edge, not to
+the item: a part sitting under several wholes takes a different position under
+each, and it is independent of every other sort index.
 
 ```bash
 curl -s -X PUT "$RHIZOME/relations" -H 'Content-Type: application/json' \
