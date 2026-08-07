@@ -197,9 +197,13 @@
   target-item is the whole and source-item one of its parts; omitted, an
   existing relation keeps the standing it had),
   \"part-of-sort-idx\" (optional int — where source-item sits among the parts of
-  target-item, -1 for unset; the parts are listed by it ascending, with the unset
-  ones after all the placed ones. Independent of every other sort index, so a
-  node with several wholes can be placed differently under each)}. The relation is
+  target-item. **Any** integer is accepted and the parts are listed by it
+  ascending. -1 is the one reserved value: it is the default, it means unplaced,
+  and it sorts *after* every part that carries an index rather than ahead of 0.
+  Every other negative is an ordinary index and does sort ahead of 0, so a
+  deliberate -2 places a part in front of everything. Independent of every other
+  sort index, so a node with several wholes can be placed differently under
+  each)}. The relation is
   added to source-item's :data.contexts, with target-item as the owner. Idempotent.
   Returns 400 on missing/invalid ids, 404 if either item does not exist, 409 when
   the part-of edge would close a loop (the body names the path), 500 otherwise.

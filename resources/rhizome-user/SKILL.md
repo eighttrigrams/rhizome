@@ -201,10 +201,17 @@ Marked with `"is-part-of": true`, a relation says the **target** item is the
 whole and the **source** item one of its parts — a chapter of a book rather
 than merely a note about it — and `"part-of-sort-idx"` places it among the
 other parts of that whole. That index is a plain integer and the parts are
-listed by it ascending; left at `-1`, the default, the part has no place yet and
-sorts after every sibling that has one. The index belongs to the edge, not to
-the item: a part sitting under several wholes takes a different position under
-each, and it is independent of every other sort index.
+listed by it ascending. The index belongs to the edge, not to the item: a part
+sitting under several wholes takes a different position under each, and it is
+independent of every other sort index.
+
+Any integer is accepted, and `-1` is the one reserved value:
+
+- `-1` is the default and means the part has no place yet. It sorts **after**
+  every sibling that carries an index, not ahead of `0`.
+- every other negative is an ordinary index and does sort ahead of `0`. `-2`
+  therefore puts a part in front of everything — a way of saying "first"
+  without renumbering its siblings, not a mistake.
 
 ```bash
 curl -s -X PUT "$RHIZOME/relations" -H 'Content-Type: application/json' \

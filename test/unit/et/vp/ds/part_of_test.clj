@@ -293,6 +293,19 @@
              (titles-under book {:hierarchy-mode? true}))
           "the placed ones ascending, then the unplaced ones, most recently touched first"))))
 
+(deftest a-negative-index-other-than-minus-one-is-an-ordinary-index
+  (test-with-reset-db-and-time
+    "-1 is the only reserved value: it means unplaced and sorts last, while a
+     deliberate -2 is a way of saying \"first\" without renumbering the siblings"
+    (let [book (ds/new-context db {:title "Book"})
+          front (ds/new-item db "Front matter" "" #{(:id book)} nil)
+          zero (ds/new-item db "Zero" "" #{(:id book)} nil)
+          unplaced (ds/new-item db "Unplaced" "" #{(:id book)} nil)]
+      (make-part-of! book zero 0)
+      (make-part-of! book front -2)
+      (make-part-of! book unplaced -1)
+      (is (= ["Front matter" "Zero" "Unplaced"] (titles-under book {:hierarchy-mode? true}))))))
+
 (deftest a-part-sits-differently-under-each-of-its-wholes
   (test-with-reset-db-and-time "the sibling index belongs to the edge, not to the node"
     (let [a (ds/new-context db {:title "A"})
