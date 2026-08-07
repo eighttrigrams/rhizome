@@ -194,6 +194,28 @@ write on their primary.
 URLs (YouTube, GitHub, Substack, …) passed as `title` on `POST /items` are
 auto-detected and enriched by the insertion pipeline.
 
+### Part-of relations
+
+`PUT /relations` also carries a second, sparse layer over the plain relations.
+Marked with `"is-part-of": true`, a relation says the **target** item is the
+whole and the **source** item one of its parts — a chapter of a book rather
+than merely a note about it — and `"part-of-sort-idx"` places it among the
+other parts of that whole. That index belongs to the edge, not to the item: a
+part sitting under several wholes takes a different position under each, and it
+is independent of every other sort index.
+
+```bash
+curl -s -X PUT "$RHIZOME/relations" -H 'Content-Type: application/json' \
+  -d '{"source-id":13,"target-id":12,"is-part-of":true,"part-of-sort-idx":1,
+       "reason":"the human asked me to file this chapter under the book"}'
+```
+
+These edges form a **directed acyclic graph**, not a tree. A node may be part
+of several wholes; do not assume a unique parent or a unique path to a root.
+What is not allowed is a cycle: a write that would close one comes back `409`
+with the path that would have closed it, in `error` and as ids in
+`part-of-cycle`. Plain relations are not constrained this way.
+
 ## Search strategy — when using rhizome for research
 
 1. Break queries into likely categories. Prefer two short searches on separate

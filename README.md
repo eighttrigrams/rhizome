@@ -203,6 +203,52 @@ touch primary.nosync   # next to config.edn, then restart the app
 
 Dev mode is unaffected — no marker needed, no guards, no badge.
 
+## Part-of relations and hierarchy mode
+
+A relation says two items belong together; it does not say how. Over that flat
+web lies a second, sparse layer: a relation may additionally be marked
+**part-of**, meaning its owner is the whole and its target one of the parts — a
+chapter *of* a book, rather than a note *about* it. Two columns on `relations`
+carry it, `is_part_of` and `part_of_sort_idx`, the latter being the position
+among the siblings under one whole.
+
+That index is independent of the relation's normal sort index and of
+`items.sort_idx`, because it belongs to the edge and not to the item: a part may
+sit under several wholes and take a different position under each.
+
+Both are edited per relation line in the item edit modal (`e`), where the index
+field takes what the "Sort index" field beside it takes — a number or a roman
+numeral. Over the REST API they are `is-part-of` and `part-of-sort-idx` on
+`PUT /api/relations`.
+
+The part-of edges form a **directed acyclic graph**, not a tree. Several wholes
+over one part is expected; a cycle is not. A write that would close a loop is
+refused in the backend — below both `/ui` and `/api`, since the guarantee is
+about the database and not about one client — and the refusal names the path:
+
+```
+Refused: this would make a thing part of itself — Chapter (13) → Book (12) → Chapter (13)
+```
+
+`/api` answers `409` (with the path as ids in `part-of-cycle`); the SPA shows
+the message in the edit modal, where the edit was made. Plain relations stay
+unconstrained and may go on forming cycles.
+
+**Hierarchy mode** (`shift+option+h`) shows that layer on its own. A strip
+appears at the top of the page — taking its own row, so the app below it is
+shorter by exactly its height rather than being covered by it — and with a
+context selected:
+
+- the item list is that context's parts, in `part_of_sort_idx` order;
+- items merely related to the context are not listed at all — that exclusion is
+  the point of the mode;
+- the intersection and filtering section disappears, since none of it means
+  anything in a hierarchy.
+
+The mode is session state, like danger mode: not persisted, not per-context.
+Selecting a child does not re-root the view on it — that is still to come, and
+the strip reserves the space for it.
+
 ## Configuration Options
 
 | Key | Notes |
