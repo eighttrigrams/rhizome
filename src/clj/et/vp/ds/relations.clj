@@ -11,6 +11,16 @@
   (or (and (string? (:short_title container)) (not-empty (:short_title container)))
       (:title container)))
 
+(defn ->part-of-sort-idx
+  "part_of_sort_idx the way the column wants it: an integer, -1 when unset. The
+   edit modal sends whatever utils/display->sort-idx made of what was typed,
+   which is NaN when that was neither a number nor a roman numeral."
+  [v]
+  (cond (integer? v) v
+        (number? v) (if (Double/isNaN (double v)) -1 (long v))
+        (string? v) (try (Long/parseLong (clojure.string/trim v)) (catch Exception _ -1))
+        :else -1))
+
 (defn set-collection-titles-of-new-item
   [db item-id]
   (let [data (:items/data (jdbc/execute-one! db
@@ -22,14 +32,25 @@
                    :else (json/parse-string (dialect/parse-json-value data)))
         data (if (get data "contexts") data (assoc data "contexts" {}))
         contexts (dissoc (into {}
-                               (map (fn [{:items/keys [id title short_title is_context]}]
+                               ;; The part-of columns are read back off the rows
+                               ;; rather than assumed false: this builds the
+                               ;; mirror from scratch out of the table, and a
+                               ;; mirror that understates the table would lose
+                               ;; the flag on the next save, which rebuilds the
+                               ;; table out of the mirror.
+                               (map (fn [{:items/keys [id title short_title is_context]
+                                          :relations/keys [is_part_of part_of_sort_idx]}]
                                       [id
                                        {:title (if (seq short_title) short_title title)
                                         :show-badge? true
-                                        :is-context? (helpers/int->bool is_context)}])
+                                        :is-context? (helpers/int->bool is_context)
+                                        :is-part-of? (helpers/int->bool is_part_of)
+                                        :part-of-sort-idx (->part-of-sort-idx part_of_sort_idx)}])
                                  (jdbc/execute!
                                    db
-                                   (sql/format {:select [:items.id :title :short_title :is_context]
+                                   (sql/format {:select [:items.id :title :short_title :is_context
+                                                         :relations.is_part_of
+                                                         :relations.part_of_sort_idx]
                                                 :from [:relations]
                                                 :join [:items [:= :relations.owner_id :items.id]]
                                                 :where [:= :relations.target_id [:inline item-id]]})
@@ -46,9 +67,13 @@
 (defn update-collection-title-in-collection-items
   "Standard use case is that you know item-id references id via contexts. That id has a new title, so we update it.
    @param constraints a list of ids; when set, the contexts of the item with item-id will be reduced to the ones present in that list
-     so the use case is not to set the title in an item's context (with a given id), but to remove contexts"
+     so the use case is not to set the title in an item's context (with a given id), but to remove contexts
+   @param is-part-of?/part-of-sort-idx when supplied, the part-of fields of that one entry are set to them.
+     Callers that write the relation row itself have to supply them, or the mirror keeps saying what the
+     row said before the write."
   [db item-id id
-   {:keys [short_title title new-contexts show-badge? remove-from-container? is-context?]}]
+   {:keys [short_title title new-contexts show-badge? remove-from-container? is-context?
+           is-part-of? part-of-sort-idx]}]
   (let [data (:items/data (jdbc/execute-one! db
                                              (sql/format {:select [:data]
                                                           :from [:items]
@@ -67,13 +92,26 @@
                                          (assoc-in [(str id) "title"]
                                                    (if (seq short_title) short_title title))
                                          (cond-> (not (nil? is-context?))
-                                                   (assoc-in [(str id) "is-context?"] is-context?)))
+                                                   (assoc-in [(str id) "is-context?"] is-context?))
+                                         (cond-> (some? is-part-of?)
+                                                   (assoc-in [(str id) "is-part-of?"]
+                                                             (boolean is-part-of?)))
+                                         (cond-> (some? part-of-sort-idx)
+                                                   (assoc-in [(str id) "part-of-sort-idx"]
+                                                             (->part-of-sort-idx
+                                                               part-of-sort-idx))))
                                      (assoc contexts
                                        (str id) (cond-> {:show-badge? show-badge?
                                                          :title
                                                            (if (seq short_title) short_title title)}
                                                   (not (nil? is-context?)) (assoc :is-context?
-                                                                             is-context?)))))))]
+                                                                             is-context?)
+                                                  (some? is-part-of?) (assoc :is-part-of?
+                                                                        (boolean is-part-of?))
+                                                  (some? part-of-sort-idx)
+                                                    (assoc :part-of-sort-idx
+                                                      (->part-of-sort-idx
+                                                        part-of-sort-idx))))))))]
     (jdbc/execute-one! db
                        (sql/format {:update [:items]
                                     :where [:= :id [:inline item-id]]
@@ -95,6 +133,18 @@
                                                           {:short_title short_title
                                                            :title title})))))
 
+(defn- normalize-part-of
+  "Fill in the part-of fields of every entry of a containers map, so that whoever
+   reads the map back -- the table writer or the mirror writer -- reads the same
+   thing, and reads something the column can hold."
+  [containers]
+  (into {}
+        (map (fn [[id container]]
+               [id (assoc container
+                     :is-part-of? (boolean (:is-part-of? container))
+                     :part-of-sort-idx (->part-of-sort-idx (:part-of-sort-idx container)))]))
+        containers))
+
 (defn- set-containers-of-item!
   [db item containers]
   (log/info (str "datastore.relations/set-containers-of-item! " (:id item)
@@ -103,42 +153,72 @@
   (jdbc/execute! db
                  (sql/format {:delete-from [:relations]
                               :where [:= :target_id [:inline (:id item)]]}))
-  (doall (for [[container-id {:keys [show-badge? annotation]}] containers]
+  (doall (for [[container-id {:keys [show-badge? annotation is-part-of? part-of-sort-idx]}]
+                 containers]
            (jdbc/execute! db
                           (sql/format {:insert-into [:relations]
-                                       :columns [:target_id :owner_id :annotation :show_badge]
+                                       :columns [:target_id :owner_id :annotation :show_badge
+                                                 :is_part_of :part_of_sort_idx]
                                        :values [[[:inline (:id item)] [:inline container-id]
-                                                 [:inline annotation] [:inline show-badge?]]]})))))
+                                                 [:inline annotation] [:inline show-badge?]
+                                                 [:inline (boolean is-part-of?)]
+                                                 [:inline (->part-of-sort-idx
+                                                            part-of-sort-idx)]]]})))))
 
 (defn set-the-containers-of-item!
   "@param containers - map {:container-id {:annotation \"annotation\"
-                                           :show-badge? true|false}}"
+                                           :show-badge? true|false
+                                           :is-part-of? true|false
+                                           :part-of-sort-idx int}}"
   [db item containers is_context]
-  (if (or is_context (seq (keys containers)))
-    (do (set-containers-of-item! db item containers)
-        (update-collection-title-in-collection-items
-          db
-          (:id item)
-          nil
-          {:short_title nil :title nil :new-contexts containers}))
-    (log/info {:is_context is_context :item (select-keys item [:id :title])}
-              "cant take out the remaining context if item is not a context")))
+  ;; One normalised map feeds both representations: the same values go into the
+  ;; relation rows and into the mirror, so the two cannot come out of this
+  ;; disagreeing. It also keeps a NaN sort index -- what the modal sends when the
+  ;; user typed something that is neither a number nor a roman numeral -- out of
+  ;; the JSON, where it would not survive the round trip.
+  (let [containers (normalize-part-of containers)]
+    (if (or is_context (seq (keys containers)))
+      (do (set-containers-of-item! db item containers)
+          (update-collection-title-in-collection-items
+            db
+            (:id item)
+            nil
+            {:short_title nil :title nil :new-contexts containers}))
+      (log/info {:is_context is_context :item (select-keys item [:id :title])}
+                "cant take out the remaining context if item is not a context"))))
 
 (defn link-item-to-another-item!
-  [db item another-item show-badge?]
-  (let [contexts (merge (:contexts (:data item))
-                        {(:id another-item) {:title (get-title another-item)
-                                             :show-badge? show-badge?
-                                             :is-context? (helpers/int->bool (:is_context another-item))}})]
-    (set-containers-of-item! db item contexts)
-    (update-collection-title-in-collection-items db
-                                                 (:id item)
-                                                 (:id another-item)
-                                                 {:short_title (:short_title another-item)
-                                                  :title (:title another-item)
-                                                  :show-badge? show-badge?
-                                                  :is-context? (boolean (:is_context
-                                                                          another-item))})))
+  "@param part-of - optional {:is-part-of? true|false :part-of-sort-idx int}. Left out,
+     an existing relation keeps the part-of standing it had; a new one starts out not
+     part-of. The entry for another-item is rebuilt from scratch here, so anything the
+     old one carried and this one doesn't is dropped -- and set-containers-of-item!
+     writes the table from exactly this map, so a dropped field is a cleared column."
+  ([db item another-item show-badge?] (link-item-to-another-item! db item another-item show-badge? nil))
+  ([db item another-item show-badge? part-of]
+   (let [previous (get (:contexts (:data item)) (:id another-item))
+         is-part-of? (boolean (if (contains? part-of :is-part-of?)
+                                (:is-part-of? part-of)
+                                (:is-part-of? previous)))
+         part-of-sort-idx (->part-of-sort-idx (if (contains? part-of :part-of-sort-idx)
+                                                (:part-of-sort-idx part-of)
+                                                (:part-of-sort-idx previous)))
+         contexts (merge (:contexts (:data item))
+                         {(:id another-item) {:title (get-title another-item)
+                                              :show-badge? show-badge?
+                                              :is-context? (helpers/int->bool (:is_context another-item))
+                                              :is-part-of? is-part-of?
+                                              :part-of-sort-idx part-of-sort-idx}})]
+     (set-containers-of-item! db item contexts)
+     (update-collection-title-in-collection-items db
+                                                  (:id item)
+                                                  (:id another-item)
+                                                  {:short_title (:short_title another-item)
+                                                   :title (:title another-item)
+                                                   :show-badge? show-badge?
+                                                   :is-context? (boolean (:is_context
+                                                                           another-item))
+                                                   :is-part-of? is-part-of?
+                                                   :part-of-sort-idx part-of-sort-idx}))))
 
 (defn unlink-item-from-another-item!
   [db item another-item]

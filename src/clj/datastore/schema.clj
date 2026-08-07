@@ -3,8 +3,8 @@
 
    The naive split-on-semicolons doesn't work because trigger bodies
    contain semicolons inside BEGIN ... END. The splitter here tracks
-   single-quote string literals and BEGIN/END nesting so trigger
-   creation comes through as a single statement."
+   single-quote string literals, -- line comments and BEGIN/END nesting
+   so trigger creation comes through as a single statement."
   (:require [clojure.string :as str]
             [datastore.connection :as connection]
             [next.jdbc :as jdbc]))
@@ -24,9 +24,25 @@
          (or (zero? i) (not (word-char? (.charAt s (dec i)))))
          (or (= n (+ i kn)) (not (word-char? (.charAt s (+ i kn))))))))
 
+(defn- line-comment-at?
+  "Start of a -- comment at position `i`."
+  [^String s i]
+  (and (= \- (.charAt s i)) (< (inc i) (count s)) (= \- (.charAt s (inc i)))))
+
+(defn- end-of-line
+  "Index of the newline ending the line `i` is on, or the end of the string."
+  [^String s i]
+  (let [nl (.indexOf s "\n" ^int i)]
+    (if (neg? nl) (count s) nl)))
+
 (defn split-statements
   "Split a SQLite script into individual statements. Honors single-quote
-   strings and BEGIN ... END blocks (so CREATE TRIGGER survives intact)."
+   strings, -- line comments and BEGIN ... END blocks (so CREATE TRIGGER
+   survives intact).
+
+   Comments are skipped rather than scanned: an apostrophe in an English
+   sentence would otherwise open a string literal that never closes, and
+   every statement after it would be swallowed into one."
   [^String sql]
   (let [n (count sql)
         upper (str/upper-case sql)]
@@ -38,6 +54,9 @@
           (cond
             in-quote
               (recur (inc i) depth (not (= c \')) start acc)
+
+            (line-comment-at? sql i)
+              (recur (end-of-line sql i) depth in-quote start acc)
 
             (= c \')
               (recur (inc i) depth true start acc)

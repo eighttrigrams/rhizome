@@ -54,6 +54,16 @@
           (is (= 0 (:relations/is_part_of row)))
           (is (= -1 (:relations/part_of_sort_idx row))))))))
 
+(deftest a-comment-does-not-swallow-the-statements-after-it
+  (testing "an apostrophe inside a -- comment must not open a string literal"
+    (is (= ["CREATE TABLE a (x INTEGER)"
+            "-- the table's second half\nCREATE TABLE b (y INTEGER)"]
+           (schema/split-statements
+             "CREATE TABLE a (x INTEGER);\n-- the table's second half\nCREATE TABLE b (y INTEGER);"))))
+  (testing "and a semicolon inside one does not end the statement"
+    (is (= ["CREATE TABLE a ( -- one; two\n  x INTEGER)"]
+           (schema/split-statements "CREATE TABLE a ( -- one; two\n  x INTEGER);")))))
+
 (deftest applying-the-schema-twice-changes-nothing
   (with-legacy-db
     (fn [db]
