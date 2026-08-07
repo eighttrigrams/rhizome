@@ -60,6 +60,26 @@
       (is (= {:is-part-of? false :part-of-sort-idx -1} (row (:id book) (:id chapter))))
       (is (= {:is-part-of? false :part-of-sort-idx -1} (mirror (:id book) (:id chapter)))))))
 
+(deftest a-save-that-fails-halfway-leaves-the-relations-as-they-were
+  (test-with-reset-db-and-time
+    "the rows and the mirror are one transaction -- a failure writing the mirror
+     must not leave the rows already rewritten, since the next save rebuilds the
+     rows out of the mirror"
+    (let [[book chapter] (book-with-chapter 3)]
+      (is (thrown? clojure.lang.ExceptionInfo
+                   (with-redefs [relations/update-collection-title-in-collection-items
+                                   (fn [& _] (throw (ex-info "mirror write failed" {})))]
+                     (relations/set-the-containers-of-item!
+                       db
+                       (ds/get-item db {:id (:id chapter)})
+                       {(:id book) {:title "Book" :show-badge? true :is-context? true
+                                    :is-part-of? true :part-of-sort-idx 9}}
+                       false))))
+      (is (= {:is-part-of? true :part-of-sort-idx 3} (row (:id book) (:id chapter)))
+          "the delete and the re-insert rolled back with it")
+      (is (= {:is-part-of? true :part-of-sort-idx 3} (mirror (:id book) (:id chapter)))
+          "so the two still agree"))))
+
 (deftest linking-an-item-elsewhere-leaves-its-part-of-edges-alone
   (test-with-reset-db-and-time
     "link-item-to-another-item! rebuilds the whole contexts map, and the table

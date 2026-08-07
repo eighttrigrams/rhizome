@@ -148,6 +148,9 @@
         containers))
 
 (defn- set-containers-of-item!
+  "Rewrite an item's inbound relations from `containers`. Every caller must run
+   this inside a transaction that also covers the mirror write -- see
+   set-the-containers-of-item! for why."
   [db item containers]
   (log/info (str "datastore.relations/set-containers-of-item! " (:id item)
                  "." (:title item)
@@ -179,7 +182,21 @@
   "@param containers - map {:container-id {:annotation \"annotation\"
                                            :show-badge? true|false
                                            :is-part-of? true|false
-                                           :part-of-sort-idx int}}"
+                                           :part-of-sort-idx int}}
+
+   The acyclicity check, the delete, the inserts and the mirror write are one
+   transaction. Both halves of that matter:
+
+   - The check only means anything if nothing can write a part-of edge between
+     it and the rows it authorises. Two clients each making the other's item a
+     part -- an agent on /api while the human saves the modal -- would otherwise
+     both read an acyclic graph and both be accepted, composing a cycle out of
+     two writes that were individually legal. SQLite serialises write
+     transactions, so the second one to reach for the write lock is refused and
+     rolls back rather than landing on a graph it never checked.
+   - The rows and the mirror describe the same relations, and a failure between
+     them leaves the two disagreeing -- in the direction that loses data, since
+     the next save rebuilds the table out of the mirror."
   [db item containers is_context]
   ;; One normalised map feeds both representations: the same values go into the
   ;; relation rows and into the mirror, so the two cannot come out of this
@@ -188,12 +205,13 @@
   ;; not survive the round trip.
   (let [containers (normalize-part-of containers)]
     (if (or is_context (seq (keys containers)))
-      (do (set-containers-of-item! db item containers)
-          (update-collection-title-in-collection-items
-            db
-            (:id item)
-            nil
-            {:short_title nil :title nil :new-contexts containers}))
+      (jdbc/with-transaction [tx db]
+        (set-containers-of-item! tx item containers)
+        (update-collection-title-in-collection-items
+          tx
+          (:id item)
+          nil
+          {:short_title nil :title nil :new-contexts containers}))
       (log/info {:is_context is_context :item (select-keys item [:id :title])}
                 "cant take out the remaining context if item is not a context"))))
 
@@ -218,17 +236,18 @@
                                               :is-context? (helpers/int->bool (:is_context another-item))
                                               :is-part-of? is-part-of?
                                               :part-of-sort-idx part-of-sort-idx}})]
-     (set-containers-of-item! db item contexts)
-     (update-collection-title-in-collection-items db
-                                                  (:id item)
-                                                  (:id another-item)
-                                                  {:short_title (:short_title another-item)
-                                                   :title (:title another-item)
-                                                   :show-badge? show-badge?
-                                                   :is-context? (boolean (:is_context
-                                                                           another-item))
-                                                   :is-part-of? is-part-of?
-                                                   :part-of-sort-idx part-of-sort-idx}))))
+     (jdbc/with-transaction [tx db]
+       (set-containers-of-item! tx item contexts)
+       (update-collection-title-in-collection-items tx
+                                                    (:id item)
+                                                    (:id another-item)
+                                                    {:short_title (:short_title another-item)
+                                                     :title (:title another-item)
+                                                     :show-badge? show-badge?
+                                                     :is-context? (boolean (:is_context
+                                                                             another-item))
+                                                     :is-part-of? is-part-of?
+                                                     :part-of-sort-idx part-of-sort-idx})))))
 
 (defn unlink-item-from-another-item!
   [db item another-item]
@@ -241,12 +260,13 @@
                      :container (select-keys item [:id :title])}
                     "can't unlink item from another item")
           false)
-      (do (set-containers-of-item! db selected-item containers)
-          (update-collection-title-in-collection-items
-            db
-            (:id selected-item)
-            (:id another-item)
-            {:short_title nil :title nil :remove-from-container? true})
+      (do (jdbc/with-transaction [tx db]
+            (set-containers-of-item! tx selected-item containers)
+            (update-collection-title-in-collection-items
+              tx
+              (:id selected-item)
+              (:id another-item)
+              {:short_title nil :title nil :remove-from-container? true}))
           true))))
 
 (defn update-relation-annotation!
