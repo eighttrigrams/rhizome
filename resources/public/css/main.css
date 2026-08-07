@@ -135,6 +135,63 @@ ul.cards {
     outline: none;
 }
 
+/* One relation target in the edit modal. The line carries four controls now
+   (badge, part-of, sibling index, annotation), so it is laid out over three
+   rows with a rule between relations rather than run together on one. */
+#modal-component .relation {
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+#modal-component .relation-title {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+#modal-component .relation-remove {
+    cursor: pointer;
+    opacity: 0.6;
+    font-size: 12px;
+    margin-left: auto;
+}
+
+#modal-component .relation-part-of {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    opacity: 0.8;
+    margin: 3px 0 3px 2px;
+}
+
+#modal-component .relation-part-of label {
+    display: flex;
+    align-items: center;
+}
+
+#modal-component input.relation-sort-idx {
+    width: 60px;
+    border: 0;
+    padding: 2px 4px;
+}
+
+#modal-component input.relation-annotation {
+    width: calc(100% - 8px);
+    border: 0;
+    padding: 2px 4px;
+}
+
+#modal-component .part-of-refusal {
+    background-color: #c0392b;
+    color: white;
+    padding: 6px 8px;
+    border-radius: 4px;
+    margin-bottom: 10px;
+    font-size: 12px;
+}
+
 #title {
     width: 600px;
 }

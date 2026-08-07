@@ -104,7 +104,8 @@
          :description [:<> [codemirror-component item]
                        (when (:show-confirm-discard @*state)
                          [confirm-discard-dialog *state #(actions/cancel-modal! *state)])]
-         :edit-context [:div#modal-component [item-edit/component item]]
+         :edit-context [:div#modal-component
+                        [item-edit/component item (:part-of-refused @*state)]]
          :annotation-edit [:div#modal-component
                            [annotation-edit/component (:annotation-edit-item @*state)
                             (:selected-item @*state)]]

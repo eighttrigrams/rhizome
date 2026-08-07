@@ -24,9 +24,10 @@
                       (and (not alt-pressed?) selected-item) (actions/deselect-context! *state))
               (not (:active-search @*state))
                 (cond
-                  (and selected-item (= "KeyE" code)) (swap! *state #(assoc %
-                                                                       :modal :edit-context
-                                                                       :item-view? false))
+                  (and selected-item (= "KeyE" code)) (swap! *state #(-> %
+                                                                        (dissoc :part-of-refused)
+                                                                        (assoc :modal :edit-context
+                                                                               :item-view? false)))
                   (and selected-item (= "Delete" code)) (actions/delete-context! *state)
                   (and alt-pressed? (= "KeyU" code) selected-item) (actions/upgrade-item-to-context!
                                                                      *state)

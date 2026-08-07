@@ -122,7 +122,7 @@
      [:<> [:span "Event"] [:input#date-picker {:type :date :defaultValue (:date item)}]])])
 
 (defn component
-  [item]
+  [item refusal]
   (let [*date-visible? (r/atom (boolean (:date item)))]
     (reset! *related-items (into {}
                                  (map (fn [{:keys [id title]}] [id title]) (:related_items item))))
@@ -130,11 +130,12 @@
                               (or (get-in item [:data :resource-links]) {})))
     (r/create-class {:component-did-mount #(.focus (get-title-el))
                      :reagent-render ;
-                       (fn [_item] [:<>
-                                    [:div.left-column [basic-elements-component item] [:hr]
-                                     [resource-links-component item]]
-                                    [:div.right-column [event-component item *date-visible?] [:hr]
-                                     [link-context-item/component item]]])})))
+                       (fn [_item refusal]
+                         [:<>
+                          [:div.left-column [basic-elements-component item] [:hr]
+                           [resource-links-component item]]
+                          [:div.right-column [event-component item *date-visible?] [:hr]
+                           [link-context-item/component item refusal]]])})))
 
 (defn get-values
   [id _item?]
