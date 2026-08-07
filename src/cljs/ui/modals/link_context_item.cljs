@@ -80,9 +80,17 @@
     (r/create-class
       {:component-did-mount #(.focus (get-component-el))
        :reagent-render ;
+         ;; The refusal lives in a slot that is always there, empty or not.
+         ;; Rendering it conditionally as a sibling changes how many children
+         ;; this fragment has, and React reconciles unkeyed children by
+         ;; position: everything below it would shift by one, be treated as a
+         ;; different element, and remount -- which recreates every uncontrolled
+         ;; input in the relation lines from its :defaultValue and so throws away
+         ;; the sibling indices the user typed. Exactly what a refusal must not
+         ;; do, and only visible in a browser.
          (fn [_item refusal]
            #_(prn @*selectable-contexts)
-           [:<> (when refusal [refusal-component refusal]) [:h4 "Related contexts"]
+           [:<> [:div (when refusal [refusal-component refusal])] [:h4 "Related contexts"]
             [:div#link-context-item-component {:tabIndex 0}
              (map (fn [[idx relation]]
                     ^{:key idx} [relation-component idx relation remove-context])

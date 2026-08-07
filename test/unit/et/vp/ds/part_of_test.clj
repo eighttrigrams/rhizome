@@ -155,7 +155,14 @@
                                                        :part-of-sort-idx idx}}
                                          true))
 
-(defn- contexts-of [item] (into #{} (keys (get-in (ds/get-item db {:id (:id item)}) [:data :contexts]))))
+(defn- wholes-of
+  "The ids that own a relation to this item, read off the `relations` table. Not
+   off the mirror: the mirror is written after the rows, so an assertion against
+   it would pass just as well if the rows had been half rewritten."
+  [item]
+  (into #{}
+        (map :relations/owner_id)
+        (jdbc/execute! db ["SELECT owner_id FROM relations WHERE target_id = ?" (:id item)])))
 
 (deftest a-node-may-be-part-of-several-wholes
   (test-with-reset-db-and-time "two wholes over one part are a DAG, not a cycle"
@@ -185,7 +192,7 @@
           chapter (ds/new-context db {:title "Chapter"})]
       (make-part-of! book chapter 1)
       (is (thrown? clojure.lang.ExceptionInfo (make-part-of! chapter book 1)))
-      (is (= #{} (contexts-of book)) "and the refused write left the relations alone")))
+      (is (= #{} (wholes-of book)) "and the refused write left the relations alone")))
   (test-with-reset-db-and-time "however long the way round, and the message names the way"
     (let [a (ds/new-context db {:title "A"})
           b (ds/new-context db {:title "B"})
@@ -216,8 +223,8 @@
           b (ds/new-context db {:title "B"})]
       (relations/set-the-containers-of-item! db a {(:id b) {:title "B" :show-badge? true}} true)
       (relations/set-the-containers-of-item! db b {(:id a) {:title "A" :show-badge? true}} true)
-      (is (= #{(:id b)} (contexts-of a)))
-      (is (= #{(:id a)} (contexts-of b))))))
+      (is (= #{(:id b)} (wholes-of a)))
+      (is (= #{(:id a)} (wholes-of b))))))
 
 (deftest a-roman-numeral-is-not-an-ordering
   (testing "the sibling index is a plain integer -- the roman convention below -1
@@ -271,13 +278,18 @@
     (let [book (ds/new-context db {:title "Book"})
           zero (ds/new-item db "Zero" "" #{(:id book)} nil)
           one (ds/new-item db "One" "" #{(:id book)} nil)
-          older (ds/new-item db "Unplaced, older" "" #{(:id book)} nil)
-          newer (ds/new-item db "Unplaced, newer" "" #{(:id book)} nil)]
+          first-made (ds/new-item db "Unplaced, made first" "" #{(:id book)} nil)
+          then-made (ds/new-item db "Unplaced, made second" "" #{(:id book)} nil)]
       (make-part-of! book one 1)
       (make-part-of! book zero 0)
-      (make-part-of! book older -1)
-      (make-part-of! book newer -1)
-      (is (= ["Zero" "One" "Unplaced, newer" "Unplaced, older"]
+      (make-part-of! book first-made -1)
+      (make-part-of! book then-made -1)
+      ;; Touch the one made first, so that most-recently-touched and
+      ;; most-recently-made disagree. Without this the two unplaced siblings come
+      ;; out in the same order either way and the assertion below cannot tell the
+      ;; tie-break it names from the order they were inserted in.
+      (ds/reprioritize-item db {:id (:id first-made)})
+      (is (= ["Zero" "One" "Unplaced, made first" "Unplaced, made second"]
              (titles-under book {:hierarchy-mode? true}))
           "the placed ones ascending, then the unplaced ones, most recently touched first"))))
 

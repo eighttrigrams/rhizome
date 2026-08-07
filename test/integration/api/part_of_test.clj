@@ -7,7 +7,8 @@
             [api.harness :refer [call!]]
             [api.helpers :refer [with-fresh-db]]
             [et.vp.ds :as ds]
-            [et.vp.ds.search-test :refer [db]]))
+            [et.vp.ds.search-test :refer [db]]
+            [next.jdbc :as jdbc]))
 
 (defn- save-relations!
   "What the edit modal sends: the item as the left-hand column has it, and the
@@ -32,8 +33,13 @@
                 :part-of-sort-idx idx}})
 
 (defn- containers-of
+  "The ids that own a relation to this item, read off the `relations` table. Not
+   off the mirror: the mirror is written after the rows, so an assertion against
+   it would pass just as well if the rows had been half rewritten."
   [item]
-  (into #{} (keys (get-in (ds/get-item db {:id (:id item)}) [:data :contexts]))))
+  (into #{}
+        (map :relations/owner_id)
+        (jdbc/execute! db ["SELECT owner_id FROM relations WHERE target_id = ?" (:id item)])))
 
 (deftest saving-a-part-of-relation-through-the-modal-test
   (with-fresh-db "the flag and the sibling index come back on the item"
