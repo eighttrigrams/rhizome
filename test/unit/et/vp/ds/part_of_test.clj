@@ -159,6 +159,18 @@
         (is (= (str "Refused: this would make a thing part of itself — "
                     "C (" (:id c) ") → A (" (:id a) ") → B (" (:id b) ") → C (" (:id c) ")")
                msg)))))
+  (test-with-reset-db-and-time "a long title is trimmed, so the path stays readable"
+    (let [long-title (apply str (repeat 20 "long title "))
+          a (ds/new-context db {:title long-title})
+          b (ds/new-context db {:title "B"})]
+      (make-part-of! a b 1)
+      (let [msg (try (make-part-of! b a 1)
+                     nil
+                     (catch clojure.lang.ExceptionInfo e (ex-message e)))]
+        (is (= (str "Refused: this would make a thing part of itself — "
+                    "B (" (:id b) ") → long title long title long title long title long title long…"
+                    " (" (:id a) ") → B (" (:id b) ")")
+               msg)))))
   (test-with-reset-db-and-time "plain relations may go on forming cycles"
     (let [a (ds/new-context db {:title "A"})
           b (ds/new-context db {:title "B"})]

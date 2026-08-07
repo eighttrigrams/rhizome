@@ -55,9 +55,19 @@
                   (into [whole-id] down))))
             (sort whole-ids)))))
 
+(def ^:private max-name-length
+  "Titles here are whole scraped headlines often enough that the untrimmed path
+   reads as a wall rather than as a diagnosis. The id is what identifies the
+   item anyway; the title is there to be recognised."
+  60)
+
 (defn- name-of
   [{:keys [title short_title id]}]
-  (str (or (not-empty short_title) (not-empty title) "untitled") " (" id ")"))
+  (let [n (or (not-empty short_title) (not-empty title) "untitled")]
+    (str (if (> (count n) max-name-length)
+           (str (str/trimr (subs n 0 max-name-length)) "…")
+           n)
+         " (" id ")")))
 
 (defn- describe
   "The loop written out, so the refusal says which way round the loop goes
