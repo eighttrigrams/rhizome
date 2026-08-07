@@ -54,7 +54,18 @@
 (defn indicator
   [*state]
   (when (:danger-mode? @*state)
-    (let [selected? (boolean (:selected-item @*state))]
+    ;; Not offered in hierarchy mode. The preview and the delete are stateless
+    ;; REST calls that plan from the context's stored view; hierarchy mode is
+    ;; session state on the client and cannot travel to them, so the planner
+    ;; always runs the ordinary related-items query -- and the dialog's own
+    ;; description, "items currently shown in this context", would be false. A
+    ;; bulk delete may not run against a set the user cannot see. Teaching the
+    ;; endpoint the mode would mean passing a view mode into a destructive REST
+    ;; call for a mode that has no navigation yet; refusing is the smaller and
+    ;; the truer answer.
+    (let [hierarchy? (boolean (:hierarchy-mode? @*state))
+          selected? (boolean (:selected-item @*state))
+          offered? (and selected? (not hierarchy?))]
       [:div#danger-indicator
        {:style {:position "fixed"
                 :top "6px"
@@ -73,11 +84,14 @@
                 :align-items "center"}}
        [:span {:title "Danger mode — destructive actions enabled"} "⚠ DANGER"]
        [:button
-        {:disabled (not selected?)
-         :title (if selected?
-                  "Delete all related items of the currently selected item (q ignored)"
-                  "Select an item first")
-         :on-click #(open-confirm! *state)
+        {:disabled (not offered?)
+         :title (cond hierarchy?
+                        (str "Not available in hierarchy mode — the deletion preview cannot see "
+                             "the mode, so it would list items that are not on screen")
+                      selected?
+                        "Delete all related items of the currently selected item (q ignored)"
+                      :else "Select an item first")
+         :on-click #(when offered? (open-confirm! *state))
          :style {:background "white"
                  :color "#c0392b"
                  :border "none"
@@ -85,8 +99,8 @@
                  :border-radius "3px"
                  :font-size "11px"
                  :font-weight "bold"
-                 :cursor (if selected? "pointer" "not-allowed")
-                 :opacity (if selected? 1 0.5)}}
+                 :cursor (if offered? "pointer" "not-allowed")
+                 :opacity (if offered? 1 0.5)}}
         "Delete related items"]])))
 
 (def ^:private keep-reason-label

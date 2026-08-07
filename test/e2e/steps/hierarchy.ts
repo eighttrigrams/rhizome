@@ -91,3 +91,12 @@ Then("the rhs should list exactly {string}", async ({ page }, expected: string) 
   const titles = await page.locator("#rhs-component li.item-card span.title").allInnerTexts();
   expect(titles.map((t) => t.trim())).toEqual(wanted);
 });
+
+// The deletion preview plans from the context's stored view over stateless
+// REST, so it cannot see hierarchy mode and would list items that are not on
+// screen. The button is therefore not offered while the mode is on.
+Then("the bulk delete button should be {word}", async ({ page }, state: string) => {
+  const button = page.locator("#danger-indicator button");
+  if (state === "enabled") await expect(button).toBeEnabled();
+  else await expect(button).toBeDisabled();
+});

@@ -41,3 +41,15 @@ Feature: Hierarchy mode
     Then I should not see the top strip
     And I should see "Merely related" in the rhs
     And I should see "Search mode" in the lhs
+
+  Scenario: Danger mode does not offer its bulk delete in hierarchy mode
+    Given I am on the app
+    When I press the "c" key
+    And I type "Book" in the search input
+    And I press the "Enter" key
+    And I type "Chapter one" in the search input
+    And I press the "Enter" key
+    And I press the "d" key with shift and alt
+    Then the bulk delete button should be enabled
+    When I press the "h" key with shift and alt
+    Then the bulk delete button should be disabled
