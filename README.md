@@ -216,10 +216,11 @@ That index is independent of the relation's normal sort index and of
 `items.sort_idx`, because it belongs to the edge and not to the item: a part may
 sit under several wholes and take a different position under each.
 
-Both are edited per relation line in the item edit modal (`e`), where the index
-field takes what the "Sort index" field beside it takes — a number or a roman
-numeral. Over the REST API they are `is-part-of` and `part-of-sort-idx` on
-`PUT /api/relations`.
+Both are edited per relation line in the item edit modal (`e`). The index field
+takes a plain integer, and only that — the roman numerals the "Sort index" field
+on the left of the same modal accepts are `items.sort_idx`'s convention, not this
+one's — and left empty it means the part has no place yet. Over the REST API they
+are `is-part-of` and `part-of-sort-idx` on `PUT /api/relations`.
 
 The part-of edges form a **directed acyclic graph**, not a tree. Several wholes
 over one part is expected; a cycle is not. A write that would close a loop is

@@ -14,8 +14,9 @@
 
 (defn ->part-of-sort-idx
   "part_of_sort_idx the way the column wants it: an integer, -1 when unset. The
-   edit modal sends whatever utils/display->sort-idx made of what was typed,
-   which is NaN when that was neither a number nor a roman numeral."
+   edit modal parses what was typed into that field and sends the result, which
+   is NaN when it was not a number -- a roman numeral included: this index is a
+   plain integer, and does not share the convention items.sort_idx has."
   [v]
   (cond (integer? v) v
         (number? v) (if (Double/isNaN (double v)) -1 (long v))
@@ -183,8 +184,8 @@
   ;; One normalised map feeds both representations: the same values go into the
   ;; relation rows and into the mirror, so the two cannot come out of this
   ;; disagreeing. It also keeps a NaN sort index -- what the modal sends when the
-  ;; user typed something that is neither a number nor a roman numeral -- out of
-  ;; the JSON, where it would not survive the round trip.
+  ;; user typed something that is not a number -- out of the JSON, where it would
+  ;; not survive the round trip.
   (let [containers (normalize-part-of containers)]
     (if (or is_context (seq (keys containers)))
       (do (set-containers-of-item! db item containers)

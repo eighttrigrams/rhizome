@@ -2,7 +2,7 @@
   "A part-of relation is written down twice -- as a row in `relations` and as an
    entry in the `contexts` map inside `items.data` -- and the save paths rebuild
    one out of the other. These tests pin the two to each other."
-  (:require [clojure.test :refer [deftest is]]
+  (:require [clojure.test :refer [deftest is testing]]
             [et.vp.ds :as ds]
             [et.vp.ds.relations :as relations]
             [et.vp.ds.search :as search]
@@ -179,10 +179,19 @@
       (is (= #{(:id b)} (contexts-of a)))
       (is (= #{(:id a)} (contexts-of b))))))
 
+(deftest a-roman-numeral-is-not-an-ordering
+  (testing "the sibling index is a plain integer -- the roman convention below -1
+            belongs to items.sort_idx, and nothing translates it here"
+    (is (= -1 (relations/->part-of-sort-idx "iv")))
+    (is (= -1 (relations/->part-of-sort-idx Double/NaN))
+        "which is what the modal parses a roman numeral into")
+    (is (= 4 (relations/->part-of-sort-idx "4")))
+    (is (= 4 (relations/->part-of-sort-idx 4)))))
+
 (deftest a-sort-index-that-is-not-a-number-becomes-unset
   (test-with-reset-db-and-time
-    "the modal sends NaN for input that is neither a number nor a roman numeral;
-     it must not reach the column, and must not reach the JSON either"
+    "the modal sends NaN for input that is not a number; it must not reach the
+     column, and must not reach the JSON either"
     (let [book (ds/new-context db {:title "Book"})
           chapter (ds/new-item db "Chapter" "" #{(:id book)} nil)]
       (relations/set-the-containers-of-item! db

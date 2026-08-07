@@ -1,6 +1,6 @@
 (ns ui.modals.link-context-item
   (:require [reagent.core :as r]
-            [utils :as utils]
+            [clojure.string :as str]
             api))
 
 (defn- get-component-el [] (.getElementById js/document "link-context-item-component"))
@@ -8,6 +8,18 @@
 (def *selectable-contexts (r/atom {}))
 
 (defn- sort-idx-el-id [idx] (str "part-of-sort-idx-" idx))
+
+;; A plain integer, and only that. The roman numerals utils/sort-idx->display
+;; maps to values below -1 are the convention of items.sort_idx, the field on the
+;; left-hand column; this index does not share it. -1 is unset and shows as an
+;; empty field, and anything that is not a number leaves here as NaN, which the
+;; backend stores as unset.
+(defn- part-of-idx->display [idx] (if (= idx -1) "" (str idx)))
+
+(defn- display->part-of-idx
+  [s]
+  (let [s (str/trim s)]
+    (if (empty? s) -1 (js/parseInt s 10))))
 
 (defn- relation-component
   [idx {:keys [title annotation show-badge? is-part-of? part-of-sort-idx]} remove-context]
@@ -34,13 +46,12 @@
                       (.-checked (.-target e))))}] " part of"]
     ;; Uncontrolled, and read back off the DOM at save time -- the same way the
     ;; item's own sort index is handled in item-edit. A controlled input would
-    ;; have to round-trip every keystroke through display->sort-idx, which turns
-    ;; half-typed input into NaN.
+    ;; have to parse every keystroke, and a half-typed number parses to NaN.
     [:input.relation-sort-idx
      {:id (sort-idx-el-id idx)
       :autoComplete :off
-      :title "Position among the parts of this whole -- a number or a roman numeral"
-      :defaultValue (utils/sort-idx->display (or part-of-sort-idx -1))
+      :title "Position among the parts of this whole -- a number; left empty it sorts last"
+      :defaultValue (part-of-idx->display (or part-of-sort-idx -1))
       :placeholder "idx"}]]
    [:input.relation-annotation
     {:value annotation
@@ -69,7 +80,7 @@
 (defn- read-sort-idx
   [idx relation]
   (if-let [el (.getElementById js/document (sort-idx-el-id idx))]
-    (utils/display->sort-idx (.-value el))
+    (display->part-of-idx (.-value el))
     (or (:part-of-sort-idx relation) -1)))
 
 (defn get-values
