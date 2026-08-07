@@ -205,6 +205,64 @@
       (is (= 404 (:status resp2)))
       (is (= "target item not found" (:error (body-json resp2)))))))
 
+(deftest upsert-relation-part-of-test
+  (test-with-fresh-db "marks the relation as a part-of edge and places the part"
+    (let [ctx (ds/new-context db {:title "Books"})
+          whole (ds/new-item db "Book" "b" #{(:id ctx)} 1)
+          part (ds/new-item db "Chapter" "c" #{(:id ctx)} 2)
+          resp (PUT* "/api/relations"
+                     {:source-id (:id part) :target-id (:id whole)
+                      :is-part-of true :part-of-sort-idx 4})]
+      (is (= 200 (:status resp)))
+      (let [row (jdbc/execute-one! db
+                                   ["SELECT is_part_of, part_of_sort_idx FROM relations
+                                     WHERE owner_id = ? AND target_id = ?"
+                                    (:id whole) (:id part)])]
+        (is (= 1 (:relations/is_part_of row)))
+        (is (= 4 (:relations/part_of_sort_idx row))))
+      (let [entry (get-in (ds/get-item db {:id (:id part)}) [:data :contexts (:id whole)])]
+        (is (true? (:is-part-of? entry)) "and the items.data mirror says the same")
+        (is (= 4 (:part-of-sort-idx entry))))))
+  (test-with-fresh-db "leaving is-part-of out keeps the standing the relation had"
+    (let [ctx (ds/new-context db {:title "Books"})
+          whole (ds/new-item db "Book" "b" #{(:id ctx)} 1)
+          part (ds/new-item db "Chapter" "c" #{(:id ctx)} 2)]
+      (PUT* "/api/relations"
+            {:source-id (:id part) :target-id (:id whole) :is-part-of true :part-of-sort-idx 4})
+      (PUT* "/api/relations" {:source-id (:id part) :target-id (:id whole) :show-badge false})
+      (let [entry (get-in (ds/get-item db {:id (:id part)}) [:data :contexts (:id whole)])]
+        (is (true? (:is-part-of? entry)))
+        (is (= 4 (:part-of-sort-idx entry))))))
+  (test-with-fresh-db "rejects a non-integer sort index"
+    (let [ctx (ds/new-context db {:title "Books"})
+          a (ds/new-item db "A" "a" #{(:id ctx)} 1)
+          b (ds/new-item db "B" "b" #{(:id ctx)} 2)
+          resp (PUT* "/api/relations"
+                     {:source-id (:id a) :target-id (:id b) :part-of-sort-idx "iv"})]
+      (is (= 400 (:status resp)))
+      (is (= "part-of-sort-idx must be an integer" (:error (body-json resp)))))))
+
+(deftest upsert-relation-part-of-cycle-test
+  (test-with-fresh-db "refuses a part-of edge that would close a loop, naming the path"
+    (let [ctx (ds/new-context db {:title "Books"})
+          book (ds/new-item db "Book" "" #{(:id ctx)} 1)
+          chapter (ds/new-item db "Chapter" "" #{(:id ctx)} 2)]
+      (PUT* "/api/relations" {:source-id (:id chapter) :target-id (:id book) :is-part-of true})
+      (let [resp (PUT* "/api/relations"
+                       {:source-id (:id book) :target-id (:id chapter) :is-part-of true})
+            body (body-json resp)]
+        (is (= 409 (:status resp)))
+        (is (= (str "Refused: this would make a thing part of itself — "
+                    "Chapter (" (:id chapter) ") → Book (" (:id book) ")"
+                    " → Chapter (" (:id chapter) ")")
+               (:error body)))
+        (is (= [(:id chapter) (:id book) (:id chapter)] (:part-of-cycle body))
+            "the path is in the body as ids too")
+        (is (empty? (jdbc/execute! db
+                                   ["SELECT id FROM relations WHERE owner_id = ? AND target_id = ?"
+                                    (:id chapter) (:id book)]))
+            "and nothing was written")))))
+
 (deftest create-context-recording-off-test
   (testing "with recording off, the write is dropped and no row is created"
     (reset-db)

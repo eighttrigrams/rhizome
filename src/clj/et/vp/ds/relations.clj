@@ -4,6 +4,7 @@
             [cambium.core :as log]
             [cheshire.core :as json]
             [datastore.dialect :as dialect]
+            [et.vp.ds.part-of :as part-of]
             [et.vp.ds.helpers :as helpers]))
 
 (defn- get-title
@@ -150,6 +151,14 @@
   (log/info (str "datastore.relations/set-containers-of-item! " (:id item)
                  "." (:title item)
                  "..." containers))
+  ;; Every relation row is written here, so this is where acyclicity is kept --
+  ;; before the delete, so a refused write leaves the relations exactly as they
+  ;; were rather than half rewritten. It throws; see et.vp.ds.part-of.
+  (part-of/check-acyclic! db
+                          (:id item)
+                          (keep (fn [[container-id {:keys [is-part-of?]}]]
+                                  (when is-part-of? container-id))
+                                containers))
   (jdbc/execute! db
                  (sql/format {:delete-from [:relations]
                               :where [:= :target_id [:inline (:id item)]]}))

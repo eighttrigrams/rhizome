@@ -3,6 +3,7 @@
             [et.vp.ds :as datastore]
             [et.vp.ds.search :as search]
             [et.vp.ds.relations :as datastore.relations]
+            [et.vp.ds.part-of :as part-of]
             [cambium.core :as log]
             [replica :as replica]
             [repository.insertion :as insertion]
@@ -465,12 +466,22 @@
     (let [context (or (:context (:context arg)) (:context arg))
           item-contexts (:item-contexts arg)]
       (log/info (str "repository/update-item" (:id context) "-" (:title context) "-" arg))
-      (let [is_context (:is_context (datastore/get-item db context))]
-        (datastore.relations/set-the-containers-of-item! db context item-contexts is_context))
-      (let [selected-item (datastore/update-item db context)]
-        (merge {:selected-item selected-item
-                :items (search-related-items db "" selected-item)
-                :q nil})))))
+      (try
+        (let [is_context (:is_context (datastore/get-item db context))]
+          (datastore.relations/set-the-containers-of-item! db context item-contexts is_context))
+        (let [selected-item (datastore/update-item db context)]
+          (merge {:selected-item selected-item
+                  :items (search-related-items db "" selected-item)
+                  :q nil}))
+        (catch clojure.lang.ExceptionInfo e
+          (if-let [msg (part-of/cycle-refusal e)]
+            ;; Answer in band, the way a refused write on a replica is answered:
+            ;; nothing else in the response, so the list the user is looking at
+            ;; stays as it was, plus the modal they made the edit in -- a
+            ;; checkbox that silently fails to stick is worse than an error.
+            (do (log/info {:event "part-of-cycle-refused" :item-id (:id context)} msg)
+                {:part-of-refused msg :modal :edit-context})
+            (throw e)))))))
 
 (defn update-annotations
   [{:keys [db]}]

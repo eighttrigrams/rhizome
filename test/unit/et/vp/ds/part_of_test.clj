@@ -101,6 +101,71 @@
       (relations/set-collection-titles-of-new-item db (:id chapter))
       (is (= {:is-part-of? true :part-of-sort-idx 4} (mirror (:id book) (:id chapter)))))))
 
+(defn- make-part-of!
+  "Make `part` a part of `whole` at sort index `idx`, the way a save from the
+   edit modal does."
+  [whole part idx]
+  (relations/set-the-containers-of-item! db
+                                         (ds/get-item db {:id (:id part)})
+                                         {(:id whole) {:title (:title whole)
+                                                       :show-badge? true
+                                                       :is-context? true
+                                                       :is-part-of? true
+                                                       :part-of-sort-idx idx}}
+                                         true))
+
+(defn- contexts-of [item] (into #{} (keys (get-in (ds/get-item db {:id (:id item)}) [:data :contexts]))))
+
+(deftest a-node-may-be-part-of-several-wholes
+  (test-with-reset-db-and-time "two wholes over one part are a DAG, not a cycle"
+    (let [a (ds/new-context db {:title "A"})
+          b (ds/new-context db {:title "B"})
+          leaf (ds/new-item db "Leaf" "" #{(:id a) (:id b)} nil)]
+      (relations/set-the-containers-of-item!
+        db
+        (ds/get-item db {:id (:id leaf)})
+        {(:id a) {:title "A" :show-badge? true :is-context? true
+                  :is-part-of? true :part-of-sort-idx 1}
+         (:id b) {:title "B" :show-badge? true :is-context? true
+                  :is-part-of? true :part-of-sort-idx 9}}
+        false)
+      (is (= {:is-part-of? true :part-of-sort-idx 1} (row (:id a) (:id leaf))))
+      (is (= {:is-part-of? true :part-of-sort-idx 9} (row (:id b) (:id leaf)))
+          "and it sits at a different position under each"))))
+
+(deftest a-part-of-edge-that-would-close-a-loop-is-refused
+  (test-with-reset-db-and-time "nothing can be part of itself"
+    (let [a (ds/new-context db {:title "A"})]
+      (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                            #"part of itself"
+                            (make-part-of! a a 1)))))
+  (test-with-reset-db-and-time "nor part of something that is already part of it"
+    (let [book (ds/new-context db {:title "Book"})
+          chapter (ds/new-context db {:title "Chapter"})]
+      (make-part-of! book chapter 1)
+      (is (thrown? clojure.lang.ExceptionInfo (make-part-of! chapter book 1)))
+      (is (= #{} (contexts-of book)) "and the refused write left the relations alone")))
+  (test-with-reset-db-and-time "however long the way round, and the message names the way"
+    (let [a (ds/new-context db {:title "A"})
+          b (ds/new-context db {:title "B"})
+          c (ds/new-context db {:title "C"})]
+      (make-part-of! a b 1)
+      (make-part-of! b c 1)
+      (let [msg (try (make-part-of! c a 1)
+                     nil
+                     (catch clojure.lang.ExceptionInfo e (ex-message e)))]
+        (is (some? msg) "the write is refused")
+        (is (= (str "Refused: this would make a thing part of itself — "
+                    "C (" (:id c) ") → A (" (:id a) ") → B (" (:id b) ") → C (" (:id c) ")")
+               msg)))))
+  (test-with-reset-db-and-time "plain relations may go on forming cycles"
+    (let [a (ds/new-context db {:title "A"})
+          b (ds/new-context db {:title "B"})]
+      (relations/set-the-containers-of-item! db a {(:id b) {:title "B" :show-badge? true}} true)
+      (relations/set-the-containers-of-item! db b {(:id a) {:title "A" :show-badge? true}} true)
+      (is (= #{(:id b)} (contexts-of a)))
+      (is (= #{(:id a)} (contexts-of b))))))
+
 (deftest a-sort-index-that-is-not-a-number-becomes-unset
   (test-with-reset-db-and-time
     "the modal sends NaN for input that is neither a number nor a roman numeral;

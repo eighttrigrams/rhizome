@@ -5,6 +5,7 @@
             [cheshire.core :as json]
             [et.vp.ds :as datastore]
             [et.vp.ds.relations :as relations]
+            [et.vp.ds.part-of :as part-of]
             [et.vp.ds.search :as search]
             [rest-api.middleware :as mw]
             [repository.insertion :as insertion]
@@ -170,10 +171,19 @@
                                 :where [:= :id [:inline source-id]]}))))
 
 (defn- upsert-relation-impl
-  [db source-item target-item show-badge?]
-  (try (relations/link-item-to-another-item! db source-item target-item show-badge?)
+  [db source-item target-item show-badge? part-of]
+  (try (relations/link-item-to-another-item! db source-item target-item show-badge? part-of)
        (force-show-badge! db (:id source-item) (:id target-item) show-badge?)
        (json-response (item->api (datastore/get-item db {:id (:id source-item)})))
+       (catch clojure.lang.ExceptionInfo e
+         (if-let [msg (part-of/cycle-refusal e)]
+           (do (log/warn {:event "part-of-cycle-refused"
+                          :source-id (:id source-item)
+                          :target-id (:id target-item)}
+                         msg)
+               (json-response 409 {:error msg :part-of-cycle (:path (ex-data e))}))
+           (do (log/error e "REST API: upsert-relation failed")
+               (json-response 500 {:error (.getMessage e)}))))
        (catch Exception e
          (log/error e "REST API: upsert-relation failed")
          (json-response 500 {:error (.getMessage e)}))))
@@ -182,18 +192,30 @@
   "PUT /api/relations — upsert a relation between two items. JSON body:
   {\"source-id\" (required int), \"target-id\" (required int),
   \"show-badge\" (optional bool, default true — controls whether the badge for
-  this relation is shown in the source item's context list)}. The relation is
+  this relation is shown in the source item's context list),
+  \"is-part-of\" (optional bool — mark this relation as a part-of edge, meaning
+  target-item is the whole and source-item one of its parts; omitted, an
+  existing relation keeps the standing it had),
+  \"part-of-sort-idx\" (optional int — where source-item sits among the parts of
+  target-item, -1 for unset; independent of every other sort index, so a node
+  with several wholes can be placed differently under each)}. The relation is
   added to source-item's :data.contexts, with target-item as the owner. Idempotent.
-  Returns 400 on missing/invalid ids, 404 if either item does not exist, 500
-  otherwise. Gated by recording mode."
+  Returns 400 on missing/invalid ids, 404 if either item does not exist, 409 when
+  the part-of edge would close a loop (the body names the path), 500 otherwise.
+  Gated by recording mode."
   [db req]
-  (let [{:keys [source-id target-id show-badge]} (parse-json-body req)
-        show-badge? (if (nil? show-badge) true (boolean show-badge))]
+  (let [{:keys [source-id target-id show-badge is-part-of part-of-sort-idx]} (parse-json-body req)
+        show-badge? (if (nil? show-badge) true (boolean show-badge))
+        part-of (cond-> {}
+                  (some? is-part-of) (assoc :is-part-of? (boolean is-part-of))
+                  (some? part-of-sort-idx) (assoc :part-of-sort-idx part-of-sort-idx))]
     (cond
       (not (and (integer? source-id) (integer? target-id)))
         (json-response 400 {:error "source-id and target-id are required integers"})
       (= source-id target-id)
         (json-response 400 {:error "source-id and target-id must differ"})
+      (and (some? part-of-sort-idx) (not (integer? part-of-sort-idx)))
+        (json-response 400 {:error "part-of-sort-idx must be an integer"})
       :else
         (let [source-item (datastore/get-item db {:id source-id})
               target-item (datastore/get-item db {:id target-id})]
@@ -203,9 +225,10 @@
             :else
               (mw/log-and-guard
                 "upsert-relation"
-                {:source-id source-id :target-id target-id :show-badge? show-badge?}
+                (merge {:source-id source-id :target-id target-id :show-badge? show-badge?}
+                       part-of)
                 (json-response (item->api source-item))
-                (fn [] (upsert-relation-impl db source-item target-item show-badge?))))))))
+                (fn [] (upsert-relation-impl db source-item target-item show-badge? part-of))))))))
 
 (defn backfill-embeddings
   "POST /api/backfill/embeddings — embed every item that has a non-empty
