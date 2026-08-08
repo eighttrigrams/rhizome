@@ -215,9 +215,11 @@
             :height frame-height
             ;; autoplay has to be granted to the frame as well as asked for in
             ;; the URL; without it the policy stops the video at the boundary
-            ;; and the player comes up paused.
+            ;; and the player comes up paused. fullscreen is in the same list
+            ;; rather than as the allowfullscreen attribute the inline embed
+            ;; carried: with both, Chromium logs that this one takes precedence
+            ;; anyway, so the attribute was saying nothing twice.
             :allow "autoplay; encrypted-media; picture-in-picture; fullscreen"
-            :allowFullScreen true
             ;; Belt to the pointer capture's braces, and free: while the drag
             ;; runs there is nothing in the iframe worth clicking anyway.
             :style (when @*drag {:pointer-events "none"})}]]
