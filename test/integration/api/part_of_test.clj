@@ -209,6 +209,47 @@
                                   ["SELECT owner_id FROM relations WHERE target_id = ?"
                                    (:id item)])))))))
 
+(deftest annotating-a-deep-edge-does-not-move-the-selection-test
+  (with-fresh-db
+    "the annotation goes to the edge the row was shown by, and the list that
+     comes back is still the selected context's. Those were one thing while the
+     modal was always handed the selected context; below level 1 they are two,
+     and answering an annotation edit by navigating to the whole that owns the
+     edge is not what the user asked for"
+    (let [{book :selected-item} (call! :insert-context nil {:title "Book"})
+          {chapter :selected-item} (call! :insert-context nil {:title "Chapter"})
+          page (ds/new-item db "Page" "" #{(:id chapter) (:id book)} nil)
+          annotation-of (fn [whole]
+                          (:relations/annotation
+                            (jdbc/execute-one! db
+                                               ["SELECT annotation FROM relations
+                                                 WHERE owner_id = ? AND target_id = ?"
+                                                (:id whole) (:id page)])))]
+      (save-relations! chapter (part-of-entry book 1))
+      (relations/set-the-containers-of-item!
+        db
+        (ds/get-item db {:id (:id page)})
+        {(:id chapter) {:title "Chapter" :show-badge? true :is-context? true
+                        :is-part-of? true :part-of-sort-idx 1}
+         (:id book) {:title "Book" :show-badge? true :is-context? true}}
+        false)
+      (let [resp (call! :update-annotations
+                        {:selected-item book
+                         :hierarchy-mode? true
+                         :hierarchy-level {:context (:id book) :level 2}}
+                        {:item-id (:id page)
+                         :context-id (:id chapter)
+                         :relation-annotation "written from level 2"})]
+        (is (= "written from level 2" (annotation-of chapter))
+            "the edge on screen is the one written to")
+        (is (nil? (annotation-of book))
+            "and the plain relation to the selected context is left alone")
+        (is (= (:id book) (:id (:selected-item resp)))
+            "the selection is where it was -- the whole that owns the edge is not
+             where the user is standing")
+        (is (= ["Page"] (mapv :title (:items resp)))
+            "and the list is still level 2 of it")))))
+
 (deftest a-hierarchy-list-is-bounded-even-when-the-caller-names-no-bound-test
   (with-fresh-db
     "the SPA asks with no limit of its own -- it always has -- and that was safe

@@ -564,7 +564,15 @@
         (datastore/update-item db (assoc existing-item :annotation global-annotation))))
     (when (and context-id relation-annotation)
       (datastore.relations/update-relation-annotation! db item-id context-id relation-annotation))
-    (let [selected-item (when context-id (datastore/get-item db {:id context-id}))]
+    ;; The list to answer with is the one under the selected context, which is
+    ;; not the same thing as the whole whose edge was just annotated. It used to
+    ;; be: the modal was always handed the selected context, so re-reading
+    ;; `context-id` re-read the selection and this was a refresh. Below level 1
+    ;; the annotated edge belongs to a whole further down (see
+    ;; ui.actions/filed-under), and re-reading that one here would answer an
+    ;; annotation edit by navigating somewhere the user did not ask to go.
+    (let [selected-item (when-let [id (:id (:selected-item state))]
+                          (datastore/get-item db {:id id}))]
       (if selected-item
         (merge (items-under db selected-item state) {:selected-item selected-item :q nil})
         {:items (search db {:q "" :selected-item nil})
