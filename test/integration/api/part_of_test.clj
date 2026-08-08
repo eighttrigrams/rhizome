@@ -72,6 +72,37 @@
              (set (mapv :title (:items (call! :fetch-context {} [{:id (:id book)} false])))))
           "and without it the ordinary related-items list is unchanged"))))
 
+(deftest hierarchy-mode-answers-at-the-level-it-is-asked-for-test
+  (with-fresh-db
+    "the level is session state the same way the mode is, so it rides in on the
+     request -- and how deep the context goes rides back with the list, because
+     the strip cannot bound its stepper without being told"
+    (let [{book :selected-item} (call! :insert-context nil {:title "Book"})
+          {one :selected-item} (call! :insert-context nil {:title "Chapter one"})
+          {two :selected-item} (call! :insert-context nil {:title "Chapter two"})
+          page-of-one (ds/new-item db "A page of chapter one" "" #{(:id one)} nil)
+          page-of-two (ds/new-item db "A page of chapter two" "" #{(:id two)} nil)
+          select (fn [state] (call! :fetch-context state [{:id (:id book)} false]))]
+      (save-relations! one (part-of-entry book 1))
+      (save-relations! two (part-of-entry book 2))
+      (save-relations! page-of-one (part-of-entry one 1))
+      (save-relations! page-of-two (part-of-entry two 1))
+      (let [resp (select {:hierarchy-mode? true})]
+        (is (= ["Chapter one" "Chapter two"] (mapv :title (:items resp)))
+            "no level asked for is level 1, what the mode listed before there were levels")
+        (is (= 2 (:hierarchy-max-level resp)) "and the strip is told where to stop"))
+      (is (= ["A page of chapter one" "A page of chapter two"]
+             (mapv :title (:items (select {:hierarchy-mode? true :hierarchy-level 2}))))
+          "level 2 is the parts of the parts, in path order")
+      (is (= [] (mapv :title (:items (select {:hierarchy-mode? true :hierarchy-level 3}))))
+          "and past the deepest path there is nothing -- which is what the stepper
+           is bounded so as not to ask")
+      (let [resp (select {})]
+        (is (= #{"Chapter one" "Chapter two"} (set (mapv :title (:items resp))))
+            "without the mode the ordinary related-items list is unchanged")
+        (is (nil? (:hierarchy-max-level resp))
+            "and the subgraph is not walked for an answer nobody is going to read")))))
+
 (deftest a-save-that-fails-for-any-other-reason-is-reported-too-test
   (with-fresh-db
     "the save takes a write transaction, so another writer holding the database

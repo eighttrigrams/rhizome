@@ -82,9 +82,33 @@
   "Hierarchy mode is session state -- it is not stored on the context the way a
    view is, so it rides along on every request the SPA makes and has to be handed
    on wherever the item list is rebuilt from something other than the whole state
-   map."
+   map. The level being looked at rides along with it, for the same reason and by
+   the same route."
   [state]
-  (select-keys state [:hierarchy-mode?]))
+  (select-keys state [:hierarchy-mode? :hierarchy-level]))
+
+(defn- hierarchy-bound
+  "How deep the part-of edges below the selected context run -- the level past
+   which the strip's stepper has nothing to offer.
+
+   It travels back with the item list rather than being asked for once, because
+   it is not a property of the session but of the tree: an edit to a part-of edge
+   reshapes what the levels index, and the stepper would go on offering a step
+   into an empty list until something else happened to refresh it. Only in
+   hierarchy mode -- nothing else asks the question, and answering it walks the
+   subgraph."
+  ([db state] (hierarchy-bound db state (:selected-item state)))
+  ([db state selected-item]
+   (when (and (:hierarchy-mode? state) (:id selected-item))
+     {:hierarchy-max-level (search/part-of-depth db (:id selected-item))})))
+
+(defn- items-under
+  "The item list under `selected-item`, and with it whatever hierarchy mode needs
+   alongside the list to draw its strip."
+  ([db selected-item state] (items-under db "" selected-item state))
+  ([db q selected-item state]
+   (merge {:items (search-related-items db q selected-item (hierarchy-opts state))}
+          (hierarchy-bound db state selected-item))))
 
 (defn- log-opts
   [{:keys [cmd q active-search] :as _opts}]
@@ -125,8 +149,8 @@
           (datastore/reprioritize-item db arg)
           (datastore/reprioritize-context db arg)))
       (merge opts
+             (items-under db selected-item old-state)
              {:selected-item selected-item
-              :items (search-related-items db "" selected-item (hierarchy-opts old-state))
               :context-to-fetch nil
               :unassigned-secondary-contexts-selected? false
               :q nil
@@ -146,7 +170,7 @@
     (log/info (str "repository/change-secondary-contexts-operation: " (:id (:selected-item opts))
                    "-" (:title (:selected-item opts))))
     (let [_context (the-future (datastore/update-item db (:selected-item opts)))]
-      {:items (search-related-items db (:q opts) (:selected-item opts) (hierarchy-opts opts))})))
+      (items-under db (:q opts) (:selected-item opts) opts))))
 
 (defn change-secondary-contexts-selection [{:keys [db]}] (change-secondary-contexts-operation db))
 
@@ -176,9 +200,8 @@
                     (assoc-in [:selected-item :data :views :current :search-mode] 0)
                     (assoc-in [:selected-item :data :views :current :notes-mode] false)
                     (assoc-in [:selected-item :data :views :current :description-filter] nil))))]
-      {:items (search-related-items db (:q opts) context (hierarchy-opts opts))
-       :contexts (search-context-items db "" {})
-       :selected-item context})))
+      (merge (items-under db (:q opts) context opts)
+             {:contexts (search-context-items db "" {}) :selected-item context}))))
 
 (defn store-current-view
   [{:keys [db]}]
@@ -190,8 +213,7 @@
   [{:keys [db]}]
   (fn [{:keys [selected-item] :as opts} idx]
     (let [selected-item (datastore/load-stored-context db selected-item idx)]
-      {:selected-item selected-item
-       :items (search-related-items db (:q opts) selected-item (hierarchy-opts opts))})))
+      (merge (items-under db (:q opts) selected-item opts) {:selected-item selected-item}))))
 
 (defn remove-stored-context
   [{:keys [db]}]
@@ -203,12 +225,13 @@
   [{:keys [db]}]
   (fn [{:keys [selected-item] :as opts}]
     (let [selected-item (datastore/cycle-search-mode db selected-item)]
-      {:selected-item selected-item
-       :items (search-related-items db (:q opts) selected-item (hierarchy-opts opts))})))
+      (merge (items-under db (:q opts) selected-item opts) {:selected-item selected-item}))))
 
 (defn delete-item
   [{:keys [db]}]
-  (fn [opts item] (deletion/delete-item db item) {:items (search db opts) :item-view? false}))
+  (fn [opts item]
+    (deletion/delete-item db item)
+    (merge {:items (search db opts) :item-view? false} (hierarchy-bound db opts))))
 
 
 (defn delete-context
@@ -252,15 +275,13 @@
                           (do (log/info log-data "Item already exists - no insertion.")
                               ((fetch-context {:db db}) state [item true]))
                           (do (log/info log-data "Inserted item")
-                              {:items (search-related-items db "" selected-item
-                                                            (hierarchy-opts state))
-                               :selected-item selected-item
-                               :item-view? false
-                               :q nil
-                               :aggregated-contexts '()
-                               :item-descriptions nil}))))
-               {:items (search-related-items db (:q state) selected-item
-                                            (hierarchy-opts state))})))))
+                              (merge (items-under db selected-item state)
+                                     {:selected-item selected-item
+                                      :item-view? false
+                                      :q nil
+                                      :aggregated-contexts '()
+                                      :item-descriptions nil})))))
+               (items-under db (:q state) selected-item state))))))
 
 (defn fetch-item-description
   [{:keys [db]}]
@@ -335,10 +356,10 @@
       (datastore/reprioritize-context db arg)
       (datastore.relations/link-item-to-another-item! db selected-item arg (not shift-pressed?))
       (let [fresh-selected-item (datastore/get-item db (:selected-item opts))]
-        (merge {:link-context nil
+        (merge (items-under db fresh-selected-item opts)
+               {:link-context nil
                 :active-search nil
                 :selected-item fresh-selected-item
-                :items (search-related-items db "" fresh-selected-item (hierarchy-opts opts))
                 :q nil}
                (when (:selected-item opts)
                  {:aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)}))))))
@@ -408,23 +429,23 @@
                      (dissoc :q :link-item :link-context)
                      (assoc-in [:selected-item :data :views :current :selected-secondary-contexts]
                                []))
-            items (search-related-items db "" (:selected-item opts) (hierarchy-opts opts))
             aggregated-contexts ((fetch-aggregated-contexts {:db db}) opts)
             selected-item (datastore/get-item db (:selected-item opts))]
-        {:items items
-         :active-search nil
-         :selected-item selected-item
-         :link-item nil
-         :link-context nil
-         :q nil
-         :aggregated-contexts aggregated-contexts}))))
+        (merge (items-under db (:selected-item opts) opts)
+               {:active-search nil
+                :selected-item selected-item
+                :link-item nil
+                :link-context nil
+                :q nil
+                :aggregated-contexts aggregated-contexts})))))
 
 (defn reprioritize-item
   [{:keys [db]}]
   (fn [state item]
     (log/info (str "repository/reprioritize-item" (:id item) (:title item)))
     (datastore/reprioritize-item db item)
-    {:items (search db (dissoc state :q)) :active-search nil :q nil}))
+    (merge {:items (search db (dissoc state :q)) :active-search nil :q nil}
+           (hierarchy-bound db state))))
 
 (defn upgrade-item-to-context
   [{:keys [db]}]
@@ -446,11 +467,11 @@
             (not old-selected-item))
       state
       (do (log/info (str "repository/unlink-selected-item-from-container - Removing now"))
-          {:selected-item old-selected-item
-           :items (search-related-items db "" old-selected-item (hierarchy-opts state))
-           :aggregated-contexts ((fetch-aggregated-contexts {:db db})
-                                  (assoc state :selected-item old-selected-item))
-           :item-view? false}))))
+          (merge (items-under db old-selected-item state)
+                 {:selected-item old-selected-item
+                  :aggregated-contexts ((fetch-aggregated-contexts {:db db})
+                                         (assoc state :selected-item old-selected-item))
+                  :item-view? false})))))
 
 (defn unlink-item
   [{:keys [db]}]
@@ -459,7 +480,7 @@
     (if-not selected-item
       (throw (Exception. "unlink-item shouldn't have been called without 'selected-item'"))
       (do (datastore.relations/unlink-item-from-another-item! db item selected-item)
-          {:items (search db state) :item-view? false}))))
+          (merge {:items (search db state) :item-view? false} (hierarchy-bound db state))))))
 
 (defn select-last-context
   [{:keys [db]}]
@@ -468,9 +489,8 @@
       {}
       (do (log/info (str "repository/select-last-context - " (:id old-selected-item)
                          ":" (:title old-selected-item)))
-          {:selected-item old-selected-item
-           :items (search-related-items db "" old-selected-item (hierarchy-opts state))
-           :item-view? false}))))
+          (merge (items-under db old-selected-item state)
+                 {:selected-item old-selected-item :item-view? false})))))
 
 (defn update-item
   [{:keys [db]}]
@@ -485,10 +505,8 @@
           ;; The edit modal stays open until this answers -- see
           ;; ui.modals.actions/update-context! -- so closing it is this
           ;; function's to say, and only on the path that saved something.
-          (merge {:selected-item selected-item
-                  :items (search-related-items db "" selected-item (hierarchy-opts state))
-                  :modal nil
-                  :q nil}))
+          (merge (items-under db selected-item state)
+                 {:selected-item selected-item :modal nil :q nil}))
         ;; Both ways this can fail are answered in band, the way a refused write
         ;; on a replica is answered: nothing else in the response, so the list
         ;; the user is looking at stays as it was, and the modal they made the
@@ -522,9 +540,7 @@
       (datastore.relations/update-relation-annotation! db item-id context-id relation-annotation))
     (let [selected-item (when context-id (datastore/get-item db {:id context-id}))]
       (if selected-item
-        {:selected-item selected-item
-         :items (search-related-items db "" selected-item (hierarchy-opts state))
-         :q nil}
+        (merge (items-under db selected-item state) {:selected-item selected-item :q nil})
         {:items (search db {:q "" :selected-item nil})
          :contexts (search-context-items db "" {})
          :q nil}))))
@@ -537,9 +553,11 @@
     (merge
       {:cmd nil :arg nil}
       (case cmd
-        nil (cond (= :items active-search) {:items (search db opts)}
+        nil (cond (= :items active-search)
+                    (merge {:items (search db opts)} (hierarchy-bound db opts))
                   (= :contexts active-search) (search-contexts db opts)
-                  :else (merge {:items (search db opts) :contexts (search-context-items db "" {})}))
+                  :else (merge {:items (search db opts) :contexts (search-context-items db "" {})}
+                               (hierarchy-bound db opts)))
         :link-item-to-selected-item (start-linking-item-to-selected-context db opts)
         :start-linking-selected-item-to-context
           (start-linking-selected-item-to-context-with-local-search db opts)
