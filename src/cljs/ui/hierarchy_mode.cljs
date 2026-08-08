@@ -70,6 +70,26 @@
                     (assoc @*state
                       :hierarchy-level {:context (:id (:selected-item @*state)) :level to})))
 
+(defn- keep-the-keyboard
+  "Stop a click on the strip from moving focus.
+
+   The strip is a sibling of #main-layer, and #main-layer is where every key
+   binding in the app lives (see ui.cljs). A plain click here therefore blurs it,
+   and nothing has a key again until the user clicks back into the app -- not
+   even Shift+Alt+H, so the keyboard could not undo what the click had done.
+
+   Preventing the default action of mousedown is what stops the focus moving at
+   all, which is better here than moving it back afterwards: with the item search
+   open the focus is in #search-input and the user is mid-word, and a control
+   that takes no focus leaves them there. On the whole strip rather than on the
+   arrows, because its label is just as clickable and did the same thing.
+
+   The controls this stepper was modelled on -- the description filter, the
+   stored views -- never needed it: they are inside #main-layer. The idiom was
+   followed; the place was not."
+  [e]
+  (.preventDefault e))
+
 (defn- arrow
   "One end of the stepper. A step that does not exist is not offered -- no
    handler, and dimmed -- rather than offered and then answered with an empty
@@ -93,7 +113,8 @@
   (when (:hierarchy-mode? @*state)
     (let [n (level @*state)
           bottom (deepest @*state)]
-      [:div#hierarchy-strip [:span#hierarchy-strip-mode "Hierarchy mode"]
+      [:div#hierarchy-strip {:on-mouse-down keep-the-keyboard}
+       [:span#hierarchy-strip-mode "Hierarchy mode"]
        ;; Nothing is selected, so the list is not a hierarchy and there is no
        ;; level to be at. The mode is still on, and the strip still says so.
        (when (:selected-item @*state)

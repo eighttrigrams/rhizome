@@ -126,6 +126,24 @@ Feature: Hierarchy mode
     And I step the level up
     Then the rhs should list exactly "Shared page, Another page, Shared page"
 
+  Scenario: Stepping the level leaves the keyboard where it was
+    Given I am on the app
+    When I press the "c" key
+    And I type "Book" in the search input
+    And I press the "Enter" key
+    And I type "Chapter" in the search input
+    And I press the "Enter" key
+    And I press the "i" key
+    And I type "Page" in the search input
+    And I press the "Enter" key
+    And I make "Chapter" part of "Book" at index 1
+    And I make "Page" part of "Chapter" at index 1
+    And I press the "h" key with shift and alt
+    And I step the level up
+    Then the strip should show level 2
+    When I press the "h" key with shift and alt, wherever the focus is
+    Then I should not see the top strip
+
   Scenario: The level goes back to 1 when another context is selected
     Given I am on the app
     When I press the "c" key

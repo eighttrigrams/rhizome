@@ -88,6 +88,26 @@ async function stepLevel(page: any, direction: string) {
 When("I step the level {word}", async ({ page }, direction: string) =>
   stepLevel(page, direction));
 
+// Unaimed on purpose. Every other key step in this suite presses on a locator,
+// so Playwright delivers the event to that element whatever document.activeElement
+// happens to be -- which is why none of them can tell whether a click has taken
+// the keyboard away from the app. page.keyboard.press goes wherever the focus
+// actually is, so this step fails if it is nowhere useful, exactly as a user's
+// keypress would do nothing.
+When(
+  "I press the {string} key with shift and alt, wherever the focus is",
+  async ({ page }, key: string) => {
+    await page.keyboard.press(`Alt+Shift+Key${key.toUpperCase()}`);
+    await page.waitForTimeout(100);
+    await page.waitForLoadState("networkidle");
+    await page.evaluate(
+      () => new Promise<void>((r) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => r())),
+      ),
+    );
+  },
+);
+
 Then("the strip should show level {int}", async ({ page }, n: number) => {
   await expect(page.locator("#hierarchy-level-value")).toHaveText(String(n));
 });
