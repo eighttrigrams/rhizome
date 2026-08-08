@@ -245,25 +245,52 @@ the wholes it is a part of, alongside its `contexts`:
 #### Levels
 
 Seen from one whole, the edges unroll into a tree, and that tree has levels.
-Level 1 is the parts of that whole — what `part_of=true` lists. Level 2 is the
-parts of *those*, reached by asking the same question of each of them. Level N
-is the nodes at depth exactly N, so the direct children are **not** among the
-level-2 nodes.
+Level 1 is the parts of that whole — what `part_of=true` lists on its own.
+Level 2 is the parts of *those*; level N is the nodes at depth exactly N, so
+the direct children are **not** among the level-2 nodes. Add `level=N`:
+
+```bash
+curl -s "$RHIZOME/items/12/related?part_of=true&level=2"
+```
+
+`level=` defaults to 1, so a call that never passes it asks for what it always
+got. It is refused rather than guessed at: `400` without `part_of=true`, `400`
+when it is not a positive integer, and `400` above **63** — one level costs one
+table in the join and SQLite plans a join over at most 64 of them. That ceiling
+is the query's, not the data's, which is why it is a refusal: an empty list at
+that depth would tell you nothing is filed that deep, and that is a different
+answer.
 
 A node's place at a level is decided by the whole path that reached it, not by
 its own `part-of-sort-idx` alone: the tuple of indices from the whole down to
 the node, compared component by component, with `-1` sorting after every set
 index at *every* component and not only at the last. Everything under the first
 child therefore comes before everything under the second, whatever indices are
-used further down. Walking level 1 in order and then each of those nodes' parts
-in order gives you exactly that ordering — you do not have to sort anything
-yourself.
+used further down. You do not have to sort anything yourself.
 
 Because these are a DAG, one node can sit at a level by more than one route,
 and it belongs at each place it occupies. A level is as long as there are paths
 into it, not as there are distinct items in it; do not collapse the repeats,
 they are two positions somebody gave the same thing. Paths can multiply with
 depth, so expect a deep level to be longer than the graph is wide.
+
+**Which is why every `part_of=true` row carries `part-of-path`** — the ids it
+was reached through, from the `:id` you asked about down to the row itself,
+both ends included, so its length is `level + 1` and its first element is
+always the id in the URL:
+
+```json
+[ { "id": 207, "title": "The relations table", "part-of-sort-idx": 1,
+    "part-of-path": [200, 202, 207] },
+  { "id": 207, "title": "The relations table", "part-of-sort-idx": 5,
+    "part-of-path": [200, 203, 207] } ]
+```
+
+Read it before you conclude anything from a repeated row. Those two rows are
+one item filed in two chapters, not the API repeating itself, and the path is
+the only thing on them that says so — a route, not an identity. The chain also
+gives you the intermediate wholes by id, so you can name the chapters or walk
+back up without another search.
 
 ## Search strategy — when using rhizome for research
 
