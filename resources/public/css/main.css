@@ -184,7 +184,9 @@ ul.cards {
     padding: 2px 4px;
 }
 
-#modal-component .part-of-refusal {
+/* Not scoped to #modal-component any more: the same banner reports a refused
+   unlink out in the item list, where no modal is involved. */
+.part-of-refusal {
     background-color: #c0392b;
     color: white;
     padding: 6px 8px;
@@ -193,7 +195,7 @@ ul.cards {
     font-size: 12px;
 }
 
-#modal-component .part-of-refusal-hint {
+.part-of-refusal-hint {
     margin-top: 4px;
     font-weight: bold;
 }

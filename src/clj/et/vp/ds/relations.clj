@@ -283,13 +283,40 @@
                                                      :is-part-of? is-part-of?
                                                      :part-of-sort-idx part-of-sort-idx})))))
 
+(defn- would-leave-no-containers?
+  "Whether unlinking `item` from `another-item` would drop its last container.
+   A context is allowed to stand on its own; anything else has to stay in at
+   least one, or nothing lists it any more.
+
+   The condition is the one `unlink-item-from-another-item!` has always branched
+   on, moved here unchanged so that the refusal sentence below and the write can
+   only ever be reading the same rule."
+  [item another-item]
+  (let [containers (dissoc (:contexts (:data item)) (:id another-item))]
+    (not (or (seq (keys containers)) (:is_context item)))))
+
+(defn last-container-refusal
+  "The refusal sentence for an unlink that `unlink-item-from-another-item!` would
+   decline, or nil when it would go through. Stated next to the rule, and off the
+   same predicate the write itself branches on, so the sentence and the rule
+   cannot drift apart -- the arrangement `part-of/cycle-refusal` already has with
+   `check-acyclic!`.
+
+   Both titles are named. The gesture is aimed at one edge out of however many
+   the item has, and a refusal that does not say which one leaves the user
+   guessing at what to do about it."
+  [item another-item]
+  (when (would-leave-no-containers? item another-item)
+    (str "Refused: \"" (:title item) "\" is only in \"" (:title another-item)
+         "\" — an item has to stay in at least one context.")))
+
 (defn unlink-item-from-another-item!
   [db item another-item]
   (let [selected-item (update-in item [:data :contexts] #(dissoc % (:id another-item)))
         containers (:contexts (:data selected-item))]
     (log/info {:is_context (:is_context item) :containers containers}
               "unlink-item-from-another-item!")
-    (if-not (or (seq (keys containers)) (:is_context item))
+    (if (would-leave-no-containers? item another-item)
       (do (log/info {:item (select-keys item [:id :title])
                      :container (select-keys item [:id :title])}
                     "can't unlink item from another item")

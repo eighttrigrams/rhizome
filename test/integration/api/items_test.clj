@@ -54,6 +54,44 @@
       (is (zero? (relations-count (:id item) (:id a))))
       (is (= 1 (relations-count (:id item) (:id b)))))))
 
+(deftest unlink-item-refused-test
+  (with-fresh-db "names the refusal when the whole is the item's only container"
+    (let [{a :selected-item} (call! :insert-context nil {:title "A"})
+          item (ds/new-item db "Sapiens" "s" #{(:id a)} 1)
+          full (ds/get-item db {:id (:id item)})
+          resp (call! :unlink-item {:selected-item a} full)]
+      (is (= 1 (relations-count (:id item) (:id a)))
+          "the relation is still there -- nothing was unlinked")
+      (is (string? (:unlink-refused resp)) "and the refusal is said out loud")
+      (is (re-find #"Sapiens" (:unlink-refused resp)) "naming the row")
+      (is (re-find #"\"A\"" (:unlink-refused resp)) "and the whole it is filed under")
+      (is (nil? (:items resp))
+          "the list is left alone: it did not change, so re-answering it would
+           only move the row under a message saying nothing happened")))
+  (with-fresh-db "lets a context out of its last container, and says nothing"
+    ;; The rule exempts contexts: one standing on its own is still reachable,
+    ;; where a plain item in nothing is not. So this is the same last edge as
+    ;; above and must go through, or the refusal has swallowed a legal unlink.
+    (let [{a :selected-item} (call! :insert-context nil {:title "A"})
+          {b :selected-item} (call! :insert-context nil {:title "B"})
+          _ (call! :link-selected-context-to-context {:selected-item b} a false false)
+          _ (is (= 1 (relations-count (:id b) (:id a))) "the one edge is in place")
+          resp (call! :unlink-item {:selected-item a} (ds/get-item db {:id (:id b)}))]
+      (is (nil? (:unlink-refused resp)))
+      (is (zero? (relations-count (:id b) (:id a)))))))
+
+(deftest unlink-selected-item-from-container-refused-test
+  (with-fresh-db "refuses the Alt+T path too, instead of dropping it silently"
+    (let [{a :selected-item} (call! :insert-context nil {:title "A"})
+          item (ds/new-item db "Sapiens" "s" #{(:id a)} 1)
+          full (ds/get-item db {:id (:id item)})
+          resp (call! :unlink-selected-item-from-container
+                      {:selected-item full :old-selected-item a})]
+      (is (= 1 (relations-count (:id item) (:id a))))
+      (is (re-find #"Sapiens" (:unlink-refused resp)))
+      (is (= (:id full) (-> resp :selected-item :id))
+          "and the view stays where it was, rather than navigating back"))))
+
 (deftest unlink-selected-item-from-container-test
   (with-fresh-db "drops the relation between :selected-item and :old-selected-item"
     (let [{a :selected-item} (call! :insert-context nil {:title "A"})

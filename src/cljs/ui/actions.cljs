@@ -50,7 +50,10 @@
 
 (defn- select-context-or-item!
   [*state context select-as-item?]
-  (reset! *state (assoc @*state
+  (reset! *state (assoc (dissoc @*state :unlink-refused)
+                   ;; The refusal names one row and one whole. Moving the
+                   ;; selection changes the list it was standing over, so it
+                   ;; stops being about anything the user can still see.
                    :active-search (when-not select-as-item? :items)
                    :item-view? select-as-item?
                    :old-selected-item (:selected-item @*state)
@@ -97,6 +100,11 @@
     ;; item?" on its own left nothing in the confirmation that could say which
     ;; of two edges was about to go.
     (when (js/window.confirm (str "Unlink \"" (:title item) "\" from \"" (:title whole) "\"?"))
+      ;; Clear last time's refusal before asking again, the way the edit modal
+      ;; clears :part-of-refused on its way into a save (ui.modals.actions):
+      ;; the response only carries the key when it is refused again, so an
+      ;; unlink that goes through has to be what takes the banner down.
+      (swap! *state dissoc :unlink-refused)
       (fetch-and-reset-with-method-2! *state api/unlink-item item whole))))
 
 (defn delete-context!
@@ -209,7 +217,9 @@
 
 (defn unlink-selected-item-from-selected-context
   [*state]
-  (fetch-and-reset-with-method! *state @*state api/unlink-selected-item-from-container))
+  (fetch-and-reset-with-method! *state
+                                (dissoc @*state :unlink-refused)
+                                api/unlink-selected-item-from-container))
 
 (defn upgrade-item-to-context!
   [*state]

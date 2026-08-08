@@ -470,6 +470,28 @@
     (log/info (str "repository/upgrade-item-to-context" (:id selected-item)))
     {:selected-item (datastore/switch-between-item-and-context! db selected-item)}))
 
+(defn- unlink-refusal-or-state
+  "What a declined unlink answers with: the state the user is looking at,
+   unchanged, carrying the reason when the rule had one to give. Both unlink
+   paths end here rather than returning a bare `state`, which is what made the
+   gesture look broken rather than declined.
+
+   Answered in band, the way the acyclicity refusal is (see update-item) -- but
+   under its own key, not :part-of-refused. The two are the same class of message
+   and are shown in the same banner (ui.refusal); the key is what differs,
+   because :part-of-refused means \"the open edit modal's save was refused\" and
+   ui.modals/save-notice reads it whenever that modal is up. Sharing it would
+   leave an unlink refused out in the list waiting inside the next modal opened.
+
+   Nothing else is refreshed alongside it: the write did not happen, so the list
+   did not change, and re-answering it would only move the row under a message
+   saying nothing happened."
+  [state item whole]
+  (if-let [msg (and whole (datastore.relations/last-container-refusal item whole))]
+    (do (log/info {:event "last-container-refused" :item-id (:id item)} msg)
+        (assoc state :unlink-refused msg))
+    state))
+
 (defn unlink-selected-item-from-container
   [{:keys [db]}]
   (fn [{:keys [selected-item old-selected-item] :as state}]
@@ -482,7 +504,7 @@
                                                                      selected-item
                                                                      old-selected-item))
             (not old-selected-item))
-      state
+      (unlink-refusal-or-state state selected-item old-selected-item)
       (do (log/info (str "repository/unlink-selected-item-from-container - Removing now"))
           (merge (items-under db old-selected-item state)
                  {:selected-item old-selected-item
@@ -505,8 +527,9 @@
       (log/info (str "unlink item " (:title item) " from " (:title whole)))
       (if-not whole
         (throw (Exception. "unlink-item shouldn't have been called without 'selected-item'"))
-        (do (datastore.relations/unlink-item-from-another-item! db item whole)
-            (merge {:items (search db state) :item-view? false} (hierarchy-bound db state)))))))
+        (if (datastore.relations/unlink-item-from-another-item! db item whole)
+          (merge {:items (search db state) :item-view? false} (hierarchy-bound db state))
+          (unlink-refusal-or-state {} item whole))))))
 
 (defn select-last-context
   [{:keys [db]}]

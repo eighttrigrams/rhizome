@@ -1,5 +1,6 @@
 (ns ui.main.rhs
   (:require [ui.main.input :as input]
+            [ui.refusal :as refusal]
             [ui.main.rhs.items-list-items :as items-list-items]))
 
 (defn- scroll-into-view
@@ -33,6 +34,14 @@
   [_*state]
   (fn [*state]
     (let [state @*state]
-      [:<> (when (= :items (:active-search state)) [input/component *state])
+      [:<>
+       ;; Above the list the refused row is still sitting in, because that list
+       ;; is the answer the user is looking at: both ways to unlink -- the
+       ;; right-click on a card and Alt+T on the selection -- leave it on screen
+       ;; unchanged, and the banner is what says the row stayed on purpose.
+       (when-let [msg (:unlink-refused state)]
+         [refusal/component msg
+          "Nothing was unlinked. Link it to another context first, or delete it instead."])
+       (when (= :items (:active-search state)) [input/component *state])
        [:div.scrollable {:class (when (= :items (:active-search state)) :search-active)}
         (when (not= :description (:modal state)) [items-list-component *state])]])))

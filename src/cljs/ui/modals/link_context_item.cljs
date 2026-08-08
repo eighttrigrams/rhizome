@@ -1,6 +1,7 @@
 (ns ui.modals.link-context-item
   (:require [reagent.core :as r]
             [clojure.string :as str]
+            [ui.refusal :as refusal]
             api))
 
 (defn- get-component-el [] (.getElementById js/document "link-context-item-component"))
@@ -69,11 +70,10 @@
    anything else, most reachably another writer holding the database, which they
    can only try again after."
   [{:keys [kind message]}]
-  [:div.part-of-refusal [:div message]
-   [:div.part-of-refusal-hint
-    (case kind
-      :refused "Nothing was saved. Correct the marked relation and save again."
-      "Nothing was saved. Everything you typed is still here — try saving again.")]])
+  [refusal/component message
+   (case kind
+     :refused "Nothing was saved. Correct the marked relation and save again."
+     "Nothing was saved. Everything you typed is still here — try saving again.")])
 
 (defn component
   [item notice]
