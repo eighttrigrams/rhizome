@@ -195,6 +195,22 @@
   [n col]
   (keyword (str "r" n "." (name col))))
 
+(defn- path-from
+  "`relations AS r1 CROSS JOIN relations AS r2 … CROSS JOIN items`: one alias per
+   step of the path, in the order the path is walked.
+
+   Raw, and that is the whole reason it is a function of its own. In SQLite
+   `CROSS JOIN` means only `do not reorder these`, and it has to be written
+   between every pair; honeysql's :cross-join emits one and then commas, and a
+   comma join is precisely the reorderable one this is trying not to be. Nothing
+   here comes from a caller -- the table is a literal and `level` is an integer
+   already clamped -- so there is no string to be careful about, only a shape
+   honeysql cannot spell."
+  [level]
+  [[[:raw (str "relations AS r1"
+               (str/join (map #(str " CROSS JOIN relations AS r" %) (range 2 (inc level))))
+               " CROSS JOIN items")]]])
+
 (defn part-of-level
   "The nodes exactly `level` steps below one whole along the part-of edges — what
    hierarchy mode lists. Level 1 is the parts of the selected item, level 2 the
@@ -234,7 +250,19 @@
    column per step. Two rows for the same node are otherwise identical, and in a
    list of items that is all the answer there is to `is this filed twice or did
    the query repeat itself` -- the strip's list is told apart by where a row sits
-   and by the badges on it, and a caller reading the rows alone has neither."
+   and by the badges on it, and a caller reading the rows alone has neither.
+
+   The aliases are joined with `CROSS JOIN` (see path-from), which pins the order
+   they are walked in -- and the order they are written in is the one the query
+   is built around: r1 is anchored by a constant owner, and every alias after it
+   is anchored by the previous one's target. There is no better order for a
+   planner to find, and past 31 aliases it stops finding this one: it abandons
+   the index on `relations` and starts building an automatic index per step
+   instead, which on a graph with diamonds in it turns a tenth of a second into
+   minutes. Measured against a chain of diamonds: level 31 answered in 122 ms and
+   level 32 had not answered after 150 seconds; pinned, level 34 answers in
+   117 ms. The join conditions live in the WHERE clause, which is where SQLite
+   puts an ON clause anyway."
   [q {:keys [selected-item-id level with-path?]} {:keys [limit] :as _ctx}]
   (let [level (clamp-part-of-level level)]
     (sql/format
@@ -244,16 +272,14 @@
                                    (when with-path?
                                      (map (fn [n] [(step n :target_id) (path-column n)])
                                           (range 1 (inc level))))))
-              :from [[:relations :r1]]
-              :join (-> (into []
-                              (mapcat (fn [n]
-                                        [[:relations (keyword (str "r" n))]
-                                         [:and [:= (step n :owner_id) (step (dec n) :target_id)]
-                                          [:= (step n :is_part_of) true]]]))
-                              (range 2 (inc level)))
-                        (into [:items [:= :items.id (step level :target_id)]]))
-              :where [:and [:= (step 1 :owner_id) [:inline selected-item-id]]
-                      [:= (step 1 :is_part_of) true] (get-search-clause q)]
+              :from (path-from level)
+              :where (-> [:and [:= (step 1 :owner_id) [:inline selected-item-id]]
+                          [:= (step 1 :is_part_of) true]
+                          [:= :items.id (step level :target_id)] (get-search-clause q)]
+                         (into (mapcat (fn [n]
+                                         [[:= (step n :owner_id) (step (dec n) :target_id)]
+                                          [:= (step n :is_part_of) true]]))
+                               (range 2 (inc level))))
               :order-by (-> (into []
                                   (mapcat (fn [n]
                                             [[[:= (step n :part_of_sort_idx) [:inline -1]] :asc]
