@@ -35,8 +35,24 @@
    Its src is a pure function of the video's id (ui.youtube/embed-url), so every
    unrelated re-render hands React the identical string and React leaves the
    element alone. A second video is the one thing that does change it, and
-   reloading is then exactly what is wanted."
+   reloading is then exactly what is wanted.
+
+   ## Why the player carries a QR of its own
+
+   The poster has one too, and this is not a copy of it. A QR is for handing the
+   video to a phone, and the moment the owner navigates away -- which is the
+   situation this whole feature exists to create -- the icon under the poster is
+   about an item that is no longer on screen. The one here is about what is
+   playing, which by then is routinely a different video, and it is the only one
+   that can still reach it.
+
+   That is also why what is playing is kept as the address the item carried and
+   not only as the id: the code has to encode the address YouTube serves, and a
+   watch URL rebuilt out of an id would be this app's guess at one rather than
+   the thing the item said. ui.qr-overlay is emphatic about not rewriting what it
+   is given, and the handover is exactly where a rewrite would be tempting."
   (:require [reagent.core :as r]
+            [ui.qr-overlay :as qr-overlay]
             [ui.youtube :as youtube]))
 
 (def ^:private frame-width
@@ -50,7 +66,7 @@
 (def ^:private handle-height
   "The grip strip. Mirrored in .floating-player-handle; kept here as well
    because the drag has to know how tall the whole box is to find its centre."
-  22)
+  24)
 
 (def ^:private corner-padding
   "Clear of the corner rather than jammed into it -- the corner badges live
@@ -60,12 +76,14 @@
 (defn play!
   "Start `url` in the player, replacing whatever was playing.
 
-   Nothing happens for an address ui.youtube cannot read: there would be no
-   video to show, and taking the running one down for it would be worse than
-   ignoring the click."
+   Both halves are kept: the id the src is built from, and `url` itself, which
+   is the address the item carried and the only thing the player's QR code may
+   encode. Nothing happens for an address ui.youtube cannot read -- there would
+   be no video to show, and taking the running one down for it would be worse
+   than ignoring the click."
   [*state url]
   (when-let [id (youtube/video-id url)]
-    (swap! *state assoc :playing-video id)))
+    (swap! *state assoc :playing-video {:id id :url url})))
 
 (defn close! [*state] (swap! *state dissoc :playing-video))
 
@@ -143,43 +161,57 @@
   "Mounted once, from ui/component, and never anywhere else."
   [_*state]
   (let [*corner (r/atom :top-left)
-        *drag (r/atom nil)]
+        *drag (r/atom nil)
+        *qr-open? (r/atom false)]
     (fn [*state]
-      (when-let [id (:playing-video @*state)]
-        [:div#floating-player
-         {:style (if-let [{:keys [left top]} @*drag]
-                   ;; Under the pointer, and with the transition off, or the box
-                   ;; would lag its own drag by the settling animation.
-                   {:left (str left "px") :top (str top "px") :transition "none"}
-                   (corner-position @*corner))}
-         [:div.floating-player-handle
-          {:title "Drag the player to another corner"
-           :on-pointer-down #(begin-drag! *drag %)
-           :on-pointer-move #(drag-to! *drag %)
-           :on-pointer-up #(settle! *drag *corner %)
-           ;; A cancelled pointer (the OS taking over, a touch turning into a
-           ;; scroll) would otherwise leave the box wherever it was and the drag
-           ;; still believing it is running.
-           :on-pointer-cancel #(settle! *drag *corner %)} [grip]
-          [:button.floating-player-close
-           {:type "button"
-            :title "Close the player"
-            :aria-label "Close the player"
-            ;; Kept out of the handle's gesture: a pointerdown that reached the
-            ;; strip would capture the pointer for the drag, and the click that
-            ;; closes the player would be delivered to the capturing element
-            ;; instead of to this button.
-            :on-pointer-down #(.stopPropagation %)
-            :on-click (fn [e] (.stopPropagation e) (close! *state))} "✕"]]
-         [:iframe#floating-player-frame
-          {:src (youtube/embed-url id)
-           :width frame-width
-           :height frame-height
-           ;; autoplay has to be granted to the frame as well as asked for in
-           ;; the URL; without it the policy stops the video at the boundary and
-           ;; the player comes up paused.
-           :allow "autoplay; encrypted-media; picture-in-picture; fullscreen"
-           :allowFullScreen true
-           ;; Belt to the pointer capture's braces, and free: while the drag
-           ;; runs there is nothing in the iframe worth clicking anyway.
-           :style (when @*drag {:pointer-events "none"})}]]))))
+      (when-let [{:keys [id url]} (:playing-video @*state)]
+        ;; A fragment, so the overlay is a sibling of the player's box and not a
+        ;; child of it. #floating-player is fixed, clipped and a stacking
+        ;; context of its own; a full-page overlay inside it would be cut down
+        ;; to 420px of player.
+        [:<>
+         [:div#floating-player
+          {:style (if-let [{:keys [left top]} @*drag]
+                    ;; Under the pointer, and with the transition off, or the
+                    ;; box would lag its own drag by the settling animation.
+                    {:left (str left "px") :top (str top "px") :transition "none"}
+                    (corner-position @*corner))}
+          [:div.floating-player-handle
+           {:title "Drag the player to another corner"
+            :on-pointer-down #(begin-drag! *drag %)
+            :on-pointer-move #(drag-to! *drag %)
+            :on-pointer-up #(settle! *drag *corner %)
+            ;; A cancelled pointer (the OS taking over, a touch turning into a
+            ;; scroll) would otherwise leave the box wherever it was and the
+            ;; drag still believing it is running.
+            :on-pointer-cancel #(settle! *drag *corner %)} [grip]
+           [:span.floating-player-controls
+            ;; Neither control may start a drag. A pointerdown reaching the
+            ;; strip captures the pointer, and the click that follows is then
+            ;; delivered to the capturing element rather than to the button
+            ;; under the finger.
+            {:on-pointer-down #(.stopPropagation %)}
+            [:span.qr-open.floating-player-qr
+             {:title "Show a QR code for the video playing here, to carry it to a phone"
+              :role "button"
+              :on-click (fn [e] (.stopPropagation e) (reset! *qr-open? true))} [qr-overlay/icon]]
+            [:button.floating-player-close
+             {:type "button"
+              :title "Close the player"
+              :aria-label "Close the player"
+              :on-click (fn [e] (.stopPropagation e) (close! *state))} "✕"]]]
+          [:iframe#floating-player-frame
+           {:src (youtube/embed-url id)
+            :width frame-width
+            :height frame-height
+            ;; autoplay has to be granted to the frame as well as asked for in
+            ;; the URL; without it the policy stops the video at the boundary
+            ;; and the player comes up paused.
+            :allow "autoplay; encrypted-media; picture-in-picture; fullscreen"
+            :allowFullScreen true
+            ;; Belt to the pointer capture's braces, and free: while the drag
+            ;; runs there is nothing in the iframe worth clicking anyway.
+            :style (when @*drag {:pointer-events "none"})}]]
+         ;; `url`, not a watch address rebuilt from `id`: what the item carried
+         ;; is what a phone should be sent to.
+         (when @*qr-open? [qr-overlay/overlay url #(reset! *qr-open? false)])]))))

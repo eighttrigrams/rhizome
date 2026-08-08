@@ -68,7 +68,14 @@
                                  (str "M" (+ col quiet-zone) "," (+ row quiet-zone) "h1v1h-1z"))
                             dark))}]]))
 
-(defn- overlay
+(defn overlay
+  "The code over the whole page, and the ways out of it.
+
+   Public because the floating player puts it up too, and cannot go through
+   `component` to do it: it has to render this as a sibling of its own box
+   rather than inside it. #floating-player is fixed, clipped and a stacking
+   context of its own, so a full-page overlay mounted within it would be cut
+   down to the size of the player."
   [url close!]
   (r/create-class
     {;; Focused on mount so the keys arrive here at all. Without it Escape goes
@@ -110,12 +117,13 @@
                                                                                (.stopPropagation e)
                                                                                (close!))} "✕"]])}))
 
-(defn- icon
+(defn icon
+  "A QR code at a glance, at a size that reads as a control rather than as
+   content. Public for the same reason `overlay` is: the player draws its own."
   []
   [:svg {:width 15 :height 15 :viewBox "0 0 16 16" :aria-hidden "true"}
    [:g {:fill "currentColor"}
-    ;; Three finder squares and a scatter of modules: a QR code at a glance, at
-    ;; a size that reads as a control rather than as content.
+    ;; Three finder squares and a scatter of modules.
     [:path {:d "M0 0h6v6H0V0zm1 1v4h4V1H1z"}] [:path {:d "M10 0h6v6h-6V0zm1 1v4h4V1h-4z"}]
     [:path {:d "M0 10h6v6H0v-6zm1 1v4h4v-4H1z"}] [:rect {:x 2 :y 2 :width 2 :height 2}]
     [:rect {:x 12 :y 2 :width 2 :height 2}] [:rect {:x 2 :y 12 :width 2 :height 2}]
@@ -123,12 +131,19 @@
     [:rect {:x 8 :y 12 :width 2 :height 2}] [:rect {:x 14 :y 14 :width 2 :height 2}]]])
 
 (defn component
-  "The icon that sits under a video, and the overlay it opens.
+  "The icon that sits under a video's poster, and the overlay it opens.
 
    Whether it is open is kept here, per mounted icon, and not in the app's
    *state: it is about one video on one screen, nothing else in the app has to
    know, and an overlay left standing in shared state would be waiting on the
-   next item that happened to have a video."
+   next item that happened to have a video.
+
+   The floating player offers the same thing for whatever it is playing, and
+   composes `icon` and `overlay` itself rather than mounting this -- see
+   ui.floating-player. Local state is right for it too, and for the same reason
+   read the other way round: an open overlay there is about the player's own
+   screen, which is why it can be nothing but local even though what the player
+   is *playing* has to be shared."
   [_url]
   (let [*open? (r/atom false)]
     (fn [url]

@@ -623,7 +623,7 @@ ul.cards {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    height: 22px;
+    height: 24px;
     padding: 0 6px;
     box-sizing: border-box;
     background: rgb(20, 20, 20);
@@ -635,6 +635,19 @@ ul.cards {
 
 .floating-player-handle:active {
     cursor: grabbing;
+}
+
+/* The player's own controls: a QR of whatever is playing, and the X. The QR is
+   the same icon as the one under a poster and takes the same .qr-open styling;
+   only its padding is trimmed to sit in a 24px strip. */
+.floating-player-controls {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.floating-player-controls .qr-open {
+    padding: 0 2px;
 }
 
 .floating-player-close {
