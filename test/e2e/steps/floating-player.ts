@@ -15,6 +15,34 @@ const CORNER_PADDING = 20;
 // carry between them.
 let rememberedFrame: any = null;
 
+// Setup over REST, and deliberately so: creating an item through the search
+// input is a round trip whose late response overwrites whatever the next
+// keypress produced, and two of them chained behind a context is one hop more
+// than that handling reliably survives. POST /api/items takes the description
+// straight, which is the half of display-youtube-video reachable from out here
+// — the :youtube-video resource link cannot be set over the API at all.
+When(
+  "{string} holds an item {string} showing {string}",
+  async ({ request }, contextTitle: string, title: string, url: string) => {
+    const found = await request.get(`/api/items?q=${encodeURIComponent(contextTitle)}`);
+    expect(found.ok(), `searching for "${contextTitle}" failed`).toBeTruthy();
+    const context = (await found.json())
+      .find((i: any) => i.title === contextTitle && i["is-context"]);
+    expect(context, `no context titled "${contextTitle}"`).toBeTruthy();
+    const resp = await request.post("/api/items", {
+      data: {
+        title,
+        "context-ids": [context.id],
+        description: `Notes on this one.\n\n${url}\n`,
+        // The write gate wants a reason for every mutation, the same one the
+        // description PUT next door hands it.
+        reason: "e2e test setup",
+      },
+    });
+    expect(resp.status(), await resp.text()).toBe(201);
+  },
+);
+
 When("I click the video poster", async ({ page }) => {
   await page.locator("#lhs-component .video-poster").first().click();
   await settle(page);

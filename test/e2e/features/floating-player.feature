@@ -11,20 +11,16 @@ Feature: A video that goes on playing
     When I press the "c" key
     And I type "Watchlist" in the search input
     And I press the "Enter" key
-    And I type "A talk worth keeping" in the search input
-    And I press the "Enter" key
-    # Wait for the row rather than pressing straight on. Creating an item is a
-    # round trip, and the next keypress's state change is what a late response
-    # overwrites — measured here as a second item that silently never existed,
-    # which then failed several steps later as "no item titled …".
-    Then I should see "A talk worth keeping" in the rhs
-    When I press the "i" key
-    And I type "Another talk entirely" in the search input
-    And I press the "Enter" key
-    Then I should see "Another talk entirely" in the rhs
-    And the item "A talk worth keeping" has "https://www.youtube.com/watch?v=dQw4w9WgXcQ" in its description
-    And the item "Another talk entirely" has "https://www.youtube.com/watch?v=oHg5SJYRHA0" in its description
-    And I reload the app
+    Then I should see "Watchlist" in the lhs
+    # Both items over REST, the way the hierarchy scenarios set their edges.
+    # Two creations chained through the input is one hop more than this app's
+    # keypress handling reliably survives — measured: the second Enter was
+    # swallowed in one run out of three, and the scenario failed several steps
+    # later on an item that had silently never been created. What is under test
+    # here is the player.
+    And "Watchlist" holds an item "A talk worth keeping" showing "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    And "Watchlist" holds an item "Another talk entirely" showing "https://www.youtube.com/watch?v=oHg5SJYRHA0"
+    When I reload the app
 
   Scenario: A still stands where the embed used to be, and nothing plays there
     When I open the item "A talk worth keeping"
