@@ -196,8 +196,25 @@
 
 (defn search! [*state] (fetch-and-reset! *state @*state))
 
+(defn- vector-fetch!
+  "Every vector request leaves through here, so the rule that none of them
+   happens in hierarchy mode is stated once.
+
+   Neither mode is taught about the other, by design -- which means the backend
+   will answer a vector request that happens to carry :hierarchy-mode? with an
+   ordinary related-items list, and that list then installs itself under the
+   hierarchy strip with the intersection section hidden. Entering either mode
+   leaves the other, so the only way to be here at all is a request that
+   outlived the state it was scheduled in: the threshold fetch is debounced by
+   120ms and reads state when it *fires*, so a toggle inside that window would
+   otherwise send one. Dropping it is the right answer -- it would be answering
+   a question about a mode the user has already left."
+  [*state method]
+  (when-not (:hierarchy-mode? @*state)
+    (fetch-and-reset-with-method! *state @*state method)))
+
 (defn vector-search! [*state]
-  (fetch-and-reset-with-method! *state @*state api/vector-search-related-items))
+  (vector-fetch! *state api/vector-search-related-items))
 
 (defn vector-threshold-search!
   "Blue-mode fetch triggered by entering the mode or changing the query.
@@ -206,10 +223,10 @@
    similarity bounds, which merge back into state (positioning the slider)."
   [*state]
   (swap! *state assoc :vector-threshold nil)
-  (fetch-and-reset-with-method! *state @*state api/vector-threshold-search-related-items))
+  (vector-fetch! *state api/vector-threshold-search-related-items))
 
 (defn- vector-threshold-fetch! [*state]
-  (fetch-and-reset-with-method! *state @*state api/vector-threshold-search-related-items))
+  (vector-fetch! *state api/vector-threshold-search-related-items))
 
 (def ^:private vector-threshold-fetch-debounced! (utils/debounce vector-threshold-fetch! 120))
 
