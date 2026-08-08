@@ -10,9 +10,11 @@
    et.vp.ds.search/search-related-items).
 
    The level rides along the same way, and the same goes for it: it is not the
-   context's, it is this session's reading of it. Which is why it is dropped when
-   another context is selected (see ui.actions/select-context-or-item!) -- level
-   2 counted from one context means something else counted from the next.
+   context's, it is this session's reading of it. It is carried together with the
+   id of the context it was counted under and counts for that one only -- level 2
+   counted from one context names other things than level 2 counted from the next
+   -- which is what puts it back to 1 when another context is selected, with
+   nothing anywhere having to clear it.
 
    Turning it on has to re-ask for the item list, which is why toggling goes
    through fetch-and-reset! rather than a plain swap!. Stepping to another level
@@ -46,7 +48,7 @@
    what keeps the number in the strip and the list beside it saying the same
    thing."
   [{:keys [hierarchy-level selected-item]}]
-  (if (= (:context hierarchy-level) (:id selected-item)) (:level hierarchy-level) 1))
+  (or (when (= (:context hierarchy-level) (:id selected-item)) (:level hierarchy-level)) 1))
 
 (defn- deepest
   "The deepest level this context has anything at, as the backend counted it
@@ -59,7 +61,8 @@
    0 -- nothing is a part of this context at all -- reads the same as 1 here:
    level 1 is what the mode shows either way, it is just empty."
   [{:keys [hierarchy-max-level selected-item]}]
-  (if (= (:context hierarchy-max-level) (:id selected-item)) (:level hierarchy-max-level) 0))
+  (or (when (= (:context hierarchy-max-level) (:id selected-item)) (:level hierarchy-max-level))
+      0))
 
 (defn- step!
   [*state to]
