@@ -43,6 +43,28 @@ html, body {
     user-select: none;
 }
 
+/* The level stepper, at the other end of the strip's own row. The arrows are
+   clickable text rather than buttons, the way the description filter and the
+   stored views are; `unavailable` is the end of the hierarchy, where the step
+   is not offered at all rather than offered and answered with an empty list. */
+#hierarchy-strip-level {
+    margin-left: 16px;
+}
+
+.hierarchy-strip-step {
+    cursor: pointer;
+    padding: 0 4px;
+}
+
+.hierarchy-strip-step.unavailable {
+    cursor: default;
+    opacity: 0.3;
+}
+
+#hierarchy-level-value {
+    font-variant-numeric: tabular-nums;
+}
+
 #sides-container {
     position: relative;
     width: 1440px;

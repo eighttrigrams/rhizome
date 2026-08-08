@@ -50,15 +50,23 @@
 
 (defn- select-context-or-item!
   [*state context select-as-item?]
-  (reset! *state (assoc @*state
-                   :active-search (when-not select-as-item? :items)
-                   :item-view? select-as-item?
-                   :old-selected-item (:selected-item @*state)
-                   ;; For a snappy response in the UI, set :selected-item immediately. The
-                   ;; subsequent call to fetch-and-reset! then will fetch and replace it,
-                   ;; thereby filling in the related items.
-                   :selected-item context))
-  (fetch-and-reset-with-method-2! *state api/fetch-context [context select-as-item?]))
+  (let [previous (:selected-item @*state)]
+    (reset! *state (cond-> (assoc @*state
+                             :active-search (when-not select-as-item? :items)
+                             :item-view? select-as-item?
+                             :old-selected-item previous
+                             ;; For a snappy response in the UI, set :selected-item immediately. The
+                             ;; subsequent call to fetch-and-reset! then will fetch and replace it,
+                             ;; thereby filling in the related items.
+                             :selected-item context)
+                     ;; A hierarchy level is counted from the context it is read
+                     ;; under, so it does not travel to the next one: level 2 of
+                     ;; this context names other things than level 2 of that one.
+                     ;; Dropped here rather than after the answer comes back,
+                     ;; because the request carries the level the backend builds
+                     ;; the list at.
+                     (not= (:id context) (:id previous)) (dissoc :hierarchy-level)))
+    (fetch-and-reset-with-method-2! *state api/fetch-context [context select-as-item?])))
 
 (defn select-last-context! [*state] (fetch-and-reset-with-method-2! *state api/select-last-context))
 
