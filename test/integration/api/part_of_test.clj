@@ -108,7 +108,34 @@
         (is (= #{"Chapter one" "Chapter two"} (set (mapv :title (:items resp))))
             "without the mode the ordinary related-items list is unchanged")
         (is (nil? (:hierarchy-max-level resp))
-            "and the subgraph is not walked for an answer nobody is going to read")))))
+            "and the subgraph is not walked for an answer nobody is going to read"))
+      ))
+  (with-fresh-db
+    "the bound comes back counted with the same q the list was filtered by --
+     the whole point of it is that a step is never offered into an empty list,
+     and a search only a level-1 row answers is where an unfiltered bound would
+     offer one"
+    (let [{book :selected-item} (call! :insert-context nil {:title "Book"})
+          {chapter :selected-item} (call! :insert-context nil {:title "Chapter"})
+          page (ds/new-item db "A page of the chapter" "" #{(:id chapter)} nil)
+          appendix (ds/new-item db "Appendix, unfiled" "" #{(:id book)} nil)
+          list! (fn [q] (call! :list-resources
+                               {:hierarchy-mode? true
+                                :hierarchy-level {:context (:id book) :level 1}
+                                :selected-item {:id (:id book)}
+                                :q q}))]
+      (save-relations! chapter (part-of-entry book 1))
+      (save-relations! page (part-of-entry chapter 1))
+      (save-relations! appendix (part-of-entry book -1))
+      (let [resp (list! nil)]
+        (is (= ["Chapter" "Appendix, unfiled"] (mapv :title (:items resp))))
+        (is (= {:context (:id book) :level 2} (:hierarchy-max-level resp))
+            "unfiltered, the tree is two deep and the step down is there to offer"))
+      (let [resp (list! "Appendix")]
+        (is (= ["Appendix, unfiled"] (mapv :title (:items resp)))
+            "the hierarchy list is filtered by q like any other item search")
+        (is (= {:context (:id book) :level 1} (:hierarchy-max-level resp))
+            "so the bound beside it is 1, and the step down is not offered")))))
 
 (deftest a-save-that-fails-for-any-other-reason-is-reported-too-test
   (with-fresh-db

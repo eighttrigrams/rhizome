@@ -263,9 +263,18 @@
              (when limit {:limit limit})))))
 
 (defn part-of-depth
-  "How many levels the part-of edges below one whole run to: the length of the
-   longest path down from it, and 0 when it has no parts at all. The number the
-   strip's stepper stops at.
+  "The deepest level below one whole that part-of-level would answer with rows,
+   and 0 when there are none at all. The number the strip's stepper stops at, so
+   it has to be the deepest level that has something in it and not the deepest
+   level that exists.
+
+   Which is why `q` is here. The list at a level is filtered by it -- typing in
+   the item search filters the hierarchy list like any other -- so a bound
+   counted over the unfiltered tree would offer a step and then answer it with
+   an empty list, which is the one thing the stepper exists to prevent. The
+   filter goes on the answer rather than on the walk: a node that does not match
+   is still a way through to one that does, so the walk has to pass through it
+   and only the MAX is taken over the matching nodes.
 
    `UNION`, not `UNION ALL`: this asks how deep, not by how many routes, so a
    node already seen at a depth need not be walked again from a second parent.
@@ -277,7 +286,7 @@
    et.vp.ds.part-of), so there is no depth cap here to make it safe. Nor one to
    make it cheap: the dedup above is that argument, and a cap would be a second
    one that has to be right about how deep a rhizome is allowed to be."
-  [selected-item-id]
+  [q selected-item-id]
   (sql/format
     {:with-recursive [[[:below {:columns [:id :depth]}]
                        {:union [{:select [:relations.target_id [[:inline 1] :depth]]
@@ -290,7 +299,9 @@
                                  :join [:relations [:and [:= :relations.owner_id :below.id]
                                                     [:= :relations.is_part_of true]]]}]}]]
      :select [[[:coalesce [:max :below.depth] [:inline 0]] :depth]]
-     :from :below}))
+     :from :below
+     :join [:items [:= :items.id :below.id]]
+     :where [:and (get-search-clause q)]}))
 
 (defn vector-similarity-bounds
   "SQL for the MIN and MAX cosine distance over the embedded related items,

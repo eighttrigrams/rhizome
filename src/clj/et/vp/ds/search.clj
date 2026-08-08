@@ -202,12 +202,16 @@
     results))
 
 (defn part-of-depth
-  "How deep the part-of edges below `selected-item-id` run -- the deepest level
-   hierarchy mode has anything to show for this whole, and 0 when it has no
-   parts at all. What the strip's stepper needs to know before it offers a step
-   down, rather than offering one and answering it with an empty list."
-  [db selected-item-id]
-  (:depth (un-namespace-keys (jdbc/execute-one! db (core/part-of-depth selected-item-id)))))
+  "The deepest level below `selected-item-id` that hierarchy mode has anything to
+   show for, and 0 when it has nothing. What the strip's stepper needs to know
+   before it offers a step down, rather than offering one and answering it with
+   an empty list.
+
+   `q` is the same one the list is built with, and has to be: the list at a level
+   is filtered by it, so a bound that ignored it would go on offering steps into
+   the part of the tree the filter just removed."
+  [db q selected-item-id]
+  (:depth (un-namespace-keys (jdbc/execute-one! db (core/part-of-depth q selected-item-id)))))
 
 (defn search-related-items-vector-threshold
   "Blue-mode retrieval. Same relational filters + INNER JOIN items_vec as

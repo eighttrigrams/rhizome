@@ -477,14 +477,14 @@
           chapter (ds/new-context db {:title "Chapter"})
           page (ds/new-context db {:title "Page"})
           loose (ds/new-item db "Merely related" "" #{(:id book)} nil)]
-      (is (= 0 (search/part-of-depth db (:id book))) "nothing is a part of it yet")
+      (is (= 0 (search/part-of-depth db "" (:id book))) "nothing is a part of it yet")
       (make-part-of! book chapter 1)
-      (is (= 1 (search/part-of-depth db (:id book))))
+      (is (= 1 (search/part-of-depth db "" (:id book))))
       (make-part-of! chapter page 1)
-      (is (= 2 (search/part-of-depth db (:id book))))
-      (is (= 1 (search/part-of-depth db (:id chapter))) "counted from the whole asked about")
-      (is (= 0 (search/part-of-depth db (:id page))))
-      (is (= 0 (search/part-of-depth db (:id loose)))
+      (is (= 2 (search/part-of-depth db "" (:id book))))
+      (is (= 1 (search/part-of-depth db "" (:id chapter))) "counted from the whole asked about")
+      (is (= 0 (search/part-of-depth db "" (:id page))))
+      (is (= 0 (search/part-of-depth db "" (:id loose)))
           "and an item merely related to the book is not below it at all")))
   (test-with-reset-db-and-time
     "the longest path decides it, not the shortest -- a whole with one shallow
@@ -498,7 +498,41 @@
       (make-part-of! book chapter 2)
       (make-part-of! chapter section 1)
       (make-part-of! section page 1)
-      (is (= 3 (search/part-of-depth db (:id book)))))))
+      (is (= 3 (search/part-of-depth db "" (:id book))))))
+  (test-with-reset-db-and-time
+    "the depth is the deepest level with something to show, so it is counted
+     with the search the list is filtered by -- otherwise the stepper offers a
+     step into the part of the tree the filter has just taken away"
+    (let [book (ds/new-context db {:title "Book"})
+          appendix (ds/new-item db "Appendix, unfiled" "" #{(:id book)} nil)
+          chapter (ds/new-context db {:title "Chapter"})
+          page (ds/new-item db "A page of the chapter" "" #{(:id chapter)} nil)]
+      (make-part-of! book appendix -1)
+      (make-part-of! book chapter 1)
+      (make-part-of! chapter page 1)
+      (is (= 2 (search/part-of-depth db "" (:id book))) "unfiltered, the tree is two deep")
+      (is (= 1 (search/part-of-depth db "Appendix" (:id book)))
+          "and one deep for a search only a level-1 row answers")
+      (is (= ["Appendix, unfiled"] (mapv :title (search/search-related-items
+                                                  db "Appendix" (:id book) (at-level book 1) {})))
+          "which is the level that has the row")
+      (is (= [] (mapv :title (search/search-related-items
+                               db "Appendix" (:id book) (at-level book 2) {})))
+          "and the level the old bound would have offered")
+      (is (= 2 (search/part-of-depth db "page" (:id book)))
+          "a search a level-2 row answers still reaches level 2")
+      (is (= 0 (search/part-of-depth db "nothingmatchesthis" (:id book)))
+          "and a search nothing answers bottoms out, so no step is offered at all")))
+  (test-with-reset-db-and-time
+    "a node that does not match is still a way through to one that does -- the
+     filter is on the answer, not on the walk"
+    (let [book (ds/new-context db {:title "Book"})
+          chapter (ds/new-context db {:title "Chapter"})
+          page (ds/new-item db "Needle" "" #{(:id chapter)} nil)]
+      (make-part-of! book chapter 1)
+      (make-part-of! chapter page 1)
+      (is (= 2 (search/part-of-depth db "Needle" (:id book)))
+          "the chapter matches nothing and is walked through anyway"))))
 
 (deftest a-part-sits-differently-under-each-of-its-wholes
   (test-with-reset-db-and-time "the sibling index belongs to the edge, not to the node"

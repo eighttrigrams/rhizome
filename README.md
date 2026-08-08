@@ -272,7 +272,9 @@ tree, and that tree is what the levels index. Two things follow:
 
 The stepper is bounded on the fly, at both ends: a step that would land on a
 level with nothing at it is not offered rather than offered and then answered
-with an empty list.
+with an empty list. Filtering counts — typing in the item search filters the
+hierarchy list like any other, so the bound is counted against the same search
+and the levels the filter empties stop being offered while it stands.
 
 The mode is session state, like danger mode: not persisted, not per-context.
 The level is the same kind of thing, and it belongs to the context it was

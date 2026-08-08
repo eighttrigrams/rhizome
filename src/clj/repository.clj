@@ -101,20 +101,28 @@
    Scoped to the context it was counted for, the way the level the SPA sends is
    (see et.vp.ds.search/level-asked-for). Same reason: a response that changes
    the selected context without rebuilding the list would otherwise leave the
-   strip bounding one context's stepper by another context's depth."
-  ([db state] (hierarchy-bound db state (:selected-item state)))
-  ([db state selected-item]
+   strip bounding one context's stepper by another context's depth.
+
+   Counted with the same `q` the list beside it was built with. A bound counted
+   over the unfiltered tree bounds a list that is filtered, which is how the
+   stepper came to offer a step and answer it empty -- the one thing it is there
+   to prevent. So `q` is a parameter here and not read off the state: the two
+   have to be the same string, and the only way to be sure of that is for the
+   caller that chose it to hand it over."
+  ([db state] (hierarchy-bound db (:q state) state (:selected-item state)))
+  ([db q state selected-item]
    (when (and (:hierarchy-mode? state) (:id selected-item))
      {:hierarchy-max-level {:context (:id selected-item)
-                            :level (search/part-of-depth db (:id selected-item))}})))
+                            :level (search/part-of-depth db (or q "") (:id selected-item))}})))
 
 (defn- items-under
   "The item list under `selected-item`, and with it whatever hierarchy mode needs
-   alongside the list to draw its strip."
+   alongside the list to draw its strip. One `q` for both, so the strip can only
+   ever be bounding the list it is standing over."
   ([db selected-item state] (items-under db "" selected-item state))
   ([db q selected-item state]
    (merge {:items (search-related-items db q selected-item (hierarchy-opts state))}
-          (hierarchy-bound db state selected-item))))
+          (hierarchy-bound db q state selected-item))))
 
 (defn- log-opts
   [{:keys [cmd q active-search] :as _opts}]
@@ -451,7 +459,10 @@
     (log/info (str "repository/reprioritize-item" (:id item) (:title item)))
     (datastore/reprioritize-item db item)
     (merge {:items (search db (dissoc state :q)) :active-search nil :q nil}
-           (hierarchy-bound db state))))
+           ;; The same state the list was built from, q and all -- this one drops
+           ;; it, so the bound has to drop it too or it would be bounding a list
+           ;; that is not the one it was counted for.
+           (hierarchy-bound db (dissoc state :q)))))
 
 (defn upgrade-item-to-context
   [{:keys [db]}]
