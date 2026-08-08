@@ -95,6 +95,15 @@
                                                           #(handle-external-edit-escape *state))
     #()))
 
+(defn- save-notice
+  "Why the last save from the edit modal did not go through, or nil. The two
+   cases read differently to the user -- one is theirs to correct, the other is
+   theirs to retry -- so they arrive as separate keys and are told apart here
+   rather than in the component."
+  [{:keys [part-of-refused save-failed]}]
+  (cond part-of-refused {:kind :refused :message part-of-refused}
+        save-failed {:kind :failed :message (str "The save failed: " save-failed)}))
+
 (defn component
   [*state]
   (fn [_*state]
@@ -105,7 +114,7 @@
                        (when (:show-confirm-discard @*state)
                          [confirm-discard-dialog *state #(actions/cancel-modal! *state)])]
          :edit-context [:div#modal-component
-                        [item-edit/component item (:part-of-refused @*state)]]
+                        [item-edit/component item (save-notice @*state)]]
          :annotation-edit [:div#modal-component
                            [annotation-edit/component (:annotation-edit-item @*state)
                             (:selected-item @*state)]]

@@ -489,17 +489,23 @@
                   :items (search-related-items db "" selected-item (hierarchy-opts state))
                   :modal nil
                   :q nil}))
-        (catch clojure.lang.ExceptionInfo e
+        ;; Both ways this can fail are answered in band, the way a refused write
+        ;; on a replica is answered: nothing else in the response, so the list
+        ;; the user is looking at stays as it was, and the modal they made the
+        ;; edit in stays open with everything they typed still in it -- a
+        ;; checkbox that silently fails to stick is worse than an error, and a
+        ;; refusal that throws the rest of the edit away is worse than both.
+        (catch Exception e
           (if-let [msg (part-of/cycle-refusal e)]
-            ;; Answer in band, the way a refused write on a replica is answered:
-            ;; nothing else in the response, so the list the user is looking at
-            ;; stays as it was, and the modal they made the edit in stays open
-            ;; with everything they typed still in it -- a checkbox that silently
-            ;; fails to stick is worse than an error, and a refusal that throws
-            ;; the rest of the edit away is worse than both.
             (do (log/info {:event "part-of-cycle-refused" :item-id (:id context)} msg)
                 {:part-of-refused msg :modal :edit-context})
-            (throw e)))))))
+            ;; Anything else -- most reachably another writer holding the
+            ;; database, since the save takes a write transaction now and the
+            ;; pollers and /api write too. Letting it throw put the SPA's
+            ;; go-block into an error it has no branch for: the modal sat there
+            ;; with :loading never cleared and nothing said at all.
+            (do (log/error e "repository/update-item failed")
+                {:save-failed (.getMessage e) :modal :edit-context})))))))
 
 (defn update-annotations
   [{:keys [db]}]

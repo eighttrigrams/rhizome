@@ -5,7 +5,7 @@
 (defn cancel-modal!
   [*state]
   (reset! *state (-> @*state
-                     (dissoc :modal :annotation-edit-item :show-confirm-discard :part-of-refused)
+                     (dissoc :modal :annotation-edit-item :show-confirm-discard :part-of-refused :save-failed)
                      (assoc :loading true)))
   (js/setTimeout (fn [_] (swap! *state dissoc :loading)) 500))
 
@@ -31,7 +31,7 @@
   ;; the refusal the previous one left standing. A save refused again gets it
   ;; back from the response.
   (fetch-and-reset-with-method! *state
-                                (dissoc @*state :part-of-refused)
+                                (dissoc @*state :part-of-refused :save-failed)
                                 api/update-item
                                 {:context context :item-contexts item-contexts}))
 

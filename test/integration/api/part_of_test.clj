@@ -7,6 +7,7 @@
             [api.harness :refer [call!]]
             [api.helpers :refer [with-fresh-db]]
             [et.vp.ds :as ds]
+            [et.vp.ds.relations]
             [et.vp.ds.search-test :refer [db]]
             [next.jdbc :as jdbc]))
 
@@ -70,6 +71,26 @@
       (is (= #{"One" "Two" "Merely related"}
              (set (mapv :title (:items (call! :fetch-context {} [{:id (:id book)} false])))))
           "and without it the ordinary related-items list is unchanged"))))
+
+(deftest a-save-that-fails-for-any-other-reason-is-reported-too-test
+  (with-fresh-db
+    "the save takes a write transaction, so another writer holding the database
+     makes it fail -- and a failure that only throws leaves the SPA's go-block in
+     an error it has no branch for: modal open, :loading never cleared, nothing
+     said. It has to come back in band like the refusal does"
+    (let [{book :selected-item} (call! :insert-context nil {:title "Book"})
+          chapter (ds/new-item db "Chapter" "" #{(:id book)} nil)
+          resp (with-redefs [et.vp.ds.relations/set-the-containers-of-item!
+                               (fn [& _]
+                                 (throw (java.sql.SQLException.
+                                          "[SQLITE_BUSY] The database file is locked")))]
+                 (save-relations! chapter (part-of-entry book 1)))]
+      (is (= "[SQLITE_BUSY] The database file is locked" (:save-failed resp))
+          "the reason comes back rather than being thrown past the client")
+      (is (= :edit-context (:modal resp))
+          "and the modal stays open, with everything typed still in it")
+      (is (nil? (:part-of-refused resp))
+          "it is not dressed up as a refusal -- the user cannot correct this one"))))
 
 (deftest a-cycle-is-refused-on-ui-test
   (with-fresh-db "the refusal names the path and reopens the modal"

@@ -28,7 +28,7 @@
               (not (:active-search @*state))
                 (cond
                   (and selected-item (= "KeyE" code)) (swap! *state #(-> %
-                                                                        (dissoc :part-of-refused)
+                                                                        (dissoc :part-of-refused :save-failed)
                                                                         (assoc :modal :edit-context
                                                                                :item-view? false)))
                   (and selected-item (= "Delete" code)) (actions/delete-context! *state)

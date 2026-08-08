@@ -59,38 +59,46 @@
      :on-change (fn [evt]
                   (swap! *selectable-contexts assoc-in [idx :annotation] (.-value (.-target evt))))}]])
 
-(defn- refusal-component
-  "A refused save writes nothing at all -- not the relations, and not the item's
-   own fields either, since the refusal is thrown before they are written. The
-   modal stays open with everything still in it, so say plainly that it is still
-   unsaved rather than leaving the user to assume the rest went through."
-  [refusal]
-  [:div.part-of-refusal [:div refusal]
-   [:div.part-of-refusal-hint "Nothing was saved. Correct the marked relation and save again."]])
+(defn- notice-component
+  "Why the save did not go through. Either way it wrote nothing -- the relations
+   and the item's own fields are one transaction and the throw comes before both
+   -- and the modal stays open with everything still in it, so say that plainly
+   rather than leaving the user to assume the rest went through.
+
+   :refused is the acyclicity refusal, which the user can act on. :failed is
+   anything else, most reachably another writer holding the database, which they
+   can only try again after."
+  [{:keys [kind message]}]
+  [:div.part-of-refusal [:div message]
+   [:div.part-of-refusal-hint
+    (case kind
+      :refused "Nothing was saved. Correct the marked relation and save again."
+      "Nothing was saved. Everything you typed is still here — try saving again.")]])
 
 (defn component
-  [item refusal]
+  [item notice]
   (let [remove-context (fn [idx] #(swap! *selectable-contexts dissoc idx))]
-    ;; A refusal means the save did not go through and the modal is still the one
+    ;; A notice means the save did not go through and the modal is still the one
     ;; the user was typing in, so it must not be reset from the stored item.
     ;; Belt and braces: the modal now stays mounted across a save, so this outer
-    ;; fn does not run again on a refusal in the first place.
-    (when-not refusal
+    ;; fn does not run again on a failed one in the first place.
+    (when-not notice
       (reset! *selectable-contexts (:contexts (:data item))))
     (r/create-class
       {:component-did-mount #(.focus (get-component-el))
        :reagent-render ;
-         ;; The refusal lives in a slot that is always there, empty or not.
-         ;; Rendering it conditionally as a sibling changes how many children
-         ;; this fragment has, and React reconciles unkeyed children by
-         ;; position: everything below it would shift by one, be treated as a
-         ;; different element, and remount -- which recreates every uncontrolled
-         ;; input in the relation lines from its :defaultValue and so throws away
-         ;; the sibling indices the user typed. Exactly what a refusal must not
-         ;; do, and only visible in a browser.
-         (fn [_item refusal]
+         ;; The notice lives in a slot that is always there, empty or not.
+         ;; Rendering it as a sibling that appears and disappears remounted the
+         ;; relation lines below it, which recreated their uncontrolled inputs
+         ;; from :defaultValue and so threw away the sibling indices the user had
+         ;; typed -- exactly what a failed save must not do. Measured, not
+         ;; reasoned: the e2e scenario for the refusal fails without this slot
+         ;; and passes with it. I do not have a confident account of the
+         ;; reconciliation that makes it so, and an earlier comment here gave one
+         ;; that does not hold up, so it is not restated.
+         (fn [_item notice]
            #_(prn @*selectable-contexts)
-           [:<> [:div (when refusal [refusal-component refusal])] [:h4 "Related contexts"]
+           [:<> [:div (when notice [notice-component notice])] [:h4 "Related contexts"]
             [:div#link-context-item-component {:tabIndex 0}
              (map (fn [[idx relation]]
                     ^{:key idx} [relation-component idx relation remove-context])

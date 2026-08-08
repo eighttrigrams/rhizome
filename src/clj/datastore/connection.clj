@@ -4,7 +4,7 @@
   (:import [java.io File]
            [javax.sql DataSource]
            [java.sql Connection]
-           [org.sqlite SQLiteConfig SQLiteDataSource]))
+           [org.sqlite SQLiteConfig SQLiteConfig$TransactionMode SQLiteDataSource]))
 
 (defn- read-config* []
   ;; Peek at config.edn directly so we don't pull in the `config` ns
@@ -86,7 +86,27 @@
   ^DataSource [{:keys [dbname read-only?]}]
   (let [cfg   (doto (SQLiteConfig.)
                 (.enableLoadExtension vec-available?)
-                (.setReadOnly (boolean read-only?)))
+                (.setReadOnly (boolean read-only?))
+                ;; Write transactions take their lock at BEGIN rather than on
+                ;; their first write. Every transaction here reads before it
+                ;; writes -- the acyclicity check before the relation rows, the
+                ;; deletion plan before the deletes -- and a deferred BEGIN takes
+                ;; only a shared lock for that read, so the write has to upgrade.
+                ;; SQLite refuses that upgrade outright when another connection
+                ;; is writing, *without* consulting the busy handler, because
+                ;; waiting there could deadlock: measured, a contended save fails
+                ;; in 4ms and the 3s busy_timeout is never spent. Taking the
+                ;; write lock up front is the case the busy handler does serve,
+                ;; so the wait actually happens -- and the read then sees a state
+                ;; no other writer can move before the write lands, which is what
+                ;; the check needs to mean anything.
+                ;;
+                ;; Not on a replica: its transactions can only ever read, and an
+                ;; immediate BEGIN would ask a read-only database for a write
+                ;; lock.
+                (.setTransactionMode (if read-only?
+                                       SQLiteConfig$TransactionMode/DEFERRED
+                                       SQLiteConfig$TransactionMode/IMMEDIATE)))
         inner (doto (SQLiteDataSource. cfg)
                 (.setUrl (str "jdbc:sqlite:" dbname)))
         ds    (if vec-available?
