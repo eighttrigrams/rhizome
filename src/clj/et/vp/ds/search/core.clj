@@ -163,14 +163,32 @@
   [q opts ctx]
   (sql/format (related-items-query-map q opts ctx)))
 
-(def ^:private max-part-of-level
+(def max-part-of-level
   "SQLite plans a join with a 64-bit bitmask over its tables, so 64 is all it
    will take in one query -- and a level costs one `relations` alias, with the
    `items` join on top. Nothing in a rhizome is filed 63 deep; the clamp is here
    so a level arriving from somewhere other than the strip's stepper answers with
    the deepest expressible level (empty, at that depth) instead of a database
-   error."
+   error.
+
+   Public because /api refuses a level past it rather than clamping -- an empty
+   list would read as `nothing is filed that deep`, which is a different fact --
+   and the refusal has to name the same ceiling this enforces."
   63)
+
+(defn clamp-part-of-level
+  "The level a part-of-level query will actually be built at: at least the first,
+   at most as deep as one query can express. Callers that have to line something
+   up with the answer -- the path columns, say -- ask here rather than repeating
+   the arithmetic."
+  [level]
+  (min max-part-of-level (max 1 (or level 1))))
+
+(defn path-column
+  "The alias the n-th step of a row's path is projected under. One column per
+   step rather than one string to be split: they are ids, and they stay ids."
+  [n]
+  (keyword (str "part_of_path_" n)))
 
 (defn- step
   "A column of the `relations` alias carrying the n-th step of a path."
@@ -210,13 +228,22 @@
 
    The sibling index projected is the last step's -- the node's place under the
    whole it is directly a part of -- because that is the number the human typed
-   into the edit modal for it."
-  [q {:keys [selected-item-id level]} {:keys [limit] :as _ctx}]
-  (let [level (min max-part-of-level (max 1 (or level 1)))]
+   into the edit modal for it.
+
+   With `:with-path?` each row also carries the ids it was reached through, one
+   column per step. Two rows for the same node are otherwise identical, and in a
+   list of items that is all the answer there is to `is this filed twice or did
+   the query repeat itself` -- the strip's list is told apart by where a row sits
+   and by the badges on it, and a caller reading the rows alone has neither."
+  [q {:keys [selected-item-id level with-path?]} {:keys [limit] :as _ctx}]
+  (let [level (clamp-part-of-level level)]
     (sql/format
       (merge {:select (vec (concat select
                                    [[(step level :annotation) :annotation]
-                                    [(step level :part_of_sort_idx) :part_of_sort_idx]]))
+                                    [(step level :part_of_sort_idx) :part_of_sort_idx]]
+                                   (when with-path?
+                                     (map (fn [n] [(step n :target_id) (path-column n)])
+                                          (range 1 (inc level))))))
               :from [[:relations :r1]]
               :join (-> (into []
                               (mapcat (fn [n]

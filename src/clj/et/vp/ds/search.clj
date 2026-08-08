@@ -134,6 +134,19 @@
   [hierarchy-level selected-item-id]
   (when (= (:context hierarchy-level) selected-item-id) (:level hierarchy-level)))
 
+(defn- fold-path
+  "The one path column per step the parts query projects, folded into the single
+   `:part_of_path` a caller reads: the ids from the whole that was asked about
+   down to the row itself, both ends included. Both ends are already known --
+   the first is the whole in the request, the last is the row's own id -- and
+   they are in it anyway, because a path that names only the middle is one a
+   reader has to reassemble before it says anything."
+  [selected-item-id level item]
+  (-> item
+      (assoc :part_of_path
+             (into [selected-item-id] (map #(get item (core/path-column %))) (range 1 (inc level))))
+      (as-> i (apply dissoc i (map core/path-column (range 1 (inc level)))))))
+
 (defn search-related-items
   "The items to list under the selected item.
 
@@ -145,27 +158,36 @@
 
    :hierarchy-level rides in with :hierarchy-mode?, and for the same reason:
    both are session state the SPA carries. See level-asked-for for what it looks
-   like and why."
-  [db q selected-item-id {:keys [link-item search-mode hierarchy-mode? hierarchy-level] :as opts}
+   like and why.
+
+   :with-part-of-path? adds `:part_of_path` to every row. The SPA does not ask
+   for it -- its list is read down the page, and each card carries the badges
+   that name the wholes -- but a caller reading the rows on their own has neither
+   of those, and two rows for one node are the same object twice without it."
+  [db q selected-item-id
+   {:keys [link-item search-mode hierarchy-mode? hierarchy-level with-part-of-path?] :as opts}
    {:keys [limit] :as ctx}]
   (when link-item
     (throw (IllegalArgumentException. "'link-item' shouldn't be supplied here any longer")))
   (when-not selected-item-id
     (throw (IllegalArgumentException. "selected-context-id must not be nil")))
   (let [opts (modify opts)
+        level (core/clamp-part-of-level (level-asked-for hierarchy-level selected-item-id))
+        path? (boolean (and hierarchy-mode? with-part-of-path?))
         items (do-query db
                         (if hierarchy-mode?
                           (core/part-of-level q
                                               {:selected-item-id selected-item-id
-                                               :level (level-asked-for hierarchy-level
-                                                                       selected-item-id)}
+                                               :level level
+                                               :with-path? path?}
                                               ctx)
                           (core/search-related-items q
                                                      (->core-opts selected-item-id search-mode opts)
                                                      ctx)))
-        results (->> (seq items)
-                     (map post-process)
-                     (map post-process-contexts))]
+        results (cond->> (->> (seq items)
+                              (map post-process)
+                              (map post-process-contexts))
+                  path? (map (partial fold-path selected-item-id level)))]
     (when (and limit (> (count results) limit))
       (throw (Exception. "got more results than 'limit' allows. impl broken!")))
     results))
