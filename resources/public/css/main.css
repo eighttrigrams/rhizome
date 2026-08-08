@@ -489,21 +489,23 @@ ul.cards {
     cursor: zoom-out;
 }
 
-/* The video has to be dimmed by itself, because the overlay cannot do it.
+/* Nothing dims a video under this overlay any more, and the reason it used to
+   have to is worth keeping.
+
    A cross-origin iframe is composited in its own layer, and Chromium does not
    blend a translucent layer above it into that one: measured here, the embed
    stayed at full brightness under an overlay that dimmed every other thing on
-   the page, at any z-index and from anywhere in the tree. An opaque cover does
-   land on it, and so does a filter on the iframe itself -- and the filter is
-   the one that leaves it faintly there rather than blacking it out, which is
-   what the overlay does to everything else.
+   the page, at any z-index and from anywhere in the tree. Only an opaque cover
+   or a filter on the iframe itself lands on it, and this file carried
+   `body:has(#qr-overlay) iframe { filter: brightness(.22) blur(2px) }` for
+   exactly that.
 
-   Hung off :has() so it lasts exactly as long as the overlay is in the
-   document, with nothing to remember to undo. Where :has() is missing the
-   video simply stays bright; the overlay is otherwise unaffected. */
-body:has(#qr-overlay) iframe {
-    filter: brightness(0.22) blur(2px);
-}
+   What it was aimed at has gone. The item detail shows a still now -- an <img>
+   like any other, which this overlay dims by ordinary compositing -- and the
+   only iframe left on the page is the floating player, which sits above this
+   overlay deliberately and is meant to stay bright and playable while a phone
+   is being lined up with the code. The rule would now find the single element
+   it must not touch, so it is not narrowed, it is gone. */
 
 /* White under the code, and a margin of it beyond the quiet zone the SVG
    already draws. Both are for the scanner rather than for looks. */
@@ -536,6 +538,51 @@ body:has(#qr-overlay) iframe {
 .qr-overlay-close:hover {
     color: #ffffff;
     background: rgba(255, 255, 255, 0.2);
+}
+
+/* The still that stands where a video used to play, and the way into the
+   player. Black underneath, so the frame still reads as a video when YouTube's
+   still does not arrive; the box is the video's 16:9 while hqdefault is 4:3, so
+   the bars it carries above and below are cropped away rather than shown. */
+.video-poster {
+    position: relative;
+    width: 420px;
+    height: 236px;
+    background: #000000;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.video-poster-still {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Dark and white rather than YouTube's own red: red in this app is danger mode
+   and a refused write, and it should not also mean "a video". The triangle's
+   mass sits to its left, so the padding nudges it back to looking centred. */
+.video-poster-play {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 66px;
+    height: 46px;
+    padding-left: 4px;
+    box-sizing: border-box;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.62);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.video-poster:hover .video-poster-play {
+    background: rgba(0, 0, 0, 0.88);
+    border-color: #ffffff;
 }
 
 /* The one player. Mounted once beside #main-layer (ui.cljs) and never moved in

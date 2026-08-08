@@ -3,40 +3,58 @@
             [clojure.string :as str]
             [ajax.core :as ajax]
             [ui.actions :as actions]
+            [ui.floating-player :as floating-player]
             [ui.main.diff :as diff]
             [ui.qr-overlay :as qr-overlay]
             [ui.replica :as replica]
+            [ui.youtube :as youtube]
             [reagent.core :as r]))
 
+(defn- video-poster
+  "The still that stands where the video used to play, and the way into the
+   player.
+
+   Not an iframe any more: a video plays in one place now, floating over the
+   app (ui.floating-player), and this is a picture of one with something on it
+   that reads as play. Clicking it is also the user gesture the browser wants
+   before it will let the player start on its own.
+
+   Nothing at all for an address ui.youtube cannot read a video id out of. The
+   QR icon beside it is not conditional on that: the address still works on a
+   phone whether or not this can name the video in it."
+  [*state url]
+  (when-let [id (youtube/video-id url)]
+    [:div.video-poster
+     {:role "button"
+      :title "Play this video"
+      :aria-label "Play this video"
+      :on-click (fn [e] (.stopPropagation e) (floating-player/play! *state url))}
+     [:img.video-poster-still {:src (youtube/poster-url id) :alt ""}]
+     [:span.video-poster-play
+      [:svg {:width 20 :height 22 :viewBox "0 0 12 14" :aria-hidden "true"}
+       [:path {:fill "#ffffff" :d "M0 0l12 7-12 7z"}]]]]))
+
 (defn- display-youtube-video
-  "The embeds for an item's video, and under each one the icon that offers it as
-   a QR code -- but only when `qr?`, which is to say only in the detail view.
+  "The posters for an item's video, and under each one the icon that offers it
+   as a QR code -- but only when `qr?`, which is to say only in the detail view.
    The preview renders the same component while the pointer rests on a row, and
    an icon there would be offering a video the reader has not asked for yet.
 
-   The QR is given the address as the item carries it. The iframe's src is the
-   embed/ rewrite of that address and is no use to a phone, so the two are read
-   off the same link separately rather than one from the other."
-  [description data qr?]
+   The QR is given the address as the item carries it, and the poster the same
+   string: what the phone has to be sent to and what the video is identified by
+   are different things, and reading one out of the other is how a phone ends up
+   on a bare embed page. The embed/ rewrite that used to happen here has gone
+   with the iframe, to ui.youtube/embed-url, where the player builds its src."
+  [*state description data qr?]
   [:<>
    (when-let [youtube-link (:youtube-video (:resource-links data))]
-     [:<>
-      [:iframe
-       {:width "420px"
-        :height "315px"
-        :src (if-not (re-matches #"https://www.youtube.com/shorts/.*" youtube-link)
-               (str/replace (str/trim youtube-link) "watch?v=" "embed/")
-               (str "https://www.youtube.com/embed/"
-                    (first (str/split (last (str/split youtube-link #"/")) #"\?"))))
-        :allowFullScreen true}]
+     [:<> [video-poster *state (str/trim youtube-link)]
       (when qr? [qr-overlay/component (str/trim youtube-link)])])
    (when (and description (str/includes? description "https://www.youtube.com/watch"))
      (let [found (re-find #"https://www.youtube.com/watch.*?\s" description)
            found (if-not found (re-find #"https://www.youtube.com/watch.*?$" description) found)
-           watch-link (str/trim found)
-           found (str/replace watch-link "watch?v=" "embed/")]
-       [:<> [:iframe {:width "420px" :height "315px" :src found :allowFullScreen true}]
-        (when qr? [qr-overlay/component watch-link])]))])
+           watch-link (str/trim found)]
+       [:<> [video-poster *state watch-link] (when qr? [qr-overlay/component watch-link])]))])
 
 (defn- image-itself
   [image-identifier]
@@ -118,7 +136,7 @@
                             ")"))
                      " "
                      title)}]] [image-component title data]
-   (display-youtube-video description data qr?)
+   (display-youtube-video *state description data qr?)
    [:div.description
     [:> ReactMarkdown
      {:children description
