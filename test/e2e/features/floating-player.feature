@@ -28,14 +28,16 @@ Feature: A video that goes on playing
     And nothing should be playing in the item view
     And nothing should be playing
 
-  Scenario: Clicking the still starts the player, playing, in the top-left corner
+  Scenario: Clicking the still starts the player, playing, in the bottom-left corner
     When I open the item "A talk worth keeping"
     And I click the video poster
     Then the player should be playing "dQw4w9WgXcQ"
     # A player that needs a second click is not what was asked for. Both halves
     # are needed: the URL asks to start, and the frame has to be allowed to.
     And the player should be asked to start on its own
-    And the player should be in the "top-left" corner
+    # Bottom left is the corner nothing else is in: REC and the vector-threshold
+    # panel are top left, DANGER is top right.
+    And the player should be in the "bottom-left" corner
 
   Scenario: Moving to another item leaves the player playing
     # The bug this is written against is a remount. An iframe React rebuilds,
@@ -45,10 +47,6 @@ Feature: A video that goes on playing
     When I open the item "A talk worth keeping"
     And I click the video poster
     And I remember the player's iframe
-    # It comes up in the top-left, over the card of the very item it was
-    # started from — that collision is the reason it is draggable at all, and
-    # moving it aside is what the owner does before going anywhere.
-    And I move the player out of the way
     And I press Escape in the app
     Then the item view should be closed
     And the player should be the very same iframe
@@ -91,7 +89,6 @@ Feature: A video that goes on playing
   Scenario: A second video replaces the first rather than stacking on it
     When I open the item "A talk worth keeping"
     And I click the video poster
-    And I move the player out of the way
     And I press Escape in the app
     And I go back to "Watchlist" in the lhs
     And I open the item "Another talk entirely"
@@ -105,7 +102,6 @@ Feature: A video that goes on playing
     # icon under the still cannot answer for it; the one on the player can.
     When I open the item "A talk worth keeping"
     And I click the video poster
-    And I move the player out of the way
     And I press Escape in the app
     And I go back to "Watchlist" in the lhs
     And I open the item "Another talk entirely"
@@ -132,6 +128,10 @@ Feature: A video that goes on playing
     # second #qr-overlay in the document, sharing an id with the first.
     When I open the item "A talk worth keeping"
     And I click the video poster
+    # The player opens over the bottom of the lhs, and the icon under the still
+    # is down there. Move it off that side first — the collision is real and
+    # dragging is the answer to it, but it is not what this scenario is about.
+    And I move the player out of the way
     And I open the QR code
     Then the player should not offer its QR code
     And there should be exactly one QR overlay

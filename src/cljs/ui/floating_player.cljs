@@ -160,7 +160,11 @@
 (defn component
   "Mounted once, from ui/component, and never anywhere else."
   [_*state]
-  (let [*corner (r/atom :top-left)
+  (let [;; Bottom left, and by the owner's decision. It is also the one corner
+        ;; nothing else is already in: the ⚠ REC badge and the vector-threshold
+        ;; panel are top left, ⚠ DANGER is top right. So a video opens beside
+        ;; the app's own markers rather than on top of one.
+        *corner (r/atom :bottom-left)
         *drag (r/atom nil)
         *qr-open? (r/atom false)]
     (fn [*state]

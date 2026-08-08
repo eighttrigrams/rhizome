@@ -76,11 +76,21 @@ When("I go back to {string} in the lhs", async ({ page }, text: string) => {
   await expect(page.locator("#rhs-component li.item-card").first()).toBeVisible();
 });
 
-// Grab the strip, sweep across the video, let go. The sweep is what the pointer
-// capture is for: without it the first move over the iframe is delivered into a
-// cross-origin document and the drag dies halfway. Hence two moves with steps
-// rather than one jump — a single event from A to B never touches the iframe at
-// all and would pass with no capture in place.
+// Grab the strip, sweep across the video, let go.
+//
+// The first leg goes straight down into the box's own body, and that is the
+// leg that matters: the iframe is under those coordinates when the move
+// starts, so the pointer genuinely crosses the video, which is what the
+// capture on the handle is for. Without it a move landing on a cross-origin
+// iframe is delivered into that document and never arrives here, and the drag
+// dies halfway.
+//
+// It has to be done on purpose rather than fallen into. The box follows the
+// pointer, so a drag that only travels up or sideways keeps the pointer over
+// the handle the whole way and never touches the iframe at all — it would pass
+// with no capture in place. That was true by luck while the player opened in
+// the top-left and every drag went down and right; from the bottom-left corner
+// it is not.
 async function dragInto(page: any, quadrant: string) {
   const [vertical, horizontal] = quadrant.split("-");
   const box = (await page.locator("#floating-player").boundingBox())!;
@@ -98,7 +108,7 @@ async function dragInto(page: any, quadrant: string) {
 
   await page.mouse.move(startX, startY);
   await page.mouse.down();
-  await page.mouse.move((startX + targetX) / 2, (startY + targetY) / 2, { steps: 12 });
+  await page.mouse.move(startX, startY + box.height / 2, { steps: 8 });
   await page.mouse.move(targetX, targetY, { steps: 12 });
   await page.mouse.up();
   await settle(page);
@@ -108,10 +118,10 @@ When("I drag the player into the {string} quadrant", async ({ page }, quadrant: 
   await dragInto(page, quadrant);
 });
 
-// The same gesture, said as what it is for. The player comes up in the
-// top-left, over the lhs card and the context badge on it, and the badge is
-// the way back to the whole an item is filed under — so a scenario that
-// navigates has to move the player first, exactly as the owner would.
+// The same gesture, said as what it is for. The player opens over the bottom
+// of the lhs, which is where the icon under a still sits, so a scenario that
+// has to reach something under there moves it to the other side first —
+// exactly as the owner would, and the reason it is draggable.
 When("I move the player out of the way", async ({ page }) => {
   await dragInto(page, "bottom-right");
 });
