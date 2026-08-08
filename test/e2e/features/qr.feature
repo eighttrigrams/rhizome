@@ -22,6 +22,18 @@ Feature: Carrying a video to a phone by QR code
     And the QR code should encode "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
     And the QR code should not encode the embed address
 
+  Scenario: The icon can be seen without hovering it
+    # It shipped the same colour as the panel behind it — on the page, laid out,
+    # hit-testable, and invisible. Every other check in this file passed on it.
+    When I open the item "A talk worth keeping"
+    Then the QR icon should be no fainter than the text beside it
+
+  Scenario: The code can be told apart from what it is drawn on
+    # The failure that looks perfect on screen: a code nobody's phone can read.
+    When I open the item "A talk worth keeping"
+    And I open the QR code
+    Then the QR code should be legible against the overlay
+
   Scenario: The X closes it
     When I open the item "A talk worth keeping"
     And I open the QR code

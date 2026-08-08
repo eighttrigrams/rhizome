@@ -1,7 +1,28 @@
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
+// Playwright bundles pngjs for its own screenshot comparison, so a real pixel
+// readback costs no new dependency — which matters in a box that installs
+// nothing. It is a private path and could move on an upgrade; if it does, the
+// require throws and these scenarios go red, which is the failure mode to want.
+// A legibility check that quietly skipped itself would be worse than none.
+const { PNG } = require("playwright-core/lib/utilsBundle");
 
 const { When, Then } = createBdd();
+
+// WCAG relative luminance and contrast ratio. Both checks below are about one
+// question — can this be told apart from what is behind it — and that question
+// has a standard answer, so it is not reinvented here.
+function luminance(r: number, g: number, b: number): number {
+  const f = (v: number) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+}
+
+function contrast(a: number, b: number): number {
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
 
 // Deliberately without the waitForLoadState("networkidle") that every other
 // step file drains on. Once a video is on the page the embed keeps talking to
@@ -152,6 +173,97 @@ Then("the QR code should not encode the embed address", async ({ page }) => {
   const embedSrc = await page.locator("iframe").first().getAttribute("src");
   expect(embedSrc, "the iframe should be built from the embed/ form").toContain("/embed/");
   expect(await renderedModules(page)).not.toBe(expectedModules(embedSrc!));
+});
+
+// The icon was once #8b8878 on the panel's own rgb(136,131,131): 1.05:1, where
+// 1.0 is the same colour. It was rendered, laid out, hit-testable and hoverable
+// — so toBeVisible passed, a screenshot showed the page as the user saw it, and
+// nothing in the suite had an opinion. Only a comparison of the ink with what
+// is behind it says anything at all here.
+//
+// The floor is the app's own body text on the same panel rather than a number
+// picked out of the air. That text sits at ~2.24:1, under the 3:1 WCAG asks of
+// a control, so any absolute standard would fail this app everywhere and the
+// honest fix would be a repaint of the whole panel, not of one icon. What can
+// be said without argument is that a control must not be *less* visible than
+// the prose beside it.
+Then("the QR icon should be no fainter than the text beside it", async ({ page }) => {
+  const measured = await page.locator(".qr-open").evaluate((icon: HTMLElement) => {
+    const parse = (s: string) => {
+      const m = s.match(/rgba?\(([^)]+)\)/);
+      return m ? m[1].split(",").map(parseFloat) : null;
+    };
+    // The nearest ancestor that actually paints. Backgrounds here are opaque or
+    // absent, so the first one found is the one on screen.
+    const behind = (el: HTMLElement | null) => {
+      for (let cur = el; cur; cur = cur.parentElement) {
+        const p = parse(getComputedStyle(cur).backgroundColor);
+        if (p && (p.length < 4 || p[3] > 0)) return p;
+      }
+      return null;
+    };
+    const prose = document.querySelector("#lhs-component .details-component .description");
+    return {
+      ink: parse(getComputedStyle(icon).color),
+      ground: behind(icon),
+      proseInk: prose ? parse(getComputedStyle(prose).color) : null,
+    };
+  });
+  expect(measured.ground, "nothing behind the icon paints a background").toBeTruthy();
+  expect(measured.proseInk, "no prose on the panel to compare against").toBeTruthy();
+  const ground = luminance(measured.ground![0], measured.ground![1], measured.ground![2]);
+  const icon = contrast(luminance(measured.ink![0], measured.ink![1], measured.ink![2]), ground);
+  const prose = contrast(
+    luminance(measured.proseInk![0], measured.proseInk![1], measured.proseInk![2]),
+    ground,
+  );
+  expect(
+    icon,
+    `the icon is at ${icon.toFixed(2)}:1 against what is behind it, fainter than the `
+      + `panel's own text at ${prose.toFixed(2)}:1`,
+  ).toBeGreaterThanOrEqual(prose - 0.01);
+});
+
+// Same class of check, one layer down and where it actually decides whether the
+// feature works: a code drawn dark-on-dark scans as nothing and looks entirely
+// fine in a screenshot. Read off the composited page rather than off the CSS —
+// what the SVG declares is not evidence about what reached the glass, and the
+// white ground could be defeated by anything painting over it.
+Then("the QR code should be legible against the overlay", async ({ page }) => {
+  const png = PNG.sync.read(await page.locator("#qr-overlay svg").screenshot());
+  const lumAt = (x: number, y: number) => {
+    const i = (png.width * y + x) << 2;
+    return luminance(png.data[i], png.data[i + 1], png.data[i + 2]);
+  };
+  const all: number[] = [];
+  for (let y = 0; y < png.height; y += 1) for (let x = 0; x < png.width; x += 1) all.push(lumAt(x, y));
+  all.sort((a, b) => a - b);
+  const dark = all[Math.floor((all.length - 1) * 0.05)];
+  const light = all[Math.floor((all.length - 1) * 0.95)];
+
+  // Not merely "far apart": the light end has to be genuinely light. Losing the
+  // white ground would leave the light modules showing the milky overlay, and
+  // dark-on-darker can still be a wide ratio while being unscannable.
+  expect(light, "the light modules are not light — is the white ground painting?")
+    .toBeGreaterThan(0.8);
+  expect(dark, "the dark modules are not dark").toBeLessThan(0.2);
+  expect(
+    contrast(dark, light),
+    `the code is at ${contrast(dark, light).toFixed(1)}:1 between its light and dark modules`,
+  ).toBeGreaterThanOrEqual(7);
+
+  // And the quiet zone: four clear modules on every side, or a scanner runs the
+  // page into the symbol. Sampled as a ring just inside the edge, which is well
+  // within that margin at any size the overlay gives the code.
+  const inset = 3;
+  const ring: number[] = [];
+  for (let x = inset; x < png.width - inset; x += 1) {
+    ring.push(lumAt(x, inset), lumAt(x, png.height - 1 - inset));
+  }
+  for (let y = inset; y < png.height - inset; y += 1) {
+    ring.push(lumAt(inset, y), lumAt(png.width - 1 - inset, y));
+  }
+  expect(Math.min(...ring), "something dark is sitting in the quiet zone").toBeGreaterThan(0.8);
 });
 
 Then("the item view should still be open", async ({ page }) => {

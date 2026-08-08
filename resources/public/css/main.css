@@ -446,19 +446,25 @@ ul.cards {
     overflow: hidden;
 }
 
-/* The icon under a video that offers it as a QR code. Sized and coloured to
-   sit quietly under the embed: it is a way out to a phone, not a second
-   subject competing with the video above it. */
+/* The icon under a video that offers it as a QR code.
+
+   No colour of its own at rest: it takes #cbc9b5 by inheritance from
+   #sides-container, which is what every other piece of text on this panel is
+   drawn in. It had its own dimmer grey here to keep it quiet under the video,
+   and that was #8b8878 over the panel's own rgb(136,131,131) -- 1.05:1, which
+   is to say the same colour as the thing behind it. It was on the page and
+   could not be seen. Quiet is the size's job, not the colour's.
+
+   White on hover, the way a link in this app already brightens. */
 .qr-open {
     display: inline-block;
     line-height: 0;
     padding: 4px 2px;
-    color: #8b8878;
     cursor: pointer;
 }
 
 .qr-open:hover {
-    color: #cbc9b5;
+    color: white;
 }
 
 /* Black and milky: the page stays faintly readable underneath, so it is plain
