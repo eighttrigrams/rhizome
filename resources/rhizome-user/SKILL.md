@@ -242,6 +242,29 @@ the wholes it is a part of, alongside its `contexts`:
 { "id": 13, "title": "…", "contexts": {"12": "The book"}, "part-of": {"12": 1} }
 ```
 
+#### Levels
+
+Seen from one whole, the edges unroll into a tree, and that tree has levels.
+Level 1 is the parts of that whole — what `part_of=true` lists. Level 2 is the
+parts of *those*, reached by asking the same question of each of them. Level N
+is the nodes at depth exactly N, so the direct children are **not** among the
+level-2 nodes.
+
+A node's place at a level is decided by the whole path that reached it, not by
+its own `part-of-sort-idx` alone: the tuple of indices from the whole down to
+the node, compared component by component, with `-1` sorting after every set
+index at *every* component and not only at the last. Everything under the first
+child therefore comes before everything under the second, whatever indices are
+used further down. Walking level 1 in order and then each of those nodes' parts
+in order gives you exactly that ordering — you do not have to sort anything
+yourself.
+
+Because these are a DAG, one node can sit at a level by more than one route,
+and it belongs at each place it occupies. A level is as long as there are paths
+into it, not as there are distinct items in it; do not collapse the repeats,
+they are two positions somebody gave the same thing. Paths can multiply with
+depth, so expect a deep level to be longer than the graph is wide.
+
 ## Search strategy — when using rhizome for research
 
 1. Break queries into likely categories. Prefer two short searches on separate

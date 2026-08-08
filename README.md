@@ -248,9 +248,38 @@ context selected:
 - the intersection and filtering section disappears, since none of it means
   anything in a hierarchy.
 
+### Levels
+
+That list is **level 1**. The strip carries a stepper — `‹ 2 ›`, clickable, no
+key bound to it — that reads the levels below it. Level 2 is the parts of those
+parts, level N the nodes at depth exactly N: a level lists what sits at that
+depth and nothing else, so the direct children are not among the level-2 rows.
+
+The edges are a DAG, but seen from the selected context they unroll into a
+tree, and that tree is what the levels index. Two things follow:
+
+- **Order comes from the whole path**, not from a node's own sibling index. The
+  tuple of `part_of_sort_idx` from the selected context down to the node is
+  compared component by component, so everything under the first child comes
+  before everything under the second whatever indices are used further down.
+  The unset `-1` sorts behind the placed ones at *every* component of that
+  path, not only at the last — a chapter nobody placed carries its pages to the
+  back with it.
+- **A node appears once per path.** The same item filed under two chapters of
+  the same book is listed at both places it occupies, not once. A level is as
+  long as there are paths into it, which in a DAG can grow with depth without
+  any cycle being involved.
+
+The stepper is bounded on the fly, at both ends: a step that would land on a
+level with nothing at it is not offered rather than offered and then answered
+with an empty list.
+
 The mode is session state, like danger mode: not persisted, not per-context.
-Selecting a child does not re-root the view on it — that is still to come, and
-the strip reserves the space for it.
+The level is the same kind of thing, and it belongs to the context it was
+counted under — select another one and it is level 1 again, because level 2 of
+one context names other things than level 2 of the next.
+
+Selecting a child does not re-root the view on it — that is still to come.
 
 ## Configuration Options
 
