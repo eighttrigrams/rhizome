@@ -13,9 +13,15 @@ Feature: A video that goes on playing
     And I press the "Enter" key
     And I type "A talk worth keeping" in the search input
     And I press the "Enter" key
-    And I press the "i" key
+    # Wait for the row rather than pressing straight on. Creating an item is a
+    # round trip, and the next keypress's state change is what a late response
+    # overwrites — measured here as a second item that silently never existed,
+    # which then failed several steps later as "no item titled …".
+    Then I should see "A talk worth keeping" in the rhs
+    When I press the "i" key
     And I type "Another talk entirely" in the search input
     And I press the "Enter" key
+    Then I should see "Another talk entirely" in the rhs
     And the item "A talk worth keeping" has "https://www.youtube.com/watch?v=dQw4w9WgXcQ" in its description
     And the item "Another talk entirely" has "https://www.youtube.com/watch?v=oHg5SJYRHA0" in its description
     And I reload the app
@@ -66,6 +72,18 @@ Feature: A video that goes on playing
     # re-parenting it would have reloaded the video on the way across.
     And the player should be the very same iframe
 
+  Scenario: Opening a modal does not take it away
+    # The third of the things that are not one of the two ways out. The edit
+    # modal draws over the app at 1010/1011; the player is above it and goes on
+    # playing, which is the point of watching something while you work.
+    When I open the item "A talk worth keeping"
+    And I click the video poster
+    And I remember the player's iframe
+    And I open the edit modal
+    Then the modal should still be open
+    And the player should be the very same iframe
+    And the player should be playing "dQw4w9WgXcQ"
+
   Scenario: The X closes it
     When I open the item "A talk worth keeping"
     And I click the video poster
@@ -98,6 +116,19 @@ Feature: A video that goes on playing
     And I open the player's QR code
     Then the QR overlay should cover the page
     And the QR code should encode "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+
+  Scenario: A code left open does not come back with the next video
+    # The player is mounted for the life of the page, so what it remembers
+    # outlives what it is showing. Its X is above the overlay and can be
+    # pressed while a code is up; the code has to go with it, or it is back
+    # over the next video on its own.
+    When I open the item "A talk worth keeping"
+    And I click the video poster
+    And I open the player's QR code
+    And I close the player
+    And I click the video poster
+    Then there should be exactly one player
+    And the QR overlay should be gone
 
   Scenario: Only one code at a time
     # The player sits above the overlay on purpose, so its own QR stays under

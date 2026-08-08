@@ -199,7 +199,16 @@
              {:type "button"
               :title "Close the player"
               :aria-label "Close the player"
-              :on-click (fn [e] (.stopPropagation e) (close! *state))} "✕"]]]
+              :on-click (fn [e]
+                          (.stopPropagation e)
+                          ;; The code goes with the player. The X is above the
+                          ;; overlay and can be pressed while one is up, and
+                          ;; this component is mounted for the life of the page
+                          ;; -- so a flag left true here is still true when the
+                          ;; next video starts, and the overlay would come back
+                          ;; up on its own over a video nobody asked to share.
+                          (reset! *qr-open? false)
+                          (close! *state))} "✕"]]]
           [:iframe#floating-player-frame
            {:src (youtube/embed-url id)
             :width frame-width
