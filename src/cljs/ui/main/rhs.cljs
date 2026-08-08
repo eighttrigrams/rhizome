@@ -14,7 +14,13 @@
 (defn- items-list-component
   [*state]
   [:ul.cards
-   (map-indexed (fn [idx item] [:<> {:key (:id item)}
+   ;; Keyed by position and not by id alone: hierarchy mode lists a node once per
+   ;; path, so the same id can legitimately appear twice in one list -- an item
+   ;; filed under two chapters of the same book sits at two places of the level
+   ;; below it. React treats a repeated key as one child and is free to drop or
+   ;; reorder the other, which is exactly the second position that was the point
+   ;; of listing it twice.
+   (map-indexed (fn [idx item] [:<> {:key (str idx "-" (:id item))}
                                 [items-list-items/regular-items-list-item-component *state item idx
                                  {:allow-delete-on-right-click? true
                                   :show-relation-annotation? true

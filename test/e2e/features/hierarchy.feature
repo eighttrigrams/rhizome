@@ -101,6 +101,31 @@ Feature: Hierarchy mode
     Then the strip should show level 1
     And the rhs should list exactly "Chapter one, Chapter two"
 
+  Scenario: A node reachable by two paths is listed at both places it occupies
+    Given I am on the app
+    When I press the "c" key
+    And I type "Book" in the search input
+    And I press the "Enter" key
+    And I type "Chapter one" in the search input
+    And I press the "Enter" key
+    And I press the "i" key
+    And I type "Chapter two" in the search input
+    And I press the "Enter" key
+    And I press the "i" key
+    And I type "Shared page" in the search input
+    And I press the "Enter" key
+    And I press the "i" key
+    And I type "Another page" in the search input
+    And I press the "Enter" key
+    And I make "Chapter one" part of "Book" at index 1
+    And I make "Chapter two" part of "Book" at index 2
+    And I make "Shared page" part of "Chapter one" at index 1
+    And I make "Another page" part of "Chapter two" at index 2
+    And I make "Shared page" part of "Chapter two" at index 5
+    And I press the "h" key with shift and alt
+    And I step the level up
+    Then the rhs should list exactly "Shared page, Another page, Shared page"
+
   Scenario: The level goes back to 1 when another context is selected
     Given I am on the app
     When I press the "c" key
