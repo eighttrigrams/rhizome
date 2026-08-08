@@ -137,10 +137,35 @@
                                                                           nil)
       (is (= {:is-part-of? true :part-of-sort-idx 6} (mirror (:id book) (:id chapter)))
           "the rebuilt entry says what the row says")
+      (is (true? (get-in (ds/get-item db {:id (:id chapter)})
+                         [:data :contexts (:id book) :show-badge?]))
+          "including the badge, which get-aggregated-contexts filters on -- a nil
+           there drops the context out of the item's badges straight away, and
+           the next save writes show_badge NULL for real")
       (let [fresh (ds/get-item db {:id (:id chapter)})]
         (relations/set-the-containers-of-item! db fresh (get-in fresh [:data :contexts]) false))
       (is (= {:is-part-of? true :part-of-sort-idx 6} (row (:id book) (:id chapter)))
-          "so the next save, which rebuilds the rows out of the mirror, keeps it"))))
+          "so the next save, which rebuilds the rows out of the mirror, keeps it")
+      (is (= 1 (:relations/show_badge
+                 (jdbc/execute-one! db
+                                    ["SELECT show_badge FROM relations
+                                      WHERE owner_id = ? AND target_id = ?"
+                                     (:id book) (:id chapter)])))
+          "and does not write show_badge NULL back over it")))
+  (test-with-reset-db-and-time "a badge that was off stays off"
+    (let [[book chapter] (book-with-chapter 6)]
+      (jdbc/execute-one! db
+                         ["UPDATE relations SET show_badge = 0 WHERE owner_id = ? AND target_id = ?"
+                          (:id book) (:id chapter)])
+      (jdbc/execute-one! db
+                         ["UPDATE items SET data = '{\"contexts\":{}}' WHERE id = ?" (:id chapter)])
+      (relations/update-collection-title-in-collection-items-for-children db
+                                                                          (:id book)
+                                                                          "Book, renamed"
+                                                                          nil)
+      (is (false? (get-in (ds/get-item db {:id (:id chapter)})
+                          [:data :contexts (:id book) :show-badge?]))
+          "the row is read, not defaulted"))))
 
 (defn- make-part-of!
   "Make `part` a part of `whole` at sort index `idx`, the way a save from the

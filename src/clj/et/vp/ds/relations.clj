@@ -23,18 +23,24 @@
         (string? v) (try (Long/parseLong (clojure.string/trim v)) (catch Exception _ -1))
         :else -1))
 
-(defn- part-of-of-row
-  "The part-of standing of one relation, read off the row it is stored in.
-   Missing row, or a relation that was never part-of, both read as not-part-of
-   and unplaced, which are the column defaults."
+(defn- standing-of-row
+  "Everything a mirror entry says about a relation that is not the title, read
+   off the row it is stored in. A missing row reads as the column defaults --
+   not-part-of, unplaced, badge shown."
   [db whole-id part-id]
   (let [r (jdbc/execute-one! db
-                             (sql/format {:select [:is_part_of :part_of_sort_idx]
+                             (sql/format {:select [:is_part_of :part_of_sort_idx :show_badge]
                                           :from [:relations]
                                           :where [:and [:= :owner_id [:inline whole-id]]
                                                   [:= :target_id [:inline part-id]]]}))]
     {:is-part-of? (boolean (helpers/int->bool (:relations/is_part_of r)))
-     :part-of-sort-idx (->part-of-sort-idx (:relations/part_of_sort_idx r))}))
+     :part-of-sort-idx (->part-of-sort-idx (:relations/part_of_sort_idx r))
+     ;; nil is the column's default too (show_badge DEFAULT 1), and the mirror
+     ;; has no way to say "unknown": get-aggregated-contexts reads a nil here as
+     ;; false and drops the context out of the item's badges.
+     :show-badge? (if (nil? (:relations/show_badge r))
+                    true
+                    (boolean (helpers/int->bool (:relations/show_badge r))))}))
 
 (defn set-collection-titles-of-new-item
   [db item-id]
@@ -116,15 +122,19 @@
                                                              (->part-of-sort-idx
                                                                part-of-sort-idx))))
                                      ;; No entry to patch: this rebuilds one the
-                                     ;; mirror had lost. What the caller did not
-                                     ;; supply comes off the relation row rather
-                                     ;; than being assumed away -- a rebuilt
-                                     ;; entry saying not-part-of would clear the
-                                     ;; column on the next save, which rebuilds
-                                     ;; the table out of the mirror.
-                                     (let [row (part-of-of-row db id item-id)]
+                                     ;; mirror had lost. Every field the caller
+                                     ;; did not supply comes off the relation
+                                     ;; row rather than being assumed away -- a
+                                     ;; rebuilt entry that understates the row
+                                     ;; is what the next save writes back, since
+                                     ;; that rebuilds the table out of the
+                                     ;; mirror.
+                                     (let [row (standing-of-row db id item-id)]
                                        (assoc contexts
-                                         (str id) (cond-> {:show-badge? show-badge?
+                                         (str id) (cond-> {:show-badge?
+                                                             (if (some? show-badge?)
+                                                               show-badge?
+                                                               (:show-badge? row))
                                                            :title (if (seq short_title)
                                                                     short_title
                                                                     title)
