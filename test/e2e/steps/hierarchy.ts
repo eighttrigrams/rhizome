@@ -69,6 +69,40 @@ Then("I should not see the top strip", async ({ page }) => {
   await expect(page.locator("#hierarchy-strip")).toHaveCount(0);
 });
 
+// The stepper is clickable and nothing else -- no key is bound to it -- so
+// clicking is the whole of what there is to drive here.
+async function stepLevel(page: any, direction: string) {
+  await page.locator(`#hierarchy-level-${direction}`).click();
+  // Same drain pattern as the mode toggle: stepping goes through
+  // fetch-and-reset!, and its late response would otherwise clobber whatever
+  // the next step does.
+  await page.waitForTimeout(100);
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(
+    () => new Promise<void>((r) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => r())),
+    ),
+  );
+}
+
+When("I step the level {word}", async ({ page }, direction: string) =>
+  stepLevel(page, direction));
+
+Then("the strip should show level {int}", async ({ page }, n: number) => {
+  await expect(page.locator("#hierarchy-level-value")).toHaveText(String(n));
+});
+
+// A step that leads nowhere is not offered: the arrow keeps its place, so the
+// strip does not jump about as the level changes, but it carries no handler and
+// its title says why.
+Then("the strip should not offer to step {word}", async ({ page }, direction: string) => {
+  await expect(page.locator(`#hierarchy-level-${direction}`)).toHaveClass(/unavailable/);
+});
+
+Then("the strip should offer to step {word}", async ({ page }, direction: string) => {
+  await expect(page.locator(`#hierarchy-level-${direction}`)).not.toHaveClass(/unavailable/);
+});
+
 // The strip is not an overlay: it takes its own row and the app below it is
 // shorter. So the app's top edge must sit at or below the strip's bottom edge,
 // and the app must have lost exactly the strip's height.

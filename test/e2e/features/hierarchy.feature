@@ -68,6 +68,66 @@ Feature: Hierarchy mode
     Then I should not see the top strip
     And the search input should be in vector mode
 
+  Scenario: The strip steps to the level below, and stops where the hierarchy stops
+    Given I am on the app
+    When I press the "c" key
+    And I type "Book" in the search input
+    And I press the "Enter" key
+    And I type "Chapter one" in the search input
+    And I press the "Enter" key
+    And I press the "i" key
+    And I type "Chapter two" in the search input
+    And I press the "Enter" key
+    And I press the "i" key
+    And I type "Page of the first chapter" in the search input
+    And I press the "Enter" key
+    And I press the "i" key
+    And I type "Page of the second chapter" in the search input
+    And I press the "Enter" key
+    And I make "Chapter one" part of "Book" at index 1
+    And I make "Chapter two" part of "Book" at index 2
+    And I make "Page of the first chapter" part of "Chapter one" at index 1
+    And I make "Page of the second chapter" part of "Chapter two" at index 1
+    And I press the "h" key with shift and alt
+    Then the strip should show level 1
+    And the rhs should list exactly "Chapter one, Chapter two"
+    And the strip should not offer to step down
+    And the strip should offer to step up
+    When I step the level up
+    Then the strip should show level 2
+    And the rhs should list exactly "Page of the first chapter, Page of the second chapter"
+    And the strip should not offer to step up
+    When I step the level down
+    Then the strip should show level 1
+    And the rhs should list exactly "Chapter one, Chapter two"
+
+  Scenario: The level goes back to 1 when another context is selected
+    Given I am on the app
+    When I press the "c" key
+    And I type "Folio" in the search input
+    And I press the "Enter" key
+    And I press the "Escape" key
+    And I press the "Escape" key
+    And I press the "c" key
+    And I type "Book" in the search input
+    And I press the "Enter" key
+    And I type "Chapter" in the search input
+    And I press the "Enter" key
+    And I press the "i" key
+    And I type "Page" in the search input
+    And I press the "Enter" key
+    And I make "Chapter" part of "Book" at index 1
+    And I make "Page" part of "Chapter" at index 1
+    And I press the "h" key with shift and alt
+    And I step the level up
+    Then the strip should show level 2
+    And the rhs should list exactly "Page"
+    When I press the "c" key
+    And I type "Folio" in the search input
+    And I press the "Enter" key
+    Then the strip should show level 1
+    And the strip should not offer to step up
+
   Scenario: The badges sit below the strip rather than on top of its label
     Given I am on the app
     When I press the "w" key with shift and alt
