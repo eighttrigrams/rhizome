@@ -1,8 +1,12 @@
 Feature: Carrying a video to a phone by QR code
 
   The item detail view offers a video's address as a QR code over the whole
-  page. The address is the one YouTube serves, not the embed/ form the iframe
+  page. The address is the one YouTube serves, not the embed/ form the player
   is built from — a phone that lands on the latter gets a bare player.
+
+  This is the icon under the item's poster. The floating player carries one of
+  its own, for whatever it happens to be playing; that one is covered in
+  floating-player.feature, along with the case the two come apart in.
 
   Background:
     Given I am on the app
@@ -54,7 +58,7 @@ Feature: Carrying a video to a phone by QR code
 
   Scenario: The preview is not offered the icon
     # The same component renders under the pointer while hovering a row. The
-    # video shows there; the way out to a phone does not.
+    # poster shows there; the way out to a phone does not.
     When I hover the item "A talk worth keeping"
     Then the preview should show the video
     And the video should not offer a QR code

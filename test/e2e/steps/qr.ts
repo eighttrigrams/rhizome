@@ -1,5 +1,6 @@
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
+import { settle } from "../settle";
 // Playwright bundles pngjs for its own screenshot comparison, so a real pixel
 // readback costs no new dependency — which matters in a box that installs
 // nothing. It is a private path and could move on an upgrade; if it does, the
@@ -22,22 +23,6 @@ function luminance(r: number, g: number, b: number): number {
 
 function contrast(a: number, b: number): number {
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
-}
-
-// Deliberately without the waitForLoadState("networkidle") that every other
-// step file drains on. Once a video is on the page the embed keeps talking to
-// YouTube for as long as it is mounted, so the network never goes idle and the
-// wait runs to the test timeout — measured: the first version of this file
-// timed out in exactly the step that pressed a key with the player up. Give
-// the go-block its tick, let Reagent commit, and lean on the retrying
-// assertions for the rest.
-async function settle(page: any) {
-  await page.waitForTimeout(150);
-  await page.evaluate(
-    () => new Promise<void>((r) =>
-      requestAnimationFrame(() => requestAnimationFrame(() => r())),
-    ),
-  );
 }
 
 // The description is the reachable half of display-youtube-video from out
@@ -81,8 +66,11 @@ When("I press Escape in the app", async ({ page }) => {
   await settle(page);
 });
 
+// The icon under the item's still, named as such. The player carries one too,
+// and .first() only told them apart by DOM order — true today and no part of
+// what either scenario means.
 When("I open the QR code", async ({ page }) => {
-  await page.locator(".qr-open").first().click();
+  await page.locator("#lhs-component .qr-open").first().click();
   await expect(page.locator("#qr-overlay")).toBeVisible();
 });
 
@@ -97,17 +85,22 @@ When("I press Escape in the QR overlay", async ({ page }) => {
   await page.locator("#qr-overlay").press("Escape");
 });
 
+// Scoped to the lhs throughout: the floating player carries a .qr-open of its
+// own, for whatever it is playing. Nothing in this file starts a video, so an
+// unscoped count would pass today and go wrong the first time one of these
+// scenarios grows a player — and the thing being asserted here is specifically
+// the icon that belongs to the item on screen.
 Then("the video should offer a QR code", async ({ page }) => {
-  await expect(page.locator("iframe")).toHaveCount(1);
-  await expect(page.locator(".qr-open")).toHaveCount(1);
+  await expect(page.locator("#lhs-component .video-poster")).toHaveCount(1);
+  await expect(page.locator("#lhs-component .qr-open")).toHaveCount(1);
 });
 
 Then("the video should not offer a QR code", async ({ page }) => {
-  await expect(page.locator(".qr-open")).toHaveCount(0);
+  await expect(page.locator("#lhs-component .qr-open")).toHaveCount(0);
 });
 
 Then("the preview should show the video", async ({ page }) => {
-  await expect(page.locator("#lhs-component iframe")).toHaveCount(1);
+  await expect(page.locator("#lhs-component .video-poster")).toHaveCount(1);
 });
 
 Then("the QR overlay should cover the page", async ({ page }) => {
@@ -169,10 +162,25 @@ Then("the QR code should encode {string}", async ({ page }, url: string) => {
   expect(await renderedModules(page)).toBe(expectedModules(url));
 });
 
+// There is no embed on the page to read a src off any more — the detail shows
+// a still, and a video plays in the floating player, which this scenario never
+// starts. The address the mistake would produce is still exactly derivable:
+// the still names the video, and ui.youtube/embed-url is the one place an
+// embed address is built. Both forms are ruled out, the bare one the old
+// inline rewrite produced and the one the player asks to autoplay.
 Then("the QR code should not encode the embed address", async ({ page }) => {
-  const embedSrc = await page.locator("iframe").first().getAttribute("src");
-  expect(embedSrc, "the iframe should be built from the embed/ form").toContain("/embed/");
-  expect(await renderedModules(page)).not.toBe(expectedModules(embedSrc!));
+  const still = await page.locator("#lhs-component .video-poster-still").first()
+    .getAttribute("src");
+  const id = still!.match(/\/vi\/([^/]+)\//);
+  expect(id, `no video id in the poster's still: ${still}`).toBeTruthy();
+  const drawn = await renderedModules(page);
+  for (const embed of [
+    `https://www.youtube.com/embed/${id![1]}`,
+    `https://www.youtube.com/embed/${id![1]}?autoplay=1`,
+  ]) {
+    expect(drawn, `the code encodes ${embed}, which sends a phone to a bare player page`)
+      .not.toBe(expectedModules(embed));
+  }
 });
 
 // The icon was once #8b8878 on the panel's own rgb(136,131,131): 1.05:1, where
@@ -268,9 +276,12 @@ Then("the QR code should be legible against the overlay", async ({ page }) => {
 
 Then("the item view should still be open", async ({ page }) => {
   await expect(page.locator("#lhs-component .details-component")).toHaveCount(1);
-  await expect(page.locator(".qr-open")).toHaveCount(1);
+  await expect(page.locator("#lhs-component .qr-open")).toHaveCount(1);
 });
 
+// The icon is the marker: the detail view offers it and the preview does not,
+// so it is gone exactly when the item view is. Scoped to the lhs so a playing
+// player's own icon cannot answer for the item's.
 Then("the item view should be closed", async ({ page }) => {
-  await expect(page.locator(".qr-open")).toHaveCount(0);
+  await expect(page.locator("#lhs-component .qr-open")).toHaveCount(0);
 });
