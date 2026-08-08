@@ -7,7 +7,8 @@
             [api.harness :refer [call!]]
             [api.helpers :refer [with-fresh-db]]
             [et.vp.ds :as ds]
-            [et.vp.ds.relations]
+            [et.vp.ds.relations :as relations]
+            [et.vp.ds.search :as search]
             [et.vp.ds.search-test :refer [db]]
             [next.jdbc :as jdbc]))
 
@@ -136,6 +137,50 @@
             "the hierarchy list is filtered by q like any other item search")
         (is (= {:context (:id book) :level 1} (:hierarchy-max-level resp))
             "so the bound beside it is 1, and the step down is not offered")))))
+
+(deftest a-hierarchy-list-is-bounded-even-when-the-caller-names-no-bound-test
+  (with-fresh-db
+    "the SPA asks with no limit of its own -- it always has -- and that was safe
+     while a list was as long as the relations somebody typed. A level is as long
+     as the paths into it, and paths multiply with depth. So the bound is the
+     query's rather than the caller's, and there is no way to ask without it"
+    (let [{book :selected-item} (call! :insert-context nil {:title "Book"})
+          {one :selected-item} (call! :insert-context nil {:title "Chapter one"})
+          {two :selected-item} (call! :insert-context nil {:title "Chapter two"})
+          ;; The shared page is a part of both chapters, so it reaches level 2 by
+          ;; two routes. Two rows for one item, plus one more, is three rows at a
+          ;; level whose two parents are only two -- which is the property the
+          ;; bound has to be counted in rows for.
+          shared (ds/new-item db "The shared page" "" #{(:id one) (:id two)} nil)
+          own (ds/new-item db "A page of chapter one" "" #{(:id one)} nil)
+          _loose (mapv #(ds/new-item db (str "Merely related " %) "" #{(:id book)} nil) [1 2])
+          at (fn [n] {:hierarchy-mode? true :hierarchy-level {:context (:id book) :level n}})
+          select (fn [state] (call! :fetch-context state [{:id (:id book)} false]))]
+      (save-relations! one (part-of-entry book 1))
+      (save-relations! two (part-of-entry book 2))
+      (save-relations! own (part-of-entry one 2))
+      (relations/set-the-containers-of-item!
+        db
+        (ds/get-item db {:id (:id shared)})
+        (into {}
+              (map (fn [chapter]
+                     [(:id chapter) {:title (:title chapter) :show-badge? true :is-context? true
+                                     :is-part-of? true :part-of-sort-idx 1}]))
+              [one two])
+        false)
+      (is (= ["The shared page" "A page of chapter one" "The shared page"]
+             (mapv :title (:items (select (at 2)))))
+          "three rows for two items, because the level is as long as its paths")
+      (with-redefs [search/max-part-of-rows 2]
+        (is (= ["The shared page" "A page of chapter one"] (mapv :title (:items (select (at 2)))))
+            "the list stops at the bound without the caller having asked for one,
+             keeping the front of the level in path order rather than a sample")
+        (is (= 2 (count (:items (select (at 1)))))
+            "level 1 is the two chapters, under the bound, so it is whole")
+        (is (= 4 (count (:items (call! :fetch-context {} [{:id (:id book)} false]))))
+            "and the ordinary related-items list is over the bound and untouched
+             by it -- its length is what somebody typed, which is why it never
+             needed one")))))
 
 (deftest a-save-that-fails-for-any-other-reason-is-reported-too-test
   (with-fresh-db

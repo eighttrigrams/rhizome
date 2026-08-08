@@ -207,7 +207,7 @@
                             :hierarchy-level {:context selected-id
                                               :level (or (parse-int-opt level) 1)}
                             :with-part-of-path? true}
-                           {:limit 5000})]
+                           {:limit search/max-part-of-rows})]
                (json-response (map item->api items)))
            vector?
              (let [items (semsearch/search-related-items-vector

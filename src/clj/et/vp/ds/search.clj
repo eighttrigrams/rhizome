@@ -127,6 +127,23 @@
    the query builder behind it."
   core/max-part-of-level)
 
+(def max-part-of-rows
+  "How long a hierarchy list is allowed to be when the caller names no shorter
+   one. Every other list in the app is as long as somebody made it -- a context's
+   related items are the relations that were typed. A level is as long as there
+   are paths into it, and in a DAG paths multiply with depth: the reviewer's
+   chain of diamonds is 52 items and 131,072 rows at level 34. So this list needs
+   a length nobody chose, and here it is.
+
+   5,000, which is the number /api has always passed for this same query. One
+   number for one question is easier to hold than two, it is far above any
+   hierarchy anybody files -- a whole book's pages at level 2 are hundreds -- and
+   it is two orders of magnitude below the shapes that made this necessary.
+
+   The rows are in path order, so what a caller that hits this gets is the front
+   of the level in reading order rather than an arbitrary sample of it."
+  5000)
+
 (defn- level-asked-for
   "The level to read, out of what the caller sent.
 
@@ -172,10 +189,17 @@
    :with-part-of-path? adds `:part_of_path` to every row. The SPA does not ask
    for it -- its list is read down the page, and each card carries the badges
    that name the wholes -- but a caller reading the rows on their own has neither
-   of those, and two rows for one node are the same object twice without it."
+   of those, and two rows for one node are the same object twice without it.
+
+   A hierarchy list is always bounded, by max-part-of-rows when the caller names
+   no smaller number. That default is here rather than at the callers because it
+   is not a policy any one of them holds: an ordinary related-items list is as
+   long as the relations somebody made, and a level is as long as the paths into
+   it, which multiply. A caller may ask for less; none may ask for all, and none
+   can leave the bound out by forgetting it."
   [db q selected-item-id
    {:keys [link-item search-mode hierarchy-mode? hierarchy-level with-part-of-path?] :as opts}
-   {:keys [limit] :as ctx}]
+   ctx]
   (when link-item
     (throw (IllegalArgumentException. "'link-item' shouldn't be supplied here any longer")))
   (when-not selected-item-id
@@ -183,6 +207,8 @@
   (let [opts (modify opts)
         level (core/clamp-part-of-level (level-asked-for hierarchy-level selected-item-id))
         path? (boolean (and hierarchy-mode? with-part-of-path?))
+        limit (or (:limit ctx) (when hierarchy-mode? max-part-of-rows))
+        ctx (cond-> ctx limit (assoc :limit limit))
         items (do-query db
                         (if hierarchy-mode?
                           (core/part-of-level q
