@@ -445,3 +445,89 @@ ul.cards {
     border-radius: 4px;
     overflow: hidden;
 }
+
+/* The icon under a video that offers it as a QR code. Sized and coloured to
+   sit quietly under the embed: it is a way out to a phone, not a second
+   subject competing with the video above it. */
+.qr-open {
+    display: inline-block;
+    line-height: 0;
+    padding: 4px 2px;
+    color: #8b8878;
+    cursor: pointer;
+}
+
+.qr-open:hover {
+    color: #cbc9b5;
+}
+
+/* Black and milky: the page stays faintly readable underneath, so it is plain
+   this is something laid over the app rather than a new screen. Above the
+   modal layer (1010/1011) and the discard dialog (2000); below the read-only
+   banner, which is the one marker that is meant to outrank everything. */
+#qr-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    z-index: 2001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(2px);
+    /* It holds the focus so Escape lands here and not in the app underneath;
+       the focus ring around a full-page overlay would only be noise. */
+    outline: none;
+    cursor: zoom-out;
+}
+
+/* The video has to be dimmed by itself, because the overlay cannot do it.
+   A cross-origin iframe is composited in its own layer, and Chromium does not
+   blend a translucent layer above it into that one: measured here, the embed
+   stayed at full brightness under an overlay that dimmed every other thing on
+   the page, at any z-index and from anywhere in the tree. An opaque cover does
+   land on it, and so does a filter on the iframe itself -- and the filter is
+   the one that leaves it faintly there rather than blacking it out, which is
+   what the overlay does to everything else.
+
+   Hung off :has() so it lasts exactly as long as the overlay is in the
+   document, with nothing to remember to undo. Where :has() is missing the
+   video simply stays bright; the overlay is otherwise unaffected. */
+body:has(#qr-overlay) iframe {
+    filter: brightness(0.22) blur(2px);
+}
+
+/* White under the code, and a margin of it beyond the quiet zone the SVG
+   already draws. Both are for the scanner rather than for looks. */
+.qr-overlay-code {
+    width: min(62vmin, 440px);
+    height: min(62vmin, 440px);
+    padding: 14px;
+    box-sizing: border-box;
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+    cursor: default;
+}
+
+.qr-overlay-close {
+    position: absolute;
+    top: calc(16px + var(--top-strip-height));
+    right: 20px;
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+    line-height: 1;
+    color: #cbc9b5;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.qr-overlay-close:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.2);
+}

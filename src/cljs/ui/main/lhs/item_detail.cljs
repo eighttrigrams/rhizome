@@ -4,26 +4,39 @@
             [ajax.core :as ajax]
             [ui.actions :as actions]
             [ui.main.diff :as diff]
+            [ui.qr-overlay :as qr-overlay]
             [ui.replica :as replica]
             [reagent.core :as r]))
 
 (defn- display-youtube-video
-  [description data]
+  "The embeds for an item's video, and under each one the icon that offers it as
+   a QR code -- but only when `qr?`, which is to say only in the detail view.
+   The preview renders the same component while the pointer rests on a row, and
+   an icon there would be offering a video the reader has not asked for yet.
+
+   The QR is given the address as the item carries it. The iframe's src is the
+   embed/ rewrite of that address and is no use to a phone, so the two are read
+   off the same link separately rather than one from the other."
+  [description data qr?]
   [:<>
    (when-let [youtube-link (:youtube-video (:resource-links data))]
-     [:iframe
-      {:width "420px"
-       :height "315px"
-       :src (if-not (re-matches #"https://www.youtube.com/shorts/.*" youtube-link)
-              (str/replace (str/trim youtube-link) "watch?v=" "embed/")
-              (str "https://www.youtube.com/embed/"
-                   (first (str/split (last (str/split youtube-link #"/")) #"\?"))))
-       :allowFullScreen true}])
+     [:<>
+      [:iframe
+       {:width "420px"
+        :height "315px"
+        :src (if-not (re-matches #"https://www.youtube.com/shorts/.*" youtube-link)
+               (str/replace (str/trim youtube-link) "watch?v=" "embed/")
+               (str "https://www.youtube.com/embed/"
+                    (first (str/split (last (str/split youtube-link #"/")) #"\?"))))
+        :allowFullScreen true}]
+      (when qr? [qr-overlay/component (str/trim youtube-link)])])
    (when (and description (str/includes? description "https://www.youtube.com/watch"))
      (let [found (re-find #"https://www.youtube.com/watch.*?\s" description)
            found (if-not found (re-find #"https://www.youtube.com/watch.*?$" description) found)
-           found (str/replace (str/trim found) "watch?v=" "embed/")]
-       [:iframe {:width "420px" :height "315px" :src found :allowFullScreen true}]))])
+           watch-link (str/trim found)
+           found (str/replace watch-link "watch?v=" "embed/")]
+       [:<> [:iframe {:width "420px" :height "315px" :src found :allowFullScreen true}]
+        (when qr? [qr-overlay/component watch-link])]))])
 
 (defn- image-itself
   [image-identifier]
@@ -87,7 +100,7 @@
                                   :style {:max-width "540px" :width "auto" :height "auto"}}])))))
 
 (defn- the-item-itself-component
-  [*state {:keys [title description date data]}]
+  [*state {:keys [title description date data]} qr?]
   [:<> (when date [:b date])
    [:span {:style {:font-size "35px"}}
     [:> ReactMarkdown
@@ -104,7 +117,8 @@
                             youtube-link
                             ")"))
                      " "
-                     title)}]] [image-component title data] (display-youtube-video description data)
+                     title)}]] [image-component title data]
+   (display-youtube-video description data qr?)
    [:div.description
     [:> ReactMarkdown
      {:children description
@@ -213,6 +227,6 @@
                                  (= :description (:modal @*state))))]
     [:<> (when show-drop-area? [drop-target (:id selected-item)])
      [version-navigation-controls *state item-descriptions version-idx item-at-idx]
-     [the-item-itself-component *state selected-item]]))
+     [the-item-itself-component *state selected-item true]]))
 
-(defn preview-component [*state item] [the-item-itself-component *state item])
+(defn preview-component [*state item] [the-item-itself-component *state item false])
