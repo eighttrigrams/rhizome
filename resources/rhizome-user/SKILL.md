@@ -292,6 +292,14 @@ the only thing on them that says so — a route, not an identity. The chain also
 gives you the intermediate wholes by id, so you can name the chapters or walk
 back up without another search.
 
+It is also what says which whole a row's `part-of-sort-idx` is an index
+**under**: the second-to-last id of the path. At level 1 that is the id you
+asked about, so the indices on the page are siblings and the next free one can
+be read straight off. Below level 1 they are not — the two rows above carry `1`
+and `5` under two *different* chapters — so group by that path element before
+comparing, and read the next free index under a whole from that whole's own
+page.
+
 ## Search strategy — when using rhizome for research
 
 1. Break queries into likely categories. Prefer two short searches on separate

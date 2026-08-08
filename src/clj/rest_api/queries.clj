@@ -155,9 +155,13 @@
   part_of=true narrows to the **parts** of :id — the relations marked as
   part-of edges — in sibling order: part_of_sort_idx ascending, the ones left
   unplaced (-1) after them, most recently touched first within each group.
-  Limit 5000. Each item comes back with its \"part-of-sort-idx\" under this
-  whole, so a caller can see which sibling index is free before writing one.
-  Items merely related to :id are not listed. Ignores secondary_ids and
+  Limit 5000. Each item comes back with its \"part-of-sort-idx\": its index
+  under the whole it is **directly** a part of, which at level 1 is :id itself,
+  and below that is the second-to-last id of its \"part-of-path\". So at level 1
+  the indices on a page are siblings and reading off the next free one is
+  sound; deeper down they belong to as many different wholes as the page has
+  parents, and have to be grouped by that path element before they compare at
+  all. Items merely related to :id are not listed. Ignores secondary_ids and
   search_mode, which have no meaning inside a hierarchy. It also wins over
   vector=true when both are given — the two ask different questions and this
   one is answered.
@@ -268,7 +272,8 @@
    "Seen from one whole the part-of edges unroll into a tree, and that tree has levels, read with level=N alongside part_of=true on GET /items/:id/related. Level 1 is the parts of that whole and is the default, so an existing caller that never passes level= is asking for what it always got; level 2 is the parts of those, and level N is the nodes at depth exactly N -- the direct children are NOT among the level-2 nodes. A node's place at a level is decided by the whole path that reached it and not by its own sibling index alone: the tuple of part-of-sort-idx from that whole down to the node, compared component by component, with the reserved -1 sorting after every set index at EVERY component rather than only at the last. So everything under the first child comes before everything under the second, whatever indices are used further down."
    "level= is refused rather than guessed at: 400 when it is given without part_of=true, when it is not a positive integer, and when it is above 63. That ceiling is real and is stated so it need not be discovered -- one level costs one table in the join and SQLite plans a join over at most 64 of them. It is a limit of the query and not of the data, which is why it comes back as a refusal: an empty list at that depth would say the data is not filed that deep, and that is a different answer."
    "Because the part-of edges are a DAG and not a tree, a node can sit at a level by more than one route -- the same item filed under two different wholes that are themselves parts of the same whole. It belongs at each place it occupies: a level is as long as there are paths to it, not as there are distinct nodes in it, and collapsing the duplicates would throw away one of two positions somebody deliberately gave the same thing. In a DAG the number of paths can grow combinatorially with depth without any cycle being involved, so a reader walking the levels should expect a level to be longer than the graph is wide."
-   "Every row of a part_of=true answer carries \"part-of-path\": the ids it was reached through, from the :id in the request down to the row itself, both ends included, so its length is level + 1 and its first element is always :id. Read it before concluding anything from a repeated row. Two rows for the same node are otherwise identical -- same id, same title, same everything -- and the path is the only thing that distinguishes \"this item is filed in two chapters\" from \"the API repeated itself\". It is a route and not an identity: the same node at the end of a second path is the same item, filed twice, not two items."])
+   "Every row of a part_of=true answer carries \"part-of-path\": the ids it was reached through, from the :id in the request down to the row itself, both ends included, so its length is level + 1 and its first element is always :id. Read it before concluding anything from a repeated row. Two rows for the same node are otherwise identical -- same id, same title, same everything -- and the path is the only thing that distinguishes \"this item is filed in two chapters\" from \"the API repeated itself\". It is a route and not an identity: the same node at the end of a second path is the same item, filed twice, not two items."
+   "The path is also what says which whole a row's \"part-of-sort-idx\" is an index under: the second-to-last id in it, the whole the row is directly a part of. At level 1 that is the :id in the request and the indices on a page are siblings of each other. Below level 1 they are not -- one page of level 2 carries the indices of as many sibling groups as it has parents -- so an index only compares with another index whose path agrees up to that point, and the next free index under a whole is read from that whole's own page rather than from a deeper one."])
 
 (def ^:private skill-resource "rhizome-user/SKILL.md")
 
