@@ -118,6 +118,22 @@
    :vector-select-similarity? (:vector-select-similarity? opts)
    :vector-max-distance (:vector-max-distance opts)})
 
+(defn- level-asked-for
+  "The level to read, out of what the caller sent.
+
+   A level is a reading of one whole's part-of tree: level 2 of this context
+   names other things than level 2 of the next. So it does not travel on its own
+   -- it is carried as {:context <whole-id> :level <n>} and counts for that whole
+   only. Handed another whole it is not a level at all, and this is the first
+   one: what hierarchy mode listed before there were levels.
+
+   Scoping it to the id, rather than clearing it wherever the selection changes,
+   is what makes the rule hold on the paths where the backend picks the next
+   context itself -- select-last-context and delete-context both answer with a
+   context the request never named."
+  [hierarchy-level selected-item-id]
+  (when (= (:context hierarchy-level) selected-item-id) (:level hierarchy-level)))
+
 (defn search-related-items
   "The items to list under the selected item.
 
@@ -128,8 +144,8 @@
    means anything in a hierarchy, and the mode hides the section that drives it.
 
    :hierarchy-level rides in with :hierarchy-mode?, and for the same reason:
-   both are session state the SPA carries. Absent, it is level 1 -- what the
-   mode listed before there were levels at all."
+   both are session state the SPA carries. See level-asked-for for what it looks
+   like and why."
   [db q selected-item-id {:keys [link-item search-mode hierarchy-mode? hierarchy-level] :as opts}
    {:keys [limit] :as ctx}]
   (when link-item
@@ -141,7 +157,8 @@
                         (if hierarchy-mode?
                           (core/part-of-level q
                                               {:selected-item-id selected-item-id
-                                               :level hierarchy-level}
+                                               :level (level-asked-for hierarchy-level
+                                                                       selected-item-id)}
                                               ctx)
                           (core/search-related-items q
                                                      (->core-opts selected-item-id search-mode opts)

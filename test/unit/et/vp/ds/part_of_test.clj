@@ -284,6 +284,14 @@
   [whole opts]
   (mapv :title (search/search-related-items db "" (:id whole) opts {})))
 
+(defn- at-level
+  "Hierarchy mode, reading level `n` of `whole`. Naming the whole twice -- once
+   to read under, once inside the level -- is the contract rather than
+   repetition: a level counts for the whole it was counted under and no other.
+   See et.vp.ds.search/level-asked-for."
+  [whole n]
+  {:hierarchy-mode? true :hierarchy-level {:context (:id whole) :level n}})
+
 (deftest hierarchy-mode-lists-the-parts-in-sibling-order
   (test-with-reset-db-and-time "children come out by part_of_sort_idx, non-children not at all"
     (let [book (ds/new-context db {:title "Book"})
@@ -368,11 +376,11 @@
       (under a2 ["a2-1" "a2-2" "a2-3"])
       (is (= ["A1" "A2"] (titles-under a {:hierarchy-mode? true}))
           "level 1 is still the direct children, and a missing level reads as 1")
-      (is (= ["A1" "A2"] (titles-under a {:hierarchy-mode? true :hierarchy-level 1})))
+      (is (= ["A1" "A2"] (titles-under a (at-level a 1))))
       (is (= ["a1-1" "a1-2" "a1-3" "a2-1" "a2-2" "a2-3"]
-             (titles-under a {:hierarchy-mode? true :hierarchy-level 2}))
+             (titles-under a (at-level a 2)))
           "by the tuples (1,1) (1,2) (1,3) (2,1) (2,2) (2,3)")
-      (is (= [] (titles-under a {:hierarchy-mode? true :hierarchy-level 3}))
+      (is (= [] (titles-under a (at-level a 3)))
           "and nothing is that deep")))
   (test-with-reset-db-and-time
     "the direct children are not among the level-2 rows -- a level lists the
@@ -382,7 +390,7 @@
           grandchild (ds/new-item db "Grandchild" "" #{(:id child)} nil)]
       (make-part-of! a child 1)
       (make-part-of! child grandchild 1)
-      (is (= ["Grandchild"] (titles-under a {:hierarchy-mode? true :hierarchy-level 2}))))))
+      (is (= ["Grandchild"] (titles-under a (at-level a 2)))))))
 
 (deftest the-unset-rule-holds-at-every-component-of-the-path
   (test-with-reset-db-and-time
@@ -402,7 +410,7 @@
       (make-part-of! placed from-placed 1)
       (is (= ["Placed chapter" "Unplaced chapter"] (titles-under book {:hierarchy-mode? true})))
       (is (= ["Page of the placed one" "Page of the unplaced one"]
-             (titles-under book {:hierarchy-mode? true :hierarchy-level 2}))
+             (titles-under book (at-level book 2)))
           "the unset -1 one component up carried its whole subtree to the back")))
   (test-with-reset-db-and-time
     "and a deliberate -2 one component up carries its subtree to the front, the
@@ -417,7 +425,7 @@
       (make-part-of! front front-page 1)
       (make-part-of! one first-page 1)
       (is (= ["A page of the front matter" "A page of chapter one"]
-             (titles-under book {:hierarchy-mode? true :hierarchy-level 2}))))))
+             (titles-under book (at-level book 2)))))))
 
 (deftest a-node-reachable-by-two-paths-is-listed-once-per-path
   (test-with-reset-db-and-time
@@ -434,10 +442,31 @@
       (make-part-of-both! [one 1] [two 5] shared)
       (make-part-of! two plain 2)
       (is (= ["The shared page" "A page of chapter two" "The shared page"]
-             (titles-under book {:hierarchy-mode? true :hierarchy-level 2}))
+             (titles-under book (at-level book 2)))
           "at (1,1) and again at (2,5), with (2,2) between them")
-      (is (= 3 (count (titles-under book {:hierarchy-mode? true :hierarchy-level 2})))
+      (is (= 3 (count (titles-under book (at-level book 2))))
           "three rows for two distinct items"))))
+
+(deftest a-level-counts-for-the-whole-it-was-counted-under
+  (test-with-reset-db-and-time
+    "level 2 of one context names other things than level 2 of the next, so a
+     level arriving with another context's id is not this context's level at all
+     and the reading starts again at the first one. That is what puts the level
+     back to 1 when another context is selected -- including on the paths where
+     the backend picks the next context itself"
+    (let [book (ds/new-context db {:title "Book"})
+          chapter (ds/new-context db {:title "Chapter"})
+          page (ds/new-item db "Page" "" #{(:id chapter)} nil)
+          other (ds/new-context db {:title "Another book"})
+          loose (ds/new-item db "A page of the other book" "" #{(:id other)} nil)]
+      (make-part-of! book chapter 1)
+      (make-part-of! chapter page 1)
+      (make-part-of! other loose 1)
+      (is (= ["Page"] (titles-under book (at-level book 2))) "the level counts for its own whole")
+      (is (= ["A page of the other book"] (titles-under other (at-level book 2)))
+          "and for no other -- read under another whole it is level 1 again")
+      (is (= ["Chapter"] (titles-under book {:hierarchy-mode? true :hierarchy-level nil}))
+          "as is no level at all"))))
 
 (deftest the-depth-below-a-whole-is-how-far-the-stepper-may-go
   (test-with-reset-db-and-time

@@ -96,11 +96,17 @@
    reshapes what the levels index, and the stepper would go on offering a step
    into an empty list until something else happened to refresh it. Only in
    hierarchy mode -- nothing else asks the question, and answering it walks the
-   subgraph."
+   subgraph.
+
+   Scoped to the context it was counted for, the way the level the SPA sends is
+   (see et.vp.ds.search/level-asked-for). Same reason: a response that changes
+   the selected context without rebuilding the list would otherwise leave the
+   strip bounding one context's stepper by another context's depth."
   ([db state] (hierarchy-bound db state (:selected-item state)))
   ([db state selected-item]
    (when (and (:hierarchy-mode? state) (:id selected-item))
-     {:hierarchy-max-level (search/part-of-depth db (:id selected-item))})))
+     {:hierarchy-max-level {:context (:id selected-item)
+                            :level (search/part-of-depth db (:id selected-item))}})))
 
 (defn- items-under
   "The item list under `selected-item`, and with it whatever hierarchy mode needs

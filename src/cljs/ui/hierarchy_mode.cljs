@@ -37,20 +37,35 @@
             (dissoc :vector-mode :vector-threshold
                     :vector-max-similarity :vector-min-similarity))))))
 
-(defn- level "The level being read, which absent means the first one." [state]
-  (or (:hierarchy-level state) 1))
+(defn- level
+  "The level being read. It is kept as {:context <id> :level <n>} and counts for
+   that context only -- level 2 of one context names other things than level 2 of
+   the next -- so as soon as another one is selected this reads 1 again, with
+   nothing having had to clear it. The backend applies the same rule to the same
+   value when it builds the list (see et.vp.ds.search/level-asked-for), which is
+   what keeps the number in the strip and the list beside it saying the same
+   thing."
+  [{:keys [hierarchy-level selected-item]}]
+  (if (= (:context hierarchy-level) (:id selected-item)) (:level hierarchy-level) 1))
 
 (defn- deepest
   "The deepest level this context has anything at, as the backend counted it
-   alongside the list (see repository/hierarchy-bound). 0 -- nothing is a part of
-   this context at all -- reads the same as 1 here: level 1 is what the mode
-   shows either way, it is just empty."
-  [state]
-  (or (:hierarchy-max-level state) 0))
+   alongside the list (see repository/hierarchy-bound). Scoped to its context the
+   same way the level is, so a bound counted for another one is no bound at all
+   and the stepper offers nothing until the answer for this context arrives --
+   erring, for the moment it takes, towards not offering a step rather than
+   towards offering one that leads nowhere.
+
+   0 -- nothing is a part of this context at all -- reads the same as 1 here:
+   level 1 is what the mode shows either way, it is just empty."
+  [{:keys [hierarchy-max-level selected-item]}]
+  (if (= (:context hierarchy-max-level) (:id selected-item)) (:level hierarchy-max-level) 0))
 
 (defn- step!
   [*state to]
-  (fetch-and-reset! *state (assoc @*state :hierarchy-level to)))
+  (fetch-and-reset! *state
+                    (assoc @*state
+                      :hierarchy-level {:context (:id (:selected-item @*state)) :level to})))
 
 (defn- arrow
   "One end of the stepper. A step that does not exist is not offered -- no
@@ -76,14 +91,17 @@
     (let [n (level @*state)
           bottom (deepest @*state)]
       [:div#hierarchy-strip [:span#hierarchy-strip-mode "Hierarchy mode"]
-       [:span#hierarchy-strip-level
-        (arrow *state "hierarchy-level-down" "‹" (dec n) (> n 1)
-               (if (> n 1)
-                 (str "Level " (dec n))
-                 "Level 1 is the parts of this context; there is nothing above it"))
-        [:span#hierarchy-level-value n]
-        (arrow *state "hierarchy-level-up" "›" (inc n) (< n bottom)
-               (cond (< n bottom) (str "Level " (inc n))
-                     (zero? bottom) "Nothing is a part of this context"
-                     :else (str "Nothing under this context is filed deeper than level "
-                                bottom)))]])))
+       ;; Nothing is selected, so the list is not a hierarchy and there is no
+       ;; level to be at. The mode is still on, and the strip still says so.
+       (when (:selected-item @*state)
+         [:span#hierarchy-strip-level
+          (arrow *state "hierarchy-level-down" "‹" (dec n) (> n 1)
+                 (if (> n 1)
+                   (str "Level " (dec n))
+                   "Level 1 is the parts of this context; there is nothing above it"))
+          [:span#hierarchy-level-value n]
+          (arrow *state "hierarchy-level-up" "›" (inc n) (< n bottom)
+                 (cond (< n bottom) (str "Level " (inc n))
+                       (zero? bottom) "Nothing is a part of this context"
+                       :else (str "Nothing under this context is filed deeper than level "
+                                  bottom)))])])))

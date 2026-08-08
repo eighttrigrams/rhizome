@@ -82,7 +82,8 @@
           {two :selected-item} (call! :insert-context nil {:title "Chapter two"})
           page-of-one (ds/new-item db "A page of chapter one" "" #{(:id one)} nil)
           page-of-two (ds/new-item db "A page of chapter two" "" #{(:id two)} nil)
-          select (fn [state] (call! :fetch-context state [{:id (:id book)} false]))]
+          select (fn [state] (call! :fetch-context state [{:id (:id book)} false]))
+          at (fn [n] {:hierarchy-mode? true :hierarchy-level {:context (:id book) :level n}})]
       (save-relations! one (part-of-entry book 1))
       (save-relations! two (part-of-entry book 2))
       (save-relations! page-of-one (part-of-entry one 1))
@@ -90,13 +91,19 @@
       (let [resp (select {:hierarchy-mode? true})]
         (is (= ["Chapter one" "Chapter two"] (mapv :title (:items resp)))
             "no level asked for is level 1, what the mode listed before there were levels")
-        (is (= 2 (:hierarchy-max-level resp)) "and the strip is told where to stop"))
+        (is (= {:context (:id book) :level 2} (:hierarchy-max-level resp))
+            "and the strip is told where to stop, and for which context"))
       (is (= ["A page of chapter one" "A page of chapter two"]
-             (mapv :title (:items (select {:hierarchy-mode? true :hierarchy-level 2}))))
+             (mapv :title (:items (select (at 2)))))
           "level 2 is the parts of the parts, in path order")
-      (is (= [] (mapv :title (:items (select {:hierarchy-mode? true :hierarchy-level 3}))))
+      (is (= [] (mapv :title (:items (select (at 3)))))
           "and past the deepest path there is nothing -- which is what the stepper
            is bounded so as not to ask")
+      (is (= ["Chapter one" "Chapter two"]
+             (mapv :title (:items (select {:hierarchy-mode? true
+                                           :hierarchy-level {:context (:id one) :level 2}}))))
+          "a level counted under another context is not this one's level, so the
+           reading starts again at the first")
       (let [resp (select {})]
         (is (= #{"Chapter one" "Chapter two"} (set (mapv :title (:items resp))))
             "without the mode the ordinary related-items list is unchanged")
