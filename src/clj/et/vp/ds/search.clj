@@ -118,6 +118,15 @@
    :vector-select-similarity? (:vector-select-similarity? opts)
    :vector-max-distance (:vector-max-distance opts)})
 
+(def max-part-of-level
+  "The deepest level one part-of-level query can express -- see
+   et.vp.ds.search.core/max-part-of-level for why there is a ceiling at all.
+
+   Re-exported here because /api refuses a level past it and has to name the same
+   number, and the REST layer talks to this namespace rather than reaching into
+   the query builder behind it."
+  core/max-part-of-level)
+
 (defn- level-asked-for
   "The level to read, out of what the caller sent.
 

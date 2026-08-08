@@ -7,6 +7,8 @@
             [ring.middleware.params :refer [wrap-params]]
             [config :as config]
             [rest-api :as rest-api]
+            [rest-api.queries :as queries]
+            [et.vp.ds.search :as search]
             [semsearch.embedder :as embedder]
             [semsearch.backfill :as backfill]
             [et.vp.ds :as ds]
@@ -317,6 +319,102 @@
       (is (= ["Merely related" "One" "Two"]
              (sort (mapv :title (body-json (GET* (str "/api/items/" (:id whole) "/related"))))))
           "while the ordinary related list is unchanged")))
+  (test-with-fresh-db "level= reads the levels below the first"
+    (let [ctx! (fn [title] (ds/new-context db {:title title}))
+          root (ctx! "Part-of demo")
+          front (ds/new-item db "Front matter" "" #{(:id root)} nil)
+          foundations (ctx! "I. Foundations")
+          layer (ctx! "II. The part-of layer")
+          hierarchy (ctx! "III. Hierarchy mode")
+          appendix (ds/new-item db "Appendix, unfiled" "" #{(:id root)} nil)
+          loose (ds/new-item db "Merely related, not a part" "" #{(:id root)} nil)
+          table (ds/new-item db "The relations table" ""
+                             #{(:id foundations) (:id layer)} nil)
+          mirror (ds/new-item db "The contexts mirror" "" #{(:id foundations)} nil)
+          check (ds/new-item db "The acyclicity check" "" #{(:id layer)} nil)
+          sibling (ds/new-item db "The sibling index" "" #{(:id layer)} nil)
+          strip (ds/new-item db "The strip" "" #{(:id hierarchy)} nil)
+          becomes (ds/new-item db "What the item list becomes" "" #{(:id hierarchy)} nil)
+          ;; One save per part naming every whole it belongs to: the save
+          ;; rebuilds an item's relations out of the map it is handed, so a
+          ;; second call naming only the other whole would drop the first edge.
+          file! (fn [part wholes]
+                  (relations/set-the-containers-of-item!
+                    db
+                    (ds/get-item db {:id (:id part)})
+                    (into {}
+                          (map (fn [[whole idx]]
+                                 [(:id whole) {:title (:title whole)
+                                               :show-badge? true
+                                               :is-context? true
+                                               :is-part-of? true
+                                               :part-of-sort-idx idx}]))
+                          wholes)
+                    false))
+          at (fn [level]
+               (body-json (GET* (str "/api/items/" (:id root) "/related?part_of=true"
+                                     (when level (str "&level=" level))))))]
+      (file! front {root -2})
+      (file! foundations {root 1})
+      (file! layer {root 2})
+      (file! hierarchy {root 3})
+      (file! appendix {root -1})
+      (file! mirror {foundations 2})
+      (file! check {layer 1})
+      (file! sibling {layer 2})
+      (file! strip {hierarchy 1})
+      (file! becomes {hierarchy 2})
+      ;; The node with two routes into level 2, at a different index under each.
+      (file! table {foundations 1 layer 5})
+      (is (= ["Front matter" "I. Foundations" "II. The part-of layer" "III. Hierarchy mode"
+              "Appendix, unfiled"]
+             (mapv :title (at nil)))
+          "no level is the first one, so every existing caller is unaffected")
+      (is (= (at nil) (at 1)) "and level=1 is the same answer spelled out")
+      (is (= [[(:id root) (:id front)] [(:id root) (:id foundations)] [(:id root) (:id layer)]
+              [(:id root) (:id hierarchy)] [(:id root) (:id appendix)]]
+             (mapv :part-of-path (at nil)))
+          "each row saying the route it was reached by, :id first and itself last")
+      (is (= ["The relations table" "The contexts mirror" "The acyclicity check"
+              "The sibling index" "The relations table" "The strip"
+              "What the item list becomes"]
+             (mapv :title (at 2)))
+          "level 2 in path order -- the same seven rows, in the same order, the strip shows")
+      (is (= 7 (count (at 2))) "seven rows for six distinct items: once per path, not deduplicated")
+      (is (= [[(:id root) (:id foundations) (:id table)]
+              [(:id root) (:id layer) (:id table)]]
+             (mapv :part-of-path
+                   (filter #(= (:id table) (:id %)) (at 2))))
+          "and the twice-listed node is told apart by its path, which is the only
+           thing on the two rows that differs")
+      (is (= [1 5] (mapv :part-of-sort-idx (filter #(= (:id table) (:id %)) (at 2))))
+          "its index under each of the two wholes coming with it")
+      (is (empty? (at 3)) "nothing is filed that deep")
+      (is (not-any? #(= "Merely related, not a part" (:title %)) (at 2))
+          "an item merely related to the root is at no level of it")))
+  (test-with-fresh-db "level= is refused rather than guessed at"
+    (let [root (ds/new-context db {:title "Book"})
+          resp (fn [qs] (GET* (str "/api/items/" (:id root) "/related?" qs)))
+          error (fn [qs] (:error (body-json (resp qs))))]
+      (is (= 400 (:status (resp "level=2"))))
+      (is (= "level is only meaningful together with part_of=true" (error "level=2"))
+          "a level without part_of asks for a level of a list that has none")
+      (is (= 400 (:status (resp "part_of=true&level=0"))))
+      (is (= "level must be a positive integer" (error "part_of=true&level=0")))
+      (is (= "level must be a positive integer" (error "part_of=true&level=deep")))
+      (is (= 400 (:status (resp (str "part_of=true&level=" (inc search/max-part-of-level)))))
+          "past the ceiling is a refusal, not an empty list -- an empty list here
+           says nothing is filed that deep, which is a different fact")
+      (is (str/includes? (error (str "part_of=true&level=" (inc search/max-part-of-level)))
+                         (str search/max-part-of-level))
+          "and it names the ceiling")
+      (is (= 200 (:status (resp (str "part_of=true&level=" search/max-part-of-level))))
+          "the ceiling itself is answerable")
+      (is (= 200 (:status (resp "part_of=true&level="))) "an empty level= is no level")))
+  (test-with-fresh-db "the documented ceiling is the enforced one"
+    (is (str/includes? (:doc (meta #'queries/get-related-items)) (str search/max-part-of-level))
+        "an agent should not have to discover the ceiling by hitting it, so the
+         docstring quotes the number -- and has to go on quoting the right one"))
   (test-with-fresh-db "an item names the wholes it is a part of"
     (let [whole (ds/new-context db {:title "Book"})
           part (ds/new-item db "One" "" #{(:id whole)} nil)

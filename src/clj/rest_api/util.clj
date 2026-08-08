@@ -33,7 +33,7 @@
 
 (defn item->api
   [{:keys [id title short_title human_readable_id description is_context data inserted_at updated_at
-           date annotation hide_in_global_search part_of_sort_idx]
+           date annotation hide_in_global_search part_of_sort_idx part_of_path]
     :as item}]
   (cond-> {:id id
            :title title
@@ -50,6 +50,12 @@
     ;; index under the one whole that was asked about, which is not a property
     ;; of the item and cannot be answered anywhere else.
     (contains? item :part_of_sort_idx) (assoc :part-of-sort-idx part_of_sort_idx)
+    ;; The route this row was reached by, from the whole that was asked about
+    ;; down to the row itself. Only the parts query carries it, and it is what
+    ;; tells two rows for one node apart: at a level below the first, the same
+    ;; item filed under two wholes comes back twice, and nothing else on the two
+    ;; rows differs.
+    (contains? item :part_of_path) (assoc :part-of-path part_of_path)
     (seq (part-of-wholes data)) (assoc :part-of (part-of-wholes data))
     (-> data
         :contexts)

@@ -128,9 +128,26 @@
          (log/error e "REST API: search-items failed")
          (json-response 500 {:error (.getMessage e)}))))
 
+(defn- level-refusal
+  "What is wrong with the `level` parameter, in words, or nil when nothing is.
+
+  A level past the ceiling is refused rather than clamped or answered empty. An
+  empty list already means something here -- nothing is filed that deep -- and
+  answering a level of 500 with one would say that about a question the database
+  was never asked. The ceiling is a property of the query, not of the data, and
+  the two must not come back looking alike."
+  [level part-of?]
+  (let [n (parse-int-opt level)]
+    (cond (not part-of?) "level is only meaningful together with part_of=true"
+          (or (nil? n) (< n 1)) "level must be a positive integer"
+          (> n search/max-part-of-level)
+            (str "level must be at most " search/max-part-of-level
+                 ": one level costs one table in the join, and SQLite plans a join"
+                 " over at most 64 of them"))))
+
 (defn get-related-items
-  "GET /api/items/:id/related?q=&secondary_ids=&search_mode=&vector=&part_of= —
-  list items related to the context :id. Optional free-text q; CSV secondary_ids
+  "GET /api/items/:id/related?q=&secondary_ids=&search_mode=&vector=&part_of=&level=
+  — list items related to the context :id. Optional free-text q; CSV secondary_ids
   enables intersection search (raises limit from 10 to 100). search_mode:
   0 = most recently touched first (default), 2 = ordered by sort_idx (limit
   5000), 5 = most recently added first.
@@ -141,25 +158,52 @@
   Limit 5000. Each item comes back with its \"part-of-sort-idx\" under this
   whole, so a caller can see which sibling index is free before writing one.
   Items merely related to :id are not listed. Ignores secondary_ids and
-  search_mode, which have no meaning inside a hierarchy.
+  search_mode, which have no meaning inside a hierarchy. It also wins over
+  vector=true when both are given — the two ask different questions and this
+  one is answered.
 
-  That is the **first level** of the tree below :id. The levels below it are
-  reached by asking the same question of each part in turn; the conventions
-  say how the levels are numbered and how a level orders itself.
+  level=N goes deeper into that tree. **Default 1**, the parts of :id. Level 2 is
+  the parts of those, level N the nodes at depth exactly N — so the direct parts
+  are NOT among the level-2 rows. Ordering is by the whole path down to a node
+  and the unset -1 sorts last at every step of it; the conventions say it in
+  full. 400 when level is given without part_of=true, when it is not a positive
+  integer, and when it is **above 63** — one level costs one table in the join
+  and SQLite plans a join over at most 64, so that is a real ceiling and it is
+  said here rather than left to be met.
+
+  Every part_of row carries **\"part-of-path\"**: the ids it was reached
+  through, from :id down to the row itself, both ends included — so its length
+  is level + 1 and its first element is always :id. This is what tells two rows
+  for one node apart. The part-of edges are a DAG, so an item filed under two
+  chapters of the same book appears twice at level 2, once per route, and the
+  two rows are otherwise the same object; the path is the only thing on them
+  that differs. Read it as the route, not as an identity: the same node under a
+  second path is the same item, filed twice.
 
   vector=true switches to semantic search: q is embedded via Ollama
   (qwen3-embedding) and items are ranked by cosine similarity. Requires a
   non-empty q. Only items with a non-empty description are embedded — both
   on ingestion (POST /api/items, PUT /api/items/:id) and by the REPL
   backfill — so title-only items never appear in vector results."
-  [db id-str {:keys [q secondary-ids search-mode vector? part-of?]}]
+  [db id-str {:keys [q secondary-ids search-mode vector? part-of? level]}]
   (try (let [selected-id (Integer/parseInt id-str)
-             secondary (parse-ids-csv secondary-ids)]
+             secondary (parse-ids-csv secondary-ids)
+             ;; An empty level= is no level, the way an empty search_mode= is no
+             ;; search mode: a caller's unset template variable, not a claim.
+             level (when-not (str/blank? level) level)]
          (cond
+           (and level (level-refusal level part-of?))
+             (json-response 400 {:error (level-refusal level part-of?)})
            part-of?
-             (let [items (search/search-related-items db (or q "") selected-id
-                                                      {:hierarchy-mode? true}
-                                                      {:limit 5000})]
+             (let [items (search/search-related-items
+                           db (or q "") selected-id
+                           {:hierarchy-mode? true
+                            ;; A level counts for the whole it was counted under,
+                            ;; which over REST is always the one in the path.
+                            :hierarchy-level {:context selected-id
+                                              :level (or (parse-int-opt level) 1)}
+                            :with-part-of-path? true}
+                           {:limit 5000})]
                (json-response (map item->api items)))
            vector?
              (let [items (semsearch/search-related-items-vector
