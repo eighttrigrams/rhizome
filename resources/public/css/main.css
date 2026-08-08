@@ -650,6 +650,19 @@ ul.cards {
     padding: 0 2px;
 }
 
+/* One code at a time. The player is above the overlay on purpose, so unlike
+   the icon under a poster this one stays reachable while a code is up -- and
+   clicking it then put a second #qr-overlay in the document: two elements
+   sharing an id, one hiding the other, and the app's own selector matching
+   both. Measured, not theorised. While a code is showing the player stops
+   offering to open another, and no state is needed to know that: the overlay
+   is in the document or it is not. Where :has() is missing the icon simply
+   stays live, which is where this started. */
+body:has(#qr-overlay) .floating-player-qr {
+    pointer-events: none;
+    opacity: 0.4;
+}
+
 .floating-player-close {
     padding: 0 2px;
     font-size: 13px;
