@@ -244,7 +244,12 @@
 
    The sibling index projected is the last step's -- the node's place under the
    whole it is directly a part of -- because that is the number the human typed
-   into the edit modal for it.
+   into the edit modal for it. So is the annotation, and so the whole itself is
+   projected beside them: those two belong to one edge, and below level 1 that
+   edge is not the one between the row and the context that was selected. A row
+   that carries an edge's fields and not the edge's other end is a row anything
+   acting on it has to guess about, and the guess that was there to be made was
+   the wrong one.
 
    With `:with-path?` each row also carries the ids it was reached through, one
    column per step. Two rows for the same node are otherwise identical, and in a
@@ -268,7 +273,8 @@
     (sql/format
       (merge {:select (vec (concat select
                                    [[(step level :annotation) :annotation]
-                                    [(step level :part_of_sort_idx) :part_of_sort_idx]]
+                                    [(step level :part_of_sort_idx) :part_of_sort_idx]
+                                    [(step level :owner_id) :part_of_whole_id]]
                                    (when with-path?
                                      (map (fn [n] [(step n :target_id) (path-column n)])
                                           (range 1 (inc level))))))

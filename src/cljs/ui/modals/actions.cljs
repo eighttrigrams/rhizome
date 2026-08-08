@@ -5,7 +5,8 @@
 (defn cancel-modal!
   [*state]
   (reset! *state (-> @*state
-                     (dissoc :modal :annotation-edit-item :show-confirm-discard :part-of-refused :save-failed)
+                     (dissoc :modal :annotation-edit-item :annotation-edit-context
+                             :show-confirm-discard :part-of-refused :save-failed)
                      (assoc :loading true)))
   (js/setTimeout (fn [_] (swap! *state dissoc :loading)) 500))
 
@@ -51,6 +52,7 @@
 (defn save-annotations-and-close!
   [*state annotations-data]
   (fetch-and-reset-with-method! *state
-                                (dissoc @*state :modal :annotation-edit-item)
+                                (dissoc @*state :modal :annotation-edit-item
+                                        :annotation-edit-context)
                                 api/update-annotations
                                 annotations-data))

@@ -138,6 +138,77 @@
         (is (= {:context (:id book) :level 1} (:hierarchy-max-level resp))
             "so the bound beside it is 1, and the step down is not offered")))))
 
+(deftest a-row-says-which-whole-it-is-filed-under-test
+  (with-fresh-db
+    "the annotation and the sibling index a row carries belong to the edge that
+     put it at this level, and below level 1 that is not the edge between the row
+     and the selected context. So the row carries the other end of it too --
+     without which anything acting on what the card shows has to guess, and the
+     guess that was there to be made was the selected context"
+    (let [{book :selected-item} (call! :insert-context nil {:title "Book"})
+          {chapter :selected-item} (call! :insert-context nil {:title "Chapter"})
+          page (ds/new-item db "Page" "" #{(:id chapter)} nil)
+          at (fn [n] {:hierarchy-mode? true :hierarchy-level {:context (:id book) :level n}})
+          select (fn [state] (call! :fetch-context state [{:id (:id book)} false]))]
+      (save-relations! chapter (part-of-entry book 1))
+      (save-relations! page (part-of-entry chapter 1))
+      (is (= [(:id book)] (mapv :part_of_whole_id (:items (select (at 1)))))
+          "at level 1 that is the selected context, which is what it always was")
+      (is (= [(:id chapter)] (mapv :part_of_whole_id (:items (select (at 2)))))
+          "at level 2 it is the chapter -- the row is shown under the book and
+           filed under the chapter, and the second is the one it says")
+      (is (every? #(nil? (:part_of_whole_id %)) (:items (call! :fetch-context {}
+                                                               [{:id (:id book)} false])))
+          "the ordinary related-items list has no such edge to name"))))
+
+(deftest unlink-aims-at-the-whole-it-is-given-test
+  (with-fresh-db
+    "the row's own whole, not the selected context. Below level 1 those are two
+     different edges, and the one the user is pointing at is the row's"
+    (let [{book :selected-item} (call! :insert-context nil {:title "Book"})
+          {chapter :selected-item} (call! :insert-context nil {:title "Chapter"})
+          ;; Also plainly related to the book, which is the shape in which
+          ;; unlinking from the selected context did something destructive: it
+          ;; deleted an edge that was nowhere on the screen.
+          page (ds/new-item db "Page" "" #{(:id chapter) (:id book)} nil)
+          wholes-of (fn [item]
+                      (into #{}
+                            (map :relations/owner_id)
+                            (jdbc/execute! db
+                                           ["SELECT owner_id FROM relations WHERE target_id = ?"
+                                            (:id item)])))]
+      (save-relations! chapter (part-of-entry book 1))
+      (relations/set-the-containers-of-item!
+        db
+        (ds/get-item db {:id (:id page)})
+        {(:id chapter) {:title "Chapter" :show-badge? true :is-context? true
+                        :is-part-of? true :part-of-sort-idx 1}
+         (:id book) {:title "Book" :show-badge? true :is-context? true}}
+        false)
+      (is (= #{(:id chapter) (:id book)} (wholes-of page)))
+      (call! :unlink-item
+             {:selected-item book :hierarchy-mode? true
+              :hierarchy-level {:context (:id book) :level 2}}
+             (ds/get-item db {:id (:id page)})
+             {:id (:id chapter) :title "Chapter"})
+      (is (= #{(:id book)} (wholes-of page))
+          "the edge the row was shown by is the one that went, and the plain
+           relation to the selected context -- which is not what was pointed at,
+           and is what used to be deleted instead -- is still there")))
+  (with-fresh-db
+    "with no whole named it is the selected context, which is what every caller
+     before this meant and what every list but hierarchy mode's still means"
+    (let [{book :selected-item} (call! :insert-context nil {:title "Book"})
+          {shelf :selected-item} (call! :insert-context nil {:title "Shelf"})
+          item (ds/new-item db "Item" "" #{(:id book) (:id shelf)} nil)]
+      (call! :unlink-item {:selected-item book} (ds/get-item db {:id (:id item)}))
+      (is (= #{(:id shelf)}
+             (into #{}
+                   (map :relations/owner_id)
+                   (jdbc/execute! db
+                                  ["SELECT owner_id FROM relations WHERE target_id = ?"
+                                   (:id item)])))))))
+
 (deftest a-hierarchy-list-is-bounded-even-when-the-caller-names-no-bound-test
   (with-fresh-db
     "the SPA asks with no limit of its own -- it always has -- and that was safe

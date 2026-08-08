@@ -69,10 +69,35 @@
   (when (js/window.confirm "Delete this item?")
     (fetch-and-reset-with-method-2! *state api/delete-item idx)))
 
+(defn filed-under
+  "The whole a row is shown under in the list it came from.
+
+   For every list but hierarchy mode's that is the selected context, and it was
+   true of hierarchy mode too while every row was a direct part of it. Below
+   level 1 it stops being true: a row is shown under the selected context and is
+   filed under something further down. The relation fields the row carries -- its
+   annotation, its sibling index -- belong to that further-down edge, so anything
+   acting on what the card displays has to aim there and not at the selection.
+
+   The id comes off the row (`part-of-level` projects it); the title off the
+   row's own contexts map, which is where the badges under it come from, so the
+   name this returns is a name already on screen."
+  [state item]
+  (let [whole-id (:part_of_whole_id item)]
+    (cond (nil? whole-id) (:selected-item state)
+          (= whole-id (:id (:selected-item state))) (:selected-item state)
+          :else {:id whole-id
+                 :title (or (get-in item [:data :contexts whole-id :title]) (str whole-id))})))
+
 (defn unlink-item!
-  [*state idx]
-  (when (js/window.confirm "Unlink this item?")
-    (fetch-and-reset-with-method-2! *state api/unlink-item idx)))
+  [*state item]
+  (let [whole (filed-under @*state item)]
+    ;; Naming it. The gesture unfiles the row from where it is shown, and below
+    ;; level 1 where it is shown is not where the eye starts -- "Unlink this
+    ;; item?" on its own left nothing in the confirmation that could say which
+    ;; of two edges was about to go.
+    (when (js/window.confirm (str "Unlink \"" (:title item) "\" from \"" (:title whole) "\"?"))
+      (fetch-and-reset-with-method-2! *state api/unlink-item item whole))))
 
 (defn delete-context!
   [*state]
@@ -303,10 +328,13 @@
 
 (defn open-annotation-edit-modal!
   [*state item]
-  (js/console.log "Setting modal to :annotation-edit")
-  (js/console.log "State before:" (clj->js @*state))
-  (swap! *state assoc :modal :annotation-edit :annotation-edit-item item)
-  (js/console.log "State after:" (clj->js @*state)))
+  ;; The whole is settled here, from the row that was clicked, rather than read
+  ;; off the selection when the modal renders or when it saves: those are two
+  ;; more places to make the same wrong guess, and the row is only in hand here.
+  (swap! *state assoc
+    :modal :annotation-edit
+    :annotation-edit-item item
+    :annotation-edit-context (filed-under @*state item)))
 
 (defn edit-item-in-obsidian!
   [*state]

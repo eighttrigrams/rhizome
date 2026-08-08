@@ -15,13 +15,21 @@
     ;; Preserve modal state when resetting, but only if new-state doesn't explicitly close it
     (let [current-modal (:modal @*state)
           new-state-has-modal? (contains? new-state :modal)
-          current-annotation-edit-item (:annotation-edit-item @*state)]
+          current-annotation-edit-item (:annotation-edit-item @*state)
+          ;; Kept with the item and not recomputed: it is the whole the open
+          ;; modal is editing the annotation of, settled from the row that was
+          ;; clicked. Losing it here would put the modal back on the selected
+          ;; context, which below level 1 is a different edge.
+          current-annotation-edit-context (:annotation-edit-context @*state)]
       (reset! *state (-> new-state
                          (dissoc :enter-pressed?)
                          (cond-> (and current-modal (not new-state-has-modal?))
                                    (assoc :modal current-modal)
                                  current-annotation-edit-item
-                                   (assoc :annotation-edit-item current-annotation-edit-item)))))))
+                                   (assoc :annotation-edit-item current-annotation-edit-item)
+                                 current-annotation-edit-context
+                                   (assoc :annotation-edit-context
+                                          current-annotation-edit-context)))))))
 
 (defn- update-state
   [response state]

@@ -86,10 +86,13 @@
                    #(do {:id (:id item) :description (get-current-description)})
                    #(handle-description-escape *state)
                    #(reset! *original-description (get-current-description)))
+    ;; The context is the one settled when the modal was opened, off the row that
+    ;; was clicked -- not the selected item, which below level 1 is not the whole
+    ;; the row's annotation belongs to. See ui.actions/filed-under.
     :annotation-edit (key-handler/handle-modal-keys *state
                                                     #(annotation-edit/get-values
                                                        (:annotation-edit-item @*state)
-                                                       (:selected-item @*state)))
+                                                       (:annotation-edit-context @*state)))
     :external-edit (key-handler/handle-external-edit-keys *state
                                                           #(do {:id (:id item)})
                                                           #(handle-external-edit-escape *state))
@@ -117,7 +120,7 @@
                         [item-edit/component item (save-notice @*state)]]
          :annotation-edit [:div#modal-component
                            [annotation-edit/component (:annotation-edit-item @*state)
-                            (:selected-item @*state)]]
+                            (:annotation-edit-context @*state)]]
          :external-edit
            [:<>
             [:div#modal-component {:tabIndex 0 :autoFocus true} [:h3 "Editing in Obsidian"]

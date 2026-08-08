@@ -491,13 +491,22 @@
                   :item-view? false})))))
 
 (defn unlink-item
+  "Unlink a row from the whole it is shown under.
+
+   `whole` is that whole, sent by the client because only the client knows which
+   list the row was clicked in: in hierarchy mode below level 1 a row is shown
+   under the selected context and filed under something further down, and the
+   relation the user is pointing at is the second one. Absent -- every caller
+   before this and every list but that one -- it is the selected context, which
+   is what it always was."
   [{:keys [db]}]
-  (fn [{:keys [selected-item] :as state} item]
-    (log/info (str "unlink item " (:title item) " from " (:title selected-item)))
-    (if-not selected-item
-      (throw (Exception. "unlink-item shouldn't have been called without 'selected-item'"))
-      (do (datastore.relations/unlink-item-from-another-item! db item selected-item)
-          (merge {:items (search db state) :item-view? false} (hierarchy-bound db state))))))
+  (fn [{:keys [selected-item] :as state} item & [whole]]
+    (let [whole (or whole selected-item)]
+      (log/info (str "unlink item " (:title item) " from " (:title whole)))
+      (if-not whole
+        (throw (Exception. "unlink-item shouldn't have been called without 'selected-item'"))
+        (do (datastore.relations/unlink-item-from-another-item! db item whole)
+            (merge {:items (search db state) :item-view? false} (hierarchy-bound db state)))))))
 
 (defn select-last-context
   [{:keys [db]}]
