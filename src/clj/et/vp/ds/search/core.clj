@@ -163,33 +163,107 @@
   [q opts ctx]
   (sql/format (related-items-query-map q opts ctx)))
 
-(defn part-of-children
-  "The parts of one whole, in sibling order — what hierarchy mode lists.
+(def ^:private max-part-of-level
+  "SQLite plans a join with a 64-bit bitmask over its tables, so 64 is all it
+   will take in one query -- and a level costs one `relations` alias, with the
+   `items` join on top. Nothing in a rhizome is filed 63 deep; the clamp is here
+   so a level arriving from somewhere other than the strip's stepper answers with
+   the deepest expressible level (empty, at that depth) instead of a database
+   error."
+  63)
 
-   Only the part-of edges out of the selected item: an item merely related to it
-   is not one of its parts, and leaving those out is the point of the mode. The
-   parts that carry an index come first, by `part_of_sort_idx` ascending; the
-   ones left unset -- the -1 the column defaults to -- come after them, and not
-   ahead of 0 as a plain ascending sort would have it: a part nobody placed does
-   not belong in front of every part somebody did. It is still listed, though --
-   it is a part, it just has no place yet. Siblings sharing an index, the unset
-   ones among themselves included, fall back on the app's usual
+(defn- step
+  "A column of the `relations` alias carrying the n-th step of a path."
+  [n col]
+  (keyword (str "r" n "." (name col))))
+
+(defn part-of-level
+  "The nodes exactly `level` steps below one whole along the part-of edges — what
+   hierarchy mode lists. Level 1 is the parts of the selected item, level 2 the
+   parts of those, and so on; a level lists nodes at that depth and no other, so
+   the direct children are not among the level-2 rows.
+
+   One `relations` alias per step, joined head to tail, which is why the level
+   has to be known before the SQL is formatted rather than being a parameter of
+   it. The part-of edges are a DAG, so a node can sit at this depth by more than
+   one route; the joins multiply and it comes out once per route, at each place
+   it occupies. That is deliberate -- deduplicating would drop one of two
+   positions the human deliberately gave the same thing -- and it means the row
+   count follows the number of paths rather than the number of nodes, which in a
+   DAG can grow with depth without a cycle being involved. Hence the limit, which
+   the caller supplies exactly as it does for the ordinary list.
+
+   Only part-of edges are walked: an item merely related to one of these is not
+   one of its parts, and leaving those out is the point of the mode.
+
+   The order is the whole path, not the last step of it: the tuple of
+   `part_of_sort_idx` from the selected item down to the node, compared
+   component by component -- so everything under the first child comes before
+   everything under the second, whatever indices are used further down. Within
+   each component the rule level 1 has always used holds: the ones carrying an
+   index first, ascending, and the ones left unset -- the -1 the column defaults
+   to -- after them, rather than ahead of 0 as a plain ascending sort would have
+   it. A part nobody placed does not belong in front of every part somebody did.
+   It is still listed, though -- it is a part, it just has no place yet. Paths
+   that are equal all the way down fall back on the app's usual
    most-recently-touched-first.
 
-   The sibling index is projected, not only ordered by, because it is the number
-   the human typed into the edit modal and the one navigation will re-root on."
-  [q {:keys [selected-item-id]} {:keys [limit] :as _ctx}]
+   The sibling index projected is the last step's -- the node's place under the
+   whole it is directly a part of -- because that is the number the human typed
+   into the edit modal for it."
+  [q {:keys [selected-item-id level]} {:keys [limit] :as _ctx}]
+  (let [level (min max-part-of-level (max 1 (or level 1)))]
+    (sql/format
+      (merge {:select (vec (concat select
+                                   [[(step level :annotation) :annotation]
+                                    [(step level :part_of_sort_idx) :part_of_sort_idx]]))
+              :from [[:relations :r1]]
+              :join (-> (into []
+                              (mapcat (fn [n]
+                                        [[:relations (keyword (str "r" n))]
+                                         [:and [:= (step n :owner_id) (step (dec n) :target_id)]
+                                          [:= (step n :is_part_of) true]]]))
+                              (range 2 (inc level)))
+                        (into [:items [:= :items.id (step level :target_id)]]))
+              :where [:and [:= (step 1 :owner_id) [:inline selected-item-id]]
+                      [:= (step 1 :is_part_of) true] (get-search-clause q)]
+              :order-by (-> (into []
+                                  (mapcat (fn [n]
+                                            [[[:= (step n :part_of_sort_idx) [:inline -1]] :asc]
+                                             [(step n :part_of_sort_idx) :asc]]))
+                                  (range 1 (inc level)))
+                            (conj [:items.updated_at :desc]))}
+             (when limit {:limit limit})))))
+
+(defn part-of-depth
+  "How many levels the part-of edges below one whole run to: the length of the
+   longest path down from it, and 0 when it has no parts at all. The number the
+   strip's stepper stops at.
+
+   `UNION`, not `UNION ALL`: this asks how deep, not by how many routes, so a
+   node already seen at a depth need not be walked again from a second parent.
+   That is what keeps this cheap where part-of-level cannot be -- the walk is
+   bounded by nodes times depth rather than by paths, which is the difference
+   between polynomial and combinatorial on the same graph.
+
+   Termination rests on acyclicity, which every write already enforces (see
+   et.vp.ds.part-of), so there is no depth cap here to make it safe. Nor one to
+   make it cheap: the dedup above is that argument, and a cap would be a second
+   one that has to be right about how deep a rhizome is allowed to be."
+  [selected-item-id]
   (sql/format
-    (merge {:select (vec (concat select
-                                 [:relations.annotation
-                                  [:relations.part_of_sort_idx :part_of_sort_idx]]))
-            :from :items
-            :join [:relations [:= :items.id :relations.target_id]]
-            :where [:and [:= :relations.owner_id [:inline selected-item-id]]
-                    [:= :relations.is_part_of true] (get-search-clause q)]
-            :order-by [[[:= :relations.part_of_sort_idx [:inline -1]] :asc]
-                       [:relations.part_of_sort_idx :asc] [:items.updated_at :desc]]}
-           (when limit {:limit limit}))))
+    {:with-recursive [[[:below {:columns [:id :depth]}]
+                       {:union [{:select [:relations.target_id [[:inline 1] :depth]]
+                                 :from :relations
+                                 :where [:and [:= :relations.owner_id [:inline selected-item-id]]
+                                         [:= :relations.is_part_of true]]}
+                                {:select [:relations.target_id
+                                          [[:+ :below.depth [:inline 1]] :depth]]
+                                 :from :below
+                                 :join [:relations [:and [:= :relations.owner_id :below.id]
+                                                    [:= :relations.is_part_of true]]]}]}]]
+     :select [[[:coalesce [:max :below.depth] [:inline 0]] :depth]]
+     :from :below}))
 
 (defn vector-similarity-bounds
   "SQL for the MIN and MAX cosine distance over the embedded related items,

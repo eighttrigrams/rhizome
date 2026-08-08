@@ -331,6 +331,146 @@
       (make-part-of! book unplaced -1)
       (is (= ["Front matter" "Zero" "Unplaced"] (titles-under book {:hierarchy-mode? true}))))))
 
+;; --- and what the levels below it list ---------------------------------------
+
+(defn- make-part-of-both!
+  "Make `part` a part of two wholes at once. Not two calls to make-part-of!:
+   set-the-containers-of-item! rebuilds the item's relations out of the map it
+   is handed, so a second call naming only the other whole would drop the first
+   edge again."
+  [[whole-a idx-a] [whole-b idx-b] part]
+  (relations/set-the-containers-of-item!
+    db
+    (ds/get-item db {:id (:id part)})
+    {(:id whole-a) {:title (:title whole-a) :show-badge? true :is-context? true
+                    :is-part-of? true :part-of-sort-idx idx-a}
+     (:id whole-b) {:title (:title whole-b) :show-badge? true :is-context? true
+                    :is-part-of? true :part-of-sort-idx idx-b}}
+    false))
+
+(deftest a-level-lists-the-nodes-at-that-depth-in-path-order
+  (test-with-reset-db-and-time
+    "level 2 is the parts of the parts, ordered by the whole path down to them
+     and not by the last step of it -- everything under the first child before
+     everything under the second, whatever indices are used further down"
+    (let [a (ds/new-context db {:title "A"})
+          a1 (ds/new-context db {:title "A1"})
+          a2 (ds/new-context db {:title "A2"})
+          under (fn [whole titles]
+                  (doall (map-indexed (fn [i t]
+                                        (let [item (ds/new-item db t "" #{(:id whole)} nil)]
+                                          (make-part-of! whole item (inc i))
+                                          item))
+                                      titles)))]
+      (make-part-of! a a1 1)
+      (make-part-of! a a2 2)
+      (under a1 ["a1-1" "a1-2" "a1-3"])
+      (under a2 ["a2-1" "a2-2" "a2-3"])
+      (is (= ["A1" "A2"] (titles-under a {:hierarchy-mode? true}))
+          "level 1 is still the direct children, and a missing level reads as 1")
+      (is (= ["A1" "A2"] (titles-under a {:hierarchy-mode? true :hierarchy-level 1})))
+      (is (= ["a1-1" "a1-2" "a1-3" "a2-1" "a2-2" "a2-3"]
+             (titles-under a {:hierarchy-mode? true :hierarchy-level 2}))
+          "by the tuples (1,1) (1,2) (1,3) (2,1) (2,2) (2,3)")
+      (is (= [] (titles-under a {:hierarchy-mode? true :hierarchy-level 3}))
+          "and nothing is that deep")))
+  (test-with-reset-db-and-time
+    "the direct children are not among the level-2 rows -- a level lists the
+     nodes at that depth and no other"
+    (let [a (ds/new-context db {:title "A"})
+          child (ds/new-context db {:title "Child"})
+          grandchild (ds/new-item db "Grandchild" "" #{(:id child)} nil)]
+      (make-part-of! a child 1)
+      (make-part-of! child grandchild 1)
+      (is (= ["Grandchild"] (titles-under a {:hierarchy-mode? true :hierarchy-level 2}))))))
+
+(deftest the-unset-rule-holds-at-every-component-of-the-path
+  (test-with-reset-db-and-time
+    "a child nobody placed sorts behind every placed child at level 1 -- and so
+     does everything below it at level 2, where its own -1 is not the last
+     component of the path but the first"
+    (let [book (ds/new-context db {:title "Book"})
+          unplaced (ds/new-context db {:title "Unplaced chapter"})
+          placed (ds/new-context db {:title "Placed chapter"})
+          from-unplaced (ds/new-item db "Page of the unplaced one" "" #{(:id unplaced)} nil)
+          from-placed (ds/new-item db "Page of the placed one" "" #{(:id placed)} nil)]
+      (make-part-of! book unplaced -1)
+      (make-part-of! book placed 1)
+      ;; Both pages carry the same index under their own chapter, so the order
+      ;; below can only come from the component above it.
+      (make-part-of! unplaced from-unplaced 1)
+      (make-part-of! placed from-placed 1)
+      (is (= ["Placed chapter" "Unplaced chapter"] (titles-under book {:hierarchy-mode? true})))
+      (is (= ["Page of the placed one" "Page of the unplaced one"]
+             (titles-under book {:hierarchy-mode? true :hierarchy-level 2}))
+          "the unset -1 one component up carried its whole subtree to the back")))
+  (test-with-reset-db-and-time
+    "and a deliberate -2 one component up carries its subtree to the front, the
+     way it does among siblings"
+    (let [book (ds/new-context db {:title "Book"})
+          front (ds/new-context db {:title "Front matter"})
+          one (ds/new-context db {:title "Chapter one"})
+          front-page (ds/new-item db "A page of the front matter" "" #{(:id front)} nil)
+          first-page (ds/new-item db "A page of chapter one" "" #{(:id one)} nil)]
+      (make-part-of! book one 1)
+      (make-part-of! book front -2)
+      (make-part-of! front front-page 1)
+      (make-part-of! one first-page 1)
+      (is (= ["A page of the front matter" "A page of chapter one"]
+             (titles-under book {:hierarchy-mode? true :hierarchy-level 2}))))))
+
+(deftest a-node-reachable-by-two-paths-is-listed-once-per-path
+  (test-with-reset-db-and-time
+    "the part-of edges are a DAG, so the same thing can sit at a level by more
+     than one route. It is listed at each place it occupies -- deduplicating it
+     would throw away one of two positions the human deliberately gave it"
+    (let [book (ds/new-context db {:title "Book"})
+          one (ds/new-context db {:title "Chapter one"})
+          two (ds/new-context db {:title "Chapter two"})
+          shared (ds/new-item db "The shared page" "" #{(:id one) (:id two)} nil)
+          plain (ds/new-item db "A page of chapter two" "" #{(:id two)} nil)]
+      (make-part-of! book one 1)
+      (make-part-of! book two 2)
+      (make-part-of-both! [one 1] [two 5] shared)
+      (make-part-of! two plain 2)
+      (is (= ["The shared page" "A page of chapter two" "The shared page"]
+             (titles-under book {:hierarchy-mode? true :hierarchy-level 2}))
+          "at (1,1) and again at (2,5), with (2,2) between them")
+      (is (= 3 (count (titles-under book {:hierarchy-mode? true :hierarchy-level 2})))
+          "three rows for two distinct items"))))
+
+(deftest the-depth-below-a-whole-is-how-far-the-stepper-may-go
+  (test-with-reset-db-and-time
+    "the deepest path down, which is the level past which there is nothing to
+     show -- so the stepper can refuse the step rather than offer it and answer
+     it with an empty list"
+    (let [book (ds/new-context db {:title "Book"})
+          chapter (ds/new-context db {:title "Chapter"})
+          page (ds/new-context db {:title "Page"})
+          loose (ds/new-item db "Merely related" "" #{(:id book)} nil)]
+      (is (= 0 (search/part-of-depth db (:id book))) "nothing is a part of it yet")
+      (make-part-of! book chapter 1)
+      (is (= 1 (search/part-of-depth db (:id book))))
+      (make-part-of! chapter page 1)
+      (is (= 2 (search/part-of-depth db (:id book))))
+      (is (= 1 (search/part-of-depth db (:id chapter))) "counted from the whole asked about")
+      (is (= 0 (search/part-of-depth db (:id page))))
+      (is (= 0 (search/part-of-depth db (:id loose)))
+          "and an item merely related to the book is not below it at all")))
+  (test-with-reset-db-and-time
+    "the longest path decides it, not the shortest -- a whole with one shallow
+     and one deep child goes as deep as the deep one"
+    (let [book (ds/new-context db {:title "Book"})
+          shallow (ds/new-item db "A page filed straight under the book" "" #{(:id book)} nil)
+          chapter (ds/new-context db {:title "Chapter"})
+          section (ds/new-context db {:title "Section"})
+          page (ds/new-item db "A page of the section" "" #{(:id section)} nil)]
+      (make-part-of! book shallow 1)
+      (make-part-of! book chapter 2)
+      (make-part-of! chapter section 1)
+      (make-part-of! section page 1)
+      (is (= 3 (search/part-of-depth db (:id book)))))))
+
 (deftest a-part-sits-differently-under-each-of-its-wholes
   (test-with-reset-db-and-time "the sibling index belongs to the edge, not to the node"
     (let [a (ds/new-context db {:title "A"})

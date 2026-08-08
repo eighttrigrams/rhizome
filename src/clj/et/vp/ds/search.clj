@@ -121,12 +121,16 @@
 (defn search-related-items
   "The items to list under the selected item.
 
-   In hierarchy mode that is a different question -- its parts, in sibling order
-   -- so it is a different query rather than the usual one with a filter bolted
-   on: none of the intersection machinery (secondary contexts, invert, search
-   modes, description filter) means anything in a hierarchy, and the mode hides
-   the section that drives it."
-  [db q selected-item-id {:keys [link-item search-mode hierarchy-mode?] :as opts}
+   In hierarchy mode that is a different question -- the nodes one level of the
+   part-of edges below it, in path order -- so it is a different query rather
+   than the usual one with a filter bolted on: none of the intersection
+   machinery (secondary contexts, invert, search modes, description filter)
+   means anything in a hierarchy, and the mode hides the section that drives it.
+
+   :hierarchy-level rides in with :hierarchy-mode?, and for the same reason:
+   both are session state the SPA carries. Absent, it is level 1 -- what the
+   mode listed before there were levels at all."
+  [db q selected-item-id {:keys [link-item search-mode hierarchy-mode? hierarchy-level] :as opts}
    {:keys [limit] :as ctx}]
   (when link-item
     (throw (IllegalArgumentException. "'link-item' shouldn't be supplied here any longer")))
@@ -135,7 +139,10 @@
   (let [opts (modify opts)
         items (do-query db
                         (if hierarchy-mode?
-                          (core/part-of-children q {:selected-item-id selected-item-id} ctx)
+                          (core/part-of-level q
+                                              {:selected-item-id selected-item-id
+                                               :level hierarchy-level}
+                                              ctx)
                           (core/search-related-items q
                                                      (->core-opts selected-item-id search-mode opts)
                                                      ctx)))
@@ -145,6 +152,14 @@
     (when (and limit (> (count results) limit))
       (throw (Exception. "got more results than 'limit' allows. impl broken!")))
     results))
+
+(defn part-of-depth
+  "How deep the part-of edges below `selected-item-id` run -- the deepest level
+   hierarchy mode has anything to show for this whole, and 0 when it has no
+   parts at all. What the strip's stepper needs to know before it offers a step
+   down, rather than offering one and answering it with an empty list."
+  [db selected-item-id]
+  (:depth (un-namespace-keys (jdbc/execute-one! db (core/part-of-depth selected-item-id)))))
 
 (defn search-related-items-vector-threshold
   "Blue-mode retrieval. Same relational filters + INNER JOIN items_vec as
