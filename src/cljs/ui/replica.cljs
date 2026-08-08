@@ -69,7 +69,12 @@
               :top "calc(6px + var(--top-strip-height))"
               :left "50%"
               :transform "translateX(-50%)"
-              :z-index 10000
+              ;; One above the floating player, which is above everything else
+              ;; (10002, see main.css). Raised from 10000 -- where it sat level
+              ;; with the other badges -- deliberately and for that one reason:
+              ;; this banner is the marker that is meant to outrank the whole
+              ;; app, and a player floating over it would have taken that away.
+              :z-index 10003
               :background "#c0392b"
               :color "white"
               :padding "4px 8px"

@@ -20,16 +20,28 @@
           ;; modal is editing the annotation of, settled from the row that was
           ;; clicked. Losing it here would put the modal back on the selected
           ;; context, which below level 1 is a different edge.
-          current-annotation-edit-context (:annotation-edit-context @*state)]
+          current-annotation-edit-context (:annotation-edit-context @*state)
+          ;; What the floating player is playing (ui.floating-player). Taken
+          ;; from the live atom and put back unconditionally, rather than
+          ;; preserved only when set: `new-state` is a snapshot from when the
+          ;; request went out, so it has an opinion about the player that is as
+          ;; old as the request. A response landing after the X was pressed
+          ;; would otherwise restart the video the owner just closed, and one
+          ;; landing after a poster was clicked would take away the video he
+          ;; just started. The player goes away in two ways and a stale
+          ;; snapshot is neither of them.
+          current-playing-video (:playing-video @*state)]
       (reset! *state (-> new-state
-                         (dissoc :enter-pressed?)
+                         (dissoc :enter-pressed? :playing-video)
                          (cond-> (and current-modal (not new-state-has-modal?))
                                    (assoc :modal current-modal)
                                  current-annotation-edit-item
                                    (assoc :annotation-edit-item current-annotation-edit-item)
                                  current-annotation-edit-context
                                    (assoc :annotation-edit-context
-                                          current-annotation-edit-context)))))))
+                                          current-annotation-edit-context)
+                                 current-playing-video
+                                   (assoc :playing-video current-playing-video)))))))
 
 (defn- update-state
   [response state]

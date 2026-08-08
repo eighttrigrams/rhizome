@@ -537,3 +537,69 @@ body:has(#qr-overlay) iframe {
     color: #ffffff;
     background: rgba(255, 255, 255, 0.2);
 }
+
+/* The one player. Mounted once beside #main-layer (ui.cljs) and never moved in
+   the tree, because moving an iframe in the DOM reloads it -- so a corner is
+   top/left on this fixed box and nothing else, and the transition is what makes
+   settling into one read as movement rather than as a jump.
+
+   z-index 10002 puts it over everything the owner might be doing: the modal
+   layer (1010/1011), the discard dialog (2000), the QR overlay (2001), the
+   corner badges at 10000 and danger mode's confirmation at 10001. Those badges
+   sit in the corners, which is the reason this is draggable at all, so being
+   over them rather than hidden behind them is the point. The read-only replica
+   banner is the one thing left above it, and it was raised from 10000 to 10003
+   to keep it there -- it is the marker that is meant to outrank everything. */
+#floating-player {
+    position: fixed;
+    z-index: 10002;
+    width: 420px;
+    background: #101010;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
+    transition: top 180ms ease, left 180ms ease;
+}
+
+#floating-player-frame {
+    display: block;
+    width: 420px;
+    height: 236px;
+    border: 0;
+}
+
+/* The grip. The video itself cannot be the drag surface -- the iframe swallows
+   the pointer, and a click inside it is one of the player's own controls -- so
+   the gesture starts on this strip. touch-action: none stops a touch drag being
+   taken for a page scroll before the pointer capture has it. */
+.floating-player-handle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 22px;
+    padding: 0 6px;
+    box-sizing: border-box;
+    background: rgb(20, 20, 20);
+    color: #cbc9b5;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+}
+
+.floating-player-handle:active {
+    cursor: grabbing;
+}
+
+.floating-player-close {
+    padding: 0 2px;
+    font-size: 13px;
+    line-height: 1;
+    color: inherit;
+    background: none;
+    border: 0;
+    cursor: pointer;
+}
+
+.floating-player-close:hover {
+    color: #ffffff;
+}

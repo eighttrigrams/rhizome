@@ -1,5 +1,6 @@
 (ns ui
   (:require [reagent.core :as r]
+            [ui.floating-player :as floating-player]
             [ui.key-handler :as key-handler]
             [ui.main :as main]
             [ui.modals :as modals]
@@ -100,4 +101,9 @@
                       [:div#modals-component
                        {:tabIndex 0
                         :on-key-down #(handle-mask-keydown *state %)}
-                       [modals/component *state]]]])]])})))
+                       [modals/component *state]]]])]
+                 ;; Here and nowhere else, and never behind anything that
+                 ;; unmounts. Its iframe reloads the moment it is moved in the
+                 ;; DOM, so the one place it can be mounted from is one that is
+                 ;; up for as long as the page is -- which is this list.
+                 [floating-player/component *state]])})))
