@@ -60,6 +60,8 @@
 
 (defn-over-http fetch-item-description :return-value {})
 
+(defn-over-http fetch-item-provenance :return-value {})
+
 (defn-over-http edit-item-in-obsidian :return-value {})
 
 (defn-over-http sync-obsidian-changes :return-value {})

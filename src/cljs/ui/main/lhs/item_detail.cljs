@@ -192,42 +192,62 @@
       "Lowres here"]]))
 
 (defn- version-navigation-controls
-  [*state item-descriptions version-idx item-at-idx]
+  "The bar over the description, in two groups that answer two different
+   questions.
+
+   Left is about A VERSION -- step through them, read which one is on screen and
+   where it came from, diff it against the one before. Right is about THE ITEM
+   AS SUCH: its provenance, and its id. Diff compares two versions of a text;
+   provenance attributes the text that is standing, whichever version the
+   arrows happen to be pointing at, so the two do not belong in one row of
+   buttons even though they sit on one bar.
+
+   Each group says which it is in words, above the controls, rather than
+   leaving it to the gap between them. The layout is the sort of thing a reader
+   infers if he already knows the answer, and the whole point of putting
+   Provenance next to Diff is that he might not.
+
+   The id is last, at the far right, because it is the least interactive thing
+   here and because it is what the group's caption is ultimately naming."
+  [*state item-descriptions version-idx item-at-idx item-id]
   (let [revisions (diff/description-revisions item-descriptions)
         diffable? (>= (count revisions) 2)]
-    [:div
-     {:style {:display "flex"
-              :align-items "center"
-              :gap "10px"
-              :margin "10px 0"
-              :padding "5px"
-              :background-color "#f0f0f0"
-              :border-radius "5px"}}
-     [:button
-      {:on-click #(swap! *state update :description-version-idx inc)
-       :disabled (or (nil? item-descriptions) (>= version-idx (dec (count item-descriptions))))
-       :style {:cursor (if (or (nil? item-descriptions)
-                               (>= version-idx (dec (count item-descriptions))))
-                         "not-allowed"
-                         "pointer")}} "←"]
-     [:button
-      {:on-click #(swap! *state update :description-version-idx dec)
-       :disabled (<= version-idx 0)
-       :style {:cursor (if (<= version-idx 0) "not-allowed" "pointer")}} "→"]
-     [:span {:style {:font-weight "bold"}}
-      (if item-descriptions
-        (let [db-version (:version item-at-idx)]
-          (str "Version " (or db-version (inc version-idx))
-               (when (= version-idx 0) " (current)")
-               (when-let [source (:source item-at-idx)] (str " · " source))))
-        "Version 1 (current)")]
-     [:button
-      {:on-click #(swap! *state assoc
-                    :diff-view? true
-                    :diff-version-idx (diff/version-idx->diff-idx revisions
-                                                                  (:version item-at-idx)))
-       :disabled (not diffable?)
-       :style {:cursor (if diffable? "pointer" "not-allowed")}} "Diff"]]))
+    [:div.version-bar
+     [:div.version-bar-group
+      [:span.version-bar-scope "this version"]
+      [:button
+       {:on-click #(swap! *state update :description-version-idx inc)
+        :disabled (or (nil? item-descriptions) (>= version-idx (dec (count item-descriptions))))
+        :style {:cursor (if (or (nil? item-descriptions)
+                                (>= version-idx (dec (count item-descriptions))))
+                          "not-allowed"
+                          "pointer")}} "←"]
+      [:button
+       {:on-click #(swap! *state update :description-version-idx dec)
+        :disabled (<= version-idx 0)
+        :style {:cursor (if (<= version-idx 0) "not-allowed" "pointer")}} "→"]
+      [:span {:style {:font-weight "bold"}}
+       (if item-descriptions
+         (let [db-version (:version item-at-idx)]
+           (str "Version " (or db-version (inc version-idx))
+                (when (= version-idx 0) " (current)")
+                (when-let [source (:source item-at-idx)] (str " · " source))))
+         "Version 1 (current)")]
+      [:button
+       {:on-click #(swap! *state assoc
+                     :diff-view? true
+                     :diff-version-idx (diff/version-idx->diff-idx revisions
+                                                                   (:version item-at-idx)))
+        :disabled (not diffable?)
+        :style {:cursor (if diffable? "pointer" "not-allowed")}} "Diff"]]
+     [:div.version-bar-group.version-bar-item-group
+      [:span.version-bar-scope "this item"]
+      [:button.provenance-open
+       {:on-click #(actions/open-provenance! *state)
+        :disabled (nil? item-id)
+        :title "Who wrote each line of the description as it stands now"
+        :style {:cursor (if item-id "pointer" "not-allowed")}} "Provenance"]
+      [:span.version-bar-item-id (str "#" item-id)]]]))
 
 (defn component
   [*state]
@@ -244,7 +264,8 @@
                                      :image)
                                  (= :description (:modal @*state))))]
     [:<> (when show-drop-area? [drop-target (:id selected-item)])
-     [version-navigation-controls *state item-descriptions version-idx item-at-idx]
+     [version-navigation-controls *state item-descriptions version-idx item-at-idx
+      (:id selected-item)]
      [the-item-itself-component *state selected-item true]]))
 
 (defn preview-component [*state item] [the-item-itself-component *state item false])

@@ -50,7 +50,16 @@
 
 (defn- select-context-or-item!
   [*state context select-as-item?]
-  (reset! *state (assoc (dissoc @*state :unlink-refused)
+  (reset! *state (assoc (dissoc @*state
+                          :unlink-refused
+                          ;; Provenance is about one item's text. Both keys go
+                          ;; here rather than only the page flag: leaving the
+                          ;; data behind would show the previous item's lines
+                          ;; for as long as it takes the next fetch to land,
+                          ;; under the new item's id, and that reads as an
+                          ;; answer rather than as a gap.
+                          :provenance-page?
+                          :provenance)
                    ;; The refusal names one row and one whole. Moving the
                    ;; selection changes the list it was standing over, so it
                    ;; stops being about anything the user can still see.
@@ -335,6 +344,24 @@
                           (= (:id (:preview-item @*state)) (:id item)))
                  (swap! *state assoc-in [:preview-item :description]
                         (:item-description result)))))))
+
+(defn open-provenance!
+  "Open the Provenance page on the selected item's current description.
+
+   The page flag goes up in the same state the request is made from, so it is
+   already on when the answer merges in -- the page opens at once and fills in,
+   rather than waiting on a round trip before anything happens, which is how
+   the config and diff pages behave too.
+
+   Whatever version the bar happens to be showing: the server reads the current
+   description (repository/fetch-item-provenance) and the page has no say in
+   it. Provenance is about the item, not about the version on screen."
+  [*state]
+  (when-let [item (:selected-item @*state)]
+    (fetch-and-reset-with-method! *state
+                                  (assoc @*state :provenance-page? true)
+                                  api/fetch-item-provenance
+                                  item)))
 
 (defn open-annotation-edit-modal!
   [*state item]

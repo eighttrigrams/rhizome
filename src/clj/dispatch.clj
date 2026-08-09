@@ -13,6 +13,7 @@
               unlink-selected-item-from-container delete-item upgrade-item-to-context
               link-selected-context-to-context select-last-context fetch-context deselect-context
               fetch-aggregated-contexts delete-context fetch-item-description edit-item-in-obsidian
+              fetch-item-provenance
               sync-obsidian-changes discard-obsidian-changes get-obsidian-file-content update-annotations
               vector-search-related-items vector-threshold-search-related-items]]
             [poll :refer
@@ -50,6 +51,7 @@
              deselect-context
              delete-context
              fetch-item-description
+             fetch-item-provenance
              edit-item-in-obsidian
              sync-obsidian-changes
              discard-obsidian-changes
@@ -88,6 +90,7 @@
     "deselect-context"
     "select-last-context"
     "fetch-item-description"
+    "fetch-item-provenance"
     "get-obsidian-file-content"
     "discard-obsidian-changes"
     "vector-search-related-items"

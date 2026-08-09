@@ -5,6 +5,7 @@
             [et.vp.ds.relations :as datastore.relations]
             [et.vp.ds.part-of :as part-of]
             [cambium.core :as log]
+            [provenance :as provenance]
             [replica :as replica]
             [repository.insertion :as insertion]
             [repository.deletion :as deletion]
@@ -307,6 +308,32 @@
         :item-descriptions descriptions
         :item-description (:description item) ; Keep for backward compatibility temporarily
         :ignore-item-description (or (nil? (:description item)) (not (seq (:description item))))))))
+
+(defn fetch-item-provenance
+  "The item's CURRENT description together with the caution ranges over it, for
+   the Provenance page.
+
+   Both in one command, and that is the point of it existing rather than being
+   folded into `fetch-item-description`. The ranges index the lines of one exact
+   text; text and ranges fetched separately could be a save apart, and then
+   every line under the cursor would be tinted with its neighbour's colour --
+   wrong in a way that still looks entirely plausible on screen.
+
+   The current description whatever version the bar is showing, because
+   provenance is about the item as such: it says who wrote the text that is
+   standing now, and a reader deciding what he may rewrite is deciding about
+   that text and no other.
+
+   Its own command rather than a field on the description fetch, because the
+   assessment is not free (see `provenance/of-item`) and that fetch runs on
+   hover. Here it is paid for once, when the button is pressed."
+  [{:keys [db]}]
+  (fn [state item-ref]
+    (let [item (datastore/get-item db item-ref)]
+      (assoc state
+        :provenance {:item-id (:id item)
+                     :description (:description item)
+                     :caution (provenance/of-item db (:id item))}))))
 
 (defn edit-item-in-obsidian
   [{:keys [db]}]

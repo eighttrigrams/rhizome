@@ -54,6 +54,11 @@
    "deselect-context"          [[{}]]
    "select-last-context"       [[{:old-selected-item ctx}]]
    "fetch-item-description"    [[{} {:id (:id item)}]]
+   ;; Swept against the context rather than the item: `seed!` gives the context
+   ;; a description and a revision to go with it, so this is the one of the two
+   ;; that actually has a history to assess.
+   "fetch-item-provenance"     [[{} {:id (:id ctx)}]
+                                [{} {:id (:id item)}]]
    "get-obsidian-file-content" [[{}]]
    "discard-obsidian-changes"  [[{}]]
    "list-youtube-poll-channels" [[{}]]
