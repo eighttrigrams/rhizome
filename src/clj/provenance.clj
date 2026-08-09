@@ -104,6 +104,18 @@
 (defn of-item
   "`{:legend :ranges}` for the item's current description, or nil when it has
   none. Ranges are one-based and inclusive, in the line numbering an editor and
-  an agent already share."
+  an agent already share.
+
+  **It is not free, and it is on the single-item read path.** The alignment
+  underneath is an LCS table per version pair, quadratic in the line count and
+  linear in the depth of the history, so the cost is roughly lines² × versions.
+  Measured here: the longest description in the owner's database (51k
+  characters, one history row) takes ~36 ms, and everything else is under 5.
+  Synthetically it turns: 1000 lines over 10 versions is ~1.3 s and 2000 over 10
+  is ~4.7 s. Nothing in the database is near that today, and nothing here caps
+  it -- a cap would mean answering some items with no ranges and no way for the
+  caller to tell that apart from an item with nothing to be careful in, which is
+  worse than being slow. If descriptions start growing that long, cache it
+  against the item's `updated_at_ctx` rather than truncating the answer."
   [db id]
   (of-versions (:versions (ds/get-description-history db {:id id}))))

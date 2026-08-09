@@ -13,6 +13,7 @@
             [semsearch.backfill :as backfill]
             [et.vp.ds :as ds]
             [et.vp.ds.relations :as relations]
+            [provenance :as provenance]
             [et.vp.ds.search-test :refer [reset-db with-time db]]))
 
 (def baseline-contexts
@@ -186,6 +187,63 @@
   (test-with-fresh-db "400 when the id is not an integer"
     (let [resp (GET* "/api/items/not-a-number")]
       (is (= 400 (:status resp))))))
+
+(defn- reset-history!
+  "`reset-db` empties items and relations but not `history`, and SQLite hands
+  out the same ids again to the next test's items -- so a caution test that did
+  not do this would be assessing some earlier test's versions along with its
+  own."
+  []
+  (jdbc/execute-one! db ["delete from history"]))
+
+(deftest get-item-caution-test
+  (test-with-fresh-db "carries per-line caution for the current description"
+    (reset-history!)
+    (let [ctx (ds/new-context db {:title "Books"})
+          item (ds/new-item db "The Prize" "prize" #{(:id ctx)} 1)
+          id (:id item)
+          ;; The owner writes two lines from the app; an agent then appends a
+          ;; third through the API and leaves a trailing newline behind it.
+          description "his one\nhis two\ntheir three\n"]
+      (ds/update-context-description db {:id id :description "his one\nhis two"} "app")
+      (ds/update-context-description db {:id id :description description} "api")
+      (let [resp (GET* (str "/api/items/" id))
+            body (body-json resp)
+            {:keys [legend ranges]} (:caution body)]
+        (is (= 200 (:status resp)))
+        (is (= description (:description body)))
+        (is (= [{:from 1 :to 2 :caution 1.0}
+                {:from 3 :to 4 :caution 0.0}]
+               ranges)
+            "his two lines are sacred, the agent's line and the empty line it left are not")
+        (is (= provenance/legend legend)
+            "the legend rides along with the ranges rather than being looked up")
+        (is (str/includes? (:body resp) "\"caution\"")
+            "and all of it survives the trip through JSON")
+        (testing "the ranges cover every line of the description as the client must split it"
+          (is (= (count (str/split description #"\n" -1)) (:to (last ranges))))
+          (is (= 1 (:from (first ranges))))
+          (is (= (map :from (rest ranges)) (map (comp inc :to) (butlast ranges)))
+              "and they run contiguously, with no line falling between two of them")))))
+
+  (test-with-fresh-db "no caution key at all when the item has no description"
+    (reset-history!)
+    (let [ctx (ds/new-context db {:title "Books"})
+          item (ds/new-item db "Title only" "title-only" #{(:id ctx)} 1)
+          body (body-json (GET* (str "/api/items/" (:id item))))]
+      (is (= "Title only" (:title body)))
+      (is (not (contains? body :caution))
+          "absent rather than empty: there is nothing to be careful in")))
+
+  (test-with-fresh-db "the shape is documented where /api/describe reads from"
+    ;; The docstring is the API doc -- there is no second catalogue to update.
+    (let [doc (->> (:endpoints (body-json (GET* "/api/describe")))
+                   (some (fn [{:keys [name doc]}] (when (= "get-item" name) doc))))]
+      (is (some? doc))
+      (is (str/includes? doc "caution"))
+      (is (str/includes? doc "\"from\""))
+      (is (str/includes? doc "\"to\""))
+      (is (str/includes? doc "legend")))))
 
 (deftest get-related-items-test
   (test-with-fresh-db "lists items in a context"

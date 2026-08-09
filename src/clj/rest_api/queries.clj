@@ -6,6 +6,7 @@
             [cambium.core :as log]
             [et.vp.ds :as datastore]
             [et.vp.ds.search :as search]
+            [provenance :as provenance]
             [replica :as replica]
             [semsearch.query :as semsearch]
             [rest-api.util :refer [json-response item->api parse-int-opt parse-ids-csv]]))
@@ -85,10 +86,45 @@
   "GET /api/items/:id — fetch a single item (context or leaf) by numeric id,
   including its description. 400 if id is not an integer. Note: currently
   returns 200 with an empty shell ({:id nil, :title nil, ...}) when no item
-  exists for the id; callers should check `:id`."
+  exists for the id; callers should check `:id`.
+
+  **Carries \"caution\": which lines of the description to leave alone.** This
+  is the one number in this API written for an agent to act on before it edits
+  something, so read it before a PUT that rewrites a description.
+
+      \"caution\": {
+        \"legend\": \"caution runs from 1.00 to 0.00 over the lines ...\",
+        \"ranges\": [{\"from\": 1, \"to\": 12, \"caution\": 1.0},
+                   {\"from\": 13, \"to\": 20, \"caution\": 0.0}]
+      }
+
+  \"from\" and \"to\" are line numbers in the description as it stands, one-based
+  and inclusive, and the ranges cover every line of it in order. \"caution\" runs
+  1.00 (written from the web UI, the owner's own hand, not yours to rewrite) to
+  0.00 (written wholly through this API or by a scraper, free to edit); anything
+  above 0.00 still contains a line of his. \"legend\" says the same thing in
+  words and is served with every answer that has ranges, so a caller that has
+  fetched this one item and nothing else can read the numbers.
+
+  Split the description on \"\\n\" **keeping trailing empty fields** to line up
+  with these numbers: a body ending in a newline is n+1 lines here, and a split
+  that discards the trailing empty one is off by one at the end.
+
+  Not a version list. A version history -- which this API does not serve, but
+  the app shows -- says where each whole *version* came from; this attributes
+  the lines of the text as it now stands, so an item the owner wrote once and an
+  agent has since edited nineteen times still has his opening paragraph at 1.00.
+
+  Absent -- not empty -- when the item has no description: there is nothing to
+  be careful in, and an empty range list would be an answer about a text that
+  is not there."
   [db id]
-  (try (let [item (datastore/get-item db {:id (Integer/parseInt id)})]
-         (if item (json-response (item->api item)) (json-response 404 {:error "Item not found"})))
+  (try (let [id (Integer/parseInt id)
+             item (datastore/get-item db {:id id})]
+         (if item
+           (let [caution (provenance/of-item db id)]
+             (json-response (cond-> (item->api item) caution (assoc :caution caution))))
+           (json-response 404 {:error "Item not found"})))
        (catch NumberFormatException _ (json-response 400 {:error "Invalid item ID"}))))
 
 (defn find-by-sort-idx
