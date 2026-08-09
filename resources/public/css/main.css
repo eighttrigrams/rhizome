@@ -686,11 +686,27 @@ body:has(#qr-overlay) .floating-player-qr {
 .version-bar {
     display: flex;
     align-items: center;
+    /* The two groups stack rather than squeeze when the panel is narrow. They
+       are separate statements; a row that crushes them together to stay on one
+       line is working against the thing the split is for. */
+    flex-wrap: wrap;
     gap: 10px;
     margin: 10px 0;
     padding: 5px;
     background-color: #f0f0f0;
+    /* #sides-container draws this panel light-on-dark and everything in it
+       inherits #cbc9b5 — which on this bar's own light background is about
+       1.4:1, i.e. the version label was on the page and could not be read.
+       The bar is a light island in a dark panel, so it has to say what colour
+       its text is rather than take the panel's. */
+    color: #2f2c2c;
     border-radius: 5px;
+}
+
+/* One line: "Version 12 (current) · obsidian" broken across two rows reads as
+   two facts. */
+.version-bar-label {
+    white-space: nowrap;
 }
 
 .version-bar-group {

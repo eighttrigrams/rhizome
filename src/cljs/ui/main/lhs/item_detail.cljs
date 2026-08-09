@@ -226,7 +226,7 @@
        {:on-click #(swap! *state update :description-version-idx dec)
         :disabled (<= version-idx 0)
         :style {:cursor (if (<= version-idx 0) "not-allowed" "pointer")}} "→"]
-      [:span {:style {:font-weight "bold"}}
+      [:span.version-bar-label {:style {:font-weight "bold"}}
        (if item-descriptions
          (let [db-version (:version item-at-idx)]
            (str "Version " (or db-version (inc version-idx))
