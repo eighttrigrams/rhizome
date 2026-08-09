@@ -4,6 +4,13 @@ For the whitepaper, see here: [*Rhizome - A “total recall” note-taking and c
 
 ## Getting started - with Docker
 
+Clone [us-vs-them](https://github.com/eighttrigrams/us-vs-them) into a sibling
+directory first. `deps.edn` names it `{:local/root "../us-vs-them"}`, which
+tools.deps resolves relative to that file, and the box mounts it read-only at
+`/workspace/us-vs-them` to match. Without it the first `clj` invocation stops
+at `Local lib eighttrigrams/us-vs-them not found`. What it is for: *Line
+provenance*, below.
+
 Run
 
 ```bash
@@ -46,6 +53,8 @@ Prerequisites are
 - node 18+, npm
 - sqlite3 CLI
 - imagemagick
+- a checkout of [us-vs-them](https://github.com/eighttrigrams/us-vs-them) in a
+  sibling directory (see above)
 
 ```bash
 npm i
@@ -282,6 +291,73 @@ counted under — select another one and it is level 1 again, because level 2 of
 one context names other things than level 2 of the next.
 
 Selecting a child does not re-root the view on it — that is still to come.
+
+## Line provenance
+
+Descriptions are written from more than one direction: typed into the app,
+synced back from Obsidian, pulled in by a scraper, and — increasingly —
+rewritten by agents over the REST API. Every version already records which of
+those it came from, and the version bar over a description has always shown it.
+That answers a question about a *version*, and it is not the question that
+matters when something is about to be edited.
+
+**Provenance answers the other one: of the text as it reads right now, which
+lines are whose.** An item written once by hand and edited nineteen times since
+by an agent still has its opening paragraph attributed by hand, and a list of
+nineteen agent versions would never say so.
+
+The button for it sits on the right of the version bar, under *this item*,
+opposite the arrows and Diff, which are under *this version*. The split is the
+point: Diff compares two versions of a text, provenance attributes the text that
+is standing — whichever version the arrows happen to be pointing at.
+
+The page shows the description's **source text**, line-numbered, each line
+washed with a colour and carrying a solid bar in the gutter. Rendered markdown
+would not do: the answer indexes source lines, and a paragraph is many source
+lines inside one `<p>`, so a paragraph half hand-written and half an agent's
+would have to be painted one colour — and would then be saying something false
+about the writing it covers.
+
+The number at the head of each range is a **caution**, 1.00 down to 0.00:
+
+- **1.00** — written wholly by hand, from the web UI (`app`) or synced back from
+  the editor (`obsidian`). Not an agent's to rewrite.
+- **0.00** — written wholly through the REST API (`api`) or by a scraper
+  (`scraper`). Free to edit.
+- **In between** — both have worked on that stretch, and the number is the share
+  of its lines that are hand-written. So 0.00 is the *only* value meaning "not
+  one line of his in here"; 0.39 is not "mostly the agent's", it is a stretch
+  that still contains his lines.
+
+A stretch is measured as an island rather than line by line, which is what keeps
+an agent's sentence dropped into the middle of a paragraph from cutting it in
+three: it dilutes the paragraph instead, because it cannot be edited without
+touching the work around it. Absorption runs one way only — a hand-written line
+landing inside an agent's block stays hand-written.
+
+None of that arithmetic lives here. It is
+[us-vs-them](https://github.com/eighttrigrams/us-vs-them), a sibling checkout
+(see *Getting started*); `src/clj/provenance.clj` is the whole of rhizome's part
+in it, and says which source markers count as whose and nothing else.
+
+**Agents get the same answer without the page.** `GET /api/items/:id` carries
+`caution` — ranges one-based and inclusive over the description, and a legend
+that explains the scale, so the number arrives with instructions for reading it
+rather than as a bare float:
+
+```json
+"caution": {
+  "legend": "caution runs from 1.00 to 0.00 over the lines of this item's description. …",
+  "ranges": [{"from": 1, "to": 12, "caution": 1.0},
+             {"from": 13, "to": 20, "caution": 0.0}]
+}
+```
+
+Two things a caller should know. A description nobody has edited since it was
+written comes back as one range covering all of it — the honest answer, not a
+missing one. And a body ending in a newline is one line longer than a split that
+discards the trailing empty field: line up with these numbers by splitting on
+`\n` and keeping it.
 
 ## Configuration Options
 
