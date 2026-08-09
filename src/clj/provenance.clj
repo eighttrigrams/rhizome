@@ -24,12 +24,23 @@
   through the REST API is stamped with it — and `\"scraper\"` is how a feed
   writes; both are them.
 
+  **`\"obsidian\"` is us as well**, and it is here on the same reasoning rather
+  than by enumeration. `repository/sync-from-obsidian` stamps a description that
+  came back from the owner's own editor, so those lines are as much his hand as
+  anything typed into the web UI — the marker records which door the text came
+  through, not who wrote it. Left out, an edit he made in Obsidian would come
+  back at 0.00 and an agent would be told in so many words that it may rewrite
+  it, which is the same failure the empty-column rule in `source-of` exists to
+  avoid. A marker nobody has seen before falls the other way, to *them*, and
+  that is the right default for a new writer: an unknown door is more likely to
+  be a new machine than a new hand.
+
   This is the one place rhizome takes sides. `et.uvt.core` is deliberately blind
   to what a marker means and only ever asks whether two are equal, which is what
   lets it be handed a vocabulary it has never heard of; `et.uvt.caution` asks for
   the side to be named once, from outside, and this is that naming. Nothing else
   in rhizome needs to have an opinion about it."
-  #{"app"})
+  #{"app" "obsidian"})
 
 (def legend
   "What a caution number means, in words, for whoever reads one.
@@ -43,8 +54,9 @@
   In rhizome's own vocabulary — its markers are `app`, `api` and `scraper`, and
   an agent holding this string is not in a position to translate someone else's."
   (str "caution runs from 1.00 to 0.00 over the lines of this item's description. "
-       "1.00 is a stretch written wholly from the web UI (source \"app\") — the "
-       "owner's own hand, and not yours to rewrite. "
+       "1.00 is a stretch written wholly by the owner's own hand — saved from the "
+       "web UI (source \"app\") or synced back from his editor (source "
+       "\"obsidian\") — and is not yours to rewrite. "
        "0.00 is a stretch written wholly through the REST API (source \"api\") or "
        "by a scraper (source \"scraper\") — free to edit. "
        "In between, both have worked on the stretch and the number is the share of "

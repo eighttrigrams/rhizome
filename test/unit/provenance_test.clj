@@ -65,6 +65,25 @@
     (is (= [{:from 1 :to 2 :caution 0.0}]
            (ranges [(v "scraped summary\nsecond line" "scraper")])))))
 
+(deftest obsidian-is-his-own-hand-test
+  ;; `repository/sync-from-obsidian` stamps "obsidian" on a description that
+  ;; came back from the owner's editor. The marker records which door the text
+  ;; came in by, not who wrote it, and this one is a hand.
+  (testing "a description synced back from his editor is sacred"
+    (is (= [{:from 1 :to 2 :caution 1.0}]
+           (ranges [(v "typed in obsidian\nsecond line" "obsidian")]))))
+  (testing "and it holds its ground against an agent editing around it"
+    (is (= [{:from 1 :to 1 :caution 1.0}
+            {:from 2 :to 2 :caution 0.0}]
+           (ranges [(v "typed in obsidian\nappended by an agent" "api")
+                    (v "typed in obsidian" "obsidian")]))))
+  (testing "a marker nobody has seen before is theirs, not his"
+    ;; The safe default for a *new writer* runs the other way from the safe
+    ;; default for a missing column: an unknown door is more likely to be a new
+    ;; machine than a new hand.
+    (is (= [{:from 1 :to 1 :caution 0.0}]
+           (ranges [(v "written by something new" "some-future-importer")])))))
+
 (deftest no-description-to-be-careful-in-test
   (testing "nil rather than ranges over a description that is not there"
     (is (nil? (provenance/of-versions [])))
@@ -103,8 +122,10 @@
   ;; a lie attached to it, and no other test in this file would notice.
   (let [sacred (clause "1.00 is" "0.00 is")
         free (clause "0.00 is" "In between")]
-    (testing "1.00 is the web UI's end, and says to leave it alone"
+    (testing "1.00 is the owner's end, and says to leave it alone"
       (is (str/includes? sacred "\"app\""))
+      (is (str/includes? sacred "\"obsidian\"")
+          "every marker that counts as his is named at his end of the scale")
       (is (not (str/includes? sacred "\"api\"")))
       (is (not (str/includes? sacred "\"scraper\"")))
       (is (str/includes? sacred "not yours to rewrite")))

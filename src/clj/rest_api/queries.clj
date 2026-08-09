@@ -100,9 +100,9 @@
 
   \"from\" and \"to\" are line numbers in the description as it stands, one-based
   and inclusive, and the ranges cover every line of it in order. \"caution\" runs
-  1.00 (written from the web UI, the owner's own hand, not yours to rewrite) to
-  0.00 (written wholly through this API or by a scraper, free to edit); anything
-  above 0.00 still contains a line of his. \"legend\" says the same thing in
+  1.00 (the owner's own hand -- saved from the web UI or synced back from his
+  editor -- not yours to rewrite) to 0.00 (written wholly through this API or by
+  a scraper, free to edit); anything above 0.00 still contains a line of his. \"legend\" says the same thing in
   words and is served with every answer that has ranges, so a caller that has
   fetched this one item and nothing else can read the numbers.
 
