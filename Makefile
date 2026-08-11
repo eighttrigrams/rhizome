@@ -66,10 +66,17 @@ COMPOSE_ENV = PORT=$(PORT) SHADOW_PORT=$(SHADOW_PORT) WITH_VEC=$(WITH_VEC) COMPO
 # the rest of the recipe. Make runs each recipe line in its own shell, so
 # the previous two-line form would exit 0 on the guard and then merrily
 # build/run docker anyway.
+# The yolo box runs with locked egress by default -- docker/run.sh layers in
+# docker-compose.locked.yml, and only tinyproxy.filter's hosts get out. INTERNET=1
+# is the escape hatch, and maps onto the `+internet` argument ../docker/run.sh
+# already uses for the plurama box. `make box` is unaffected: it is the plain
+# root dev shell, not an agent surface.
+YOLO_INTERNET = $(if $(filter 1,$(INTERNET)),+internet,)
+
 yolo:
 	@./scripts/detect-ports.sh check PORT SHADOW_PORT || exit 0; \
 	./scripts/write-compose-ports.sh $(PORT) $(SHADOW_PORT) && \
-	$(COMPOSE_ENV) ./docker/run.sh
+	$(COMPOSE_ENV) ./docker/run.sh $(YOLO_INTERNET)
 
 box:
 	@./scripts/detect-ports.sh check PORT SHADOW_PORT || exit 0; \
