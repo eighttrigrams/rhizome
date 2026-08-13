@@ -35,6 +35,10 @@ docker-rhizome/token
 docker/package-lock.json
 docker/.env
 .playwright-mcp
+# Playwright's compiled-test cache, moved in here out of the shared system temp
+# dir by scripts/e2e.sh -- which also drops it before every run. See the comment
+# there for what a stale one did.
+.playwright-cache
 rhizome-test.db
 rhizome-e2e.db
 *.db-journal

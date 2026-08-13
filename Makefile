@@ -30,6 +30,7 @@ clean:
 	rm -f docker/compose.ports.yml
 	rm -f *.db-journal *.db-wal *.db-shm
 	rm -f test/*.db-journal test/*.db-wal test/*.db-shm
+	rm -rf .playwright-cache
 
 # When WITH_VEC=1, also activate the `vec` compose profile so the Ollama
 # sidecar starts. Otherwise it stays absent and devs who don't need semsearch
