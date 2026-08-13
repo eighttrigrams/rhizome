@@ -1,236 +1,30 @@
 (ns ui.codemirror
+  "The editor behind the description modal.
+
+  The keyboard scheme is not here any more. It used to be: a 47-chord table and
+  eleven hand-written commands, of which tracker and treina each held a
+  near-identical copy. All of that is now `@eighttrigrams/kw-codemirror`, the
+  library in the keyboard-wizardry repo that also holds Daniel's VSCode and
+  Obsidian keymaps of the same scheme — one implementation rather than one per
+  app. The 47 chords are the same 47.
+
+  Two of them behave differently on purpose. ctrl+j and ctrl+l were line start
+  and end here; in the library they are the markdown \"sentence\" motions — the
+  block, or just the line when the one above it ended in a hard break. That is
+  blog's behaviour and the only one the scheme's README defines, so the apps were
+  unified onto it, and ctrl+shift+j / ctrl+shift+l select as far as those now
+  move. Separately, the four option motions gained a second meaning inside a
+  fenced ```clojure block, where they move by form instead of by word and line.
+
+  What stays here is what is rhizome's: the wheat theme, basicSetup and the
+  markdown extension, and the __codemirror handle on the element that
+  ui.modals and the e2e steps read the editor back out of."
   (:require ["codemirror" :refer [basicSetup]]
             ["@codemirror/state" :refer [EditorState]]
             ["@codemirror/view" :refer [EditorView]]
             ["@codemirror/commands" :as commands]
-            ["@codemirror/lang-markdown" :refer [markdown]]))
-
-;; Direct key to command mapping
-(def key-commands
-  {;; Basic movement
-   #{"KeyJ" #{:meta}} commands/cursorCharLeft
-   #{"KeyL" #{:meta}} commands/cursorCharRight
-   #{"KeyI" #{:meta}} commands/cursorLineUp
-   #{"KeyK" #{:meta}} commands/cursorLineDown
-   #{"KeyJ" #{:alt}} commands/cursorGroupLeft
-   #{"KeyL" #{:alt}} commands/cursorGroupRight
-   #{"KeyI" #{:alt}} commands/cursorLineUp
-   #{"KeyK" #{:alt}} commands/cursorLineDown
-   #{"KeyJ" #{:ctrl}} commands/cursorLineStart
-   #{"KeyL" #{:ctrl}} commands/cursorLineEnd
-   ;; Selection variants
-   #{"KeyJ" #{:meta :shift}} commands/selectCharLeft
-   #{"KeyL" #{:meta :shift}} commands/selectCharRight
-   #{"KeyI" #{:meta :shift}} commands/selectLineUp
-   #{"KeyK" #{:meta :shift}} commands/selectLineDown
-   #{"KeyJ" #{:alt :shift}} commands/selectGroupLeft
-   #{"KeyL" #{:alt :shift}} commands/selectGroupRight
-   #{"KeyI" #{:alt :shift}} commands/selectLineUp
-   #{"KeyK" #{:alt :shift}} commands/selectLineDown
-   #{"KeyJ" #{:ctrl :shift}} commands/selectLineStart
-   #{"KeyL" #{:ctrl :shift}} commands/selectLineEnd
-   ;; Delete operations
-   #{"Equal" #{:alt}} commands/deleteGroupForward
-   #{"Equal" #{:meta}} commands/deleteCharForward
-   #{"Backspace" #{:ctrl}} commands/deleteToLineStart
-   #{"Equal" #{:ctrl}} commands/deleteToLineEnd
-   #{"Equal" #{:ctrl :meta}} commands/deleteLine
-   ;; Line operations
-   #{"Enter" #{:shift}} :custom-new-line-below
-   #{"Enter" #{:meta}} :custom-new-line-above
-   #{"KeyI" #{:ctrl :meta}} commands/moveLineUp
-   #{"KeyK" #{:ctrl :meta}} commands/moveLineDown
-   ;; Indentation
-   #{"KeyL" #{:ctrl :meta}} commands/indentMore
-   #{"KeyJ" #{:ctrl :meta}} commands/indentLess
-   ;; Page navigation
-   #{"KeyP" #{:alt :meta}} commands/cursorPageUp
-   #{"Semicolon" #{:alt :meta}} commands/cursorPageDown
-   ;; Viewport scrolling (without moving cursor)
-   #{"KeyI" #{:alt :meta :shift}} :custom-scroll-down
-   #{"KeyK" #{:alt :meta :shift}} :custom-scroll-up
-   ;; Viewport + cursor movement
-   #{"KeyI" #{:alt :meta}} :custom-cursor-viewport-up
-   #{"KeyK" #{:alt :meta}} :custom-cursor-viewport-down
-   ;; Document navigation
-   #{"KeyP" #{:ctrl :alt :meta}} commands/cursorDocStart
-   #{"Semicolon" #{:ctrl :alt :meta}} commands/cursorDocEnd
-   ;; Center caret/line in viewport
-   #{"Semicolon" #{:meta}} :custom-center-caret
-   #{"Semicolon" #{:ctrl :meta}} :custom-center-line
-   ;; Select all
-   #{"KeyA" #{:alt}} commands/selectAll
-   ;; Undo/Redo
-   #{"Backquote" #{:alt}} commands/undo
-   #{"Backquote" #{:shift}} commands/redo
-   ;; Clipboard operations (custom implementations)
-   #{"KeyC" #{:alt}} :custom-copy
-   #{"KeyV" #{:alt}} :custom-paste
-   #{"KeyX" #{:alt}} :custom-cut})
-
-;; Custom clipboard operations
-(defn custom-copy
-  [view]
-  (let [selection (.. view -state -selection -main)]
-    (when-not (= (.-from selection) (.-to selection))
-      (let [text (.. view -state -doc (slice (.-from selection) (.-to selection)))]
-        (.writeText js/navigator.clipboard text)))))
-
-(defn custom-paste
-  [view]
-  (.then (.readText js/navigator.clipboard)
-         (fn [text]
-           (let [selection (.. view -state -selection -main)
-                 transaction (.update (.-state view)
-                                      #js {:changes #js {:from (.-from selection)
-                                                         :to (.-to selection)
-                                                         :insert text}})]
-             (.dispatch view transaction)))))
-
-(defn custom-cut
-  [view]
-  (let [selection (.. view -state -selection -main)]
-    (when-not (= (.-from selection) (.-to selection))
-      (let [text (.. view -state -doc (slice (.-from selection) (.-to selection)))]
-        (.writeText js/navigator.clipboard text)
-        (let [transaction (.update (.-state view)
-                                   #js {:changes #js {:from (.-from selection)
-                                                      :to (.-to selection)
-                                                      :insert ""}})]
-          (.dispatch view transaction))))))
-
-(defn custom-new-line-below
-  "Insert a new line below current line and move cursor to it"
-  [view]
-  (let [state (.-state view)
-        cursor (.. state -selection -main -head)
-        doc (.-doc state)
-        line-info (.lineAt ^js doc cursor)
-        line-end (.-to line-info)
-        transaction (.update state
-                             #js {:changes #js {:from line-end :to line-end :insert "\n"}
-                                  :selection #js {:anchor (inc line-end) :head (inc line-end)}})]
-    (.dispatch view transaction)))
-
-(defn custom-new-line-above
-  "Insert a new line above current line and move cursor to it"
-  [view]
-  (let [state (.-state view)
-        cursor (.. state -selection -main -head)
-        doc (.-doc state)
-        line-info (.lineAt ^js doc cursor)
-        line-start (.-from line-info)
-        transaction (.update state
-                             #js {:changes #js {:from line-start :to line-start :insert "\n"}
-                                  :selection #js {:anchor line-start :head line-start}})]
-    (.dispatch view transaction)))
-
-(defn custom-scroll-up
-  "Scroll viewport up by one line without moving cursor"
-  [view]
-  (let [line-height 20 ; Fixed line height approximation
-        scroll-dom ^js (.-scrollDOM view)]
-    (set! (.-scrollTop scroll-dom) (- (.-scrollTop scroll-dom) line-height))))
-
-(defn custom-scroll-down
-  "Scroll viewport down by one line without moving cursor"
-  [view]
-  (let [line-height 20 ; Fixed line height approximation
-        scroll-dom ^js (.-scrollDOM view)]
-    (set! (.-scrollTop scroll-dom) (+ (.-scrollTop scroll-dom) line-height))))
-
-(defn custom-cursor-viewport-up
-  "Move cursor up one line and scroll viewport up"
-  [view]
-  (let [line-height 20 ; Fixed line height approximation
-        scroll-dom ^js (.-scrollDOM view)]
-    ;; Move cursor up
-    (commands/cursorLineUp view)
-    ;; Scroll viewport up
-    (set! (.-scrollTop scroll-dom) (- (.-scrollTop scroll-dom) line-height))))
-
-(defn custom-cursor-viewport-down
-  "Move cursor down one line and scroll viewport down"
-  [view]
-  (let [line-height 20 ; Fixed line height approximation
-        scroll-dom ^js (.-scrollDOM view)]
-    ;; Move cursor down
-    (commands/cursorLineDown view)
-    ;; Scroll viewport down
-    (set! (.-scrollTop scroll-dom) (+ (.-scrollTop scroll-dom) line-height))))
-
-(defn custom-center-caret
-  "Center caret position in viewport"
-  [view]
-  (try
-    (let [state (.-state view)
-          doc (.-doc state)
-          scroll-dom ^js (.-scrollDOM view)
-          viewport-height (.-clientHeight scroll-dom)
-          scroll-top (.-scrollTop scroll-dom)
-          ;; Find the top and bottom visible positions using coordinate calculations
-          ;; similar to how custom-center-line works
-          viewport-middle-y (+ scroll-top (/ viewport-height 2))
-          ;; Find what line is at the middle of the viewport. We'll iterate through lines to
-          ;; find which one is at the middle pixel position
-          total-lines (.-lines doc)
-          middle-line-num
-            (loop [line-num 1]
-              (if (>= line-num total-lines)
-                total-lines
-                (let [line-obj (.line ^js doc line-num)
-                      line-start-pos (.-from line-obj)
-                      coords ^js (.coordsAtPos ^js view line-start-pos)]
-                  (if coords
-                    (let [line-y (+ (.-top coords) scroll-top)]
-                      (if (>= line-y viewport-middle-y) line-num (recur (inc line-num))))
-                    (recur (inc line-num))))))
-          ;; Get position of the found middle line
-          middle-line-obj (.line ^js doc middle-line-num)
-          middle-line-pos (.-from middle-line-obj)
-          ;; Create transaction to move cursor
-          transaction
-            (.update state #js {:selection #js {:anchor middle-line-pos :head middle-line-pos}})]
-      (js/console.log "Centering caret - viewport-middle-y:" viewport-middle-y
-                      "middle-line:" middle-line-num
-                      "scroll-top:" scroll-top)
-      (.dispatch view transaction))
-    (catch :default e (js/console.error "Error in custom-center-caret:" e))))
-
-(defn custom-center-line
-  "Center current line in viewport"
-  [view]
-  (try (let [state (.-state view)
-             selection (.-selection state)
-             main-selection (.-main selection)
-             cursor-pos (.-head main-selection)
-             doc (.-doc state)
-             line-info (.lineAt ^js doc cursor-pos)
-             line-start (.-from line-info)
-             ;; Get coordinates of the current line
-             coords ^js (.coordsAtPos ^js view line-start)
-             scroll-dom ^js (.-scrollDOM view)
-             scroll-top (.-scrollTop scroll-dom)
-             viewport-height (.-clientHeight scroll-dom)]
-         (when coords
-           (let [;; Calculate absolute line position
-                 line-top (.-top coords)
-                 absolute-line-top (+ line-top scroll-top)
-                 ;; Calculate target scroll to center the line
-                 target-scroll (- absolute-line-top (/ viewport-height 2))]
-             (js/console.log "Centering line - line-top:" line-top "target-scroll:" target-scroll)
-             (.scrollTo scroll-dom #js {:top (max 0 target-scroll) :behavior "smooth"}))))
-       (catch :default e (js/console.error "Error in custom-center-line:" e))))
-
-(defn get-modifiers
-  "Extract modifier keys from event"
-  [e]
-  (let [modifiers #{}]
-    (cond-> modifiers
-      (.-altKey e) (conj :alt)
-      (.-metaKey e) (conj :meta)
-      (.-ctrlKey e) (conj :ctrl)
-      (.-shiftKey e) (conj :shift))))
+            ["@codemirror/lang-markdown" :refer [markdown]]
+            ["@eighttrigrams/kw-codemirror" :as ijkl]))
 
 (defn create-editor
   "Create CodeMirror 6 editor with cljs-text-editor-style keyboard handling"
@@ -277,37 +71,10 @@
         view (new EditorView #js {:state state :parent element})]
     ;; Store reference for later access
     (aset element "__codemirror" view)
-    ;; Add cljs-text-editor-style keydown handler that prevents ALL defaults
-    (.addEventListener
-      element
-      "keydown"
-      (fn [e]
-        (let [code (.-code e)
-              modifiers (get-modifiers e)
-              key #{code modifiers}
-              command (key-commands key)]
-          ;; Only prevent default for our custom commands
-          (if command
-            (do (.preventDefault e)
-                (.stopPropagation e)
-                (js/console.log "Executing command for key:" (str key))
-                ;; Handle both function commands and custom keywords
-                (cond (= command :custom-copy) (custom-copy view)
-                      (= command :custom-paste) (custom-paste view)
-                      (= command :custom-cut) (custom-cut view)
-                      (= command :custom-new-line-below) (custom-new-line-below view)
-                      (= command :custom-new-line-above) (custom-new-line-above view)
-                      (= command :custom-scroll-up) (custom-scroll-up view)
-                      (= command :custom-scroll-down) (custom-scroll-down view)
-                      (= command :custom-cursor-viewport-up) (custom-cursor-viewport-up view)
-                      (= command :custom-cursor-viewport-down) (custom-cursor-viewport-down view)
-                      (= command :custom-center-caret) (custom-center-caret view)
-                      (= command :custom-center-line) (custom-center-line view)
-                      (fn? command) (command view)
-                      :else (js/console.warn "Unknown command:" command)))
-            ;; For non-custom keys, allow normal behavior
-            true)))
-      true)
+    ;; The scheme. install puts a capture-phase keydown listener on the view's
+    ;; own element, so these chords win before CodeMirror's keymaps — which is
+    ;; what the listener this replaces did, one level further out on `element`.
+    (ijkl/install view commands)
     ;; Focus if requested
     (when (:focus? config) (.focus view))
     view))
