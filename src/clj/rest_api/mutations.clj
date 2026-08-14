@@ -44,11 +44,13 @@
     item))
 
 (defn- create-item-impl
-  [db {:keys [title context-ids sort-idx description] :as _body}]
+  [db {:keys [title context-ids sort-idx description] :as _body} scrape?]
   (try (let [context-ids (set context-ids)
              primary-id (first context-ids)
              rest-ids (disj context-ids primary-id)
-             item (insertion/insert-item db title {:id primary-id} rest-ids "api")
+             item (if scrape?
+                    (insertion/insert-item db title {:id primary-id} rest-ids "api")
+                    (datastore/new-item db title "" context-ids nil "api"))
              item (apply-sort-idx db item sort-idx)
              item (apply-description db item description)]
          (when (map? item)
@@ -60,13 +62,47 @@
          (log/error e "REST API: create-item failed")
          (json-response 500 {:error (.getMessage e)}))))
 
+(defn- imports-context-id
+  "The numeric id of the context whose human-readable id is \"imports\", or nil
+  when there is none. Looked up and never created: an endpoint that could
+  conjure the context which opens its own gate would not be gated at all."
+  [db]
+  (try (:id (first (search/find-items-by-ids db {:human-readable-ids ["imports"]})))
+       (catch Exception e
+         (log/error e "REST API: could not look up the 'imports' context")
+         nil)))
+
+(defn- imports-only?
+  "True when `context-ids` names the \"imports\" context and nothing besides.
+  That single shape is what POST /api/items is let through a shut recording
+  gate for; a second context on the same request is enough to close it again."
+  [db context-ids]
+  (when-let [imports-id (imports-context-id db)]
+    (= #{imports-id} (set context-ids))))
+
 (defn create-item
   "POST /api/items — create a new item. JSON body: {\"title\" (required),
   \"context-ids\" (required, at least one), \"description\" (optional),
-  \"sort-idx\" (optional int, e.g. a page number). Gated by recording mode: when
-  off, the write is logged and dropped with 201 {:created true} stub."
+  \"sort-idx\" (optional int, e.g. a page number).
+
+  Query parameter \"scrape\": with ?scrape=true a title that is a URL is handed
+  to the ingesters, which fetch the page and keep what they find there — an item
+  that came about that way is stamped provenance \"scraper\". Without it, which
+  is the default, nothing is fetched: the item is stored exactly as it was sent,
+  URL-shaped title and all, and is stamped \"api\". A title no ingester
+  recognises is stored as it came in either way, and is \"api\" either way —
+  the stamp records whether the text was scraped, not whether it was asked for.
+
+  Gated by recording mode: when off, the write is logged and dropped with 201
+  {:created true} stub. One exception: when a context carrying the
+  human-readable id \"imports\" exists and \"context-ids\" names that context
+  and no other, the item is written with the gate still shut. That is the import
+  door, and it is deliberately narrow — one extra context on the request and it
+  is gated like everything else, and while no such context exists there is no
+  door at all."
   [db req]
-  (let [body (parse-json-body req)]
+  (let [body (parse-json-body req)
+        scrape? (= "true" (get-in req [:params "scrape"]))]
     (cond
       (not (:title body))
         (json-response 400 {:error "title is required"})
@@ -78,9 +114,11 @@
           {:title (:title body)
            :context-ids (:context-ids body)
            :sort-idx (:sort-idx body)
+           :scrape? scrape?
            :description-length (count (or (:description body) ""))}
           (json-response 201 {:created true})
-          (fn [] (create-item-impl db body))))))
+          (fn [] (imports-only? db (:context-ids body)))
+          (fn [] (create-item-impl db body scrape?))))))
 
 (defn- update-item-description-impl
   [db id description]

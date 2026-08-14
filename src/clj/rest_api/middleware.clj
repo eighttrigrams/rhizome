@@ -22,10 +22,23 @@
   "Log the intended write action, then either run `thunk` (when recording)
    or drop the request silently and return `dropped-response` instead.
    The log line does not reveal whether the request actually executed —
-   it records the intent identically either way."
-  [intent details dropped-response thunk]
-  (log/info (assoc details :intent intent) (str "REST " intent))
-  (if (enabled?) (thunk) dropped-response))
+   it records the intent identically either way.
+
+   The five-argument arity opens one door in a shut gate: `bypass?` is a
+   no-argument predicate, consulted only when recording is off, and a truthy
+   answer runs the thunk anyway. The intent line is emitted there too and
+   carries `:gate-bypassed true` — the one case where the line does say the
+   request went through, and it says so on purpose, because a write that took
+   a side door is worth being able to find in the log afterwards."
+  ([intent details dropped-response thunk]
+   (log-and-guard intent details dropped-response (constantly false) thunk))
+  ([intent details dropped-response bypass? thunk]
+   (let [open? (enabled?)
+         bypassed? (and (not open?) (boolean (bypass?)))]
+     (log/info (cond-> (assoc details :intent intent)
+                 bypassed? (assoc :gate-bypassed true))
+               (str "REST " intent))
+     (if (or open? bypassed?) (thunk) dropped-response))))
 
 (def ^:private max-body-log-chars 4000)
 
