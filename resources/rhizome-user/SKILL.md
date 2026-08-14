@@ -192,7 +192,11 @@ Reads work exactly as everywhere else — report the refusal and let the human
 write on their primary.
 
 URLs (YouTube, GitHub, Substack, …) passed as `title` on `POST /items` are
-auto-detected and enriched by the insertion pipeline.
+auto-detected and enriched by the insertion pipeline — but only when you ask
+for that with `?scrape=true`. Without it nothing is fetched: the title is
+stored exactly as you sent it, URL and all. The two are told apart afterwards
+by provenance, `"scraper"` against `"api"`, so ask for the scrape when you mean
+the page and leave it off when you mean the line you typed.
 
 ### Part-of relations
 

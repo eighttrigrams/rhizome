@@ -56,8 +56,18 @@ A red ⚠ REC badge appears in the top-left corner while the mode is active.
 Toggle it off with the same shortcut. Every attempted write is logged to
 `rhizome/rhizome.log` regardless of whether it was executed or dropped.
 
+`POST /api/items` has one door in the shut gate: when a context carrying the
+human-readable id `imports` exists and it is the only entry in `context-ids`,
+the item is written even with recording off. The intent line is logged with
+`gate-bypassed=true`, so that is what to grep for when a write appears that the
+badge says should not have. Add a second context and it is gated again; the
+endpoint never creates the `imports` context, so while none exists there is no
+door.
+
 URLs (YouTube, GitHub, Substack, …) passed as `title` on `POST /api/items` are
-auto-detected and enriched by the insertion pipeline.
+auto-detected and enriched by the insertion pipeline, but only under
+`?scrape=true`. Without it nothing is fetched and the title is stored as sent.
+What was scraped is stamped provenance `scraper`, everything else `api`.
 
 ## Embedding backfill
 
