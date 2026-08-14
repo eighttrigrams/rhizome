@@ -16,3 +16,5 @@ The following are necessary:
 
 When an additional query parameter `?scrape=true` is provided,
 automatic scraping may happen. Otherwise the item is inserted plainly, as is.
+When the Item has undergone scraping it gets logged under provenance 'scraper',
+otherwise under 'api'.
