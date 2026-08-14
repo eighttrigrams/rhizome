@@ -7,6 +7,7 @@
             [config :as config]
             [rest-api :as rest-api]
             [rest-api.middleware :as mw]
+            [scrapers.website :as website-scraper]
             [et.vp.ds :as ds]
             [et.vp.ds.search-test :refer [reset-db with-time db]]))
 
@@ -592,6 +593,99 @@
       (is (= [(:id x)] (ids-with-status body :cascade "deleted")))
       (is (nil? (:id (ds/get-item db {:id (:id b)}))))
       (is (nil? (:id (ds/get-item db {:id (:id x)})))))))
+
+;; -- the import door, and what is scraped ------------------------------------
+
+(defmacro with-gate-shut
+  "Run the body with recording mode off — the state the write gate is in
+   outside a UI session, and the only state in which a bypass means anything."
+  [& body]
+  `(do (mw/toggle!) (try ~@body (finally (mw/toggle!)))))
+
+(defn- imports-context!
+  "A context carrying the human-readable id \"imports\", made the way
+   `poll/ensure-imports-context!` makes it."
+  []
+  (let [ctx (ds/new-context db {:title "Imports"})]
+    (jdbc/execute-one! db ["update items set human_readable_id = 'imports' where id = ?" (:id ctx)])
+    ctx))
+
+(defn- titled
+  [title]
+  (jdbc/execute! db ["select id from items where title = ?" title]))
+
+(deftest create-item-bypasses-the-gate-for-the-imports-context-test
+  (test-with-fresh-db "an item filed under 'imports' and nothing else is written with the gate shut"
+    (let [imports (imports-context!)]
+      (with-gate-shut
+        (let [resp (POST* "/api/items" {:title "Sapiens" :context-ids [(:id imports)]})
+              body (body-json resp)]
+          (is (= 201 (:status resp)))
+          (is (integer? (:id body)) "a real id came back, not the {:created true} stub")
+          (let [stored (ds/get-item db {:id (:id body)})]
+            (is (= "Sapiens" (:title stored)))
+            (is (contains? (get-in stored [:data :contexts]) (:id imports)))))))))
+
+(deftest create-item-does-not-bypass-with-a-second-context-test
+  (test-with-fresh-db "one context besides 'imports' and the write is gated like any other"
+    (let [imports (imports-context!)
+          other (ds/new-context db {:title "Books"})]
+      (with-gate-shut
+        (let [resp (POST* "/api/items"
+                          {:title "Sapiens" :context-ids [(:id imports) (:id other)]})]
+          (is (= 201 (:status resp)))
+          (is (= {:created true} (body-json resp)))
+          (is (empty? (titled "Sapiens"))))))))
+
+(deftest create-item-does-not-bypass-without-the-imports-context-test
+  (test-with-fresh-db "a context merely titled Imports is not the door — the handle is"
+    ;; Same title, no human_readable_id. If the lookup ever went by title this
+    ;; would be the write that slipped through.
+    (let [ctx (ds/new-context db {:title "Imports"})]
+      (with-gate-shut
+        (let [resp (POST* "/api/items" {:title "Sapiens" :context-ids [(:id ctx)]})]
+          (is (= 201 (:status resp)))
+          (is (= {:created true} (body-json resp)))
+          (is (empty? (titled "Sapiens"))))))))
+
+(deftest create-item-without-scrape-stores-a-url-title-as-is-test
+  (test-with-fresh-db "with no scrape param a URL-shaped title is stored verbatim, stamped api"
+    (let [ctx (ds/new-context db {:title "Books"})
+          resp (POST* "/api/items" {:title "https://example.com/some/page"
+                                    :context-ids [(:id ctx)]})
+          body (body-json resp)
+          stored (ds/get-item db {:id (:id body)})]
+      (is (= 201 (:status resp)))
+      (is (= "https://example.com/some/page" (:title stored))
+          "the ingesters never saw it — a scrape would have put the page's title here")
+      (is (= "api" (:description_source stored)))
+      (is (= "api" (:source (first (:versions (ds/get-description-history db {:id (:id body)})))))))))
+
+(deftest create-item-with-scrape-runs-the-ingesters-test
+  (test-with-fresh-db "?scrape=true hands a URL title to the ingesters, and what they store is scraper"
+    (let [ctx (ds/new-context db {:title "Books"})
+          _ (ds/new-context db {:title "Websites"})]
+      ;; The box has no network. Only the fetch is stubbed; the dispatch, the
+      ;; website ingester and the provenance stamp are the real ones.
+      (with-redefs [website-scraper/get-metadata (fn [url] {:title (str "Page at " url) :image nil})]
+        (let [resp (POST* "/api/items?scrape=true"
+                          {:title "https://example.com/some/page" :context-ids [(:id ctx)]})
+              body (body-json resp)
+              stored (ds/get-item db {:id (:id body)})]
+          (is (= 201 (:status resp)))
+          (is (= "Page at https://example.com/some/page" (:title stored)))
+          (is (= "scraper" (:description_source stored))))))))
+
+(deftest create-item-with-scrape-but-no-ingester-is-still-api-test
+  (test-with-fresh-db "?scrape=true on a title no ingester claims is stored as it came in, stamped api"
+    (let [ctx (ds/new-context db {:title "Books"})
+          resp (POST* "/api/items?scrape=true" {:title "Sapiens" :context-ids [(:id ctx)]})
+          body (body-json resp)
+          stored (ds/get-item db {:id (:id body)})]
+      (is (= 201 (:status resp)))
+      (is (= "Sapiens" (:title stored)))
+      (is (= "api" (:description_source stored))
+          "asking for a scrape is not the same as having been scraped"))))
 
 (deftest delete-related-items-not-in-describe-test
   (testing "delete-related-items + deletion-preview are unlisted in /api/describe"
