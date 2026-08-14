@@ -12,7 +12,7 @@ The recording gate is automatically bypassed for Item creation
 with `POST /api/items` under specific circumstances.  
 The following are necessary:
 - An Item with human readable id 'imports' exists
-- The Item's only specied context is 'imports'
+- The Item's only specified context is 'imports'
 
 When an additional query parameter `?scrape=true` is provided,
 automatic scraping may happen. Otherwise the item is inserted plainly, as is.
