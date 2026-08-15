@@ -11,11 +11,20 @@ tools.deps resolves relative to that file, and the box mounts it read-only at
 at `Local lib eighttrigrams/us-vs-them not found`. What it is for: *Line
 provenance*, below.
 
-Run
+Then run
 
 ```bash
 make box
 root@dev-box:/workspace/rhizome# make onboard
+```
+
+That is the whole setup. A fresh clone plus that sibling is enough — nothing
+per-machine to write first, no token, no local compose file. Add `WITH_VEC=1`
+for semantic search (*With Vector DB*, below); both forms stand on their own:
+
+```bash
+make box
+make box WITH_VEC=1
 ```
 
 To start the app, use:
@@ -95,6 +104,11 @@ agent surface, and stays on the default bridge.
 **In Docker:** just add `WITH_VEC=1`. An `ollama` sidecar container is
 brought up automatically; the embedding model is pulled into a named volume
 on first run and cached afterwards. No host-side Ollama install required.
+
+That volume is `rhizome_ollama_models`, and it is deliberately one per
+*machine* rather than one per checkout — it holds a downloaded model, so a
+second clone should find it already there rather than pull ~640 MB again.
+Everything else a box keeps is still namespaced per checkout.
 
 ```bash
 make box WITH_VEC=1

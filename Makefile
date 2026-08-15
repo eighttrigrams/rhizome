@@ -37,6 +37,14 @@ clean:
 # never pay the 3 GB pull cost.
 COMPOSE_VEC = $(if $(filter 1,$(WITH_VEC)),COMPOSE_PROFILES=vec,)
 
+# ollama_models is declared `external: true` in docker-compose.yml so the
+# embedding model is downloaded once per machine and shared, rather than once
+# per compose project (see the volumes block there). External disables
+# compose's auto-creation, so the volume has to exist before the sidecar comes
+# up. `docker volume create` is idempotent -- a no-op when it already exists --
+# and is only worth running when the `vec` profile will actually start ollama.
+ENSURE_OLLAMA_VOLUME = $(if $(filter 1,$(WITH_VEC)),docker volume create rhizome_ollama_models >/dev/null &&,)
+
 # Always layer docker-compose.yml with the generated compose.ports.yml so
 # the host bindings come from .envrc / config.edn / shadow-cljs.edn rather
 # than YAML fallbacks. COMPOSE_FILE uses ':' as separator (compose convention).
@@ -45,8 +53,15 @@ COMPOSE_VEC = $(if $(filter 1,$(WITH_VEC)),COMPOSE_PROFILES=vec,)
 # (this checkout's owner mounts an in-box CLAUDE.md through it). Compose only
 # auto-loads an override file when COMPOSE_FILE is unset -- and we always set
 # it -- so it has to be named here, last, to win.
-COMPOSE_OVERRIDE = docker-compose.override.yml
-COMPOSE_FILES = COMPOSE_FILE=docker-compose.yml:compose.ports.yml:$(COMPOSE_OVERRIDE)
+#
+# Named only when it is actually present. A COMPOSE_FILE entry that does not
+# exist is a hard error from compose ("stat .../docker-compose.override.yml:
+# no such file or directory"), and this file is absent in every clone but its
+# owner's -- so naming it unconditionally broke `make box` for everyone else.
+# $(wildcard) reports a dangling symlink as absent too, which is what we want:
+# the owner's copy is a symlink into a dotfiles repo.
+COMPOSE_OVERRIDE = $(if $(wildcard docker/docker-compose.override.yml),:docker-compose.override.yml,)
+COMPOSE_FILES = COMPOSE_FILE=docker-compose.yml:compose.ports.yml$(COMPOSE_OVERRIDE)
 
 # Compose project name is derived from this checkout's directory name so
 # two sibling clones get separate volumes (m2_cache, npm_cache, ...) and
@@ -77,11 +92,13 @@ YOLO_INTERNET = $(if $(filter 1,$(INTERNET)),+internet,)
 yolo:
 	@./scripts/detect-ports.sh check PORT SHADOW_PORT || exit 0; \
 	./scripts/write-compose-ports.sh $(PORT) $(SHADOW_PORT) && \
+	$(ENSURE_OLLAMA_VOLUME) \
 	$(COMPOSE_ENV) ./docker/run.sh $(YOLO_INTERNET)
 
 box:
 	@./scripts/detect-ports.sh check PORT SHADOW_PORT || exit 0; \
 	./scripts/write-compose-ports.sh $(PORT) $(SHADOW_PORT) && \
+	$(ENSURE_OLLAMA_VOLUME) \
 	cd docker && $(COMPOSE_ENV) docker compose build box && $(COMPOSE_ENV) docker compose run --rm --service-ports box
 
 install-sqlite-vec:
