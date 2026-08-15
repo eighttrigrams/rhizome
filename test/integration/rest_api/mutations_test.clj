@@ -676,6 +676,48 @@
           (is (= "Page at https://example.com/some/page" (:title stored)))
           (is (= "scraper" (:description_source stored))))))))
 
+(deftest create-item-with-scrape-keeps-the-named-contexts-test
+  (test-with-fresh-db "a bare-domain URL is filed under the contexts the request named"
+    ;; The domain has no path, so the website ingester's own item *is* the item
+    ;; being created. It used to be conjured a few lines above the branch that
+    ;; files it, and so came out under Websites alone — the import door opened
+    ;; on a context the item then never reached.
+    (let [imports (imports-context!)
+          _ (ds/new-context db {:title "Websites"})]
+      (with-redefs [website-scraper/get-metadata (fn [url] {:title (str "Site " url) :image nil})]
+        (with-gate-shut
+          (let [resp (POST* "/api/items?scrape=true"
+                            {:title "https://example.com" :context-ids [(:id imports)]})
+                body (body-json resp)
+                stored (ds/get-item db {:id (:id body)})]
+            (is (= 201 (:status resp)))
+            (is (contains? (get-in stored [:data :contexts]) (:id imports)))))))))
+
+(deftest create-item-with-scrape-files-an-already-known-url-test
+  (test-with-fresh-db "a URL the graph already holds still lands under the named context"
+    ;; Second bookmark of a page: the ingester answers with the item it found,
+    ;; which is under the contexts of the first bookmark. Nothing new is stored
+    ;; — same id — but the context this caller named is put on it, or the write
+    ;; would report 201 for a bookmark that arrived nowhere.
+    (let [imports (imports-context!)
+          books (ds/new-context db {:title "Books"})
+          _ (ds/new-context db {:title "Websites"})]
+      (with-redefs [website-scraper/get-metadata (fn [url] {:title (str "Page at " url) :image nil})]
+        (let [first-id (:id (body-json (POST* "/api/items?scrape=true"
+                                              {:title "https://example.com/some/page"
+                                               :context-ids [(:id books)]})))]
+          (with-gate-shut
+            (let [resp (POST* "/api/items?scrape=true"
+                              {:title "https://example.com/some/page"
+                               :context-ids [(:id imports)]})
+                  body (body-json resp)
+                  stored (ds/get-item db {:id (:id body)})]
+              (is (= 201 (:status resp)))
+              (is (= first-id (:id body)) "the page was not stored a second time")
+              (is (contains? (get-in stored [:data :contexts]) (:id imports)))
+              (is (contains? (get-in stored [:data :contexts]) (:id books))
+                  "and the context it was already filed under is still there"))))))))
+
 (deftest create-item-with-scrape-but-no-ingester-is-still-api-test
   (test-with-fresh-db "?scrape=true on a title no ingester claims is stored as it came in, stamped api"
     (let [ctx (ds/new-context db {:title "Books"})

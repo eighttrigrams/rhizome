@@ -43,6 +43,29 @@
     (datastore/update-context-description db {:id (:id item) :description description} "api")
     item))
 
+(defn- ensure-contexts!
+  "File `item` under every context the request named that it is not already
+  under, and hand back the item as it stands afterwards.
+
+  A URL the graph already holds is answered by the ingesters with the item they
+  found rather than one they made, and that item sits under the contexts it was
+  filed under the first time — not the ones this caller asked for. In the app
+  that is the point: a human pasted a link and gets shown the item they already
+  have. Here nobody is sitting there. A caller that named \"imports\" and read a
+  201 has no way to tell that its item never arrived, so the contexts it named
+  go on either way.
+
+  A no-op on the ordinary path, where the insert already filed the item under
+  all of them."
+  [db item context-ids]
+  (let [missing (remove (set (keys (get-in item [:data :contexts]))) context-ids)]
+    (doseq [ctx-id missing]
+      (when-let [ctx (datastore/get-item db {:id ctx-id})]
+        ;; Re-read per link: link-item-to-another-item! rebuilds the context map
+        ;; out of the item it is handed, so a stale one would undo the link before.
+        (relations/link-item-to-another-item! db (datastore/get-item db {:id (:id item)}) ctx true)))
+    (if (seq missing) (merge item (datastore/get-item db {:id (:id item)})) item)))
+
 (defn- create-item-impl
   [db {:keys [title context-ids sort-idx description] :as _body} scrape?]
   (try (let [context-ids (set context-ids)
@@ -51,6 +74,7 @@
              item (if scrape?
                     (insertion/insert-item db title {:id primary-id} rest-ids "api")
                     (datastore/new-item db title "" context-ids nil "api"))
+             item (if (map? item) (ensure-contexts! db item context-ids) item)
              item (apply-sort-idx db item sort-idx)
              item (apply-description db item description)]
          (when (map? item)
@@ -92,6 +116,12 @@
   URL-shaped title and all, and is stamped \"api\". A title no ingester
   recognises is stored as it came in either way, and is \"api\" either way —
   the stamp records whether the text was scraped, not whether it was asked for.
+
+  A URL the graph already holds is not stored a second time: the ingesters
+  answer with the item that is already there, and its id is what comes back.
+  The contexts named on the request go on that item all the same, so a link
+  bookmarked twice is filed where this caller asked for it rather than
+  quietly going nowhere.
 
   Gated by recording mode: when off, the write is logged and dropped with 201
   {:created true} stub. One exception: when a context carrying the

@@ -44,7 +44,11 @@
   [db url context-ids-set _]
   (let [{:keys [domain-url full-url host has-path?]} (parse-url url)
         websites-id (common/get-item-or-throw-error db "Websites")
-        website-id (create-website-or-take-existing db domain-url host websites-id)
+        ;; Only the page branch needs the domain's own item. Resolving it for a
+        ;; bare domain created the item the :else branch then found as already
+        ;; existing, so that branch's create -- the one that files it under the
+        ;; caller's contexts -- could never run.
+        website-id (when has-path? (create-website-or-take-existing db domain-url host websites-id))
         existing-item
           (when has-path?
             (datastore/get-item-by-path db "data->'resource-links'->>'webpage-url'" full-url))]
