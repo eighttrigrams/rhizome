@@ -278,10 +278,15 @@
   [{:keys [db]}]
   (fn [{:keys [selected-item] :as state} {:keys [title]}]
     (log/info "insert-item")
-    (let [item (insertion/insert-item db
-                                      title
-                                      selected-item
-                                      (get-selected-secondary-contexts-set state))]
+    (let [secondary-contexts-set (get-selected-secondary-contexts-set state)
+          ;; Pasting a link is a gesture at the context you are standing in, so
+          ;; it is filed there even when the graph already holds it and the
+          ;; ingester hands back what it found. The item view below still opens
+          ;; on it, which is how you see that it was already there.
+          item (insertion/ensure-contexts!
+                 db
+                 (insertion/insert-item db title selected-item secondary-contexts-set)
+                 (insertion/contexts-of selected-item secondary-contexts-set))]
       (merge {:active-search nil}
              (if (map? item)
                (merge {:item-view? true :old-selected-item selected-item}

@@ -173,7 +173,13 @@
         (try
           (when (and link (not (seen? db :atom_poll_seen :entry_id entry-id)))
             (log/info (str "poll: importing " link " from " (or name feed-url)))
-            (let [item (insertion/insert-item db link {:id imports-id} nil "scraper")]
+            ;; Filed under Imports even when the graph already holds the link:
+            ;; the entry is new, and the folder it came in through is where it
+            ;; has to show up or nothing ever tells you it arrived.
+            (let [item (insertion/ensure-contexts!
+                         db
+                         (insertion/insert-item db link {:id imports-id} nil "scraper")
+                         #{imports-id})]
               (fill-description! db item summary))
             (mark-seen! db :atom_poll_seen :entry_id entry-id))
           (catch Exception e

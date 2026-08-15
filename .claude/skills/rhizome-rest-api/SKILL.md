@@ -69,11 +69,14 @@ auto-detected and enriched by the insertion pipeline, but only under
 `?scrape=true`. Without it nothing is fetched and the title is stored as sent.
 What was scraped is stamped provenance `scraper`, everything else `api`.
 
-A URL already in the graph is not stored twice: the ingesters answer with the
-item that is already there, and its id is what comes back. The contexts named
-on the request go on it all the same, alongside the ones it was filed under
-before and the ones the ingester adds of its own (Websites, Articles, the
-channel, the repo).
+`POST /api/items` creates and does nothing else — that is what makes the door
+safe to leave open. A title an ingester recognises as something the graph
+already holds is refused with `409 {"collision":true,"existing-item-id":…}` and
+nothing is written: not the contexts on the request, not the description, not
+the sort index. To file an existing item under another context use
+`PUT /api/relations`, and to replace its description `PUT /api/items/:id` —
+both need recording mode on. Pasting the same link inside the app does file it
+under the context you are standing in; the API deliberately does not.
 
 ## Embedding backfill
 

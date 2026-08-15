@@ -709,37 +709,44 @@
             (is (= 201 (:status resp)))
             (is (contains? (get-in stored [:data :contexts]) (:id imports)))))))))
 
-(deftest create-item-with-scrape-files-an-already-known-url-test
-  (test-with-fresh-db "a URL the graph already holds still lands under the named context"
-    ;; Second bookmark of a page: the ingester answers with the item it found,
-    ;; which is under the contexts of the first bookmark. Nothing new is stored
-    ;; — same id — but the context this caller named is put on it, or the write
-    ;; would report 201 for a bookmark that arrived nowhere.
+(deftest create-item-with-scrape-refuses-a-url-already-held-test
+  (test-with-fresh-db "a URL the graph already holds is refused, and nothing about it changes"
+    ;; POST creates. A second bookmark of the same page is a collision, and the
+    ;; refusal has to leave the item exactly as it stood — the description on
+    ;; this request is the one that would otherwise have overwritten it, and the
+    ;; context on this request is the filing that would otherwise have happened.
     (let [imports (imports-context!)
           books (ds/new-context db {:title "Books"})
           _ (ds/new-context db {:title "Websites"})]
       (with-redefs [website-scraper/get-metadata (fn [url] {:title (str "Page at " url) :image nil})]
         (let [first-id (:id (body-json (POST* "/api/items?scrape=true"
                                               {:title "https://example.com/some/page"
-                                               :context-ids [(:id books)]})))]
+                                               :context-ids [(:id books)]
+                                               :description "what I thought of it"})))]
           (with-gate-shut
             (let [resp (POST* "/api/items?scrape=true"
                               {:title "https://example.com/some/page"
-                               :context-ids [(:id imports)]})
+                               :context-ids [(:id imports)]
+                               :description "something else entirely"})
                   body (body-json resp)
-                  stored (ds/get-item db {:id (:id body)})]
-              (is (= 201 (:status resp)))
-              (is (= first-id (:id body)) "the page was not stored a second time")
-              (is (contains? (get-in stored [:data :contexts]) (:id imports)))
+                  stored (ds/get-item db {:id first-id})]
+              (is (= 409 (:status resp)))
+              (is (true? (:collision body)))
+              (is (= first-id (:existing-item-id body)) "the refusal names what it collided with")
+              (is (re-find #"already in the graph" (:error body)))
+              (is (= "what I thought of it" (:description stored))
+                  "the description on the refused request did not land")
+              (is (not (contains? (get-in stored [:data :contexts]) (:id imports)))
+                  "and neither did the context it named")
               (is (contains? (get-in stored [:data :contexts]) (:id books))
-                  "and the context it was already filed under is still there"))))))))
+                  "what was already there is untouched"))))))))
 
-(deftest create-item-with-scrape-refiles-a-known-post-from-another-site-test
-  (test-with-fresh-db "a site that used to refuse a second bookmark files it instead"
+(deftest create-item-with-scrape-refuses-a-known-post-from-another-site-test
+  (test-with-fresh-db "a collision on another site is the same refusal, not a 500"
     ;; The x.com ingester threw on a post already in the graph, so a bookmark
-    ;; application re-posting a link read a 500. Nothing is stored twice, but
-    ;; the contexts the request named need an item to go on to.
-    ;; This one reaches no network: the ingester builds the post from the URL.
+    ;; application re-posting a link read a 500 and a stack trace. The collision
+    ;; is a fact about the graph, not a failure, and every site says so the same
+    ;; way. This one reaches no network: the ingester builds the post from the URL.
     (let [imports (imports-context!)
           books (ds/new-context db {:title "Books"})
           _ (ds/new-context db {:title "Twitter"})
@@ -751,13 +758,10 @@
       (is (integer? first-id) "the first bookmark landed")
       (with-gate-shut
         (let [resp (POST* "/api/items?scrape=true" {:title url :context-ids [(:id imports)]})
-              body (body-json resp)
-              stored (ds/get-item db {:id (:id body)})]
-          (is (= 201 (:status resp)))
-          (is (= first-id (:id body)) "the post was not stored a second time")
-          (is (contains? (get-in stored [:data :contexts]) (:id imports)))
-          (is (contains? (get-in stored [:data :contexts]) (:id books))
-              "and the context it was already filed under is still there"))))))
+              body (body-json resp)]
+          (is (= 409 (:status resp)))
+          (is (= first-id (:existing-item-id body)))
+          (is (= 1 (count (titled "X Post"))) "the post was not stored a second time"))))))
 
 (deftest create-item-with-scrape-but-no-ingester-is-still-api-test
   (test-with-fresh-db "?scrape=true on a title no ingester claims is stored as it came in, stamped api"

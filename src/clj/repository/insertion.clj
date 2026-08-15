@@ -19,6 +19,12 @@
   [db title context-ids-set source]
   (datastore/new-item db title "" context-ids-set nil source))
 
+(defn contexts-of
+  "The contexts an insertion files under: the one selected, and the secondary
+   ones ticked alongside it."
+  [selected-item selected-secondary-contexts-set]
+  (into #{} (conj selected-secondary-contexts-set (:id selected-item))))
+
 (defn ensure-contexts!
   "Put the contexts the caller named onto `item`, and hand it back.
 
@@ -32,6 +38,13 @@
    that item stands under the contexts of the first time round. Nothing is
    stored twice -- that is the point of finding it -- but it is filed where this
    caller asked for it as well.
+
+   Deliberately not folded into insert-item, because what a collision means is
+   the caller's to say and the callers do not agree. Standing in a context and
+   pasting a link you already have is a gesture at that context, so the app and
+   the feed poller ask for this. POST /api/items creates, and only creates --
+   that is the whole of what the import door is open for -- so it refuses the
+   collision instead, and writes nothing.
 
    A no-op where the insertion already did it, which is every fresh item, and on
    a batch import, which answers with a list rather than an item."
@@ -57,19 +70,17 @@
    (insert-item db title selected-item selected-secondary-contexts-set "app"))
   ([db title selected-item selected-secondary-contexts-set source]
    (log/info (str "Import for " title))
-   (let [context-ids-set (into #{} (conj selected-secondary-contexts-set (:id selected-item)))
-         item (cond
-                (batch/match? title) (batch/ingest db title nil nil)
-                (youtube/match? title) (youtube/ingest db title context-ids-set nil)
-                (github/match? title) (github/save-article db title context-ids-set)
-                (apple-pods/match? title) (apple-pods/ingest db title context-ids-set nil)
-                (substack/match? title) ((substack/make:save-article false) db title context-ids-set)
-                (substack-external/match? title)
-                  (substack-external/save-article db title context-ids-set)
-                (substack-plain/match? title) (substack-plain/save-article db title context-ids-set)
-                (substack-note/match? title) (substack-note/ingest db title context-ids-set)
-                (twitter-tweet/match? title) (twitter-tweet/ingest db title context-ids-set)
-                (simonwillison/match? title) (simonwillison/ingest db title context-ids-set nil)
-                (website/match? title) (website/ingest db title context-ids-set nil)
-                :else (normal-item-insertion db title context-ids-set source))]
-     (ensure-contexts! db item context-ids-set))))
+   (let [context-ids-set (contexts-of selected-item selected-secondary-contexts-set)]
+     (cond (batch/match? title) (batch/ingest db title nil nil)
+           (youtube/match? title) (youtube/ingest db title context-ids-set nil)
+           (github/match? title) (github/save-article db title context-ids-set)
+           (apple-pods/match? title) (apple-pods/ingest db title context-ids-set nil)
+           (substack/match? title) ((substack/make:save-article false) db title context-ids-set)
+           (substack-external/match? title)
+             (substack-external/save-article db title context-ids-set)
+           (substack-plain/match? title) (substack-plain/save-article db title context-ids-set)
+           (substack-note/match? title) (substack-note/ingest db title context-ids-set)
+           (twitter-tweet/match? title) (twitter-tweet/ingest db title context-ids-set)
+           (simonwillison/match? title) (simonwillison/ingest db title context-ids-set nil)
+           (website/match? title) (website/ingest db title context-ids-set nil)
+           :else (normal-item-insertion db title context-ids-set source)))))

@@ -43,6 +43,34 @@
     (datastore/update-context-description db {:id (:id item) :description description} "api")
     item))
 
+(defn- collision-refusal
+  "The answer to a POST whose title names something the graph already holds.
+
+  POST /api/items creates, and creating is the whole of what it does. That is
+  what the import door is open for: a request that can only add cannot rewrite
+  anything that is already there, and so it is safe to let through a shut gate.
+  An ingester handed a URL it has seen before answers with the item it found,
+  and everything this endpoint would do next — filing it under the contexts on
+  the request, replacing its description, moving its sort index — is that
+  rewrite. So it is refused, and nothing is written.
+
+  409 and not 400: the request was well formed, and what stands in the way is
+  the state of the graph. The item that was found is named in the body, so a
+  caller can tell a collision from a failure and can see what it collided with."
+  [item]
+  (log/info {:event "create-item-collision" :id (:id item) :title (:title item)}
+            (str "REST create-item refused: already held as item " (:id item)))
+  (json-response 409
+                 {:error (str "already in the graph as item " (:id item)
+                              " (\"" (:title item) "\"). POST /api/items creates; it does not"
+                              " change an item that is already there. PUT /api/items/" (:id item)
+                              " replaces a description and PUT /api/relations files an item under"
+                              " another context — both need recording mode on, which the import"
+                              " door does not turn on for them.")
+                  :collision true
+                  :existing-item-id (:id item)
+                  :existing-item-title (:title item)}))
+
 (defn- create-item-impl
   [db {:keys [title context-ids sort-idx description] :as _body} scrape?]
   (try (let [context-ids (set context-ids)
@@ -50,14 +78,18 @@
              rest-ids (disj context-ids primary-id)
              item (if scrape?
                     (insertion/insert-item db title {:id primary-id} rest-ids "api")
-                    (datastore/new-item db title "" context-ids nil "api"))
-             item (apply-sort-idx db item sort-idx)
-             item (apply-description db item description)]
-         (when (map? item)
-           (embed-item-best-effort! db item))
-         (if (map? item)
-           (json-response 201 (item->api item))
-           (json-response 201 {:created true})))
+                    (datastore/new-item db title "" context-ids nil "api"))]
+         ;; Before apply-sort-idx and apply-description, which are writes: a
+         ;; refusal that had already changed the item would not be one.
+         (if (:previously-existing-item? item)
+           (collision-refusal item)
+           (let [item (apply-sort-idx db item sort-idx)
+                 item (apply-description db item description)]
+             (when (map? item)
+               (embed-item-best-effort! db item))
+             (if (map? item)
+               (json-response 201 (item->api item))
+               (json-response 201 {:created true})))))
        (catch Exception e
          (log/error e "REST API: create-item failed")
          (json-response 500 {:error (.getMessage e)}))))
@@ -94,12 +126,12 @@
   recognises is stored as it came in either way, and is \"api\" either way —
   the stamp records whether the text was scraped, not whether it was asked for.
 
-  A URL the graph already holds is not stored a second time: the ingesters
-  answer with the item that is already there, and its id is what comes back.
-  The contexts named on the request go on that item all the same, alongside
-  the ones it was filed under before and the ones the ingester adds of its own
-  (Websites, Articles, the channel, the repo), so a link bookmarked twice is
-  filed where this caller asked for it rather than quietly going nowhere.
+  This endpoint creates and does nothing else. A title an ingester recognises
+  as something the graph already holds is refused with 409 {\"collision\": true}
+  naming the item that was found, and nothing is written — not the contexts on
+  the request, not the description, not the sort index. Filing an existing item
+  under another context is PUT /api/relations and replacing its description is
+  PUT /api/items/:id; both are gated by recording mode.
 
   Gated by recording mode: when off, the write is logged and dropped with 201
   {:created true} stub. One exception: when a context carrying the
@@ -107,7 +139,9 @@
   written with the gate still shut, whatever else is named alongside. That is
   the import door. It stands on the handle and on nothing else — a context
   merely titled \"Imports\" is not the door, and while no context carries the
-  handle there is no door at all."
+  handle there is no door at all. What keeps the door safe to leave open is the
+  paragraph above: a request that comes through it can add to the graph and can
+  do nothing else to it."
   [db req]
   (let [body (parse-json-body req)
         scrape? (= "true" (get-in req [:params "scrape"]))]

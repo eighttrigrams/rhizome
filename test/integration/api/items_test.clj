@@ -20,6 +20,29 @@
       (is (false? (:item-view? resp)))
       (is (some #(= "The Prize" (:title %)) (:items resp))))))
 
+(deftest insert-item-files-a-link-the-graph-already-holds-test
+  (with-fresh-db "pasting a link you already have files it under the context you stand in"
+    ;; The app's half of what POST /api/items refuses. Standing in a context and
+    ;; pasting a link is a gesture at that context, so the item is filed there
+    ;; even though nothing new is stored; the item view opening on it is how you
+    ;; see it was already there. The x.com ingester reaches no network — it
+    ;; builds the post out of the URL — so this is the shipped path throughout.
+    (let [{books :selected-item} (call! :insert-context nil {:title "Books"})
+          {shelf :selected-item} (call! :insert-context nil {:title "Shelf"})
+          _ (call! :insert-context nil {:title "Twitter"})
+          _ (call! :insert-context nil {:title "Twitter Handles"})
+          _ (call! :insert-context nil {:title "Poasts"})
+          url "https://x.com/someone/status/123"
+          _ (call! :insert-item {:selected-item books} {:title url})
+          post (ds/get-item-by-title db {:title "X Post"})
+          resp (call! :insert-item {:selected-item shelf} {:title url})]
+      (is (= 1 (relations-count (:id post) (:id shelf)))
+          "the second paste filed it under the context it was pasted into")
+      (is (= 1 (relations-count (:id post) (:id books)))
+          "and left the context it was already under alone")
+      (is (true? (:item-view? resp))
+          "the app still opens on the item, which is how you see it already existed"))))
+
 (deftest delete-item-test
   (with-fresh-db "removes the item from the database"
     (let [{ctx :selected-item} (call! :insert-context nil {:title "Books"})
