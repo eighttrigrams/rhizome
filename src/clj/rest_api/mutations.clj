@@ -43,29 +43,6 @@
     (datastore/update-context-description db {:id (:id item) :description description} "api")
     item))
 
-(defn- ensure-contexts!
-  "File `item` under every context the request named that it is not already
-  under, and hand back the item as it stands afterwards.
-
-  A URL the graph already holds is answered by the ingesters with the item they
-  found rather than one they made, and that item sits under the contexts it was
-  filed under the first time — not the ones this caller asked for. In the app
-  that is the point: a human pasted a link and gets shown the item they already
-  have. Here nobody is sitting there. A caller that named \"imports\" and read a
-  201 has no way to tell that its item never arrived, so the contexts it named
-  go on either way.
-
-  A no-op on the ordinary path, where the insert already filed the item under
-  all of them."
-  [db item context-ids]
-  (let [missing (remove (set (keys (get-in item [:data :contexts]))) context-ids)]
-    (doseq [ctx-id missing]
-      (when-let [ctx (datastore/get-item db {:id ctx-id})]
-        ;; Re-read per link: link-item-to-another-item! rebuilds the context map
-        ;; out of the item it is handed, so a stale one would undo the link before.
-        (relations/link-item-to-another-item! db (datastore/get-item db {:id (:id item)}) ctx true)))
-    (if (seq missing) (merge item (datastore/get-item db {:id (:id item)})) item)))
-
 (defn- create-item-impl
   [db {:keys [title context-ids sort-idx description] :as _body} scrape?]
   (try (let [context-ids (set context-ids)
@@ -74,7 +51,6 @@
              item (if scrape?
                     (insertion/insert-item db title {:id primary-id} rest-ids "api")
                     (datastore/new-item db title "" context-ids nil "api"))
-             item (if (map? item) (ensure-contexts! db item context-ids) item)
              item (apply-sort-idx db item sort-idx)
              item (apply-description db item description)]
          (when (map? item)
@@ -96,13 +72,14 @@
          (log/error e "REST API: could not look up the 'imports' context")
          nil)))
 
-(defn- imports-only?
-  "True when `context-ids` names the \"imports\" context and nothing besides.
-  That single shape is what POST /api/items is let through a shut recording
-  gate for; a second context on the same request is enough to close it again."
+(defn- names-imports?
+  "True when \"imports\" is among the contexts `context-ids` names, whatever else
+  is named alongside it. That is what POST /api/items is let through a shut
+  recording gate for. The door stands on the handle and on nothing else: a
+  context merely titled \"Imports\" is not it."
   [db context-ids]
   (when-let [imports-id (imports-context-id db)]
-    (= #{imports-id} (set context-ids))))
+    (contains? (set context-ids) imports-id)))
 
 (defn create-item
   "POST /api/items — create a new item. JSON body: {\"title\" (required),
@@ -119,17 +96,18 @@
 
   A URL the graph already holds is not stored a second time: the ingesters
   answer with the item that is already there, and its id is what comes back.
-  The contexts named on the request go on that item all the same, so a link
-  bookmarked twice is filed where this caller asked for it rather than
-  quietly going nowhere.
+  The contexts named on the request go on that item all the same, alongside
+  the ones it was filed under before and the ones the ingester adds of its own
+  (Websites, Articles, the channel, the repo), so a link bookmarked twice is
+  filed where this caller asked for it rather than quietly going nowhere.
 
   Gated by recording mode: when off, the write is logged and dropped with 201
   {:created true} stub. One exception: when a context carrying the
-  human-readable id \"imports\" exists and \"context-ids\" names that context
-  and no other, the item is written with the gate still shut. That is the import
-  door, and it is deliberately narrow — one extra context on the request and it
-  is gated like everything else, and while no such context exists there is no
-  door at all."
+  human-readable id \"imports\" exists and \"context-ids\" names it, the item is
+  written with the gate still shut, whatever else is named alongside. That is
+  the import door. It stands on the handle and on nothing else — a context
+  merely titled \"Imports\" is not the door, and while no context carries the
+  handle there is no door at all."
   [db req]
   (let [body (parse-json-body req)
         scrape? (= "true" (get-in req [:params "scrape"]))]
@@ -147,7 +125,7 @@
            :scrape? scrape?
            :description-length (count (or (:description body) ""))}
           (json-response 201 {:created true})
-          (fn [] (imports-only? db (:context-ids body)))
+          (fn [] (names-imports? db (:context-ids body)))
           (fn [] (create-item-impl db body scrape?))))))
 
 (defn- update-item-description-impl

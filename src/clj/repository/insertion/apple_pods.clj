@@ -43,17 +43,21 @@
   (let [apple-podcasts-platform-id (common/get-item-or-throw-error db "Apple Podcasts")
         [podcast-id podcast-title]
           (create-podcast-or-take-existing db url apple-podcasts-platform-id)
-        podcast-episodes-id (common/get-item-or-throw-error db "Podcast Episodes")]
-    (when (:id
-            (datastore/get-item-by-path db "data->'resource-links'->>'apple-podcast-episode'" url))
-      (throw (Exception. "apple podcast episode already exists!")))
-    (let [title (-> url
-                    extract-title
-                    (str/replace (str podcast-title ":") "")
-                    str/trim)]
-      (common/insert-item
-        db
-        title
-        ""
-        (conj context-ids-set podcast-id podcast-episodes-id apple-podcasts-platform-id)
-        {:apple-podcast-episode url}))))
+        podcast-episodes-id (common/get-item-or-throw-error db "Podcast Episodes")
+        existing-item
+          (datastore/get-item-by-path db "data->'resource-links'->>'apple-podcast-episode'" url)]
+    ;; An episode we already hold is answered with the item we hold, the way the
+    ;; other ingesters answer it. It used to throw, which told the caller
+    ;; nothing it could use and left the contexts it asked for nowhere to go.
+    (if (:id existing-item)
+      (assoc (datastore/get-item db existing-item) :previously-existing-item? true)
+      (let [title (-> url
+                      extract-title
+                      (str/replace (str podcast-title ":") "")
+                      str/trim)]
+        (common/insert-item
+          db
+          title
+          ""
+          (conj context-ids-set podcast-id podcast-episodes-id apple-podcasts-platform-id)
+          {:apple-podcast-episode url})))))

@@ -106,7 +106,13 @@
                 (do (log/info (str "poll: skipping short video " url))
                     (mark-seen! db :youtube_poll_seen :video_id video-id))
                 (do (log/info (str "poll: importing " url " from " (or name channel-id)))
-                    (youtube-insertion/ingest db url #{imports-id} nil)
+                    ;; Straight at the ingester rather than through
+                    ;; insertion/insert-item, so Imports is put on here -- a
+                    ;; video already in the graph would otherwise be marked seen
+                    ;; without ever showing up in the folder it came in through.
+                    (insertion/ensure-contexts! db
+                                                (youtube-insertion/ingest db url #{imports-id} nil)
+                                                #{imports-id})
                     (mark-seen! db :youtube_poll_seen :video_id video-id))))
             (catch Exception e
               (log/error e (str "poll: failed importing " url))))))

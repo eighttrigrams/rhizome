@@ -35,23 +35,28 @@
         note-id (subs url 0 (or (str/index-of url "?") (count url)))
         tree (scrapers.substack-note/get-tree note-id)
         {:keys [title date year image description]} (scrapers.substack-note/get-date tree)
-        year-id (common/get-item-or-throw-error db year)]
-    (when (:id (datastore/get-item-by-path db "data->'resource-links'->>'substack-note'" note-id))
-      (throw (Exception. "substack note already exists!")))
-    (let [item (common/insert-item
-                 db
-                 title
-                 ""
-                 (conj context-ids-set poasts-id substack-platform-id author-id year-id)
-                 {:substack-note note-id})
-          item (datastore/update-context-description db
-                                                     (assoc item :description description)
-                                                     "scraper")]
-      (when image
-        (try (upload/upload-preview-file db {:tempfile image} (:id item) "false")
-             (catch Exception e
-               (log/error
-                 (str "problem while trying to create preview image for substack note. message"
-                      (.getMessage e))))))
-      (datastore/insert-date db (:id item) date)
-      item)))
+        year-id (common/get-item-or-throw-error db year)
+        existing-item
+          (datastore/get-item-by-path db "data->'resource-links'->>'substack-note'" note-id)]
+    ;; A note we already hold is answered with the item we hold, the way the
+    ;; other ingesters answer it. It used to throw, which told the caller
+    ;; nothing it could use and left the contexts it asked for nowhere to go.
+    (if (:id existing-item)
+      (assoc (datastore/get-item db existing-item) :previously-existing-item? true)
+      (let [item (common/insert-item
+                   db
+                   title
+                   ""
+                   (conj context-ids-set poasts-id substack-platform-id author-id year-id)
+                   {:substack-note note-id})
+            item (datastore/update-context-description db
+                                                       (assoc item :description description)
+                                                       "scraper")]
+        (when image
+          (try (upload/upload-preview-file db {:tempfile image} (:id item) "false")
+               (catch Exception e
+                 (log/error
+                   (str "problem while trying to create preview image for substack note. message"
+                        (.getMessage e))))))
+        (datastore/insert-date db (:id item) date)
+        item))))

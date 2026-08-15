@@ -57,17 +57,23 @@ Toggle it off with the same shortcut. Every attempted write is logged to
 `rhizome/rhizome.log` regardless of whether it was executed or dropped.
 
 `POST /api/items` has one door in the shut gate: when a context carrying the
-human-readable id `imports` exists and it is the only entry in `context-ids`,
-the item is written even with recording off. The intent line is logged with
-`gate-bypassed=true`, so that is what to grep for when a write appears that the
-badge says should not have. Add a second context and it is gated again; the
-endpoint never creates the `imports` context, so while none exists there is no
-door.
+human-readable id `imports` exists and `context-ids` names it, the item is
+written even with recording off, whatever else is named alongside. The intent
+line is logged with `gate-bypassed=true`, so that is what to grep for when a
+write appears that the badge says should not have. The door goes by the handle
+and not by the title, and the endpoint never creates the `imports` context, so
+while no context carries the handle there is no door.
 
 URLs (YouTube, GitHub, Substack, …) passed as `title` on `POST /api/items` are
 auto-detected and enriched by the insertion pipeline, but only under
 `?scrape=true`. Without it nothing is fetched and the title is stored as sent.
 What was scraped is stamped provenance `scraper`, everything else `api`.
+
+A URL already in the graph is not stored twice: the ingesters answer with the
+item that is already there, and its id is what comes back. The contexts named
+on the request go on it all the same, alongside the ones it was filed under
+before and the ones the ingester adds of its own (Websites, Articles, the
+channel, the repo).
 
 ## Embedding backfill
 

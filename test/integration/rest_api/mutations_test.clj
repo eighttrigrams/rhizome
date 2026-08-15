@@ -626,13 +626,29 @@
             (is (= "Sapiens" (:title stored)))
             (is (contains? (get-in stored [:data :contexts]) (:id imports)))))))))
 
-(deftest create-item-does-not-bypass-with-a-second-context-test
-  (test-with-fresh-db "one context besides 'imports' and the write is gated like any other"
+(deftest create-item-bypasses-the-gate-with-imports-among-the-contexts-test
+  (test-with-fresh-db "'imports' among the contexts opens the door, whatever else is named"
     (let [imports (imports-context!)
           other (ds/new-context db {:title "Books"})]
       (with-gate-shut
         (let [resp (POST* "/api/items"
-                          {:title "Sapiens" :context-ids [(:id imports) (:id other)]})]
+                          {:title "Sapiens" :context-ids [(:id imports) (:id other)]})
+              body (body-json resp)]
+          (is (= 201 (:status resp)))
+          (is (integer? (:id body)) "a real id came back, not the {:created true} stub")
+          (let [stored (ds/get-item db {:id (:id body)})]
+            (is (contains? (get-in stored [:data :contexts]) (:id imports)))
+            (is (contains? (get-in stored [:data :contexts]) (:id other))
+                "and the context named alongside it is on the item too")))))))
+
+(deftest create-item-does-not-bypass-when-imports-is-not-named-test
+  (test-with-fresh-db "the door exists but this request does not name it — gated like any other"
+    ;; The one that tells "imports is among them" apart from "a door exists":
+    ;; the handle is on a context here, it is just not one this write asked for.
+    (let [_ (imports-context!)
+          other (ds/new-context db {:title "Books"})]
+      (with-gate-shut
+        (let [resp (POST* "/api/items" {:title "Sapiens" :context-ids [(:id other)]})]
           (is (= 201 (:status resp)))
           (is (= {:created true} (body-json resp)))
           (is (empty? (titled "Sapiens"))))))))
@@ -717,6 +733,31 @@
               (is (contains? (get-in stored [:data :contexts]) (:id imports)))
               (is (contains? (get-in stored [:data :contexts]) (:id books))
                   "and the context it was already filed under is still there"))))))))
+
+(deftest create-item-with-scrape-refiles-a-known-post-from-another-site-test
+  (test-with-fresh-db "a site that used to refuse a second bookmark files it instead"
+    ;; The x.com ingester threw on a post already in the graph, so a bookmark
+    ;; application re-posting a link read a 500. Nothing is stored twice, but
+    ;; the contexts the request named need an item to go on to.
+    ;; This one reaches no network: the ingester builds the post from the URL.
+    (let [imports (imports-context!)
+          books (ds/new-context db {:title "Books"})
+          _ (ds/new-context db {:title "Twitter"})
+          _ (ds/new-context db {:title "Twitter Handles"})
+          _ (ds/new-context db {:title "Poasts"})
+          url "https://x.com/someone/status/123"
+          first-id (:id (body-json (POST* "/api/items?scrape=true"
+                                          {:title url :context-ids [(:id books)]})))]
+      (is (integer? first-id) "the first bookmark landed")
+      (with-gate-shut
+        (let [resp (POST* "/api/items?scrape=true" {:title url :context-ids [(:id imports)]})
+              body (body-json resp)
+              stored (ds/get-item db {:id (:id body)})]
+          (is (= 201 (:status resp)))
+          (is (= first-id (:id body)) "the post was not stored a second time")
+          (is (contains? (get-in stored [:data :contexts]) (:id imports)))
+          (is (contains? (get-in stored [:data :contexts]) (:id books))
+              "and the context it was already filed under is still there"))))))
 
 (deftest create-item-with-scrape-but-no-ingester-is-still-api-test
   (test-with-fresh-db "?scrape=true on a title no ingester claims is stored as it came in, stamped api"

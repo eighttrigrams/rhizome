@@ -30,11 +30,15 @@
         poasts-id (common/get-item-or-throw-error db "Poasts")
         handle-url (subs url 0 (str/index-of url "/status/"))
         handle-id (create-or-take-handle-id db handle-url twitter-platform-id twitter-handles-id)
-        note-id (subs url 0 (or (str/index-of url "?") (count url)))]
-    (when (:id (datastore/get-item-by-path db "data->'resource-links'->>'x-post'" note-id))
-      (throw (Exception. "x post already exists!")))
-    (common/insert-item db
-                        "X Post"
-                        ""
-                        (conj context-ids-set poasts-id twitter-platform-id handle-id)
-                        {:x-post note-id})))
+        note-id (subs url 0 (or (str/index-of url "?") (count url)))
+        existing-item (datastore/get-item-by-path db "data->'resource-links'->>'x-post'" note-id)]
+    ;; A post we already hold is answered with the item we hold, the way the
+    ;; other ingesters answer it. It used to throw, which told the caller
+    ;; nothing it could use and left the contexts it asked for nowhere to go.
+    (if (:id existing-item)
+      (assoc (datastore/get-item db existing-item) :previously-existing-item? true)
+      (common/insert-item db
+                          "X Post"
+                          ""
+                          (conj context-ids-set poasts-id twitter-platform-id handle-id)
+                          {:x-post note-id}))))
