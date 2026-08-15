@@ -32,9 +32,9 @@ rhizome.db
 test-results
 playwright-report
 docker-rhizome/token
-# Belt and braces for the OAuth token: the rule above names a directory that
-# does not exist, and docker/.gitignore (which does cover it) goes away with
-# the yolo split. This repo is public -- never let that file become addable.
+# Belt and braces for any stray OAuth token: the rule above names a directory
+# that does not exist, so on its own it protects nothing. This repo is public
+# -- never let a file by that name become addable, wherever it turns up.
 token
 docker/token
 .playwright-mcp
