@@ -63,3 +63,7 @@ nohup.out
 # suffix, and never committed -- see config/read-only-replica?.
 primary.nosync
 CLAUDE.md
+handoffs
+plans
+scratchpad
+screenshots
