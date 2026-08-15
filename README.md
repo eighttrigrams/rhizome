@@ -73,32 +73,6 @@ make start
 make stop
 ```
 
-## Docker - Claude YOLO
-
-Sandboxed Claude (using Docker). Run
-
-```bash
-make yolo
-claude@yolo-box:/workspace/rhizome$ make onboard # if haven't done already
-claude@yolo-box:/workspace/rhizome$ claude # has playwright MCP, can start app etc.
-```
-
-Its egress is locked. The box sits on an internal network with no default
-gateway, and the only route out is a tinyproxy sidecar forwarding to the hosts
-listed in `docker/tinyproxy.filter` — `api.anthropic.com` and nothing else. Its
-dependencies are baked into the image at build time, so no run needs Clojars,
-Maven Central or the npm registry. See `docker/README.md` to allow another host.
-
-The escape hatch, when a run genuinely needs the network (bumping dependencies,
-say):
-
-```bash
-make yolo INTERNET=1
-```
-
-`make box` is unaffected either way — it is the plain root dev shell, not an
-agent surface, and stays on the default bridge.
-
 ## With Vector DB
 
 **In Docker:** just add `WITH_VEC=1`. An `ollama` sidecar container is
@@ -112,7 +86,6 @@ Everything else a box keeps is still namespaced per checkout.
 
 ```bash
 make box WITH_VEC=1
-make yolo WITH_VEC=1
 ```
 
 **On the host system:** you need Ollama yourself. On MacOS:

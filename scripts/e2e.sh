@@ -30,8 +30,8 @@ refuse_exit=0
 
 # `box` (the plain dev container) deliberately ships without chromium to
 # keep the image small. Detect that case before doing anything expensive
-# and steer the user at the image that has the browser stack -- otherwise
-# they hit a generic playwright error after a 10s shadow-cljs build.
+# and steer the user at the host, which is where the browser stack lives --
+# otherwise they hit a generic playwright error after a 10s shadow-cljs build.
 if [ -f /.dockerenv ] && [ ! -x /usr/bin/chromium ]; then
   # Refusal is informational, not an error -- exit 0 so Make doesn't tack
   # on a `*** [e2e] Error 1` tail. Same pattern as the lock/port refusal.
@@ -39,9 +39,11 @@ if [ -f /.dockerenv ] && [ ! -x /usr/bin/chromium ]; then
   echo "Refusing: this container has no chromium installed."
   echo
   echo "  You appear to be inside the 'box' dev shell, which intentionally"
-  echo "  ships without the Playwright/Chromium stack. Run e2e either:"
-  echo "    - on the host       (npx playwright install chromium once, then 'make e2e'), or"
-  echo "    - inside 'yolo'     (exit this shell, then 'make yolo' on the host)."
+  echo "  ships without the Playwright/Chromium stack."
+  echo
+  echo "  Run e2e on the host instead: exit this shell, then"
+  echo "    npx playwright install chromium     # first time only"
+  echo "    make e2e"
   exit "$refuse_exit"
 fi
 

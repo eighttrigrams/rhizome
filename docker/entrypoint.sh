@@ -3,27 +3,15 @@
 # invocation in any mounted repo trips "dubious ownership".
 git config --global --add safe.directory '*'
 
-# docker-compose bind-mounts ./.mcp.json over /workspace/rhizome/.mcp.json, so
-# the container always sees a different file than what's committed at HEAD.
-# Without skip-worktree, every `git status` inside the container would list
-# .mcp.json as modified -- noisy, and easy to accidentally `git add .` it.
-# The bit is stored in .git/index (shared with the host via the workspace
-# mount), so this is idempotent and persists for the life of the clone.
-if [ -d /workspace/rhizome/.git ]; then
-  git -C /workspace/rhizome update-index --skip-worktree \
-      .mcp.json \
-      .claude/settings.json 2>/dev/null || true
-fi
-
 # Auto-install node deps on first container run. The node_modules volume keeps
 # this cached afterwards so re-entering the container is fast. Sentinel marker
 # avoids running npm install on every shell start; delete .npm-installed to
-# force a re-run. In yolo (non-root) the freshly created named volume is owned
-# by root, so claim it via sudo first -- yolo's Dockerfile installs
-# NOPASSWD sudoers for the claude user. Box runs as root and doesn't need it.
-# Fresh named volumes mounted on workspace subpaths land as root-owned; in
-# yolo we run as `claude` and can't write to them. Claim them with sudo
-# (yolo's Dockerfile installs NOPASSWD sudoers); box already runs as root.
+# force a re-run.
+#
+# Fresh named volumes mounted on workspace subpaths land as root-owned. The box
+# runs as root and doesn't care; a non-root consumer of this image needs to
+# claim them first, hence the sudo branch (which no-ops when the dir is already
+# writable, and when sudo isn't installed).
 for d in /workspace/rhizome/node_modules /workspace/rhizome/.shadow-cljs /workspace/rhizome/.cpcache; do
   if [ -d "$d" ] && [ ! -w "$d" ] && command -v sudo >/dev/null 2>&1; then
     sudo chown -R "$(id -u):$(id -g)" "$d"

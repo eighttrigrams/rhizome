@@ -18,7 +18,7 @@ $(error DEPLOY_TARGET is required and must be passed on the command line: make d
 endif
 endif
 
-.PHONY: start stop test e2e deploy install-sqlite-vec yolo box backfill-embeddings clean
+.PHONY: start stop test e2e deploy install-sqlite-vec box backfill-embeddings clean
 
 onboard:
 	./scripts/onboard.sh
@@ -49,23 +49,15 @@ ENSURE_OLLAMA_VOLUME = $(if $(filter 1,$(WITH_VEC)),docker volume create rhizome
 # the host bindings come from .envrc / config.edn / shadow-cljs.edn rather
 # than YAML fallbacks. COMPOSE_FILE uses ':' as separator (compose convention).
 #
-# docker/docker-compose.override.yml is the gitignored, per-machine layer
-# (this checkout's owner mounts an in-box CLAUDE.md through it). Compose only
-# auto-loads an override file when COMPOSE_FILE is unset -- and we always set
-# it -- so it has to be named here, last, to win.
-#
-# Named only when it is actually present. A COMPOSE_FILE entry that does not
-# exist is a hard error from compose ("stat .../docker-compose.override.yml:
-# no such file or directory"), and this file is absent in every clone but its
-# owner's -- so naming it unconditionally broke `make box` for everyone else.
-# $(wildcard) reports a dangling symlink as absent too, which is what we want:
-# the owner's copy is a symlink into a dotfiles repo.
-COMPOSE_OVERRIDE = $(if $(wildcard docker/docker-compose.override.yml),:docker-compose.override.yml,)
-COMPOSE_FILES = COMPOSE_FILE=docker-compose.yml:compose.ports.yml$(COMPOSE_OVERRIDE)
+# There is deliberately no per-machine override layer here. A file named in
+# COMPOSE_FILE that does not exist is a hard error from compose, not a skipped
+# file, so naming an optional one would break `make box` in every checkout
+# that does not happen to have it.
+COMPOSE_FILES = COMPOSE_FILE=docker-compose.yml:compose.ports.yml
 
 # Compose project name is derived from this checkout's directory name so
-# two sibling clones get separate volumes (m2_cache, npm_cache, ...) and
-# container names. Compose project names must match [a-z0-9][a-z0-9_-]*
+# two sibling clones get separate volumes (box_m2_cache, box_npm_cache, ...)
+# and container names. Compose project names must match [a-z0-9][a-z0-9_-]*
 # -- lowercase the basename and replace `.` with `-` (covers names like
 # "rhizome.alt").
 COMPOSE_PROJECT_NAME := $(subst .,-,$(shell echo $(notdir $(CURDIR)) | tr '[:upper:]' '[:lower:]'))
@@ -82,24 +74,18 @@ COMPOSE_ENV = PORT=$(PORT) SHADOW_PORT=$(SHADOW_PORT) WITH_VEC=$(WITH_VEC) COMPO
 # the rest of the recipe. Make runs each recipe line in its own shell, so
 # the previous two-line form would exit 0 on the guard and then merrily
 # build/run docker anyway.
-# The yolo box runs with locked egress by default -- docker/run.sh layers in
-# docker-compose.locked.yml, and only tinyproxy.filter's hosts get out. INTERNET=1
-# is the escape hatch, and maps onto the `+internet` argument ../docker/run.sh
-# already uses for the plurama box. `make box` is unaffected: it is the plain
-# root dev shell, not an agent surface.
-YOLO_INTERNET = $(if $(filter 1,$(INTERNET)),+internet,)
-
-yolo:
-	@./scripts/detect-ports.sh check PORT SHADOW_PORT || exit 0; \
-	./scripts/write-compose-ports.sh $(PORT) $(SHADOW_PORT) && \
-	$(ENSURE_OLLAMA_VOLUME) \
-	$(COMPOSE_ENV) ./docker/run.sh $(YOLO_INTERNET)
-
+#
+# --name gives the container a fixed, memorable name rather than compose's
+# `rhizome-box-run-<random hex>`. Two knock-ons, both wanted: the blocked-port
+# message in detect-ports.sh tells you to `docker stop <container>`, which is
+# now typeable; and a second concurrent `make box` fails immediately with
+# "container name is already in use" instead of quietly starting a second box.
+# `--rm` still removes it on exit, so the name frees up for the next run.
 box:
 	@./scripts/detect-ports.sh check PORT SHADOW_PORT || exit 0; \
 	./scripts/write-compose-ports.sh $(PORT) $(SHADOW_PORT) && \
 	$(ENSURE_OLLAMA_VOLUME) \
-	cd docker && $(COMPOSE_ENV) docker compose build box && $(COMPOSE_ENV) docker compose run --rm --service-ports box
+	cd docker && $(COMPOSE_ENV) docker compose build box && $(COMPOSE_ENV) docker compose run --rm --service-ports --name rhizome-box box
 
 install-sqlite-vec:
 	@./scripts/install-sqlite-vec.sh
