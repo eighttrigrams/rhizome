@@ -66,13 +66,20 @@ context carries the handle there is no door at all.
   with recording off, whatever else is named alongside.
 - `PUT /api/items/:id` — when the item has **no description yet**, the
   description is written with recording off, and the item is also filed under
-  `imports`. An item that already has a description is not writable this way:
-  replacing text needs the gate open. Filing under `imports` happens on the
-  door path only — with recording on, the endpoint replaces the description
-  and touches nothing else.
+  `imports`. Filing under `imports` happens on the door path only — with
+  recording on, the endpoint replaces the description and touches nothing else.
 
 Through a door you may add and only add. That is what makes them safe to leave
-open, and it is why POST refuses a collision rather than updating.
+open, and it is why both refuse rather than update:
+
+| situation | answer |
+|---|---|
+| `POST` names a URL already in the graph | `409 {"collision":true,"existing-item-id":…}` |
+| `PUT` at an item that already has a description, gate shut | `409 {"collision":true,"item-id":…}` |
+| gated for any other reason | the drop stub — `403 {"dropped":true}`, or for `POST`/`PUT` on items a 2xx echo of what the write would have looked like |
+
+A 409 is a standing refusal: sending it again changes nothing, and the way
+through is the app. A drop just means the gate is shut right now.
 
 URLs (YouTube, GitHub, Substack, …) passed as `title` on `POST /api/items` are
 auto-detected and enriched by the insertion pipeline, but only under

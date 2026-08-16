@@ -681,23 +681,43 @@
           (is (contains? (get-in stored [:data :contexts]) (:id books))
               "alongside where it already was"))))))
 
-(deftest update-description-does-not-bypass-over-an-existing-description-test
-  (test-with-fresh-db "an item that already has a description is not writable through the door"
+(deftest update-description-refuses-over-an-existing-description-test
+  (test-with-fresh-db "an item that already has a description is refused, out loud"
     ;; The half that makes the door an add and not an overwrite. Without it a
-    ;; caller could replace any text in the graph with the gate shut.
+    ;; caller could replace any text in the graph with the gate shut. And it is
+    ;; a refusal rather than a drop, because no amount of sending it again from
+    ;; out here will make it land, and a caller cannot learn that from a stub.
     (let [imports (imports-context!)
           books (ds/new-context db {:title "Books"})
           item (ds/new-item db "Sapiens" "" #{(:id books)} nil "api")
           _ (ds/update-context-description db {:id (:id item) :description "mine"} "app")]
       (with-gate-shut
         (let [resp (PUT* (str "/api/items/" (:id item)) {:description "not mine"})
+              body (body-json resp)
               stored (ds/get-item db {:id (:id item)})]
-          (is (= 200 (:status resp)) "answered with the stub, as a dropped write is")
+          (is (= 409 (:status resp)))
+          (is (true? (:collision body)))
+          (is (= (:id item) (:item-id body)))
+          (is (re-find #"already has a description" (:error body)))
           (is (= "mine" (:description stored)) "and the text that was there is still there")
           (is (not (contains? (get-in stored [:data :contexts]) (:id imports)))))))))
 
-(deftest update-description-does-not-bypass-without-the-imports-context-test
-  (test-with-fresh-db "no context carries the handle, so there is no door"
+(deftest update-description-with-the-gate-open-replaces-an-existing-one-test
+  (test-with-fresh-db "recording on, and replacing a description is an ordinary write"
+    ;; The refusal above is about the door, not about the endpoint. With the
+    ;; gate open this is the owner replacing his own text and goes through.
+    (let [books (ds/new-context db {:title "Books"})
+          item (ds/new-item db "Sapiens" "" #{(:id books)} nil "api")
+          _ (ds/update-context-description db {:id (:id item) :description "mine"} "app")
+          resp (PUT* (str "/api/items/" (:id item)) {:description "second thoughts"})]
+      (is (= 200 (:status resp)))
+      (is (= "second thoughts" (:description (ds/get-item db {:id (:id item)})))))))
+
+(deftest update-description-drops-without-the-imports-context-test
+  (test-with-fresh-db "no context carries the handle, so there is no door — and no refusal"
+    ;; Gated, not refused: there is nothing here to displace, and the day a
+    ;; context takes the handle this same request goes through. That is a shut
+    ;; gate and not a standing no, so it gets the stub the gate always gave.
     (let [books (ds/new-context db {:title "Books"})
           item (ds/new-item db "Sapiens" "" #{(:id books)} nil "api")]
       (with-gate-shut

@@ -184,6 +184,27 @@
          (log/error e "REST API: update-item-description failed")
          (json-response 500 {:error (.getMessage e)}))))
 
+(defn- description-refusal
+  "The answer to a PUT, made with the gate shut, at an item that already carries
+  a description.
+
+  Not the ordinary dropped write. A drop is for a request the gate simply does
+  not admit, and it says so by answering with the item as it would have looked,
+  which leaves a caller unable to tell a write from a silence. This one is a
+  standing refusal: the text is there, and no amount of trying from out here
+  will replace it. Saying so out loud lets a caller stop rather than send it
+  again, and it is the same 409 POST answers a collision with — both mean the
+  graph already holds this and the way in only adds."
+  [item]
+  (json-response 409
+                 {:error (str "item " (:id item) " (\"" (:title item) "\") already has a"
+                              " description. With recording off, PUT /api/items/:id writes a"
+                              " description that is not there yet and does not replace one."
+                              " Replacing it is done in the app.")
+                  :collision true
+                  :item-id (:id item)
+                  :item-title (:title item)}))
+
 (defn update-item-description
   "PUT /api/items/:id — replace an item's description. JSON body: {\"description\"}.
   404 if the item does not exist.
@@ -195,6 +216,12 @@
   and only add. An item that already has a description is not writable this way
   at all, so nothing a caller sends can displace text that is already in the
   graph, and the gate has to be opened from the app to replace one.
+
+  Trying it anyway is answered with 409 {\"collision\": true} rather than the
+  dropped-write stub, so a caller can tell a standing refusal from a gate that
+  happens to be shut, and stop instead of sending it again. The stub is still
+  what a request gets when it is only gated — an item with no description and no
+  context carrying the handle, where there is no door rather than a refusal.
 
   An item written through the door is also filed under \"imports\", if it is not
   already, so what came in from outside turns up where the rest of it does. That
@@ -217,7 +244,14 @@
                  (mw/log-and-guard
                    "update-item-description"
                    {:id id :title (:title item) :description-length (count description)}
-                   (json-response (item->api (assoc item :description description)))
+                   ;; Reached only with the gate shut and the door unopened, so
+                   ;; the two cases can be told apart here rather than by asking
+                   ;; a second time how the gate stands. A non-empty description
+                   ;; is what closes the door, and it is the refusal; anything
+                   ;; else is an ordinary drop.
+                   (if (str/blank? (:description item))
+                     (json-response (item->api (assoc item :description description)))
+                     (description-refusal item))
                    (fn [] (and @imports-id (str/blank? (:description item))))
                    (fn [bypassed?]
                      (update-item-description-impl db
