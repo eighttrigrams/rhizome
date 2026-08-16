@@ -664,6 +664,62 @@
           (is (= {:created true} (body-json resp)))
           (is (empty? (titled "Sapiens"))))))))
 
+;; -- the door on PUT /api/items/:id ------------------------------------------
+
+(deftest update-description-bypasses-the-gate-for-an-empty-description-test
+  (test-with-fresh-db "an item with no description yet can be written to with the gate shut"
+    (let [imports (imports-context!)
+          books (ds/new-context db {:title "Books"})
+          item (ds/new-item db "Sapiens" "" #{(:id books)} nil "api")]
+      (with-gate-shut
+        (let [resp (PUT* (str "/api/items/" (:id item)) {:description "a history of us"})
+              stored (ds/get-item db {:id (:id item)})]
+          (is (= 200 (:status resp)))
+          (is (= "a history of us" (:description stored)))
+          (is (contains? (get-in stored [:data :contexts]) (:id imports))
+              "and what came in through the door is filed where such things go")
+          (is (contains? (get-in stored [:data :contexts]) (:id books))
+              "alongside where it already was"))))))
+
+(deftest update-description-does-not-bypass-over-an-existing-description-test
+  (test-with-fresh-db "an item that already has a description is not writable through the door"
+    ;; The half that makes the door an add and not an overwrite. Without it a
+    ;; caller could replace any text in the graph with the gate shut.
+    (let [imports (imports-context!)
+          books (ds/new-context db {:title "Books"})
+          item (ds/new-item db "Sapiens" "" #{(:id books)} nil "api")
+          _ (ds/update-context-description db {:id (:id item) :description "mine"} "app")]
+      (with-gate-shut
+        (let [resp (PUT* (str "/api/items/" (:id item)) {:description "not mine"})
+              stored (ds/get-item db {:id (:id item)})]
+          (is (= 200 (:status resp)) "answered with the stub, as a dropped write is")
+          (is (= "mine" (:description stored)) "and the text that was there is still there")
+          (is (not (contains? (get-in stored [:data :contexts]) (:id imports)))))))))
+
+(deftest update-description-does-not-bypass-without-the-imports-context-test
+  (test-with-fresh-db "no context carries the handle, so there is no door"
+    (let [books (ds/new-context db {:title "Books"})
+          item (ds/new-item db "Sapiens" "" #{(:id books)} nil "api")]
+      (with-gate-shut
+        (let [resp (PUT* (str "/api/items/" (:id item)) {:description "a history of us"})
+              stored (ds/get-item db {:id (:id item)})]
+          (is (= 200 (:status resp)))
+          (is (nil? (:description stored)) "nothing was written"))))))
+
+(deftest update-description-with-the-gate-open-does-not-file-under-imports-test
+  (test-with-fresh-db "recording on: the description is replaced and nothing else happens"
+    ;; The contrast the spec draws. Filing under Imports says "this came from
+    ;; outside"; a write the owner made with the gate open did not.
+    (let [imports (imports-context!)
+          books (ds/new-context db {:title "Books"})
+          item (ds/new-item db "Sapiens" "" #{(:id books)} nil "api")
+          resp (PUT* (str "/api/items/" (:id item)) {:description "a history of us"})
+          stored (ds/get-item db {:id (:id item)})]
+      (is (= 200 (:status resp)))
+      (is (= "a history of us" (:description stored)))
+      (is (not (contains? (get-in stored [:data :contexts]) (:id imports)))
+          "an open gate is the owner's own hand — it does not announce itself to Imports"))))
+
 (deftest create-item-without-scrape-stores-a-url-title-as-is-test
   (test-with-fresh-db "with no scrape param a URL-shaped title is stored verbatim, stamped api"
     (let [ctx (ds/new-context db {:title "Books"})

@@ -56,13 +56,23 @@ A red ⚠ REC badge appears in the top-left corner while the mode is active.
 Toggle it off with the same shortcut. Every attempted write is logged to
 `rhizome/rhizome.log` regardless of whether it was executed or dropped.
 
-`POST /api/items` has one door in the shut gate: when a context carrying the
-human-readable id `imports` exists and `context-ids` names it, the item is
-written even with recording off, whatever else is named alongside. The intent
-line is logged with `gate-bypassed=true`, so that is what to grep for when a
-write appears that the badge says should not have. The door goes by the handle
-and not by the title, and the endpoint never creates the `imports` context, so
-while no context carries the handle there is no door.
+Two endpoints have a door in the shut gate. Both are logged with
+`gate-bypassed=true` on the intent line, so that is what to grep for when a
+write appears that the badge says should not have. Both go by the handle and
+not by the title, and neither creates the `imports` context, so while no
+context carries the handle there is no door at all.
+
+- `POST /api/items` — when `context-ids` names `imports`, the item is written
+  with recording off, whatever else is named alongside.
+- `PUT /api/items/:id` — when the item has **no description yet**, the
+  description is written with recording off, and the item is also filed under
+  `imports`. An item that already has a description is not writable this way:
+  replacing text needs the gate open. Filing under `imports` happens on the
+  door path only — with recording on, the endpoint replaces the description
+  and touches nothing else.
+
+Through a door you may add and only add. That is what makes them safe to leave
+open, and it is why POST refuses a collision rather than updating.
 
 URLs (YouTube, GitHub, Substack, …) passed as `title` on `POST /api/items` are
 auto-detected and enriched by the insertion pipeline, but only under

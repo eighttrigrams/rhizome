@@ -26,19 +26,25 @@
 
    The five-argument arity opens one door in a shut gate: `bypass?` is a
    no-argument predicate, consulted only when recording is off, and a truthy
-   answer runs the thunk anyway. The intent line is emitted there too and
+   answer runs the write anyway. The intent line is emitted there too and
    carries `:gate-bypassed true` — the one case where the line does say the
    request went through, and it says so on purpose, because a write that took
-   a side door is worth being able to find in the log afterwards."
+   a side door is worth being able to find in the log afterwards.
+
+   That arity's `write` takes one argument, which the four-argument one's thunk
+   does not: whether this is the side door. A write is allowed to differ by how
+   it got in — what comes through the door may be held to terms an open gate
+   does not impose — and the alternative is the handler working the answer out a
+   second time, which would put the decision in two places."
   ([intent details dropped-response thunk]
-   (log-and-guard intent details dropped-response (constantly false) thunk))
-  ([intent details dropped-response bypass? thunk]
+   (log-and-guard intent details dropped-response (constantly false) (fn [_] (thunk))))
+  ([intent details dropped-response bypass? write]
    (let [open? (enabled?)
          bypassed? (and (not open?) (boolean (bypass?)))]
      (log/info (cond-> (assoc details :intent intent)
                  bypassed? (assoc :gate-bypassed true))
                (str "REST " intent))
-     (if (or open? bypassed?) (thunk) dropped-response))))
+     (if (or open? bypassed?) (write bypassed?) dropped-response))))
 
 (def ^:private max-body-log-chars 4000)
 

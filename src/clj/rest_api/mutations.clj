@@ -1,6 +1,7 @@
 (ns rest-api.mutations
   (:require [next.jdbc :as jdbc]
             [honey.sql :as sql]
+            [clojure.string :as str]
             [cambium.core :as log]
             [cheshire.core :as json]
             [et.vp.ds :as datastore]
@@ -160,14 +161,23 @@
            :description-length (count (or (:description body) ""))}
           (json-response 201 {:created true})
           (fn [] (names-imports? db (:context-ids body)))
-          (fn [] (create-item-impl db body scrape?))))))
+          ;; The same write either way: what POST does is create, and creating
+          ;; is all it does, so there is nothing for the door to hold back.
+          (fn [_bypassed?] (create-item-impl db body scrape?))))))
 
 (defn- update-item-description-impl
-  [db id description]
+  [db id description file-under-imports-id]
   (try (let [updated (datastore/update-context-description
                        db
                        {:id id :description description}
-                       "api")]
+                       "api")
+             ;; Only ever set on the door path. An item that arrived that way is
+             ;; filed in Imports so it turns up where things that came in from
+             ;; outside turn up; a write through an open gate is the owner's own
+             ;; hand and does not need announcing to itself.
+             updated (if file-under-imports-id
+                       (insertion/ensure-contexts! db updated #{file-under-imports-id})
+                       updated)]
          (embed-item-best-effort! db updated)
          (json-response (item->api updated)))
        (catch Exception e
@@ -176,7 +186,20 @@
 
 (defn update-item-description
   "PUT /api/items/:id — replace an item's description. JSON body: {\"description\"}.
-  Gated by recording mode. 404 if the item does not exist."
+  404 if the item does not exist.
+
+  Gated by recording mode, with a door beside the one POST /api/items has: when
+  a context carrying the human-readable id \"imports\" exists and the item being
+  written to has no description yet, the write goes through with the gate still
+  shut. Both halves are the same idea as over there — through a door you may add
+  and only add. An item that already has a description is not writable this way
+  at all, so nothing a caller sends can displace text that is already in the
+  graph, and the gate has to be opened from the app to replace one.
+
+  An item written through the door is also filed under \"imports\", if it is not
+  already, so what came in from outside turns up where the rest of it does. That
+  happens on the door path alone: with recording on this endpoint replaces a
+  description and touches nothing else."
   [db id req]
   (try (let [id (Integer/parseInt id)
              {:keys [description]} (parse-json-body req)]
@@ -184,14 +207,23 @@
            (not description)
              (json-response 400 {:error "description is required"})
            :else
-             (let [item (datastore/get-item db {:id id})]
+             (let [item (datastore/get-item db {:id id})
+                   ;; Looked up at most once, and not at all unless the gate is
+                   ;; shut and something asks — the common path does not pay for
+                   ;; it, and the answer is wanted twice on the path that does.
+                   imports-id (delay (imports-context-id db))]
                (if-not item
                  (json-response 404 {:error "Item not found"})
                  (mw/log-and-guard
                    "update-item-description"
                    {:id id :title (:title item) :description-length (count description)}
                    (json-response (item->api (assoc item :description description)))
-                   (fn [] (update-item-description-impl db id description)))))))
+                   (fn [] (and @imports-id (str/blank? (:description item))))
+                   (fn [bypassed?]
+                     (update-item-description-impl db
+                                                   id
+                                                   description
+                                                   (when bypassed? @imports-id))))))))
        (catch NumberFormatException _ (json-response 400 {:error "Invalid item ID"}))))
 
 (defn- context-extras-set
