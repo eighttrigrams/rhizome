@@ -31,11 +31,13 @@
   [element config]
   (let [doc (or (:doc config) "")
         ;; The editor's outer box is the caller's to size, because the two places
-        ;; it is used are not the same kind of thing. The description modal is a
-        ;; page and takes the viewport; the relation modal's text is one field
-        ;; among several and takes a slice of it, growing with the text up to a
-        ;; cap. Either way .cm-scroller below does the scrolling inside the box,
-        ;; so the page never grows a second scrollbar.
+        ;; it is used are not the same kind of thing: the description modal is a
+        ;; page and takes the viewport, the relation modal's text is one field
+        ;; among several and takes a slice of it. Both give it a definite height
+        ;; and let .cm-scroller below do the scrolling inside that -- CodeMirror
+        ;; stretches its content and its gutter to a height it has been given and
+        ;; not to one it has merely been allowed, so a min/max pair leaves the
+        ;; editing surface one line tall inside a taller box.
         box (merge {:backgroundColor "wheat" :border "1px solid #ddd"}
                    (or (:box config) {:height "90vh" :minHeight "500px"}))
         ;; Create custom theme with wheat-friendly colors throughout

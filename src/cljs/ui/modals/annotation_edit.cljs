@@ -180,16 +180,25 @@
    the annotation field above, and taking the cursor off them then would be the
    fetch interrupting them.
 
-   Its box is capped rather than fixed: it grows with the text to 70% of the
-   viewport and scrolls inside itself after that, so a long text never pushes the
-   save hint off the modal."
+   Its box has a definite height and scrolls inside itself, the way the
+   description modal's does. Definite and not a max: a box that grew with the text
+   would move the save hint down the modal as you typed, and -- the part that is
+   not a matter of taste -- CodeMirror only stretches its content and its gutter
+   to a height it has actually been given, so under a mere min-height the editing
+   surface is one line tall inside a box several lines high, with the rest of it
+   dead space the cursor cannot be put into.
+
+   The height is what is left rather than a flat 70vh, which is the same thing to
+   about five percent and fits. #modal-component is 100vh tall at top: 50px, so
+   the last 50px of it are off screen to begin with; the 300px is that, plus this
+   modal's padding, heading, two annotation lines, standing row and save hint. A
+   flat 70vh put the hint just past the bottom edge."
   [doc]
   (r/create-class
     {:component-did-mount #(codemirror/create-editor (editor-el)
                                                      {:doc doc
                                                       :markdown? true
-                                                      :box {:maxHeight "70vh"
-                                                            :minHeight "120px"}})
+                                                      :box {:height "calc(100vh - 300px)"}})
      :reagent-render (fn [_doc] [:div#relation-description-editor.relation-description])}))
 
 (defn component

@@ -100,7 +100,12 @@
 ;; rest of the card takes it away again and gives the item preview back.
 (defn- on-relation-mouse-enter
   [*state item whole]
-  #(when-not (:loading @*state)
+  ;; No whole, no edge, nothing to preview: in the overview a card is not shown
+  ;; under anything (ui.actions/filed-under answers nil), and hovering the strip
+  ;; there used to ask for the text of a relation that does not exist and caption
+  ;; the answer with a blank name. The card's own preview stands, which is the
+  ;; right one when there is no edge to outrank it.
+  #(when (and whole (not (:loading @*state)))
      (swap! *state assoc
        :preview-relation {:item-id (:id item) :context-id (:id whole) :item-title (:title item)
                           :context-title (:title whole)}
