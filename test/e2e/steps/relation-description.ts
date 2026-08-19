@@ -51,16 +51,38 @@ Then("the relation text should have been fetched once", async () => {
   expect(uiCalls.filter((f) => f === "fetch-relation-description")).toHaveLength(1);
 });
 
-// fill() waits for the textarea to be enabled, and it is disabled until the
-// fetch that opened with the modal has landed — so this step is also where a
-// modal that never loaded its text would fail.
+// The field is a CodeMirror editor, and it is mounted only once the fetch that
+// opened with the modal has landed — so waiting for it is also where a modal that
+// never loaded its text would fail.
+//
+// The text goes in through CodeMirror's own API rather than being typed, the way
+// the description modal's does in provenance.ts and for its reason: the modal
+// reads what it saves off the view attached at element.__codemirror, so this is
+// the same value either way, and typing it would additionally be exercising this
+// project's custom keymap.
+async function editorText(page: any): Promise<string | null> {
+  return await page.evaluate(() => {
+    const el = document.getElementById("relation-description-editor") as any;
+    const view = el && el.__codemirror;
+    return view ? view.state.doc.toString() : null;
+  });
+}
+
 When("I type {string} into the relation text", async ({ page }, text: string) => {
-  await page.locator("#relation-description-input").fill(text);
+  await expect(page.locator("#relation-description-editor")).toBeVisible();
+  const wrote = await page.evaluate((next: string) => {
+    const el = document.getElementById("relation-description-editor") as any;
+    const view = el && el.__codemirror;
+    if (!view) return false;
+    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: next } });
+    return true;
+  }, text);
+  expect(wrote, "the relation's editor was not mounted").toBe(true);
 });
 
 Then("the relation text should read {string}", async ({ page }, text: string) => {
-  await expect(page.locator("#relation-description-input")).toBeEnabled();
-  await expect(page.locator("#relation-description-input")).toHaveValue(text);
+  await expect(page.locator("#relation-description-editor")).toBeVisible();
+  await expect.poll(() => editorText(page)).toBe(text);
 });
 
 // Both hover handlers — the card's and the strip's — bail while :loading is

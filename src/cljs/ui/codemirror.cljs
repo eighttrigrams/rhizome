@@ -30,13 +30,18 @@
   "Create CodeMirror 6 editor with cljs-text-editor-style keyboard handling"
   [element config]
   (let [doc (or (:doc config) "")
+        ;; The editor's outer box is the caller's to size, because the two places
+        ;; it is used are not the same kind of thing. The description modal is a
+        ;; page and takes the viewport; the relation modal's text is one field
+        ;; among several and takes a slice of it, growing with the text up to a
+        ;; cap. Either way .cm-scroller below does the scrolling inside the box,
+        ;; so the page never grows a second scrollbar.
+        box (merge {:backgroundColor "wheat" :border "1px solid #ddd"}
+                   (or (:box config) {:height "90vh" :minHeight "500px"}))
         ;; Create custom theme with wheat-friendly colors throughout
         custom-theme
           (.theme EditorView
-                  #js {"&" #js {:height "90vh"
-                                :minHeight "500px"
-                                :backgroundColor "wheat"
-                                :border "1px solid #ddd"}
+                  #js {"&" (clj->js box)
                        ".cm-scroller" #js {:overflow "auto"}
                        ".cm-content" #js {:padding "10px"}
                        ".cm-focused" #js {:outline "none"}
@@ -62,9 +67,13 @@
                                                               "rgba(255, 250, 240, 0.4)"}})
         ;; Build extensions array with line wrapping
         line-wrapping (.-lineWrapping EditorView)
+        ;; No red squiggles under the prose. The editing surface is a
+        ;; contenteditable, which the browser spellchecks by default, and nothing
+        ;; in this app underlines words.
+        no-spellcheck (.of (.-contentAttributes EditorView) #js {:spellcheck "false"})
         extensions (if (:markdown? config)
-                     #js [basicSetup (markdown) custom-theme line-wrapping]
-                     #js [basicSetup custom-theme line-wrapping])
+                     #js [basicSetup (markdown) custom-theme line-wrapping no-spellcheck]
+                     #js [basicSetup custom-theme line-wrapping no-spellcheck])
         ;; Create editor state
         state (.create EditorState #js {:doc doc :extensions extensions})
         ;; Create editor view

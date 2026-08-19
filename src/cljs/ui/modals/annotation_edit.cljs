@@ -9,6 +9,7 @@
    is standing on, which is the only place they can be reached for a row that is
    not the selection."
   (:require [reagent.core :as r]
+            [ui.codemirror :as codemirror]
             [ui.modals.link-context-item :as link-context-item]
             [ui.refusal :as refusal]
             api))
@@ -81,11 +82,28 @@
                          (assoc fields :relation-description (or text ""))
                          fields)))))))))
 
+(defn- editor-el [] (.getElementById js/document "relation-description-editor"))
+
+(defn- editor-value
+  "What the editor is holding, or nil while it is not mounted.
+
+   Read off the view rather than out of *fields, unlike every other field here:
+   CodeMirror owns its own DOM and there is no controlled-input reconciliation to
+   trail behind it, which is what made the DOM the wrong place to read the others
+   from. ui.modals/get-current-description reads the description modal's editor
+   the same way, off the same __codemirror handle."
+  []
+  (when-let [el (editor-el)]
+    (when-let [view (.-__codemirror el)] (codemirror/get-editor-value view))))
+
 (defn get-values
   [item selected-context]
   (let [{:keys [global-annotation relation-annotation relation-description show-badge? is-part-of?
                 part-of-sort-idx]}
-          @*fields]
+          @*fields
+        ;; The editor when it is up, and the loaded text when it is not -- which
+        ;; is to say nil, since nothing is loaded then either.
+        relation-description (or (editor-value) relation-description)]
     (cond-> {:item-id (:id item)
              :context-id (when selected-context (:id selected-context))
              :global-annotation global-annotation
@@ -151,6 +169,29 @@
       :on-change (field :part-of-sort-idx)
       :placeholder "idx"}]]])
 
+(defn- description-editor-component
+  "The relation's text, in the editor the description modal uses -- the same
+   CodeMirror, the same markdown mode, the same keyboard scheme.
+
+   Mounted with its document rather than created empty and filled, which is why
+   it is a component of its own: the text arrives after the modal does, and
+   CodeMirror is built from a state, not re-rendered from props. Not focused, for
+   the same reason -- the answer lands while the user may already be typing in
+   the annotation field above, and taking the cursor off them then would be the
+   fetch interrupting them.
+
+   Its box is capped rather than fixed: it grows with the text to 70% of the
+   viewport and scrolls inside itself after that, so a long text never pushes the
+   save hint off the modal."
+  [doc]
+  (r/create-class
+    {:component-did-mount #(codemirror/create-editor (editor-el)
+                                                     {:doc doc
+                                                      :markdown? true
+                                                      :box {:maxHeight "70vh"
+                                                            :minHeight "120px"}})
+     :reagent-render (fn [_doc] [:div#relation-description-editor.relation-description])}))
+
 (defn component
   [*state item selected-context notice]
   ;; A notice means the save did not go through and the modal is still the one
@@ -189,13 +230,9 @@
                  :placeholder (str "Relation annotation for " (:title selected-context) "...")}]
                [relation-standing-component]
                (let [description (:relation-description @*fields)]
-                 [:textarea#relation-description-input.relation-description
-                  {:value (or description "")
-                   :disabled (nil? description)
-                   :rows 10
-                   :on-change (field :relation-description)
-                   :placeholder (if (nil? description)
-                                  "Loading the relation's text…"
-                                  "Text on this relation...")}])])
+                 (if (nil? description)
+                   [:div.relation-description-loading "Loading the relation's text…"]
+                   ^{:key (pr-str (:edge @*fields))}
+                   [description-editor-component description]))])
             [:p {:style {:font-size "0.9em" :color "#666" :margin-top "10px"}}
              "Press Alt+9 to save, ESC to cancel"]]))}))
