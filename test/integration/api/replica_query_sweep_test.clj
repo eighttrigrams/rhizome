@@ -22,6 +22,7 @@
             [datastore.schema :as schema]
             [dispatch :as dispatch]
             [et.vp.ds :as ds]
+            [et.vp.ds.relations :as relations]
             [opener :as opener]
             [semsearch.backfill :as backfill]
             [semsearch.embedder :as embedder])
@@ -63,6 +64,15 @@
    ;; one that is not. A read for a relation nobody wrote must stay a read.
    "fetch-relation-description" [[{} {:item-id (:id item) :context-id (:id ctx)}]
                                  [{} {:item-id (:id ctx) :context-id (:id item)}]]
+   ;; Same two directions again, for the same reason -- and these two matter more
+   ;; here than the read above them. `seed!` gives that edge a revision, so the
+   ;; version list is not empty and the caution assessment actually runs; and the
+   ;; edge that does not exist is the branch where a history read could most
+   ;; plausibly be tempted to create something.
+   "fetch-relation-history" [[{} {:item-id (:id item) :context-id (:id ctx)}]
+                             [{} {:item-id (:id ctx) :context-id (:id item)}]]
+   "fetch-relation-provenance" [[{} {:item-id (:id item) :context-id (:id ctx)}]
+                                [{} {:item-id (:id ctx) :context-id (:id item)}]]
    "get-obsidian-file-content" [[{}]]
    "discard-obsidian-changes"  [[{}]]
    "list-youtube-poll-channels" [[{}]]
@@ -91,11 +101,18 @@
 (defn- seed!
   "A context with one related item, plus a description revision so the history
    reads are not trivially empty. Written through a normal datasource -- this is
-   the primary's side of the sync."
+   the primary's side of the sync.
+
+   The edge between the two gets a revision of its own, twice-written for the same
+   reason: the relation history and provenance reads are swept below, and over an
+   edge nobody ever wrote on they would come back empty without having touched the
+   tables they are about."
   [db]
   (let [ctx (ds/new-context db {:title "Books"})
         item (ds/new-item db "Sapiens" "" #{(:id ctx)} 1)]
     (ds/update-context-description db {:id (:id ctx) :description "a shelf"} "app")
+    (relations/update-relation-description! db (:id item) (:id ctx) "why it is on this shelf" "api")
+    (relations/update-relation-description! db (:id item) (:id ctx) "why it is really here" "app")
     ;; So the vector sweep has something to match against rather than querying an
     ;; empty items_vec. Without the extension there is no table to write to.
     (when connection/vec-available?

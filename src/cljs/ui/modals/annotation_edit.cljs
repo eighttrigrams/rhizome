@@ -8,8 +8,12 @@
    ui.modals.link-context-item); here they are offered for the one edge the card
    is standing on, which is the only place they can be reached for a row that is
    not the selection."
-  (:require [reagent.core :as r]
+  (:require ["react-markdown$default" :as ReactMarkdown]
+            [clojure.string :as str]
+            [reagent.core :as r]
             [ui.codemirror :as codemirror]
+            [ui.markdown :as markdown]
+            [ui.main.provenance :as provenance]
             [ui.modals.link-context-item :as link-context-item]
             [ui.refusal :as refusal]
             api))
@@ -59,27 +63,45 @@
        ;; so opening the modal is where it is asked for, and until the answer
        ;; lands there is nothing here that could be saved -- which is what
        ;; get-values reads this absence as.
-       :relation-description nil})))
+       :relation-description nil
+       ;; Absent for the same reason and by the same fetch: the versions arrive
+       ;; with the text (repository/fetch-relation-history). Nil is what the
+       ;; version bar draws as "Version 1 (current)" with both arrows dead, which
+       ;; is what an unanswered history looks like from the outside.
+       :versions nil
+       ;; 0 is the current version, and stepping back only ever reads: see
+       ;; past-version-component.
+       :version-idx 0
+       :pane nil
+       :provenance nil})))
 
-(defn- load-description!
-  "Ask for the edge's body text, which is the one field of a relation that does
-   not arrive with the row -- see repository/fetch-relation-description, and the
-   pointer resting on the card's strip, which is the other gesture that asks for
-   it.
+(defn- load-history!
+  "Ask for the edge's body text and its versions, which are the one part of a
+   relation that does not arrive with the row -- see
+   repository/fetch-relation-history, and the pointer resting on the card's
+   strip, which is the other gesture that asks for the text (and asks for nothing
+   else, because it runs on hover).
+
+   One fetch and not two. The bar has to know how many versions there are before
+   it can say which one is on screen, so a modal that fetched the text now and the
+   history on demand would either open with a bar that cannot be read or need two
+   round trips to open at all.
 
    The answer is dropped unless the fields still belong to the edge it is about:
    this modal is opened by clicking a card, and another card can be clicked
    before the first answer lands."
   [*state item selected-context]
   (when selected-context
-    (-> (api/fetch-relation-description @*state
-                                        {:item-id (:id item) :context-id (:id selected-context)})
+    (-> (api/fetch-relation-history @*state
+                                    {:item-id (:id item) :context-id (:id selected-context)})
         (.then (fn [result]
-                 (let [{:keys [item-id context-id text]} (:relation-description result)]
+                 (let [{:keys [item-id context-id text versions]} (:relation-history result)]
                    (swap! *fields
                      (fn [{:keys [edge] :as fields}]
                        (if (= edge [item-id context-id])
-                         (assoc fields :relation-description (or text ""))
+                         (assoc fields
+                           :relation-description (or text "")
+                           :versions (vec versions))
                          fields)))))))))
 
 (defn- editor-el [] (.getElementById js/document "relation-description-editor"))
@@ -101,8 +123,14 @@
   (let [{:keys [global-annotation relation-annotation relation-description show-badge? is-part-of?
                 part-of-sort-idx]}
           @*fields
-        ;; The editor when it is up, and the loaded text when it is not -- which
-        ;; is to say nil, since nothing is loaded then either.
+        ;; The editor when it is up, and what was loaded when it is not. Two
+        ;; different absences: before the fetch lands there is nothing loaded
+        ;; either and this stays nil, which is what stops the save writing; while
+        ;; the bar is off the current version, or the provenance pane is open, the
+        ;; editor is unmounted and this is the text it was holding -- see
+        ;; switch-view!, which puts it there on the way out. So a save from a past
+        ;; version rewrites the text that is standing, which is to say writes
+        ;; nothing to it, rather than reviving the version being read.
         relation-description (or (editor-value) relation-description)]
     (cond-> {:item-id (:id item)
              :context-id (when selected-context (:id selected-context))
@@ -169,6 +197,131 @@
       :on-change (field :part-of-sort-idx)
       :placeholder "idx"}]]])
 
+(defn- switch-view!
+  "Move the bar, or open and close a pane -- and keep what is in the editor.
+
+   The editor is CodeMirror, it owns its own document, and every one of these
+   moves unmounts it. An edit that had only ever been made in that document would
+   go with it: back to the current version and the editor would be rebuilt from
+   the text the fetch delivered, silently discarding what had been typed. So it is
+   read back into *fields first, which is both where the save looks (get-values)
+   and what the editor is remounted from."
+  [changes]
+  (let [typed (editor-value)]
+    (swap! *fields
+      (fn [fields]
+        (merge (cond-> fields typed (assoc :relation-description typed)) changes)))))
+
+(defn- load-provenance!
+  "Who wrote each line of the text this edge is carrying now.
+
+   Fetched when the pane is opened and not when the modal is, the arrangement
+   ui.actions/open-provenance! has for an item: the assessment is not free (see
+   provenance/of-relation) and nothing on the way in needs it.
+
+   Fetched again on every open rather than kept, because the text under it can
+   have moved in between -- the editor above is live, and a save closes the modal
+   but a refused one does not. Dropped, like every other answer here, unless the
+   fields still belong to the edge it is about."
+  [*state item selected-context]
+  (-> (api/fetch-relation-provenance @*state
+                                     {:item-id (:id item) :context-id (:id selected-context)})
+      (.then (fn [result]
+               (let [{:keys [item-id context-id description caution]} (:relation-provenance result)]
+                 (swap! *fields
+                   (fn [{:keys [edge] :as fields}]
+                     (if (= edge [item-id context-id])
+                       (assoc fields :provenance {:description description :caution caution})
+                       fields))))))))
+
+(defn- version-label
+  [versions idx]
+  (if (seq versions)
+    (let [{:keys [version source]} (nth versions idx nil)]
+      (str "Version " (or version (inc idx))
+           (when (zero? idx) " (current)")
+           (when source (str " · " source))))
+    "Version 1 (current)"))
+
+(defn- version-bar-component
+  "The bar over a relation's text: the item's version bar, in a modal.
+
+   The same two groups, saying the same two different things -- see
+   ui.main.lhs.item-detail/version-navigation-controls, where the split is argued.
+   Left is about a version: step through them and read which one is on screen and
+   where it came from. Right is about the relation as such: who wrote the text
+   that is standing, whichever version the arrows are pointing at.
+
+   Here rather than as a page of its own, unlike the item's provenance, and not by
+   preference: #modals-layer is a sibling of #main-layer and sits over it, so a
+   page opened from inside a modal would be drawn behind it.
+
+   No Diff button. The item's bar has one and this deliberately does not -- what
+   was asked for is the older texts and their provenance, and a merge view inside a
+   modal is a piece of work of its own rather than a smaller version of the two
+   panes below."
+  [*state item selected-context]
+  (let [{:keys [versions version-idx pane]} @*fields
+        idx (or version-idx 0)
+        total (count versions)
+        provenance? (= :provenance pane)]
+    [:div.version-bar
+     [:div.version-bar-group
+      [:span.version-bar-scope "this version"]
+      [:button.relation-version-back
+       {:on-click #(switch-view! {:version-idx (inc idx)})
+        :disabled (>= (inc idx) total)
+        :title "The version before this one"} "←"]
+      [:button.relation-version-forward
+       {:on-click #(switch-view! {:version-idx (dec idx)})
+        :disabled (<= idx 0)
+        :title "The version after this one"} "→"]
+      [:span.version-bar-label {:style {:font-weight "bold"}} (version-label versions idx)]]
+     [:div.version-bar-group.version-bar-item-group
+      [:span.version-bar-scope "this relation"]
+      [:button.relation-provenance-open
+       {:on-click (fn []
+                    (if provenance?
+                      (switch-view! {:pane nil})
+                      (do (switch-view! {:pane :provenance :provenance nil})
+                          (load-provenance! *state item selected-context))))
+        :title "Who wrote each line of the text on this relation as it stands now"}
+       (if provenance? "Close" "Provenance")]
+      ;; Whole first, then the item: that is the direction the row is stored in
+      ;; (relations.owner_id -> relations.target_id) and the direction the
+      ;; sentence above the fields reads in.
+      [:span.version-bar-item-id
+       {:title "The whole this relation runs from, and the item it runs to"}
+       (str "#" (:id selected-context) "→#" (:id item))]]]))
+
+(defn- past-version-component
+  "A version that is no longer the current one: rendered, and not editable.
+
+   Rendered markdown rather than a second editor, because that is what an older
+   version of an item's description is too -- the bar swaps the text under the
+   detail view (ui.main.lhs.item-detail/component), which renders it. Reading a
+   past version is reading, and it is not this modal's business to offer a save
+   that would silently make the newest thing something old.
+
+   Its element id is not the editor's, and that matters rather than merely being
+   tidy: `editor-value` finds the editor by id, and a read-only view answering to
+   that name would hand the save a text nobody typed."
+  [{:keys [text]}]
+  [:div.relation-version-past
+   (if (str/blank? text)
+     [:div.relation-version-note "This version of the text was empty."]
+     [:div.description
+      [:> ReactMarkdown {:children text :components markdown/components}]])])
+
+(defn- provenance-pane-component
+  "The provenance of the edge's text, in the view the item's own page draws it in
+   -- ui.main.provenance/view, the same legend and the same spectrum. Two
+   renderings of one number is how two surfaces come to disagree about it."
+  []
+  [:div.relation-provenance
+   [provenance/view (:provenance @*fields)
+    "Nothing is written on this relation, so there is nothing to attribute."]])
+
 (defn- description-editor-component
   "The relation's text, in the editor the description modal uses -- the same
    CodeMirror, the same markdown mode, the same keyboard scheme.
@@ -190,15 +343,25 @@
 
    The height is what is left rather than a flat 70vh, which is the same thing to
    about five percent and fits. #modal-component is 100vh tall at top: 50px, so
-   the last 50px of it are off screen to begin with; the 300px is that, plus this
-   modal's padding, heading, two annotation lines, standing row and save hint. A
-   flat 70vh put the hint just past the bottom edge."
+   the last 50px of it are off screen to begin with; the rest of the subtraction is
+   that, plus this modal's padding, heading, two annotation lines, standing row,
+   version bar and save hint. A flat 70vh put the hint just past the bottom edge.
+
+   The number itself is in main.css, as --relation-text-height on
+   #modal-component, because it is not only this box's: the two read-only panes
+   that stand in this one's place have to be exactly as tall, or switching between
+   them would walk the save hint up and down the modal. A custom property
+   inherits, so the editor's own theme rule resolves it -- with the calc repeated
+   as a fallback, because a height CodeMirror cannot resolve is the one-line-tall
+   box described above rather than a visibly broken one."
   [doc]
   (r/create-class
-    {:component-did-mount #(codemirror/create-editor (editor-el)
-                                                     {:doc doc
-                                                      :markdown? true
-                                                      :box {:height "calc(100vh - 300px)"}})
+    {:component-did-mount #(codemirror/create-editor
+                             (editor-el)
+                             {:doc doc
+                              :markdown? true
+                              :box {:height
+                                      "var(--relation-text-height, calc(100vh - 350px))"}})
      :reagent-render (fn [_doc] [:div#relation-description-editor.relation-description])}))
 
 (defn component
@@ -210,12 +373,12 @@
   ;; time a card is clicked: the layer it lives in is emptied when :modal goes nil.
   (when-not notice (reset-fields! item selected-context))
   (r/create-class
-    {:component-did-mount (fn [] (when-not notice (load-description! *state item selected-context)))
+    {:component-did-mount (fn [] (when-not notice (load-history! *state item selected-context)))
      :component-did-update (fn [this [_ _old-state old-item _old-selected-context]]
                              (let [[_ _ new-item new-selected-context] (r/argv this)]
                                (when (not= (:id old-item) (:id new-item))
                                  (reset-fields! new-item new-selected-context)
-                                 (load-description! *state new-item new-selected-context))))
+                                 (load-history! *state new-item new-selected-context))))
      :reagent-render ;
        (fn [_*state _item selected-context notice]
          (let [in-overview? (nil? selected-context)]
@@ -238,10 +401,29 @@
                  :on-change (field :relation-annotation)
                  :placeholder (str "Relation annotation for " (:title selected-context) "...")}]
                [relation-standing-component]
-               (let [description (:relation-description @*fields)]
-                 (if (nil? description)
-                   [:div.relation-description-loading "Loading the relation's text…"]
-                   ^{:key (pr-str (:edge @*fields))}
-                   [description-editor-component description]))])
+               [version-bar-component *state item selected-context]
+               (let [{:keys [relation-description versions version-idx pane]} @*fields
+                     idx (or version-idx 0)]
+                 (cond
+                   ;; Until the fetch lands there is neither a text to edit nor a
+                   ;; history to step through, and this stands in the box's place
+                   ;; for that one round trip.
+                   (nil? relation-description)
+                     [:div.relation-description-loading "Loading the relation's text…"]
+                   (= :provenance pane) [provenance-pane-component]
+                   (pos? idx) [past-version-component (nth versions idx nil)]
+                   :else ^{:key (pr-str (:edge @*fields))}
+                         [description-editor-component relation-description]))])
             [:p {:style {:font-size "0.9em" :color "#666" :margin-top "10px"}}
-             "Press Alt+9 to save, ESC to cancel"]]))}))
+             ;; What the hint says depends on what is in the box, because Alt+9
+             ;; does not do the same thing in all three. Off the current version
+             ;; the text on screen is not the one a save would write (get-values),
+             ;; and saying "save" over it without saying that would read as an
+             ;; offer to restore it.
+             (let [{:keys [version-idx pane]} @*fields]
+               (cond (= :provenance pane)
+                       "Reading who wrote what. Alt+9 saves the relation, ESC cancels."
+                     (pos? (or version-idx 0))
+                       (str "An older version, read-only — step forward to the current one to"
+                            " edit it. Alt+9 saves the relation, ESC cancels.")
+                     :else "Press Alt+9 to save, ESC to cancel"))]]))}))

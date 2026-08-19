@@ -210,6 +210,20 @@ ul.cards {
     opacity: 1;
 }
 
+/* How tall the box under the version bar is, whichever of the three things is in
+   it: the editor, an older version, or the provenance of the text. One number for
+   all three, because switching between them must not move the save hint under
+   them up and down the modal. The editor resolves it through its own theme rule
+   (ui.codemirror, :box) -- a custom property inherits, and that is the only way
+   the number can be in one place and still reach a CodeMirror theme.
+
+   100vh minus: the 50px of #modal-component that hangs off the bottom of the
+   screen to begin with, this modal's padding, its heading, two annotation lines,
+   the standing row, the version bar and the save hint. */
+#modal-component {
+    --relation-text-height: calc(100vh - 350px);
+}
+
 /* The relation's own body text: the description modal's CodeMirror, in a box the
    width of the fields above it. Its height is capped in the theme rather than
    here (ui.codemirror, :box) -- it belongs with the scroller rule that makes the
@@ -217,6 +231,47 @@ ul.cards {
 #modal-component .relation-description {
     width: calc(100% - 20px);
     margin-top: 8px;
+}
+
+/* The version bar over the relation's text is the item's bar (see .version-bar
+   further down, which is where the two groups and their captions are described).
+   All this adds is the width the modal gives it -- the same width as the editor
+   under it, so the two line up on both edges. */
+#modal-component .version-bar {
+    width: calc(100% - 20px);
+    box-sizing: border-box;
+}
+
+/* An older version of the text, and the provenance of the current one: the two
+   read-only things that stand in the editor's place. Same height and same width
+   as it, and each scrolls inside itself for the reason the editor does -- a box
+   that grew with its content would push the save hint off the modal. */
+#modal-component .relation-version-past,
+#modal-component .relation-provenance {
+    width: calc(100% - 20px);
+    height: var(--relation-text-height, calc(100vh - 350px));
+    margin-top: 8px;
+    padding: 10px;
+    box-sizing: border-box;
+    overflow-y: auto;
+    background-color: wheat;
+    border: 1px solid #ddd;
+}
+
+/* A version that was saved empty. It is not the same as an edge nobody has
+   written on -- somebody cleared this one -- so it says so rather than leaving a
+   blank panel that reads as a fault. */
+#modal-component .relation-version-note {
+    font-style: italic;
+    opacity: 0.6;
+}
+
+/* The provenance rows are drawn for the dark page they were written for
+   (#provenance-page), where the text colour comes off the panel. In here the
+   modal is light, so the pane says what colour its text is rather than letting
+   the tints be read against a colour nothing set. */
+#modal-component .relation-provenance {
+    color: #2f2c2c;
 }
 
 /* Standing in the editor's place until the text arrives. It is fetched when the

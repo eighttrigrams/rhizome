@@ -6,7 +6,10 @@
    this moment, which stretches are the owner's own hand and which an agent may
    rewrite. An item he wrote once and an agent has edited nineteen times since
    still has his opening paragraph at 1.00 here, and nothing in a list of
-   nineteen agent versions would tell him that."
+   nineteen agent versions would tell him that.
+
+   `view` is the answer without the page around it, so the same one can be read of
+   a relation's text inside the modal that edits it -- see ui.modals.annotation-edit."
   (:require [clojure.string :as str]))
 
 ;; The two ends of the spectrum, as solid colours. Mixed in OKLCH and never in
@@ -108,14 +111,54 @@
    ;; blank line of his is as much his as any other.
    [:div.provenance-text (if (str/blank? text) "\u200b" text)]])
 
+(defn view
+  "The answer itself: the legend, the key, and the text with a tint per line.
+
+   Everything except the header, and that is what makes it reusable -- the same
+   view stands on the item's own page and inside the relation modal, which is
+   where a relation's is read (ui.modals.annotation-edit). Two renderings of one
+   number is how two surfaces come to disagree about it, and the wording is the
+   server's in both places for the same reason.
+
+   `provenance` is `{:description :caution}`, and its three states are three
+   different things: nil is the fetch still in flight, a nil `:caution` is a text
+   there is nothing to attribute in, and anything else is the answer. The sentence
+   for the middle one is the caller's, because only the caller knows what kind of
+   thing was empty."
+  ([provenance] (view provenance "This item has no description to attribute."))
+  ([provenance nothing-to-attribute]
+   (let [{:keys [description caution]} provenance
+         {:keys [legend ranges]} caution
+         lines (source-lines description)
+         by-line (caution-by-line ranges)
+         heads (range-heads ranges)]
+     (cond
+       (nil? provenance) [:p.provenance-empty "Reading the history…"]
+       (nil? caution) [:p.provenance-empty nothing-to-attribute]
+       :else
+       [:<>
+         ;; The server's own sentence, rendered rather than retyped. A second
+         ;; wording here is how two surfaces come to explain one number
+         ;; differently, and the agent reading the API and the person reading
+         ;; this page have to be told the same thing.
+         [:p.provenance-legend legend]
+         [colour-key]
+         ;; The source text, not the rendered markdown. The ranges index source
+         ;; lines and rendering does not preserve them -- a paragraph is many
+         ;; source lines inside one <p>, so tinting rendered blocks would mean
+         ;; guessing which block a line landed in. It would be wrong exactly
+         ;; where it matters most: a paragraph half his and half an agent's
+         ;; would have to pick one colour, and would then be saying something
+         ;; false about his own text.
+         [:div.provenance-lines
+          (map-indexed (fn [i text]
+                         (let [n (inc i)]
+                           ^{:key n} [line-row n text (by-line n) (contains? heads n)]))
+                       lines)]]))))
+
 (defn component
   [*state]
-  (let [{:keys [selected-item provenance]} @*state
-        {:keys [description caution]} provenance
-        {:keys [legend ranges]} caution
-        lines (source-lines description)
-        by-line (caution-by-line ranges)
-        heads (range-heads ranges)]
+  (let [{:keys [selected-item provenance]} @*state]
     [:div#provenance-page
      [:div.config-header
       [:button.config-close {:on-click #(close! *state) :title "Close"} "✕"]
@@ -123,26 +166,4 @@
       [:span.provenance-subject
        (str "#" (:id selected-item)
             (when-let [title (:title selected-item)] (str " · " title)))]]
-     (cond
-       (nil? provenance) [:p.provenance-empty "Reading the history…"]
-       (nil? caution) [:p.provenance-empty "This item has no description to attribute."]
-       :else
-       [:<>
-        ;; The server's own sentence, rendered rather than retyped. A second
-        ;; wording here is how two surfaces come to explain one number
-        ;; differently, and the agent reading the API and the person reading
-        ;; this page have to be told the same thing.
-        [:p.provenance-legend legend]
-        [colour-key]
-        ;; The source text, not the rendered markdown. The ranges index source
-        ;; lines and rendering does not preserve them -- a paragraph is many
-        ;; source lines inside one <p>, so tinting rendered blocks would mean
-        ;; guessing which block a line landed in. It would be wrong exactly
-        ;; where it matters most: a paragraph half his and half an agent's
-        ;; would have to pick one colour, and would then be saying something
-        ;; false about his own text.
-        [:div.provenance-lines
-         (map-indexed (fn [i text]
-                        (let [n (inc i)]
-                          ^{:key n} [line-row n text (by-line n) (contains? heads n)]))
-                      lines)]])]))
+     [view provenance]]))

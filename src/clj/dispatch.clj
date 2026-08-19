@@ -15,7 +15,7 @@
               fetch-aggregated-contexts delete-context fetch-item-description edit-item-in-obsidian
               fetch-item-provenance
               sync-obsidian-changes discard-obsidian-changes get-obsidian-file-content update-annotations
-              fetch-relation-description
+              fetch-relation-description fetch-relation-history fetch-relation-provenance
               vector-search-related-items vector-threshold-search-related-items]]
             [poll :refer
              [list-youtube-poll-channels add-youtube-poll-channel delete-youtube-poll-channel
@@ -59,6 +59,8 @@
              get-obsidian-file-content
              update-annotations
              fetch-relation-description
+             fetch-relation-history
+             fetch-relation-provenance
              vector-search-related-items
              vector-threshold-search-related-items
              list-youtube-poll-channels
@@ -94,6 +96,8 @@
     "fetch-item-description"
     "fetch-item-provenance"
     "fetch-relation-description"
+    "fetch-relation-history"
+    "fetch-relation-provenance"
     "get-obsidian-file-content"
     "discard-obsidian-changes"
     "vector-search-related-items"

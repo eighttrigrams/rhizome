@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS relations (
     description TEXT,
     is_part_of INTEGER NOT NULL DEFAULT 0,
     part_of_sort_idx INTEGER NOT NULL DEFAULT -1,
+    description_source TEXT,
     FOREIGN KEY (owner_id) REFERENCES items(id),
     FOREIGN KEY (target_id) REFERENCES items(id)
 );
@@ -40,6 +41,28 @@ CREATE TABLE IF NOT EXISTS history (
     source TEXT,
     PRIMARY KEY (id, version),
     FOREIGN KEY (id) REFERENCES items(id) ON DELETE CASCADE
+);
+
+-- The same history, for the text a relation carries. Keyed on the PAIR and not
+-- on relations.id, and that is the whole design of this table: an item's inbound
+-- relations are DELETEd and re-INSERTed wholesale every time its edit modal is
+-- saved (see et.vp.ds.relations/set-containers-of-item!), so the row's id is not
+-- the edge's identity and a history hung off it would be orphaned by the next
+-- save. What does not change is which two items the edge runs between.
+--
+-- No `title` column, unlike history above. There it records what the item was
+-- called when that version was superseded; a relation has no name of its own --
+-- it is identified by the two items it joins, and those are the primary key here.
+CREATE TABLE IF NOT EXISTS relation_history (
+    owner_id INTEGER NOT NULL,
+    target_id INTEGER NOT NULL,
+    text TEXT,
+    version INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    source TEXT,
+    PRIMARY KEY (owner_id, target_id, version),
+    FOREIGN KEY (owner_id) REFERENCES items(id) ON DELETE CASCADE,
+    FOREIGN KEY (target_id) REFERENCES items(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_items_title ON items(title);

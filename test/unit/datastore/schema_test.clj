@@ -73,7 +73,7 @@
                                "WHERE owner_id = 1")])
       (schema/apply-schema! db)
       (is (= #{"id" "owner_id" "target_id" "show_badge" "annotation" "description"
-               "is_part_of" "part_of_sort_idx"}
+               "description_source" "is_part_of" "part_of_sort_idx"}
              (columns db "relations"))
           "the second run adds no duplicate column")
       (let [row (jdbc/execute-one! db ["SELECT * FROM relations WHERE owner_id = 1"])]

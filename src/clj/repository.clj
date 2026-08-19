@@ -335,6 +335,67 @@
                              :context-id context-id
                              :text (datastore.relations/relation-description db item-id context-id)})))
 
+(defn fetch-relation-history
+  "Every version of one relation's text, and the text as it stands now, for the
+   modal that edits it.
+
+   Its own command rather than a field on `fetch-relation-description`, because
+   that one runs on hover and this one does not. A version list carries the full
+   text of every version -- which is the same reason the *item* version list is
+   loaded by `fetch-item-description` and not projected onto list rows, and the
+   whole reason a relation's text is fetched one edge at a time in the first
+   place.
+
+   `:text` says which of the versions the editor is to be filled from, and says it
+   rather than leaving the client to work it out. It is the head of the list, but
+   only when the head IS the current version: an edge that has been unlinked
+   answers with its archive and no current version at all (see
+   get-relation-description-history), and an editor filled from the newest
+   *archived* version would put a text that is no longer on the edge back onto it
+   at the next save. Read off that one list and not re-queried, so the two cannot
+   come back disagreeing.
+
+   Nil when the edge carries no text, and nil is not \"\" here: the modal reads a
+   nil as \"not loaded yet\" (ui.modals.annotation-edit), so the field is turned
+   into an empty string on arrival rather than on the way out.
+
+   The answer names the edge it is about, exactly as fetch-relation-description
+   does and for the same reason: a second card can be clicked before the first
+   answer lands."
+  [{:keys [db]}]
+  (fn [state {:keys [item-id context-id]}]
+    (let [{:keys [versions total]} (datastore.relations/get-relation-description-history
+                                     db
+                                     item-id
+                                     context-id)
+          current (first versions)]
+      (assoc state
+        :relation-history {:item-id item-id
+                           :context-id context-id
+                           :text (when (:current current) (:text current))
+                           :versions versions
+                           :total total}))))
+
+(defn fetch-relation-provenance
+  "The text one relation is carrying now, together with the caution ranges over
+   it.
+
+   `fetch-item-provenance` for an edge, and both halves of its reasoning apply
+   unchanged. Text and ranges come back together because the ranges index the
+   lines of one exact text, and two fetches a save apart would tint every line
+   with its neighbour's colour -- wrong in a way that still looks right. And it is
+   a command of its own because the assessment is not free, so it is paid for when
+   the button is pressed rather than every time the modal opens."
+  [{:keys [db]}]
+  (fn [state {:keys [item-id context-id]}]
+    (assoc state
+      :relation-provenance {:item-id item-id
+                            :context-id context-id
+                            :description (datastore.relations/relation-description db
+                                                                                   item-id
+                                                                                   context-id)
+                            :caution (provenance/of-relation db item-id context-id)})))
+
 (defn fetch-item-provenance
   "The item's CURRENT description together with the caution ranges over it, for
    the Provenance page.

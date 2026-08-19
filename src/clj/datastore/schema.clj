@@ -133,6 +133,7 @@
      (ensure-column! db "relations" "description" "TEXT")
      (ensure-column! db "relations" "is_part_of" "INTEGER NOT NULL DEFAULT 0")
      (ensure-column! db "relations" "part_of_sort_idx" "INTEGER NOT NULL DEFAULT -1")
+     (ensure-column! db "relations" "description_source" "TEXT")
      (ensure-column! db "history" "source" "TEXT")
      (ensure-column! db "history" "title" "TEXT")
      (ensure-column! db "youtube_poll_channels" "min_duration_minutes" "INTEGER")

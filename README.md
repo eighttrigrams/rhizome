@@ -350,7 +350,7 @@ rather than as a bare float:
 
 ```json
 "caution": {
-  "legend": "caution runs from 1.00 to 0.00 over the lines of this item's description. …",
+  "legend": "caution runs from 1.00 to 0.00 over the lines of the text it is served with. …",
   "ranges": [{"from": 1, "to": 12, "caution": 1.0},
              {"from": 13, "to": 20, "caution": 0.0}]
 }
@@ -361,6 +361,46 @@ written comes back as one range covering all of it — the honest answer, not a
 missing one. And a body ending in a newline is one line longer than a split that
 discards the trailing empty field: line up with these numbers by splitting on
 `\n` and keeping it.
+
+### The text a relation carries has the same history
+
+A relation holds a body of text of its own — why *this* chapter is in *this*
+book — edited in the modal a card's annotation strip opens. That text is
+versioned by the mechanism above, and the same two questions can be asked of it:
+which versions there were, and who wrote the one standing now.
+
+Both are answered **inside that modal**, on a bar over the text that is the
+item's version bar in miniature: arrows and the version label under *this
+version*, a Provenance button under *this relation*. Not on a page of its own,
+unlike the item's — the modal layer sits over the main one, so a page opened
+from inside a modal would be drawn behind it.
+
+Stepping back shows an older version **rendered and read-only**; there is no
+editor on screen at all, and a save from there writes the text that is standing
+rather than the one being read. What has been typed into the editor survives the
+trip: it is read out before the editor is unmounted and put back when the bar
+returns to the current version.
+
+Two differences from an item's history, both deliberate:
+
+- **The history is keyed on the two items, not on `relations.id`.** Saving either
+  item's edit modal deletes that item's relation rows and re-inserts them, so the
+  row's id is not the edge's identity. What does not change is which two items the
+  edge runs between, and `relation_history` is keyed on that pair.
+- **A save that did not change the text earns no version.** The description modal
+  exists to write a description, so every save of it is a version even when the
+  text came back identical; the relation modal writes the text alongside a badge,
+  a part-of tick and two annotations, so a save there is not evidence that
+  anything was written. Unticking a badge four times is not four versions.
+
+An unlink is the one write that can destroy a relation's text with nobody having
+typed over it — the row goes and the text goes with it — so the text is archived
+on the way out. Re-link the edge later and it starts blank with its history
+underneath, which is what happened.
+
+Only the web UI writes this text today, so every version of it reads as
+hand-written; there is no `/api` route that replaces a relation's description the
+way `PUT /api/items/:id` replaces an item's.
 
 ## Configuration Options
 

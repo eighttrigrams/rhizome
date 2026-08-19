@@ -1,5 +1,6 @@
 (ns provenance
-  "How careful an agent should be in an item's description, line by line.
+  "How careful an agent should be in a text this system holds, line by line — an
+  item's description, or the text one relation carries.
 
   An adapter and nothing else. The question itself belongs to `et.uvt.caution`,
   and `assess` there is the specification of what the numbers mean — islands,
@@ -14,7 +15,8 @@
   for the ordering and `source-of` for the empty column."
   (:require [clojure.string :as str]
             [et.uvt.caution :as uvt]
-            [et.vp.ds :as ds]))
+            [et.vp.ds :as ds]
+            [et.vp.ds.relations :as relations]))
 
 (def ours
   "The source markers that are the owner's own hand.
@@ -53,7 +55,7 @@
 
   In rhizome's own vocabulary — its markers are `app`, `api` and `scraper`, and
   an agent holding this string is not in a position to translate someone else's."
-  (str "caution runs from 1.00 to 0.00 over the lines of this item's description. "
+  (str "caution runs from 1.00 to 0.00 over the lines of the text it is served with. "
        "1.00 is a stretch written wholly by the owner's own hand — saved from the "
        "web UI (source \"app\") or synced back from his editor (source "
        "\"obsidian\") — and is not yours to rewrite. "
@@ -131,3 +133,22 @@
   against the item's `updated_at_ctx` rather than truncating the answer."
   [db id]
   (of-versions (:versions (ds/get-description-history db {:id id}))))
+
+(defn of-relation
+  "`{:legend :ranges}` for the text one relation is carrying, or nil when it is
+   carrying none. Same question as `of-item`, asked of an edge.
+
+   The same `of-versions` and therefore the same reversal, the same legend and the
+   same reading of an empty source column -- which is what makes the two answers
+   comparable. A relation's history is versioned by exactly the mechanism an
+   item's description is (et.vp.ds.relations/get-relation-description-history), so
+   there is nothing for this namespace to know about edges beyond where to ask.
+
+   Cheaper than `of-item` in practice for the same reason it is on a colder path:
+   the assessment costs lines² × versions, and a relation's text is a paragraph
+   about why one thing is filed under another, not a note. It is still asked for
+   only when the reader presses the button -- see repository/fetch-relation-provenance."
+  [db item-id container-id]
+  (of-versions (:versions (relations/get-relation-description-history db
+                                                                     item-id
+                                                                     container-id))))

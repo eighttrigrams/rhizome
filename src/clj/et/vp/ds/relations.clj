@@ -181,8 +181,43 @@
                      :part-of-sort-idx (->part-of-sort-idx (:part-of-sort-idx container)))]))
         containers))
 
-(defn- descriptions-of-inbound-rows
-  "The body text of each of an item's inbound relations, as {owner-id text}.
+(defn- present? [s] (and s (not (clojure.string/blank? s))))
+
+(defn- save-relation-revision!
+  "Archive the text an edge is carrying, before something replaces it.
+
+   `et.vp.ds/save-revision-to-history!` for a relation, and the same mechanism
+   edge for edge: the text about to be overwritten is copied under the next
+   version number, stamped with the source that WROTE it rather than the one
+   about to write, and a blank text is not archived at all -- there is nothing in
+   it to recover, and a run of empty versions would be a version bar with nothing
+   to step through.
+
+   Keyed on the two items and not on relations.id, because the row's id does not
+   survive a save of either item's edit modal -- see set-containers-of-item!
+   below, and the note over the table in schema-sqlite.sql."
+  [db item-id container-id text source]
+  (when (present? text)
+    (let [next-version
+            (inc (:max_version
+                   (jdbc/execute-one!
+                     db
+                     (sql/format {:select [[[:coalesce [:max :version] 0] :max_version]]
+                                  :from [:relation_history]
+                                  :where [:and [:= :owner_id [:inline container-id]]
+                                          [:= :target_id [:inline item-id]]]}))))]
+      (jdbc/execute-one! db
+                         (sql/format {:insert-into [:relation_history]
+                                      :values [{:owner_id [:inline container-id]
+                                                :target_id [:inline item-id]
+                                                :text [:inline text]
+                                                :version [:inline next-version]
+                                                :source [:inline source]}]}))))
+  nil)
+
+(defn- texts-of-inbound-rows
+  "The body text of each of an item's inbound relations and the source that wrote
+   it, as {owner-id {:description text :source source}}.
 
    Read before set-containers-of-item! deletes those rows, and written back on
    the inserts that replace them. The description is the one thing a relation
@@ -190,13 +225,21 @@
    hover and nowhere else, so it never travels with a list row and the client
    cannot hand it back the way it hands back the annotation. Without this, every
    save from the edit modal would rewrite the rows from a map that has never
-   heard of it, and the text would be gone."
+   heard of it, and the text would be gone.
+
+   The source travels with the text, and there is more at stake in it than in the
+   text itself. A text that survived the rewrite with its source dropped would
+   come back reading as nobody's -- `provenance/source-of` takes an empty column
+   for the owner's own hand -- so an agent's paragraph would be handed back to him
+   as his, in an answer that looks entirely well-formed. Carried and not
+   re-stamped: rewriting the rows is not writing the text."
   [db item-id]
   (into {}
-        (keep (fn [{:relations/keys [owner_id description]}]
-                (when description [owner_id description])))
+        (keep (fn [{:relations/keys [owner_id description description_source]}]
+                (when description
+                  [owner_id {:description description :source description_source}])))
         (jdbc/execute! db
-                       (sql/format {:select [:owner_id :description]
+                       (sql/format {:select [:owner_id :description :description_source]
                                     :from [:relations]
                                     :where [:= :target_id [:inline item-id]]}))))
 
@@ -216,7 +259,17 @@
                           (keep (fn [[container-id {:keys [is-part-of?]}]]
                                   (when is-part-of? container-id))
                                 containers))
-  (let [descriptions (descriptions-of-inbound-rows db (:id item))]
+  (let [texts (texts-of-inbound-rows db (:id item))]
+    ;; An edge the new map does not mention is being taken away, and the delete
+    ;; below takes its text with it. Archived first, so it is still recoverable
+    ;; afterwards: this is the one write in the system that can destroy a
+    ;; relation's text without anyone having typed over it, and a field a delete
+    ;; can carry off unrecorded is not a versioned field. The edge that comes
+    ;; back if it is ever re-linked then starts out blank with a history under it,
+    ;; which is what happened.
+    (doseq [[container-id {:keys [description source]}] texts
+            :when (not (contains? containers container-id))]
+      (save-relation-revision! db (:id item) container-id description source))
     (jdbc/execute! db
                    (sql/format {:delete-from [:relations]
                                 :where [:= :target_id [:inline (:id item)]]}))
@@ -224,19 +277,28 @@
       (for [[container-id
              {:keys [show-badge? annotation is-part-of? part-of-sort-idx] :as container}]
               containers]
-        (jdbc/execute! db
-                       (sql/format {:insert-into [:relations]
-                                    :columns [:target_id :owner_id :annotation :description
-                                              :show_badge :is_part_of :part_of_sort_idx]
-                                    :values [[[:inline (:id item)] [:inline container-id]
-                                              [:inline annotation]
-                                              [:inline (if (contains? container :description)
-                                                         (:description container)
-                                                         (get descriptions container-id))]
-                                              [:inline show-badge?]
-                                              [:inline (boolean is-part-of?)]
-                                              [:inline (->part-of-sort-idx
-                                                         part-of-sort-idx)]]]}))))))
+        (let [{:keys [description source]} (get texts container-id)]
+          (jdbc/execute! db
+                         (sql/format {:insert-into [:relations]
+                                      :columns [:target_id :owner_id :annotation :description
+                                                :description_source :show_badge :is_part_of
+                                                :part_of_sort_idx]
+                                      :values [[[:inline (:id item)] [:inline container-id]
+                                                [:inline annotation]
+                                                ;; A caller that carries the key
+                                                ;; has the text in hand and wins.
+                                                ;; The source stays the row's
+                                                ;; either way: nothing here knows
+                                                ;; who that caller is, and a
+                                                ;; rewrite is not an edit.
+                                                [:inline (if (contains? container :description)
+                                                           (:description container)
+                                                           description)]
+                                                [:inline source]
+                                                [:inline show-badge?]
+                                                [:inline (boolean is-part-of?)]
+                                                [:inline (->part-of-sort-idx
+                                                           part-of-sort-idx)]]]})))))))
 
 (defn set-the-containers-of-item!
   "@param containers - map {:container-id {:annotation \"annotation\"
@@ -476,10 +538,106 @@
                                     :where [:and [:= :target_id [:inline item-id]]
                                             [:= :owner_id [:inline container-id]]]}))))
 
-(defn update-relation-description!
-  [db item-id container-id description]
+(defn- relation-text-row
+  "The two columns a relation's text is held in -- the text and who wrote it --
+   or nil when there is no such edge."
+  [db item-id container-id]
   (jdbc/execute-one! db
-                     (sql/format {:update [:relations]
-                                  :set {:description [:inline description]}
+                     (sql/format {:select [:description :description_source]
+                                  :from [:relations]
                                   :where [:and [:= :target_id [:inline item-id]]
                                           [:= :owner_id [:inline container-id]]]})))
+
+(defn update-relation-description!
+  "Replace the body text of one relation, keeping the text it replaces.
+
+   `et.vp.ds/update-context-description` for a relation, with one deliberate
+   difference, and it is the reason anything is compared here at all. There a save
+   IS an edit: the description modal exists to write a description and nothing
+   else, so every save of it earns a version even when the text came back
+   identical. This save is not. The relation modal writes the body alongside the
+   badge, the part-of tick and two annotations, and sends it whenever any of those
+   is touched (ui.modals.annotation-edit/get-values), so archiving on every save
+   would fill the history with versions nobody wrote -- ticking a badge four times
+   would be four versions of an unchanged text. An unchanged text is therefore not
+   written either, which is also what keeps the source column honest: re-stamping
+   it for a save that wrote nothing would hand the text to whoever saved last.
+
+   `source` is who is writing, in the vocabulary `provenance/ours` reads. It
+   defaults to \"app\" -- the person at the web UI, which is the only writer this
+   field has today.
+
+   Read, archive and write are one transaction, the arrangement
+   update-relation-standing! above has and for the same kind of reason: two saves
+   landing together would otherwise both read the same old text and both claim the
+   same version number, and one of them would be refused by the primary key after
+   having already overwritten the row.
+
+   Returns true when it wrote and nil when it did not -- there being no such edge,
+   or the text being the one already there."
+  ([db item-id container-id description]
+   (update-relation-description! db item-id container-id description "app"))
+  ([db item-id container-id description source]
+   (jdbc/with-transaction [tx db]
+     (when-let [row (relation-text-row tx item-id container-id)]
+       (when (not= (:relations/description row) description)
+         (save-relation-revision! tx
+                                  item-id
+                                  container-id
+                                  (:relations/description row)
+                                  (:relations/description_source row))
+         (jdbc/execute-one! tx
+                            (sql/format {:update [:relations]
+                                         :set {:description [:inline description]
+                                               :description_source [:inline source]}
+                                         :where [:and [:= :target_id [:inline item-id]]
+                                                 [:= :owner_id [:inline container-id]]]}))
+         true)))))
+
+(defn get-relation-description-history
+  "Every version of one relation's text, newest first, and how many there are --
+   the shape `et.vp.ds/get-description-history` answers with for an item.
+
+   Two differences from that one, both deliberate.
+
+   **The current version is always at the head, blank or not**, as long as the
+   edge is still there. For an item the current row joins the list only when it
+   has something in it, and it can afford to: the list is read in the detail view
+   and the description is edited somewhere else. Here the one surface that shows
+   this list is the one that EDITS the text, so the head of the list has to be the
+   text that is standing. A cleared description that dropped out would leave the
+   modal's editor showing the newest version that was not blank, and the next save
+   would put a text the user had deleted back onto the edge.
+
+   **The current version carries no timestamp.** A relation has no updated_at of
+   its own, and there is nothing to borrow one from: the items at either end are
+   touched by every edit to themselves, so dating the edge's text by one of them
+   would be a date about something else. The archived rows do carry `created_at`,
+   which is when each was superseded, exactly as an item's do.
+
+   An edge that is gone still answers with its archive, and with no current
+   version at the head. Unlinking takes the row and its text away, having archived
+   the text on the way out (set-containers-of-item!), and what is left is the
+   history -- which is the honest answer to what this relation's text was."
+  [db item-id container-id]
+  (let [row (relation-text-row db item-id container-id)
+        archived (mapv (fn [r]
+                         {:text (:relation_history/text r)
+                          :version (:relation_history/version r)
+                          :created_at (:relation_history/created_at r)
+                          :source (:relation_history/source r)})
+                   (jdbc/execute! db
+                                  (sql/format {:select [:text :version :created_at :source]
+                                               :from [:relation_history]
+                                               :where [:and [:= :owner_id [:inline container-id]]
+                                                       [:= :target_id [:inline item-id]]]
+                                               :order-by [[:version :desc]]})))
+        versions (if row
+                   (into [{:text (:relations/description row)
+                           :version (inc (or (:version (first archived)) 0))
+                           :created_at nil
+                           :source (:relations/description_source row)
+                           :current true}]
+                         archived)
+                   archived)]
+    {:versions versions :total (count versions)}))
