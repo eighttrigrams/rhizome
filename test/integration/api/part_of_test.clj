@@ -331,3 +331,70 @@
             "nothing was written: the refused save left the relations as they were")
         (is (= #{(:id book)} (containers-of chapter))
             "including the edge that was already there")))))
+
+(defn- standing-of
+  "The whole of one relation row, as the table holds it."
+  [whole part]
+  (let [r (jdbc/execute-one! db
+                             ["SELECT is_part_of, part_of_sort_idx, show_badge, annotation
+                               FROM relations WHERE owner_id = ? AND target_id = ?"
+                              (:id whole) (:id part)])]
+    {:is-part-of? (= 1 (:relations/is_part_of r))
+     :part-of-sort-idx (:relations/part_of_sort_idx r)
+     :show-badge? (= 1 (:relations/show_badge r))
+     :annotation (:relations/annotation r)}))
+
+(deftest editing-a-relation-from-the-list-test
+  (with-fresh-db
+    "the card in the list opens the one edge it is shown by, and everything the
+     modal offers for it lands on that edge -- the badge and the part-of standing
+     as well as the two annotations"
+    (let [{book :selected-item} (call! :insert-context nil {:title "Book"})
+          chapter (ds/new-item db "Chapter" "" #{(:id book)} nil)
+          resp (call! :update-annotations
+                      {:selected-item book}
+                      {:item-id (:id chapter)
+                       :context-id (:id book)
+                       :global-annotation "a subtitle"
+                       :relation-annotation "the first one"
+                       :relation-standing {:show-badge? false
+                                           :is-part-of? true
+                                           :part-of-sort-idx 4}})]
+      (is (= {:is-part-of? true :part-of-sort-idx 4 :show-badge? false
+              :annotation "the first one"}
+             (standing-of book chapter)))
+      (is (= "a subtitle" (:annotation (ds/get-item db {:id (:id chapter)})))
+          "and the item's own subtitle is still saved alongside it")
+      (is (= {:is-part-of? true :part-of-sort-idx 4}
+             (-> (ds/get-item db {:id (:id chapter)})
+                 (get-in [:data :contexts (:id book)])
+                 (select-keys [:is-part-of? :part-of-sort-idx])))
+          "the mirror says what the row says")
+      (is (and (contains? resp :modal) (nil? (:modal resp)))
+          "a save that went through closes the modal it came from")))
+  (with-fresh-db
+    "a part-of tick that would close a loop is refused here too, and nothing at
+     all is written -- not the annotations either, which travel in the same save"
+    (let [{book :selected-item} (call! :insert-context nil {:title "Book"})
+          {chapter :selected-item} (call! :insert-context nil {:title "Chapter"})]
+      (save-relations! chapter (part-of-entry book 1))
+      ;; The book is shown under the chapter as a plain relation, so its card
+      ;; there offers `part of` -- which is the loop.
+      (relations/link-item-to-another-item! db (ds/get-item db {:id (:id book)}) chapter true)
+      (let [resp (call! :update-annotations
+                        {:selected-item chapter}
+                        {:item-id (:id book)
+                         :context-id (:id chapter)
+                         :global-annotation "should not be written"
+                         :relation-annotation "nor this"
+                         :relation-standing {:show-badge? true
+                                             :is-part-of? true
+                                             :part-of-sort-idx 1}})]
+        (is (re-find #"part of itself" (:part-of-refused resp)))
+        (is (= :annotation-edit (:modal resp))
+            "and the modal stays up, with everything the user typed still in it")
+        (is (= {:is-part-of? false :part-of-sort-idx -1 :show-badge? true :annotation nil}
+               (standing-of chapter book))
+            "the edge is as it was")
+        (is (nil? (:annotation (ds/get-item db {:id (:id book)})))
+            "and the annotations that came with the refused save were not written")))))

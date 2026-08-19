@@ -368,10 +368,14 @@
   ;; The whole is settled here, from the row that was clicked, rather than read
   ;; off the selection when the modal renders or when it saves: those are two
   ;; more places to make the same wrong guess, and the row is only in hand here.
-  (swap! *state assoc
-    :modal :annotation-edit
-    :annotation-edit-item item
-    :annotation-edit-context (filed-under @*state item)))
+  ;; Opened clean: a refusal the last save left standing belongs to that save,
+  ;; and a modal that comes up already telling the user something was declined
+  ;; is telling them about a write they are no longer making.
+  (swap! *state #(-> %
+                     (dissoc :part-of-refused :save-failed)
+                     (assoc :modal :annotation-edit
+                            :annotation-edit-item item
+                            :annotation-edit-context (filed-under % item)))))
 
 (defn edit-item-in-obsidian!
   [*state]

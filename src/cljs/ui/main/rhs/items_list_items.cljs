@@ -148,7 +148,11 @@
                    false)}
       (if (not-empty (:annotation item))
         (:annotation item)
-        [:span {:style {:color "#888" :font-style "italic"}} "Click to add annotation"])])
+        ;; Not "add annotation": what the click opens is the relation, and the
+        ;; relation is already there -- it is what put the card in this list.
+        ;; Only its annotation is missing, which is what this placeholder
+        ;; standing where the annotation would be already says.
+        [:span {:style {:color "#888" :font-style "italic"}} "Click to edit relation"])])
    [:div.item-card-inner
     (when (or (:preview-image-lowres (:data item))
               (:preview-image (:data item))

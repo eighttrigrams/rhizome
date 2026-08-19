@@ -49,10 +49,19 @@
                                 api/sync-obsidian-changes
                                 item))
 
-(defn save-annotations-and-close!
-  [*state annotations-data]
+(defn save-relation!
+  "The relation modal's save. The modal stays open across it and the server
+   closes it -- the response carries :modal nil when the save went through and
+   :modal :annotation-edit when it was refused. That is the arrangement
+   update-context! above already has with the edit modal, and it is here for the
+   same reason, now that this modal can be refused too: ticking `part of` may
+   close a loop, and taking the modal down here would throw away the annotations
+   the user typed alongside it for a save that wrote nothing.
+
+   :part-of-refused and :save-failed go out cleared, so a save that goes through
+   is what takes down the notice the last one left standing."
+  [*state relation-data]
   (fetch-and-reset-with-method! *state
-                                (dissoc @*state :modal :annotation-edit-item
-                                        :annotation-edit-context)
+                                (dissoc @*state :part-of-refused :save-failed)
                                 api/update-annotations
-                                annotations-data))
+                                relation-data))

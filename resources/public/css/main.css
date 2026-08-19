@@ -184,6 +184,32 @@ ul.cards {
     padding: 2px 4px;
 }
 
+/* The one edge the relation modal edits, out in the list where the card is. The
+   part-of pair inside it is the edit modal's, rules and all; what is this
+   modal's own is the row -- there is no relation title over these controls and
+   no next relation under them, so they sit on one line rather than in a block
+   ruled off from the next. */
+#modal-component .relation-standing {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 12px;
+    opacity: 0.8;
+    margin: 4px 0 0 2px;
+}
+
+#modal-component .relation-standing label {
+    display: flex;
+    align-items: center;
+}
+
+/* Its own margin and dimming are for the line it has under a relation title in
+   the edit modal; here it is one half of a row that already carries both. */
+#modal-component .relation-standing .relation-part-of {
+    margin: 0;
+    opacity: 1;
+}
+
 /* Not scoped to #modal-component any more: the same banner reports a refused
    unlink out in the item list, where no modal is involved. */
 .part-of-refusal {

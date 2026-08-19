@@ -607,32 +607,62 @@
                 {:save-failed (.getMessage e) :modal :edit-context})))))))
 
 (defn update-annotations
+  "What the relation modal saves: the item's own subtitle, the annotation on the
+   edge the card was shown by, and -- since that modal edits the relation and no
+   longer only its annotation -- that edge's badge and part-of standing.
+
+   The standing is written first because it is the only write here that can be
+   refused: an edge ticked `part of` may close a loop, and et.vp.ds.part-of
+   throws rather than write it. Going first is what makes \"nothing was saved\"
+   true of a refusal -- the two annotations below have not been written yet.
+
+   The modal stays open across the save and this closes it, the arrangement
+   update-item already has with the edit modal (see ui.modals.actions), and for
+   the same reason: a refused save has to leave the user with everything they
+   typed still in front of them."
   [{:keys [db]}]
-  (fn [state {:keys [item-id context-id global-annotation relation-annotation]}]
+  (fn [state
+       {:keys [item-id context-id global-annotation relation-annotation relation-standing]}]
     (log/info (str "repository/update-annotations item-id: " item-id
                    " context-id: " context-id
                    " global: " global-annotation
-                   " relation: " relation-annotation))
-    (when global-annotation
-      ;; Fetch the existing item to preserve all its properties
-      (let [existing-item (datastore/get-item db {:id item-id})]
-        (datastore/update-item db (assoc existing-item :annotation global-annotation))))
-    (when (and context-id relation-annotation)
-      (datastore.relations/update-relation-annotation! db item-id context-id relation-annotation))
-    ;; The list to answer with is the one under the selected context, which is
-    ;; not the same thing as the whole whose edge was just annotated. It used to
-    ;; be: the modal was always handed the selected context, so re-reading
-    ;; `context-id` re-read the selection and this was a refresh. Below level 1
-    ;; the annotated edge belongs to a whole further down (see
-    ;; ui.actions/filed-under), and re-reading that one here would answer an
-    ;; annotation edit by navigating somewhere the user did not ask to go.
-    (let [selected-item (when-let [id (:id (:selected-item state))]
-                          (datastore/get-item db {:id id}))]
-      (if selected-item
-        (merge (items-under db selected-item state) {:selected-item selected-item :q nil})
-        {:items (search db {:q "" :selected-item nil})
-         :contexts (search-context-items db "" {})
-         :q nil}))))
+                   " relation: " relation-annotation
+                   " standing: " relation-standing))
+    (try
+      (when (and context-id (seq relation-standing))
+        (datastore.relations/update-relation-standing! db item-id context-id relation-standing))
+      (when global-annotation
+        ;; Fetch the existing item to preserve all its properties
+        (let [existing-item (datastore/get-item db {:id item-id})]
+          (datastore/update-item db (assoc existing-item :annotation global-annotation))))
+      (when (and context-id relation-annotation)
+        (datastore.relations/update-relation-annotation! db item-id context-id relation-annotation))
+      ;; The list to answer with is the one under the selected context, which is
+      ;; not the same thing as the whole whose edge was just annotated. It used to
+      ;; be: the modal was always handed the selected context, so re-reading
+      ;; `context-id` re-read the selection and this was a refresh. Below level 1
+      ;; the annotated edge belongs to a whole further down (see
+      ;; ui.actions/filed-under), and re-reading that one here would answer an
+      ;; annotation edit by navigating somewhere the user did not ask to go.
+      (let [selected-item (when-let [id (:id (:selected-item state))]
+                            (datastore/get-item db {:id id}))]
+        (if selected-item
+          (merge (items-under db selected-item state)
+                 {:selected-item selected-item :modal nil :q nil})
+          {:items (search db {:q "" :selected-item nil})
+           :contexts (search-context-items db "" {})
+           :modal nil
+           :q nil}))
+      (catch Exception e
+        (if-let [msg (part-of/cycle-refusal e)]
+          (do (log/info {:event "part-of-cycle-refused" :item-id item-id :context-id context-id}
+                        msg)
+              {:part-of-refused msg :modal :annotation-edit})
+          ;; Same fail-open-in-band answer update-item gives: nothing else in the
+          ;; response, so the list stays as it was and the modal stays up with
+          ;; what was typed in it.
+          (do (log/error e "repository/update-annotations failed")
+              {:save-failed (.getMessage e) :modal :annotation-edit}))))))
 
 (defn list-resources
   [{:keys [db]}]

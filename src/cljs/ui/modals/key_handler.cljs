@@ -17,7 +17,7 @@
                 (do (.preventDefault e) (actions/sync-obsidian-and-close! *state (value-fn)))
               (and (= "Digit9" code) (or meta-pressed? alt-pressed?) (= :annotation-edit modal))
                 (do (.preventDefault e)
-                    (actions/save-annotations-and-close! *state (value-fn))))))))
+                    (actions/save-relation! *state (value-fn))))))))
 
 (defn handle-description-keys
   [*state value-fn escape-fn save-callback-fn]

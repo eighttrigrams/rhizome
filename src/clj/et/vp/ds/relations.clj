@@ -337,3 +337,98 @@
                                   :set {:annotation [:inline annotation]}
                                   :where [:and [:= :target_id [:inline item-id]]
                                           [:= :owner_id [:inline context-id]]]})))
+
+(defn- container-entry
+  "A mirror entry for `container-id` built from the container itself: what the
+   entry says besides the standing of the relation. Only reached when the mirror
+   has no entry to patch -- dev-seed writes relation rows with raw SQL and never
+   the mirror, and the human's dev db is full of items in that shape."
+  [db container-id]
+  (let [{:items/keys [title short_title is_context]}
+          (jdbc/execute-one! db
+                             (sql/format {:select [:title :short_title :is_context]
+                                          :from [:items]
+                                          :where [:= :id [:inline container-id]]}))]
+    {"title" (if (seq short_title) short_title title)
+     "is-context?" (boolean (helpers/int->bool is_context))}))
+
+(defn- set-mirror-standing!
+  "Write the standing of one relation into the part's contexts mirror, read back
+   off the row rather than off what the caller asked for: the row has already
+   been written when this runs, so the two representations cannot come out of
+   here disagreeing whatever the caller sent."
+  [db item-id container-id]
+  (let [row (standing-of-row db container-id item-id)
+        data (:items/data (jdbc/execute-one! db
+                                             (sql/format {:select [:data]
+                                                          :from [:items]
+                                                          :where [:= :id [:inline item-id]]})
+                                             {:return-keys true}))
+        data (if (nil? data) {} (json/parse-string (dialect/parse-json-value data)))
+        data (if (get data "contexts") data (assoc data "contexts" {}))
+        entry (get-in data ["contexts" (str container-id)])
+        entry (merge (if (map? entry) entry (container-entry db container-id))
+                     {"show-badge?" (:show-badge? row)
+                      "is-part-of?" (:is-part-of? row)
+                      "part-of-sort-idx" (:part-of-sort-idx row)})]
+    (jdbc/execute-one!
+      db
+      (sql/format {:update [:items]
+                   :where [:= :id [:inline item-id]]
+                   :set {:data [:inline (json/generate-string (assoc-in data
+                                                                        ["contexts"
+                                                                         (str container-id)]
+                                                                        entry))]}})
+      {:return-keys true})))
+
+(defn update-relation-standing!
+  "Set the badge and the part-of standing of the one relation that runs from
+   `container-id` (the whole) to `item-id` (the part), and leave every other
+   relation of either alone.
+
+   @param standing - a map, and only the keys it actually carries are written:
+     {:show-badge? true|false :is-part-of? true|false :part-of-sort-idx int}
+
+   The edit modal rewrites all of an item's relations at once, from the map the
+   client hands back (set-the-containers-of-item!). This is the other gesture:
+   one edge, edited where it is shown, out in the list. Rewriting the lot from
+   here would mean rebuilding every other edge out of the mirror -- including
+   the annotations, which the mirror only carries because get-item glues them on
+   from a GROUP_CONCAT -- to change one column of one row. So the row is written
+   in place instead.
+
+   The row goes first and the mirror is then read back off it, and both are one
+   transaction with the acyclicity check, for the reason set-the-containers-of-item!
+   states: the check only means anything if nothing can write a part-of edge
+   between it and the row it authorises.
+
+   Throws the acyclicity refusal (et.vp.ds.part-of/check-acyclic!) when ticking
+   `part of` here would make a thing part of itself. Returns false, having
+   written nothing, when there is no such relation to edit."
+  [db item-id container-id {:keys [show-badge? is-part-of? part-of-sort-idx] :as standing}]
+  (let [set-map (cond-> {}
+                  (contains? standing :show-badge?) (assoc :show_badge
+                                                      [:inline (boolean show-badge?)])
+                  (contains? standing :is-part-of?) (assoc :is_part_of
+                                                      [:inline (boolean is-part-of?)])
+                  (contains? standing :part-of-sort-idx)
+                    (assoc :part_of_sort_idx [:inline (->part-of-sort-idx part-of-sort-idx)]))]
+    (if (empty? set-map)
+      false
+      (jdbc/with-transaction [tx db]
+        (if-not (jdbc/execute-one! tx
+                                   (sql/format {:select [:id]
+                                                :from [:relations]
+                                                :where [:and [:= :owner_id [:inline container-id]]
+                                                        [:= :target_id [:inline item-id]]]}))
+          (do (log/info {:item-id item-id :container-id container-id}
+                        "no such relation to set the standing of")
+              false)
+          (do (when is-part-of? (part-of/check-acyclic! tx item-id [container-id]))
+              (jdbc/execute-one! tx
+                                 (sql/format {:update [:relations]
+                                              :set set-map
+                                              :where [:and [:= :target_id [:inline item-id]]
+                                                      [:= :owner_id [:inline container-id]]]}))
+              (set-mirror-standing! tx item-id container-id)
+              true))))))

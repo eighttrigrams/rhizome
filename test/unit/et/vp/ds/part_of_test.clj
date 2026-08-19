@@ -553,3 +553,105 @@
       (under y 2 1)
       (is (= ["X" "Y"] (titles-under a {:hierarchy-mode? true})))
       (is (= ["Y" "X"] (titles-under b {:hierarchy-mode? true}))))))
+
+(defn- badge-row
+  "The badge column of one relation, as the table holds it."
+  [whole-id part-id]
+  (:relations/show_badge (jdbc/execute-one! db
+                                            ["SELECT show_badge FROM relations
+                                              WHERE owner_id = ? AND target_id = ?"
+                                             whole-id part-id])))
+
+(defn- badge-mirror
+  [whole-id part-id]
+  (get-in (ds/get-item db {:id part-id}) [:data :contexts whole-id :show-badge?]))
+
+(deftest one-edge-can-be-edited-where-it-is-shown
+  (test-with-reset-db-and-time
+    "the relation modal out in the list writes one edge, and writes it to both
+     representations -- the edit modal's save rebuilds every edge of the item
+     from the map the client hands back, and there is no such map here"
+    (let [[book chapter] (book-with-chapter 3)]
+      (is (true? (relations/update-relation-standing! db
+                                                      (:id chapter)
+                                                      (:id book)
+                                                      {:show-badge? false
+                                                       :is-part-of? true
+                                                       :part-of-sort-idx 7})))
+      (is (= {:is-part-of? true :part-of-sort-idx 7} (row (:id book) (:id chapter))))
+      (is (= {:is-part-of? true :part-of-sort-idx 7} (mirror (:id book) (:id chapter)))
+          "the mirror is read back off the row, so the two cannot disagree")
+      (is (= 0 (badge-row (:id book) (:id chapter))))
+      (is (false? (badge-mirror (:id book) (:id chapter)))
+          "including the badge, which update-collection-title-in-collection-items
+           does not patch on an entry that is already there")))
+  (test-with-reset-db-and-time "and only the keys it was given"
+    (let [[book chapter] (book-with-chapter 3)]
+      (relations/update-relation-standing! db (:id chapter) (:id book) {:show-badge? false})
+      (is (= {:is-part-of? true :part-of-sort-idx 3} (row (:id book) (:id chapter)))
+          "unticking the badge does not unfile the chapter")
+      (is (= {:is-part-of? true :part-of-sort-idx 3} (mirror (:id book) (:id chapter))))))
+  (test-with-reset-db-and-time "an empty standing writes nothing at all"
+    (let [[book chapter] (book-with-chapter 3)]
+      (is (false? (relations/update-relation-standing! db (:id chapter) (:id book) {})))
+      (is (= {:is-part-of? true :part-of-sort-idx 3} (row (:id book) (:id chapter))))))
+  (test-with-reset-db-and-time "nor is there anything to write when there is no such relation"
+    (let [[book chapter] (book-with-chapter 3)
+          shelf (ds/new-context db {:title "Shelf"})]
+      (is (false? (relations/update-relation-standing! db
+                                                       (:id chapter)
+                                                       (:id shelf)
+                                                       {:is-part-of? true})))
+      (is (nil? (get-in (ds/get-item db {:id (:id chapter)}) [:data :contexts (:id shelf)]))
+          "and no mirror entry is invented for an edge that is not there"))))
+
+(deftest editing-one-edge-leaves-the-others-as-they-were
+  (test-with-reset-db-and-time
+    "the item's other relations are not rewritten -- including their annotations,
+     which the client never sends on this path and so could not send back"
+    (let [[book chapter] (book-with-chapter 3)
+          shelf (ds/new-context db {:title "Shelf"})]
+      (relations/link-item-to-another-item! db
+                                            (ds/get-item db {:id (:id chapter)})
+                                            shelf
+                                            true)
+      (relations/update-relation-annotation! db (:id chapter) (:id shelf) "on the shelf")
+      (relations/update-relation-standing! db
+                                           (:id chapter)
+                                           (:id book)
+                                           {:show-badge? false :is-part-of? false
+                                            :part-of-sort-idx -1})
+      (is (= "on the shelf"
+             (:relations/annotation
+               (jdbc/execute-one! db
+                                  ["SELECT annotation FROM relations
+                                    WHERE owner_id = ? AND target_id = ?"
+                                   (:id shelf) (:id chapter)])))
+          "the untouched edge keeps its annotation")
+      (is (= 1 (badge-row (:id shelf) (:id chapter))) "and its badge")
+      (is (= {:is-part-of? false :part-of-sort-idx -1} (row (:id shelf) (:id chapter)))
+          "and its part-of standing")
+      (is (= {:is-part-of? false :part-of-sort-idx -1} (row (:id book) (:id chapter)))
+          "while the edge that was edited is the one that changed"))))
+
+(deftest ticking-part-of-out-in-the-list-is-refused-when-it-would-close-a-loop
+  (test-with-reset-db-and-time
+    "the check lives below both write channels, so the gesture that only sets one
+     column reaches it too"
+    (let [book (ds/new-context db {:title "Book"})
+          chapter (ds/new-context db {:title "Chapter"})]
+      (make-part-of! book chapter 1)
+      ;; A plain relation the other way round: the book is shown under the
+      ;; chapter, and its card offers `part of`.
+      (relations/link-item-to-another-item! db (ds/get-item db {:id (:id book)}) chapter true)
+      (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                            #"part of itself"
+                            (relations/update-relation-standing! db
+                                                                 (:id book)
+                                                                 (:id chapter)
+                                                                 {:is-part-of? true
+                                                                  :part-of-sort-idx 1})))
+      (is (= {:is-part-of? false :part-of-sort-idx -1} (row (:id chapter) (:id book)))
+          "and the refused write left the row alone")
+      (is (= {:is-part-of? false :part-of-sort-idx -1} (mirror (:id chapter) (:id book)))
+          "the mirror with it"))))

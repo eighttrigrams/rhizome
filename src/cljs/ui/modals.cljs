@@ -99,10 +99,15 @@
     #()))
 
 (defn- save-notice
-  "Why the last save from the edit modal did not go through, or nil. The two
-   cases read differently to the user -- one is theirs to correct, the other is
-   theirs to retry -- so they arrive as separate keys and are told apart here
-   rather than in the component."
+  "Why the last save from a modal did not go through, or nil. The two cases read
+   differently to the user -- one is theirs to correct, the other is theirs to
+   retry -- so they arrive as separate keys and are told apart here rather than
+   in the component.
+
+   Read by both modals that can be refused: the edit modal, and the relation
+   modal now that it writes a part-of edge too. One modal is open at a time and
+   the keys are cleared on the way into every save, so the two cannot be looking
+   at each other's refusal."
   [{:keys [part-of-refused save-failed]}]
   (cond part-of-refused {:kind :refused :message part-of-refused}
         save-failed {:kind :failed :message (str "The save failed: " save-failed)}))
@@ -120,7 +125,7 @@
                         [item-edit/component item (save-notice @*state)]]
          :annotation-edit [:div#modal-component
                            [annotation-edit/component (:annotation-edit-item @*state)
-                            (:annotation-edit-context @*state)]]
+                            (:annotation-edit-context @*state) (save-notice @*state)]]
          :external-edit
            [:<>
             [:div#modal-component {:tabIndex 0 :autoFocus true} [:h3 "Editing in Obsidian"]

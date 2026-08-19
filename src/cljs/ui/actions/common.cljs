@@ -15,12 +15,19 @@
     ;; Preserve modal state when resetting, but only if new-state doesn't explicitly close it
     (let [current-modal (:modal @*state)
           new-state-has-modal? (contains? new-state :modal)
-          current-annotation-edit-item (:annotation-edit-item @*state)
+          ;; Whether there is still a modal once this response has landed. The
+          ;; relation modal's two keys are carried across a save -- a refused one
+          ;; has to come back to what the user was typing in -- and they are the
+          ;; open modal's, not the app's: kept past the save that closed it they
+          ;; would ride along on every later request, since the whole state is
+          ;; what a request is made of.
+          modal-after? (if new-state-has-modal? (:modal new-state) current-modal)
+          current-annotation-edit-item (when modal-after? (:annotation-edit-item @*state))
           ;; Kept with the item and not recomputed: it is the whole the open
           ;; modal is editing the annotation of, settled from the row that was
           ;; clicked. Losing it here would put the modal back on the selected
           ;; context, which below level 1 is a different edge.
-          current-annotation-edit-context (:annotation-edit-context @*state)
+          current-annotation-edit-context (when modal-after? (:annotation-edit-context @*state))
           ;; What the floating player is playing (ui.floating-player). Taken
           ;; from the live atom and put back unconditionally, rather than
           ;; preserved only when set: `new-state` is a snapshot from when the

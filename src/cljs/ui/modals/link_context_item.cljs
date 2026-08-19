@@ -15,9 +15,13 @@
 ;; left-hand column; this index does not share it. -1 is unset and shows as an
 ;; empty field, and anything that is not a number leaves here as NaN, which the
 ;; backend stores as unset.
-(defn- part-of-idx->display [idx] (if (= idx -1) "" (str idx)))
+;;
+;; Public because the relation modal out in the list (ui.modals.annotation-edit)
+;; offers the same field for a single edge. One convention, stated once: two
+;; copies of it would be two chances to drift from what the column holds.
+(defn part-of-idx->display [idx] (if (= idx -1) "" (str idx)))
 
-(defn- display->part-of-idx
+(defn display->part-of-idx
   [s]
   (let [s (str/trim s)]
     (if (empty? s) -1 (js/parseInt s 10))))
