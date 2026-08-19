@@ -5,6 +5,7 @@
             [ui.actions :as actions]
             [ui.floating-player :as floating-player]
             [ui.main.diff :as diff]
+            [ui.markdown :as markdown]
             [ui.qr-overlay :as qr-overlay]
             [ui.replica :as replica]
             [ui.youtube :as youtube]
@@ -140,7 +141,9 @@
    [:div.description
     [:> ReactMarkdown
      {:children description
-      :components {:a (custom-link-component *state) :img (custom-image-component *state)}}]]])
+      :components (assoc markdown/components
+                    :a (custom-link-component *state)
+                    :img (custom-image-component *state))}]]])
 
 (defn- upload-error-handler
   "A read-only replica refuses /upload, and there a refusal is normal operation
@@ -286,4 +289,5 @@
     [:span.relation-preview-item item-title] " in " [:span.relation-preview-context context-title]]
    (cond (nil? text) [:div.relation-preview-note "Loading…"]
          (str/blank? text) [:div.relation-preview-note "Nothing written on this relation yet."]
-         :else [:div.description [:> ReactMarkdown {:children text}]])])
+         :else [:div.description
+                [:> ReactMarkdown {:children text :components markdown/components}]])])

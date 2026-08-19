@@ -273,6 +273,120 @@ ul.cards {
     letter-spacing: .02rem;
 }
 
+/* Code inside a rendered description -- the block, and then in the section
+   below it the colours highlight.js paints into one (see ui.markdown).
+
+   The block gets a dark ground of its own rather than sitting on the panel's
+   mid grey. Two reasons, and the second is the load-bearing one: a fence is a
+   different kind of thing from the prose around it and should look like it, and
+   the syntax hues below are the bright ones, which need something dark under
+   them to read as colour rather than as smudge. The panel's own tone is too
+   close to them for that.
+
+   Inline code keeps the prose line and only tints its ground, because it is
+   part of a sentence -- a block's padding and radius inside a paragraph would
+   break the line it sits in. */
+.description pre {
+    background-color: rgba(0, 0, 0, 0.5);
+    color: #e6e2d0;
+    padding: 10px 12px;
+    border-radius: 4px;
+    margin: 0.6em 0;
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.description code {
+    font-family: 'SF Mono', SFMono-Regular, Menlo, Monaco, monospace;
+    font-size: 0.9em;
+}
+
+.description :not(pre) > code {
+    background-color: rgba(0, 0, 0, 0.22);
+    padding: 0.1em 0.3em;
+    border-radius: 3px;
+}
+
+/* Syntax colours for the highlighter.
+ *
+ * highlight.js emits plain classes and leaves the palette to the page, so a
+ * stock theme .css would arrive with a background and a foreground of its own
+ * and fight the panel. These are cookbook's dark-mode tokens, unchanged: it is
+ * the sibling app that reached for this library first, the hues are warm ones
+ * that sit with the wheat-and-cream the rest of this app is built out of, and a
+ * Clojure form ought to look the same in both places. They are named as
+ * variables here for the same reason cookbook names them -- the mapping below
+ * is long, and a hue should be one line to change.
+ */
+:root {
+    --syntax-comment: #a89984;
+    --syntax-keyword: #fb4934;
+    --syntax-name: #83a598;
+    --syntax-title: #fe8019;
+    --syntax-symbol: #8ec07c;
+    --syntax-string: #b8bb26;
+    --syntax-literal: #d3869b;
+}
+
+.description .hljs-comment,
+.description .hljs-quote {
+    color: var(--syntax-comment);
+    font-style: italic;
+}
+
+.description .hljs-keyword,
+.description .hljs-selector-tag,
+.description .hljs-section {
+    color: var(--syntax-keyword);
+}
+
+.description .hljs-name,
+.description .hljs-built_in,
+.description .hljs-variable,
+.description .hljs-attr,
+.description .hljs-attribute {
+    color: var(--syntax-name);
+}
+
+.description .hljs-title,
+.description .hljs-class .hljs-title,
+.description .hljs-type {
+    color: var(--syntax-title);
+}
+
+.description .hljs-symbol,
+.description .hljs-meta,
+.description .hljs-selector-attr {
+    color: var(--syntax-symbol);
+}
+
+/* `regex`, not `regexp`, is what the Clojure grammar emits -- it is the only
+   one in the package that spells it that way, and a Clojure regex literal is a
+   string with a `#` in front of it, so it belongs in this group. `regexp` stays
+   for the grammars that do spell it so. Getting this wrong is invisible: the
+   token simply renders at body colour, which reads as prose. */
+.description .hljs-string,
+.description .hljs-regex,
+.description .hljs-regexp,
+.description .hljs-addition {
+    color: var(--syntax-string);
+}
+
+.description .hljs-number,
+.description .hljs-literal,
+.description .hljs-character,
+.description .hljs-deletion {
+    color: var(--syntax-literal);
+}
+
+.description .hljs-emphasis {
+    font-style: italic;
+}
+
+.description .hljs-strong {
+    font-weight: 600;
+}
+
 #confirm-discard-dialog {
     position: fixed;
     top: 0;
