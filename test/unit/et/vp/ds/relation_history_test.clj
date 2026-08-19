@@ -20,6 +20,22 @@
             [next.jdbc :as jdbc]
             [provenance :as provenance]))
 
+(defmacro ^:private with-fresh-history
+  "`test-with-reset-db-and-time`, and the relation history cleared as well.
+
+   reset-db stops at `items` and leaves both history tables standing. That is only
+   harmless while item ids are never handed back out, and whether they are depends
+   on a DDL detail no test can see: SQLite reissues rowids on a table declared
+   without AUTOINCREMENT, so on such a database a new item can be born already
+   owning an earlier test's versions -- which shows up as a namespace that passes
+   alone and fails in the suite. (Cookbook: \"Rhizome tests: reset-db leaves the
+   history table, and SQLite reissues item ids\".) Every test below asserts on
+   those rows, so every one of them starts from none."
+  [description & body]
+  `(test-with-reset-db-and-time ~description
+     (jdbc/execute-one! db ["delete from relation_history"])
+     ~@body))
+
 (defn- book-with-chapter
   []
   (let [book (ds/new-context db {:title "Book"})
@@ -59,7 +75,7 @@
 ;; -- the mechanism, edge for edge with an item's description ------------------
 
 (deftest a-fresh-edge-has-one-version-and-it-is-the-current-one
-  (test-with-reset-db-and-time "an edge nobody has written on: one version, and it is empty"
+  (with-fresh-history "an edge nobody has written on: one version, and it is empty"
     (let [[book chapter] (book-with-chapter)
           {:keys [versions total]} (history chapter book)]
       (is (= 1 total))
@@ -69,7 +85,7 @@
           "the head is the version that is standing, which is what the modal edits")
       (is (empty? (archived-rows chapter book))
           "and nothing has been archived, because there was nothing to archive")))
-  (test-with-reset-db-and-time "the first text written is the current version, still version 1"
+  (with-fresh-history "the first text written is the current version, still version 1"
     (let [[book chapter] (book-with-chapter)]
       (write! chapter book "why this chapter is in this book")
       (is (= ["why this chapter is in this book"] (texts chapter book)))
@@ -79,7 +95,7 @@
            to recover, and every edge would open with one"))))
 
 (deftest replacing-the-text-archives-the-one-it-replaces
-  (test-with-reset-db-and-time "newest first, and the numbers count up"
+  (with-fresh-history "newest first, and the numbers count up"
     (let [[book chapter] (book-with-chapter)]
       (write! chapter book "the first thing said")
       (write! chapter book "the second thing said")
@@ -90,7 +106,7 @@
       (is (= 3 (:total (history chapter book))))
       (is (= [true nil nil] (mapv :current (versions chapter book)))
           "exactly one of them is the one standing")))
-  (test-with-reset-db-and-time "each archived row carries the source that WROTE it"
+  (with-fresh-history "each archived row carries the source that WROTE it"
     ;; The whole of provenance rests on this. Stamping the archived row with the
     ;; source of the write that superseded it would hand every old version to
     ;; whoever came next, and the ranges would come back well-formed and wrong.
@@ -99,7 +115,7 @@
       (write! chapter book "an agent's paragraph" "api")
       (is (= [{:text "an agent's paragraph" :source "api"} {:text "his paragraph" :source "app"}]
              (mapv #(select-keys % [:text :source]) (versions chapter book))))))
-  (test-with-reset-db-and-time "and the archived row keeps its own created_at"
+  (with-fresh-history "and the archived row keeps its own created_at"
     (let [[book chapter] (book-with-chapter)]
       (write! chapter book "one")
       (write! chapter book "two")
@@ -127,7 +143,7 @@
       (write! chapter book "his paragraph" "api")
       (is (= [{:text "his paragraph" :source "app"}]
              (mapv #(select-keys % [:text :source]) (versions chapter book))))))
-  (test-with-reset-db-and-time "a write to an edge that does not exist writes nothing at all"
+  (with-fresh-history "a write to an edge that does not exist writes nothing at all"
     (let [[book chapter] (book-with-chapter)
           shelf (ds/new-context db {:title "Shelf"})]
       (write! chapter shelf "there is no such edge")
@@ -149,7 +165,7 @@
       (is (= "" (relations/relation-description db (:id chapter) (:id book)))))))
 
 (deftest the-history-belongs-to-the-edge
-  (test-with-reset-db-and-time "two edges of one item have two histories"
+  (with-fresh-history "two edges of one item have two histories"
     (let [[book chapter] (book-with-chapter)
           shelf (ds/new-context db {:title "Shelf"})]
       (relations/link-item-to-another-item! db chapter shelf true)
@@ -158,7 +174,7 @@
       (write! chapter shelf "as a thing on a shelf")
       (is (= ["as a chapter of this book" "as a chapter"] (texts chapter book)))
       (is (= ["as a thing on a shelf"] (texts chapter shelf)))))
-  (test-with-reset-db-and-time "and the same pair read backwards is not that edge"
+  (with-fresh-history "and the same pair read backwards is not that edge"
     (let [[book chapter] (book-with-chapter)]
       (write! chapter book "which way round this runs")
       (write! chapter book "which way round this really runs")
@@ -194,7 +210,7 @@
               "precondition: the row really is a different row now")))
       (is (= ["the second thing said" "the first thing said"] (texts chapter book))
           "and the history came through it whole")))
-  (test-with-reset-db-and-time "the rewrite is not an edit, so it adds no version"
+  (with-fresh-history "the rewrite is not an edit, so it adds no version"
     (let [[book chapter] (book-with-chapter)]
       (write! chapter book "the standing text")
       (dotimes [_ 3]
@@ -217,7 +233,7 @@
                                              false)
       (is (= [{:text "an agent's paragraph" :source "api"}]
              (mapv #(select-keys % [:text :source]) (versions chapter book))))))
-  (test-with-reset-db-and-time "linking somewhere else rewrites the same rows, and is not an edit"
+  (with-fresh-history "linking somewhere else rewrites the same rows, and is not an edit"
     (let [[book chapter] (book-with-chapter)
           shelf (ds/new-context db {:title "Shelf"})]
       (write! chapter book "before the new edge" "api")
@@ -245,7 +261,7 @@
         (is (not-any? :current versions)
             "and no current version at the head: there is no text standing on an
              edge that is not there"))))
-  (test-with-reset-db-and-time "re-linking starts blank, on top of what was kept"
+  (with-fresh-history "re-linking starts blank, on top of what was kept"
     (let [[book chapter] (book-with-chapter)
           shelf (ds/new-context db {:title "Shelf"})]
       (relations/link-item-to-another-item! db (ds/get-item db {:id (:id chapter)}) shelf true)
@@ -258,13 +274,13 @@
       (is (= [nil "said the first time round"] (texts chapter book))
           "which is what happened: nothing is written on it now, and something was")
       (is (true? (:current (first (versions chapter book)))))))
-  (test-with-reset-db-and-time "unlinking an edge nobody wrote on archives nothing"
+  (with-fresh-history "unlinking an edge nobody wrote on archives nothing"
     (let [[book chapter] (book-with-chapter)
           shelf (ds/new-context db {:title "Shelf"})]
       (relations/link-item-to-another-item! db (ds/get-item db {:id (:id chapter)}) shelf true)
       (relations/unlink-item-from-another-item! db (ds/get-item db {:id (:id chapter)}) book)
       (is (= {:versions [] :total 0} (history chapter book)))))
-  (test-with-reset-db-and-time "and unlinking one edge leaves the other one's history alone"
+  (with-fresh-history "and unlinking one edge leaves the other one's history alone"
     (let [[book chapter] (book-with-chapter)
           shelf (ds/new-context db {:title "Shelf"})]
       (relations/link-item-to-another-item! db (ds/get-item db {:id (:id chapter)}) shelf true)
@@ -278,7 +294,7 @@
 ;; -- provenance over a relation's history ------------------------------------
 
 (deftest provenance-of-a-relations-text
-  (test-with-reset-db-and-time "his lines and an agent's, told apart within one edge's text"
+  (with-fresh-history "his lines and an agent's, told apart within one edge's text"
     (let [[book chapter] (book-with-chapter)]
       (write! chapter book "his line" "app")
       (write! chapter book "his line\nan agent's line\nand another" "api")
@@ -294,17 +310,17 @@
       (write! chapter book "their one\ntheir two\ntheir three" "api")
       (is (= [{:from 1 :to 3 :caution 0.0}]
              (:ranges (provenance/of-relation db (:id chapter) (:id book)))))))
-  (test-with-reset-db-and-time "an edge with no text has nothing to attribute"
+  (with-fresh-history "an edge with no text has nothing to attribute"
     (let [[book chapter] (book-with-chapter)]
       (is (nil? (provenance/of-relation db (:id chapter) (:id book))))))
-  (test-with-reset-db-and-time "nor has one whose text was cleared, though it has a history"
+  (with-fresh-history "nor has one whose text was cleared, though it has a history"
     (let [[book chapter] (book-with-chapter)]
       (write! chapter book "written and then removed" "app")
       (write! chapter book "" "app")
       (is (some? (seq (versions chapter book))) "precondition: there is a history")
       (is (nil? (provenance/of-relation db (:id chapter) (:id book)))
           "ranges over a text that is not there would answer a question nobody asked")))
-  (test-with-reset-db-and-time "a text written before the source column existed reads as his"
+  (with-fresh-history "a text written before the source column existed reads as his"
     ;; The rows in the owner's database predate description_source, so this is the
     ;; shape almost every relation in it is in.
     (let [[book chapter] (book-with-chapter)]
@@ -315,7 +331,7 @@
                           (:id book) (:id chapter)])
       (is (= [{:from 1 :to 2 :caution 1.0}]
              (:ranges (provenance/of-relation db (:id chapter) (:id book)))))))
-  (test-with-reset-db-and-time "and the edge it is asked about is the edge it answers about"
+  (with-fresh-history "and the edge it is asked about is the edge it answers about"
     (let [[book chapter] (book-with-chapter)
           shelf (ds/new-context db {:title "Shelf"})]
       (relations/link-item-to-another-item! db chapter shelf true)
