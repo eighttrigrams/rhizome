@@ -126,7 +126,7 @@
              own, and a date borrowed off either item would be about something else")))))
 
 (deftest a-save-that-changed-nothing-earns-no-version
-  (test-with-reset-db-and-time
+  (with-fresh-history
     "the relation modal writes the text alongside the badge and the sibling index,
      so a save is not evidence of an edit -- ticking a badge four times must not be
      four versions of an unchanged text"
@@ -135,7 +135,7 @@
       (dotimes [_ 4] (write! chapter book "written once"))
       (is (= ["written once"] (texts chapter book)))
       (is (empty? (archived-rows chapter book)))))
-  (test-with-reset-db-and-time
+  (with-fresh-history
     "and it does not re-stamp the source either: a writer who wrote nothing does
      not get to own the text"
     (let [[book chapter] (book-with-chapter)]
@@ -151,7 +151,7 @@
       (is (empty? (archived-rows chapter shelf))))))
 
 (deftest clearing-the-text-is-a-version-like-any-other
-  (test-with-reset-db-and-time
+  (with-fresh-history
     "the text that was cleared is recoverable, and the empty one is what stands"
     (let [[book chapter] (book-with-chapter)]
       (write! chapter book "written by mistake")
@@ -185,7 +185,7 @@
 ;; -- the rewrite: an item's relation rows are replaced wholesale --------------
 
 (deftest the-history-survives-the-rows-being-rewritten
-  (test-with-reset-db-and-time
+  (with-fresh-history
     "set-containers-of-item! deletes an item's relation rows and re-inserts them,
      so relations.id is not the edge's identity. The history is keyed on the two
      items instead, and this is the test that says so"
@@ -220,7 +220,7 @@
                                                false))
       (is (= ["the standing text"] (texts chapter book)))
       (is (empty? (archived-rows chapter book)))))
-  (test-with-reset-db-and-time
+  (with-fresh-history
     "and it carries the source across. A text that came back from the rewrite with
      an empty source would read as the owner's own hand -- provenance/source-of
      takes an empty column for his -- so an agent's paragraph would be handed to
@@ -243,7 +243,7 @@
       (is (= [nil] (texts chapter shelf)) "and the new edge starts out with nothing on it"))))
 
 (deftest unlinking-keeps-what-it-takes-away
-  (test-with-reset-db-and-time
+  (with-fresh-history
     "the row goes and the text goes with it, so this is the one write that can
      destroy a relation's text without anyone having typed over it. Archived on the
      way out, or the field is not versioned at all"
@@ -301,7 +301,7 @@
       (let [{:keys [legend ranges]} (provenance/of-relation db (:id chapter) (:id book))]
         (is (= provenance/legend legend) "the server's own sentence, and only one of them")
         (is (= [{:from 1 :to 1 :caution 1.0} {:from 2 :to 3 :caution 0.0}] ranges)))))
-  (test-with-reset-db-and-time
+  (with-fresh-history
     "the history is folded oldest-first. Handed over the way it arrives it would
      say the agent wrote his line -- a well-formed answer with the value inverted,
      which is the failure et.vp.ds's own history has a test for too"
