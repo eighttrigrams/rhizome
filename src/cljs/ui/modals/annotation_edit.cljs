@@ -10,7 +10,8 @@
    not the selection."
   (:require [reagent.core :as r]
             [ui.modals.link-context-item :as link-context-item]
-            [ui.refusal :as refusal]))
+            [ui.refusal :as refusal]
+            api))
 
 (def *fields
   "Everything the modal is holding, and what the save is read off. At the ns
@@ -37,7 +38,8 @@
   (let [item-data (when item (or (:data item) {}))
         standing (standing-of item selected-context)]
     (reset! *fields
-      {:global-annotation (or (:annotation item-data) "")
+      {:edge [(:id item) (:id selected-context)]
+       :global-annotation (or (:annotation item-data) "")
        :relation-annotation (or (:annotation item) "")
        ;; Read exactly the way the badge itself is read, nil and missing entry
        ;; included: ui.main.context-badges draws a badge only for an entry that
@@ -50,16 +52,50 @@
        :show-badge? (boolean (:show-badge? standing))
        :is-part-of? (boolean (:is-part-of? standing))
        :part-of-sort-idx (link-context-item/part-of-idx->display
-                           (or (:part-of-sort-idx standing) -1))})))
+                           (or (:part-of-sort-idx standing) -1))
+       ;; Absent, not empty. The body text is the one field of a relation that
+       ;; does not travel with the row (see repository/fetch-relation-description),
+       ;; so opening the modal is where it is asked for, and until the answer
+       ;; lands there is nothing here that could be saved -- which is what
+       ;; get-values reads this absence as.
+       :relation-description nil})))
+
+(defn- load-description!
+  "Ask for the edge's body text, which is the one field of a relation that does
+   not arrive with the row -- see repository/fetch-relation-description, and the
+   pointer resting on the card's strip, which is the other gesture that asks for
+   it.
+
+   The answer is dropped unless the fields still belong to the edge it is about:
+   this modal is opened by clicking a card, and another card can be clicked
+   before the first answer lands."
+  [*state item selected-context]
+  (when selected-context
+    (-> (api/fetch-relation-description @*state
+                                        {:item-id (:id item) :context-id (:id selected-context)})
+        (.then (fn [result]
+                 (let [{:keys [item-id context-id text]} (:relation-description result)]
+                   (swap! *fields
+                     (fn [{:keys [edge] :as fields}]
+                       (if (= edge [item-id context-id])
+                         (assoc fields :relation-description (or text ""))
+                         fields)))))))))
 
 (defn get-values
   [item selected-context]
-  (let [{:keys [global-annotation relation-annotation show-badge? is-part-of? part-of-sort-idx]}
+  (let [{:keys [global-annotation relation-annotation relation-description show-badge? is-part-of?
+                part-of-sort-idx]}
           @*fields]
     (cond-> {:item-id (:id item)
              :context-id (when selected-context (:id selected-context))
              :global-annotation global-annotation
              :relation-annotation (when selected-context relation-annotation)}
+      ;; Only once it has been loaded. A save while the textarea is still filling
+      ;; would otherwise write its emptiness over whatever is stored -- the one
+      ;; way a lazily loaded field can lose text, and the reason the textarea is
+      ;; disabled until then rather than merely blank.
+      (and selected-context (some? relation-description))
+        (assoc :relation-description relation-description)
       ;; The standing travels only when the modal actually offered it. In the
       ;; overview there is no edge under the card at all, and a map sent from
       ;; there would ask the backend to write the standing of a relation nobody
@@ -116,19 +152,22 @@
       :placeholder "idx"}]]])
 
 (defn component
-  [item selected-context notice]
+  [*state item selected-context notice]
   ;; A notice means the save did not go through and the modal is still the one
-  ;; the user was typing in, so it must not be reset from the stored item. This
-  ;; runs once per mount, and the modal is mounted afresh every time a card is
-  ;; clicked -- the layer it lives in is emptied when :modal goes nil.
+  ;; the user was typing in, so it must not be reset from the stored item -- nor
+  ;; re-fetched, which would put the stored text back over the edit that was
+  ;; refused. This runs once per mount, and the modal is mounted afresh every
+  ;; time a card is clicked: the layer it lives in is emptied when :modal goes nil.
   (when-not notice (reset-fields! item selected-context))
   (r/create-class
-    {:component-did-update (fn [this [_ old-item _old-selected-context]]
-                             (let [[_ new-item new-selected-context] (r/argv this)]
+    {:component-did-mount (fn [] (when-not notice (load-description! *state item selected-context)))
+     :component-did-update (fn [this [_ _old-state old-item _old-selected-context]]
+                             (let [[_ _ new-item new-selected-context] (r/argv this)]
                                (when (not= (:id old-item) (:id new-item))
-                                 (reset-fields! new-item new-selected-context))))
+                                 (reset-fields! new-item new-selected-context)
+                                 (load-description! *state new-item new-selected-context))))
      :reagent-render ;
-       (fn [_item selected-context notice]
+       (fn [_*state _item selected-context notice]
          (let [in-overview? (nil? selected-context)]
            [:div [:h3 "Edit Relation"]
             ;; The notice sits in a slot that is always there, empty or not --
@@ -148,6 +187,15 @@
                  :value (:relation-annotation @*fields)
                  :on-change (field :relation-annotation)
                  :placeholder (str "Relation annotation for " (:title selected-context) "...")}]
-               [relation-standing-component]])
+               [relation-standing-component]
+               (let [description (:relation-description @*fields)]
+                 [:textarea#relation-description-input.relation-description
+                  {:value (or description "")
+                   :disabled (nil? description)
+                   :rows 10
+                   :on-change (field :relation-description)
+                   :placeholder (if (nil? description)
+                                  "Loading the relation's text…"
+                                  "Text on this relation...")}])])
             [:p {:style {:font-size "0.9em" :color "#666" :margin-top "10px"}}
              "Press Alt+9 to save, ESC to cancel"]]))}))

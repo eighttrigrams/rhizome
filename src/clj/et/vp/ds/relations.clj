@@ -181,6 +181,25 @@
                      :part-of-sort-idx (->part-of-sort-idx (:part-of-sort-idx container)))]))
         containers))
 
+(defn- descriptions-of-inbound-rows
+  "The body text of each of an item's inbound relations, as {owner-id text}.
+
+   Read before set-containers-of-item! deletes those rows, and written back on
+   the inserts that replace them. The description is the one thing a relation
+   carries that the `contexts` mirror does not, deliberately -- it is loaded on
+   hover and nowhere else, so it never travels with a list row and the client
+   cannot hand it back the way it hands back the annotation. Without this, every
+   save from the edit modal would rewrite the rows from a map that has never
+   heard of it, and the text would be gone."
+  [db item-id]
+  (into {}
+        (keep (fn [{:relations/keys [owner_id description]}]
+                (when description [owner_id description])))
+        (jdbc/execute! db
+                       (sql/format {:select [:owner_id :description]
+                                    :from [:relations]
+                                    :where [:= :target_id [:inline item-id]]}))))
+
 (defn- set-containers-of-item!
   "Rewrite an item's inbound relations from `containers`. Every caller must run
    this inside a transaction that also covers the mirror write -- see
@@ -197,20 +216,27 @@
                           (keep (fn [[container-id {:keys [is-part-of?]}]]
                                   (when is-part-of? container-id))
                                 containers))
-  (jdbc/execute! db
-                 (sql/format {:delete-from [:relations]
-                              :where [:= :target_id [:inline (:id item)]]}))
-  (doall (for [[container-id {:keys [show-badge? annotation is-part-of? part-of-sort-idx]}]
-                 containers]
-           (jdbc/execute! db
-                          (sql/format {:insert-into [:relations]
-                                       :columns [:target_id :owner_id :annotation :show_badge
-                                                 :is_part_of :part_of_sort_idx]
-                                       :values [[[:inline (:id item)] [:inline container-id]
-                                                 [:inline annotation] [:inline show-badge?]
-                                                 [:inline (boolean is-part-of?)]
-                                                 [:inline (->part-of-sort-idx
-                                                            part-of-sort-idx)]]]})))))
+  (let [descriptions (descriptions-of-inbound-rows db (:id item))]
+    (jdbc/execute! db
+                   (sql/format {:delete-from [:relations]
+                                :where [:= :target_id [:inline (:id item)]]}))
+    (doall
+      (for [[container-id
+             {:keys [show-badge? annotation is-part-of? part-of-sort-idx] :as container}]
+              containers]
+        (jdbc/execute! db
+                       (sql/format {:insert-into [:relations]
+                                    :columns [:target_id :owner_id :annotation :description
+                                              :show_badge :is_part_of :part_of_sort_idx]
+                                    :values [[[:inline (:id item)] [:inline container-id]
+                                              [:inline annotation]
+                                              [:inline (if (contains? container :description)
+                                                         (:description container)
+                                                         (get descriptions container-id))]
+                                              [:inline show-badge?]
+                                              [:inline (boolean is-part-of?)]
+                                              [:inline (->part-of-sort-idx
+                                                         part-of-sort-idx)]]]}))))))
 
 (defn set-the-containers-of-item!
   "@param containers - map {:container-id {:annotation \"annotation\"
@@ -432,3 +458,28 @@
                                                       [:= :owner_id [:inline container-id]]]}))
               (set-mirror-standing! tx item-id container-id)
               true))))))
+
+(defn relation-description
+  "The body text of one relation, or nil.
+
+   Its own read, and nothing else reads it. Every other field of a relation
+   reaches the client on the back of a list row -- the annotation is projected by
+   the search queries, the badge and the part-of standing come off the `contexts`
+   mirror -- and a body of text on every row of every list is what this must not
+   become. So it is not projected, not mirrored, and asked for one edge at a time,
+   when a pointer comes to rest on it."
+  [db item-id container-id]
+  (:relations/description
+    (jdbc/execute-one! db
+                       (sql/format {:select [:description]
+                                    :from [:relations]
+                                    :where [:and [:= :target_id [:inline item-id]]
+                                            [:= :owner_id [:inline container-id]]]}))))
+
+(defn update-relation-description!
+  [db item-id container-id description]
+  (jdbc/execute-one! db
+                     (sql/format {:update [:relations]
+                                  :set {:description [:inline description]}
+                                  :where [:and [:= :target_id [:inline item-id]]
+                                          [:= :owner_id [:inline container-id]]]})))

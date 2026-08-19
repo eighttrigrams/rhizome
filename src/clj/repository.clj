@@ -314,6 +314,27 @@
         :item-description (:description item) ; Keep for backward compatibility temporarily
         :ignore-item-description (or (nil? (:description item)) (not (seq (:description item))))))))
 
+(defn fetch-relation-description
+  "The body text of one relation, asked for on its own.
+
+   Its own command for the reason fetch-item-provenance is: it runs on hover, and
+   what runs on hover has to be cheap to *not* run. Every other field of a
+   relation already rides in on the list row; a body of text on every row of every
+   list is what this exists to avoid, so nothing projects it and nothing mirrors
+   it, and it is read here, one edge at a time, when a pointer comes to rest on
+   one.
+
+   The answer names the edge it is about. The pointer moves while the request is
+   in flight, and a client that could not tell which edge answered would paint one
+   relation's text under another's card -- see ui.actions/fetch-relation-description!,
+   which drops an answer for an edge it has already left."
+  [{:keys [db]}]
+  (fn [state {:keys [item-id context-id]}]
+    (assoc state
+      :relation-description {:item-id item-id
+                             :context-id context-id
+                             :text (datastore.relations/relation-description db item-id context-id)})))
+
 (defn fetch-item-provenance
   "The item's CURRENT description together with the caution ranges over it, for
    the Provenance page.
@@ -609,7 +630,8 @@
 (defn update-annotations
   "What the relation modal saves: the item's own subtitle, the annotation on the
    edge the card was shown by, and -- since that modal edits the relation and no
-   longer only its annotation -- that edge's badge and part-of standing.
+   longer only its annotation -- that edge's body text, badge and part-of
+   standing.
 
    The standing is written first because it is the only write here that can be
    refused: an edge ticked `part of` may close a loop, and et.vp.ds.part-of
@@ -622,7 +644,8 @@
    typed still in front of them."
   [{:keys [db]}]
   (fn [state
-       {:keys [item-id context-id global-annotation relation-annotation relation-standing]}]
+       {:keys [item-id context-id global-annotation relation-annotation relation-description
+               relation-standing]}]
     (log/info (str "repository/update-annotations item-id: " item-id
                    " context-id: " context-id
                    " global: " global-annotation
@@ -637,6 +660,12 @@
           (datastore/update-item db (assoc existing-item :annotation global-annotation))))
       (when (and context-id relation-annotation)
         (datastore.relations/update-relation-annotation! db item-id context-id relation-annotation))
+      ;; `some?` and not truthiness, unlike the two above: the modal sends this
+      ;; key only once the fetch that filled its textarea has landed (see
+      ;; ui.modals.annotation-edit), so its absence means "not loaded" and must
+      ;; not be written, while an empty string means the user cleared it and must.
+      (when (and context-id (some? relation-description))
+        (datastore.relations/update-relation-description! db item-id context-id relation-description))
       ;; The list to answer with is the one under the selected context, which is
       ;; not the same thing as the whole whose edge was just annotated. It used to
       ;; be: the modal was always handed the selected context, so re-reading

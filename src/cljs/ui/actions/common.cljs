@@ -74,9 +74,15 @@
 
 (defn fetch-and-reset!
   [*state state]
+  ;; :preview-relation goes out with :preview-item, and for a sharper version of
+  ;; its reason: the whole state is what a request is made of, and this one holds
+  ;; a body of text fetched for one hover. Left in, the text the feature goes to
+  ;; some length not to load with a list would be uploaded with every request
+  ;; after it.
   (let [state (assoc state
                 :loading true
-                :preview-item nil)]
+                :preview-item nil
+                :preview-relation nil)]
     (reset! *state state)
     (go (-> state
             fetch-resources
@@ -93,7 +99,7 @@
 (defn fetch-and-reset-with-method!
   [*state state method & args]
   (let [state''' (if (map? state) state @state)
-        state' (assoc state''' :loading true :preview-item nil)]
+        state' (assoc state''' :loading true :preview-item nil :preview-relation nil)]
     (reset! *state state')
     (go (-> (apply fetch-resources-with-method
                    (if (map? state) state' state)

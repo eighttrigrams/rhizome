@@ -93,6 +93,27 @@
      (swap! *state assoc :preview-item item :mouse :enter)
      (actions/fetch-item-description! *state item)))
 
+;; The strip sits inside the card, and React fires enter handlers from the
+;; outside in, so the card's has already put the item in the preview slot by the
+;; time this runs. Setting :preview-relation is therefore how this overrules it:
+;; the lhs prefers the relation when both are up, and leaving the strip for the
+;; rest of the card takes it away again and gives the item preview back.
+(defn- on-relation-mouse-enter
+  [*state item whole]
+  #(when-not (:loading @*state)
+     (swap! *state assoc
+       :preview-relation {:item-id (:id item) :context-id (:id whole) :item-title (:title item)
+                          :context-title (:title whole)}
+       :mouse :enter)
+     (actions/fetch-relation-description! *state item whole)))
+
+(defn- on-relation-mouse-leave
+  [*state]
+  #(do (swap! *state assoc :mouse :leave)
+       (js/setTimeout (fn [_]
+                        (when (= :leave (:mouse @*state)) (swap! *state dissoc :preview-relation)))
+                      300)))
+
 (defn regular-items-list-item-component
   [*state item idx
    {:keys [allow-delete-on-right-click? show-relation-annotation? select-fn show-context-selector?
@@ -140,6 +161,12 @@
      [:div
       {:class (str "relation-annotation" (when (empty? (:annotation item)) " empty-annotation"))
        :style {:z-index 10 :cursor "pointer"}
+       ;; Only here, and only on hover: the edge's body text is the one thing it
+       ;; carries that no list query projects and no mirror holds (see
+       ;; repository/fetch-relation-description), so resting on this strip is the
+       ;; whole of what asks for it.
+       :on-mouse-enter (when idx (on-relation-mouse-enter *state item (actions/filed-under @*state item)))
+       :on-mouse-leave (when idx (on-relation-mouse-leave *state))
        :on-click (fn [e]
                    (.stopPropagation e)
                    (.preventDefault e)

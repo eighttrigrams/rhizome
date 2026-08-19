@@ -59,6 +59,10 @@
    ;; that actually has a history to assess.
    "fetch-item-provenance"     [[{} {:id (:id ctx)}]
                                 [{} {:id (:id item)}]]
+   ;; Both directions of the one edge `seed!` makes: the one that is there, and
+   ;; one that is not. A read for a relation nobody wrote must stay a read.
+   "fetch-relation-description" [[{} {:item-id (:id item) :context-id (:id ctx)}]
+                                 [{} {:item-id (:id ctx) :context-id (:id item)}]]
    "get-obsidian-file-content" [[{}]]
    "discard-obsidian-changes"  [[{}]]
    "list-youtube-poll-channels" [[{}]]

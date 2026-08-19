@@ -124,7 +124,7 @@
          :edit-context [:div#modal-component
                         [item-edit/component item (save-notice @*state)]]
          :annotation-edit [:div#modal-component
-                           [annotation-edit/component (:annotation-edit-item @*state)
+                           [annotation-edit/component *state (:annotation-edit-item @*state)
                             (:annotation-edit-context @*state) (save-notice @*state)]]
          :external-edit
            [:<>

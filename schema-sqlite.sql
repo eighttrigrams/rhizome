@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS relations (
     target_id INTEGER NOT NULL,
     show_badge INTEGER DEFAULT 1,
     annotation TEXT,
+    description TEXT,
     is_part_of INTEGER NOT NULL DEFAULT 0,
     part_of_sort_idx INTEGER NOT NULL DEFAULT -1,
     FOREIGN KEY (owner_id) REFERENCES items(id),

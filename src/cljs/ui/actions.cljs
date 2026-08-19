@@ -14,11 +14,11 @@
                                                  *state
                                                  (-> @*state
                                                      (assoc :active-search :items)
-                                                     (dissoc :preview-item :link-item :link-context :q)))
+                                                     (dissoc :preview-item :preview-relation :link-item :link-context :q)))
         (= :items (:active-search @*state))
           (fetch-and-reset! *state
                             (-> @*state
-                                (dissoc :preview-item :active-search :link-item :link-context :q)))))
+                                (dissoc :preview-item :preview-relation :active-search :link-item :link-context :q)))))
 
 (defn load-stored-context
   [*state idx]
@@ -344,6 +344,23 @@
                           (= (:id (:preview-item @*state)) (:id item)))
                  (swap! *state assoc-in [:preview-item :description]
                         (:item-description result)))))))
+
+(defn fetch-relation-description!
+  "The body text of the edge a card is standing on, fetched because the pointer
+   came to rest on the strip that shows its annotation. Nothing else asks for it
+   and nothing carries it along -- see repository/fetch-relation-description.
+
+   Merged into :preview-relation rather than reset! over the whole state, the
+   way fetch-item-description! is and for its reasons; and dropped outright when
+   the answer is for an edge the pointer has already left, which on a list of
+   cards is the common case rather than the exotic one."
+  [*state item whole]
+  (-> (api/fetch-relation-description @*state {:item-id (:id item) :context-id (:id whole)})
+      (.then (fn [result]
+               (let [{:keys [item-id context-id text]} (:relation-description result)
+                     shown (:preview-relation @*state)]
+                 (when (and (= item-id (:item-id shown)) (= context-id (:context-id shown)))
+                   (swap! *state assoc-in [:preview-relation :text] (or text ""))))))))
 
 (defn open-provenance!
   "Open the Provenance page on the selected item's current description.

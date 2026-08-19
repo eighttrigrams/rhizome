@@ -269,3 +269,21 @@
      [the-item-itself-component *state selected-item true]]))
 
 (defn preview-component [*state item] [the-item-itself-component *state item false])
+
+(defn relation-preview-component
+  "One relation's body text, standing where the hovered item's preview normally
+   stands. The pointer is on the card the relation belongs to, so this says which
+   edge it is in one small line rather than repeating the card.
+
+   Three states, and they are not the same thing: nil text is the fetch still in
+   flight (the state is set when the pointer arrives, the text lands after), a
+   blank one is an edge nobody has written anything on yet, and anything else is
+   the text. Saying nothing for the first two would leave an empty panel that
+   reads as a fault either way."
+  [{:keys [item-title context-title text]}]
+  [:<>
+   [:div.relation-preview-caption
+    [:span.relation-preview-item item-title] " in " [:span.relation-preview-context context-title]]
+   (cond (nil? text) [:div.relation-preview-note "Loading…"]
+         (str/blank? text) [:div.relation-preview-note "Nothing written on this relation yet."]
+         :else [:div.description [:> ReactMarkdown {:children text}]])])

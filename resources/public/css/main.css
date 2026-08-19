@@ -210,6 +210,43 @@ ul.cards {
     opacity: 1;
 }
 
+/* The relation's own body text. Wider and taller than anything else in this
+   modal because it is the only field here that is prose rather than a label. */
+#modal-component textarea.relation-description {
+    width: calc(100% - 20px);
+    margin-top: 8px;
+    padding: 10px;
+    border: 0;
+    font-family: inherit;
+    font-size: inherit;
+    resize: vertical;
+}
+
+#modal-component textarea.relation-description:disabled {
+    background-color: rgba(255, 255, 255, 0.5);
+    color: #888;
+}
+
+/* One relation's text, standing in the lhs where a hovered item's preview
+   normally stands. The caption is small and dim on purpose: the pointer is on
+   the card the relation belongs to, so this only has to say which of the card's
+   edges is being shown, not repeat the card. */
+.relation-preview-caption {
+    font-size: 12px;
+    opacity: 0.7;
+    margin-bottom: 10px;
+}
+
+.relation-preview-caption .relation-preview-item,
+.relation-preview-caption .relation-preview-context {
+    font-weight: bold;
+}
+
+.relation-preview-note {
+    font-style: italic;
+    opacity: 0.6;
+}
+
 /* Not scoped to #modal-component any more: the same banner reports a refused
    unlink out in the item list, where no modal is involved. */
 .part-of-refusal {

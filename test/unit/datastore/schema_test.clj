@@ -72,8 +72,8 @@
                          [(str "UPDATE relations SET is_part_of = 1, part_of_sort_idx = 7 "
                                "WHERE owner_id = 1")])
       (schema/apply-schema! db)
-      (is (= #{"id" "owner_id" "target_id" "show_badge" "annotation" "is_part_of"
-               "part_of_sort_idx"}
+      (is (= #{"id" "owner_id" "target_id" "show_badge" "annotation" "description"
+               "is_part_of" "part_of_sort_idx"}
              (columns db "relations"))
           "the second run adds no duplicate column")
       (let [row (jdbc/execute-one! db ["SELECT * FROM relations WHERE owner_id = 1"])]

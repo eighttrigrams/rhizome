@@ -43,6 +43,15 @@
                                                    [contexts-list *state]]]
           ;; Item-view takes priority over preview
           (:item-view? @*state) [:div.details-component.scrollable [item-detail/component *state]]
+          ;; And the relation takes priority over the item preview, because it is
+          ;; the more specific pointer: the strip it comes from sits inside the
+          ;; card whose hover set the item preview, so both are up whenever the
+          ;; pointer is on the strip and only one of them is what was aimed at.
+          (and (:preview-relation @*state)
+               (not (:loading @*state))
+               (not (= :contexts (:active-search @*state))))
+            [:div.details-component.scrollable
+             [item-detail/relation-preview-component (:preview-relation @*state)]]
           (and (:preview-item @*state)
                (not (:loading @*state))
                (not (= :contexts (:active-search @*state))))
