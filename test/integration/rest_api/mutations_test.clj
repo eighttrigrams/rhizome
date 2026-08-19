@@ -9,6 +9,7 @@
             [rest-api.middleware :as mw]
             [scrapers.website :as website-scraper]
             [et.vp.ds :as ds]
+            [et.vp.ds.relations :as relations]
             [et.vp.ds.search-test :refer [reset-db with-time db]]))
 
 (defn- with-recording-on
@@ -333,6 +334,43 @@
       (is (nil? (:id (ds/get-item db {:id (:id a)}))))
       (is (nil? (:id (ds/get-item db {:id (:id b)}))))
       (is (= (:id c) (:id (ds/get-item db {:id (:id c)})))))))
+
+(deftest delete-related-items-tombstones-the-texts-it-takes-test
+  (test-with-fresh-db
+    "the bulk delete writes down what it destroys, as a single delete does: each
+     item's description and the text on each edge, as one more version, marked as
+     the deletion. Both directions of an edge, because this is the gesture that can
+     take a container and the thing inside it at once -- an edge can lose the end it
+     runs FROM here, which no single delete can do to it."
+    (jdbc/execute-one! db ["delete from history"])
+    (jdbc/execute-one! db ["delete from relation_history"])
+    (let [parent (ds/new-context db {:title "Library"})
+          mid (ds/new-item db "Sub-context" "" #{(:id parent)} 1)
+          _ (jdbc/execute-one! db ["update items set is_context = true where id = ?" (:id mid)])
+          child (ds/new-item db "Child" "" #{(:id mid)} 1)
+          edge-versions (fn [item-id container-id]
+                          (:versions (relations/get-relation-description-history
+                                       db item-id container-id)))]
+      (ds/update-context-description db {:id (:id child) :description "what it said"} "app")
+      (relations/update-relation-description! db (:id mid) (:id parent) "the upper edge" "app")
+      (relations/update-relation-description! db (:id child) (:id mid) "the lower edge" "api")
+      (is (= 200 (:status (POST-empty* (str "/api/items/" (:id parent) "/related/delete")))))
+      (is (nil? (:id (ds/get-item db {:id (:id mid)}))) "precondition: both items went")
+      (is (nil? (:id (ds/get-item db {:id (:id child)}))))
+      (let [versions (:versions (ds/get-description-history db {:id (:id child)}))]
+        (is (= "what it said" (:text (first versions)))
+            "the description the cascade-deleted item was carrying")
+        (is (true? (:tombstone (first versions)))))
+      (let [versions (edge-versions (:id mid) (:id parent))]
+        (is (= ["the upper edge"] (mapv :text versions))
+            "the edge that lost the end it runs TO")
+        (is (= [true] (mapv :tombstone versions))))
+      (let [versions (edge-versions (:id child) (:id mid))]
+        (is (= ["the lower edge"] (mapv :text versions))
+            "and the edge that lost the end it runs FROM")
+        (is (= ["api"] (mapv :source versions))
+            "still stamped with whoever wrote it, which is what provenance rests on")
+        (is (= [true] (mapv :tombstone versions)))))))
 
 (deftest delete-related-items-no-related-test
   (test-with-fresh-db "parent with no related items returns empty buckets"

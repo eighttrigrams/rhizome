@@ -108,3 +108,44 @@ Feature: The versions of the text a relation carries
     When I open the relation modal on "Chapter one"
     And I open the relation's provenance
     Then the relation provenance should say there is nothing to attribute
+
+  # Deletion is a tombstoning: the text the edge was carrying goes to the history
+  # on the way out, marked. For a relation that mark earns its keep, because the
+  # history is keyed on the two items and an edge can come back — so an unlink and
+  # a re-link leave one version list with the cut in the middle of it, and the mark
+  # is what says that is what happened rather than a text having been blanked.
+  Scenario: An edge that was unlinked and made again says where it was cut
+    When I open the relation modal on "Chapter one"
+    And I type "why this chapter is in this book" into the relation text
+    And I save the relation modal
+    # A second container, or the unlink is refused — see unlink.feature. Filed
+    # through the app rather than over the API, because the refusal branches on
+    # the containers the CLIENT is holding for that row, and coming back into Book
+    # afterwards is what re-reads them.
+    And I press the "Escape" key
+    And I press the "c" key
+    And I type "Shelf" in the search input
+    And I press the "Enter" key
+    And I press the "Escape" key
+    And I press the "a" key
+    And I type "Chapter one" in the search input
+    And I press the "Enter" key
+    And I press the "c" key
+    And I type "Book" in the search input
+    And I press the "Enter" key
+    And I unlink the row "Chapter one" from the list
+    Then I should not see "Chapter one" in the rhs
+    # And made again, by the gesture that made it the first time.
+    When I press the "Escape" key
+    And I press the "a" key
+    And I type "Chapter one" in the search input
+    And I press the "Enter" key
+    Then I should see "Chapter one" in the rhs
+    When I open the relation modal on "Chapter one"
+    # Nothing is written on the edge that came back, and it opens on that rather
+    # than on the text from before: what the edge carries now is nothing.
+    Then the relation version bar should read "Version 2 (current)"
+    When I step back a relation version
+    Then the relation version bar should read "Version 1 · app · unlinked"
+    And the older relation version should read "why this chapter is in this book"
+    And the older relation version should say the relation was unlinked here

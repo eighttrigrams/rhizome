@@ -237,10 +237,15 @@
 (defn- version-label
   [versions idx]
   (if (seq versions)
-    (let [{:keys [version source]} (nth versions idx nil)]
+    (let [{:keys [version source tombstone]} (nth versions idx nil)]
       (str "Version " (or version (inc idx))
            (when (zero? idx) " (current)")
-           (when source (str " · " source))))
+           (when source (str " · " source))
+           ;; The one version that no later text superseded: the relation was cut
+           ;; here. Said in the bar and not only in the pane below, because the
+           ;; bar is what a reader steps through, and a version that came about
+           ;; differently from the rest should say so where the stepping happens.
+           (when tombstone " · unlinked")))
     "Version 1 (current)"))
 
 (defn- version-bar-component
@@ -306,12 +311,22 @@
    Its element id is not the editor's, and that matters rather than merely being
    tidy: `editor-value` finds the editor by id, and a read-only view answering to
    that name would hand the save a text nobody typed."
-  [{:keys [text]}]
-  [:div.relation-version-past
-   (if (str/blank? text)
-     [:div.relation-version-note "This version of the text was empty."]
-     [:div.description
-      [:> ReactMarkdown {:children text :components markdown/components}]])])
+  [{:keys [text tombstone]}]
+  (let [blank? (str/blank? text)]
+    [:div.relation-version-past
+     (cond
+       (and tombstone blank?)
+       [:div.relation-version-note
+        "The relation was unlinked here, and it was carrying no text."]
+       tombstone
+       [:div.relation-version-note
+        (str "The relation was unlinked here. This is the text it went out on — "
+             "step forward for what it carries now.")]
+       blank?
+       [:div.relation-version-note "This version of the text was empty."])
+     (when-not blank?
+       [:div.description
+        [:> ReactMarkdown {:children text :components markdown/components}]])]))
 
 (defn- provenance-pane-component
   "The provenance of the edge's text, in the view the item's own page draws it in

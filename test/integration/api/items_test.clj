@@ -3,6 +3,7 @@
             [api.harness :refer [call!]]
             [api.helpers :refer [with-fresh-db]]
             [et.vp.ds :as ds]
+            [et.vp.ds.relations :as relations]
             [et.vp.ds.search-test :refer [db]]
             [next.jdbc :as jdbc]))
 
@@ -48,7 +49,26 @@
     (let [{ctx :selected-item} (call! :insert-context nil {:title "Books"})
           item (ds/new-item db "Doomed" "d" #{(:id ctx)} 1)]
       (call! :delete-item {:selected-item ctx} item)
-      (is (nil? (:id (ds/get-item db {:id (:id item)})))))))
+      (is (nil? (:id (ds/get-item db {:id (:id item)}))))))
+  (with-fresh-db
+    "and writes down what it was on the way out: the description it was carrying and
+     the text on the edge that held it, each as one more version, marked as the
+     deletion. The mechanism is pinned in et.vp.ds.deletion-tombstone-test; what is
+     here is that the command the keyboard reaches it through goes through it too"
+    (jdbc/execute-one! db ["delete from history"])
+    (jdbc/execute-one! db ["delete from relation_history"])
+    (let [{ctx :selected-item} (call! :insert-context nil {:title "Books"})
+          item (ds/new-item db "Doomed" "d" #{(:id ctx)} 1)]
+      (ds/update-context-description db {:id (:id item) :description "what it said"} "app")
+      (relations/update-relation-description! db (:id item) (:id ctx) "why it was here" "app")
+      (call! :delete-item {:selected-item ctx} item)
+      (let [versions (:versions (ds/get-description-history db {:id (:id item)}))]
+        (is (= "what it said" (:text (first versions))))
+        (is (true? (:tombstone (first versions)))))
+      (let [versions (:versions (relations/get-relation-description-history
+                                  db (:id item) (:id ctx)))]
+        (is (= ["why it was here"] (mapv :text versions)))
+        (is (= [true] (mapv :tombstone versions)))))))
 
 (deftest update-item-test
   (with-fresh-db "renames an existing item"

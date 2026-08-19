@@ -102,8 +102,35 @@
                         (sql/format {:select :* :from [:relations] :where [:= :owner_id id]})
                         {:return-keys true})))
 
+(declare save-revision-to-history!)
+
 (defn delete-item
+  "Scrap an item, having first written down what it was.
+
+   Deletion is a tombstoning: the description standing in the row, and the text on
+   every edge that pointed at it, are archived under one more version and marked as
+   the deletion before the rows go. What is left under a dead id is a history whose
+   newest version was superseded by nothing, which is how a delete can be read as a
+   delete afterwards -- as against the hole it used to leave, where the versions
+   before the last one survived and the text the item actually had when it was
+   deleted was the one thing that did not.
+
+   The mark is written whether or not there was anything to preserve (see
+   save-revision-to-history!). An item with an empty description was still an item,
+   and the record that this id was here and was deleted is the point.
+
+   Inbound edges only, because inbound is what the delete below deletes. A bulk
+   delete clears both directions and tombstones them on its own way past --
+   repository.deletion/execute!."
   [db {:keys [id]}]
+  (when-let [row (jdbc/execute-one! db
+                                    (sql/format {:select [:title :description
+                                                          :description_source]
+                                                 :from [:items]
+                                                 :where [:= :id [:inline id]]}))]
+    (datastore.relations/tombstone-inbound-relations! db id)
+    (save-revision-to-history! db id (:items/description row) (:items/title row)
+                               (:items/description_source row) true))
   (delete-date db id)
   (jdbc/execute! db (sql/format {:delete-from [:relations] :where [:= :target_id [:inline id]]}))
   (jdbc/execute! db (sql/format {:delete-from [:items] :where [:= :id [:inline id]]})))
@@ -190,24 +217,35 @@
 (defn- present? [s] (and s (not (clojure.string/blank? s))))
 
 (defn- save-revision-to-history!
-  [db id description title source]
-  (when (or (present? description) (present? title))
-    (let [max-version-result (jdbc/execute-one! db
-                                                (sql/format {:select [[[:coalesce [:max :version] 0]
-                                                                       :max_version]]
-                                                             :from [:history]
-                                                             :where [:= :id [:inline id]]})
-                                                {:return-keys true})
-          new-version (inc (:max_version max-version-result))]
-      (jdbc/execute-one! db
-                         (sql/format {:insert-into [:history]
-                                      :values [{:id [:inline id]
-                                                :text [:inline description]
-                                                :title [:inline title]
-                                                :version [:inline new-version]
-                                                :source [:inline source]}]})
-                         {:return-keys true})))
-  nil)
+  "Archive one version of an item's description, before something replaces it.
+
+   `tombstone?` says nothing is going to replace it -- the item itself is being
+   deleted (see delete-item), and this is the text it went out on. Two things
+   follow. The row is written even when there is neither description nor title to
+   put in it, because what is being recorded is the deletion and not the text; and
+   the row is marked, so a reader can tell the version a delete ended from the
+   versions a later edit superseded."
+  ([db id description title source]
+   (save-revision-to-history! db id description title source false))
+  ([db id description title source tombstone?]
+   (when (or tombstone? (present? description) (present? title))
+     (let [max-version-result (jdbc/execute-one! db
+                                                 (sql/format {:select [[[:coalesce [:max :version] 0]
+                                                                        :max_version]]
+                                                              :from [:history]
+                                                              :where [:= :id [:inline id]]})
+                                                 {:return-keys true})
+           new-version (inc (:max_version max-version-result))]
+       (jdbc/execute-one! db
+                          (sql/format {:insert-into [:history]
+                                       :values [{:id [:inline id]
+                                                 :text [:inline description]
+                                                 :title [:inline title]
+                                                 :version [:inline new-version]
+                                                 :source [:inline source]
+                                                 :tombstone [:inline (if tombstone? 1 0)]}]})
+                          {:return-keys true})))
+   nil))
 
 (defn get-description-history
   [db {:keys [id]}]
@@ -215,7 +253,7 @@
         current-description (:description current-item)
         history-items (jdbc/execute! db
                                      (sql/format {:select [:text :title :version :created_at
-                                                           :source]
+                                                           :source :tombstone]
                                                   :from [:history]
                                                   :where [:= :id [:inline id]]
                                                   :order-by [[:version :desc]]})
@@ -225,7 +263,11 @@
                                       :title (:history/title row)
                                       :version (:history/version row)
                                       :created_at (:history/created_at row)
-                                      :source (:history/source row)})
+                                      :source (:history/source row)
+                                      ;; A boolean and not the column's 0/1: the
+                                      ;; reader on the other end is cljs, where 0
+                                      ;; is truthy.
+                                      :tombstone (= 1 (:history/tombstone row))})
                                 history-items)
         all-versions (if (or (present? current-description) (present? (:title current-item)))
                        (concat [{:text current-description
@@ -233,6 +275,7 @@
                                  :version (inc (or (:history/version (first history-items)) 0))
                                  :created_at (:updated_at_ctx current-item)
                                  :source (:description_source current-item)
+                                 :tombstone false
                                  :current true}]
                                history-items-as-maps)
                        history-items-as-maps)]

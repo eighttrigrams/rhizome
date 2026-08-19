@@ -56,6 +56,14 @@ Then("the older relation version should read {string}", async ({ page }, text: s
   await expect(pastPane(page)).toContainText(text);
 });
 
+// What a tombstoned version says about itself. The bar says it too (" · unlinked"),
+// and is asserted on whole by the step above; this is the sentence in the pane,
+// which is where a reader who stepped back is actually looking.
+Then("the older relation version should say the relation was unlinked here", async ({ page }) => {
+  await expect(pastPane(page).locator(".relation-version-note"))
+    .toContainText("The relation was unlinked here");
+});
+
 // The editor being absent is half of what makes a past version read-only, and it
 // is also what makes a save from there write the standing text rather than the one
 // on screen: ui.modals.annotation-edit/get-values finds the editor by id, and

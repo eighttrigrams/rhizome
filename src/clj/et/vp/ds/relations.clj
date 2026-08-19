@@ -193,27 +193,92 @@
    it to recover, and a run of empty versions would be a version bar with nothing
    to step through.
 
+   `tombstone?` says the edge itself is going away rather than its text being
+   replaced, and it changes both of those. The row is written even when the text
+   is blank -- what is being recorded is that the edge was cut, and an edge that
+   carried nothing was still an edge -- and the row is marked, so a reader can
+   tell the version that was superseded by a deletion from the versions that were
+   superseded by a later text. See the note over the table in schema-sqlite.sql.
+
    Keyed on the two items and not on relations.id, because the row's id does not
    survive a save of either item's edit modal -- see set-containers-of-item!
    below, and the note over the table in schema-sqlite.sql."
-  [db item-id container-id text source]
-  (when (present? text)
-    (let [next-version
-            (inc (:max_version
-                   (jdbc/execute-one!
-                     db
-                     (sql/format {:select [[[:coalesce [:max :version] 0] :max_version]]
-                                  :from [:relation_history]
-                                  :where [:and [:= :owner_id [:inline container-id]]
-                                          [:= :target_id [:inline item-id]]]}))))]
-      (jdbc/execute-one! db
-                         (sql/format {:insert-into [:relation_history]
-                                      :values [{:owner_id [:inline container-id]
-                                                :target_id [:inline item-id]
-                                                :text [:inline text]
-                                                :version [:inline next-version]
-                                                :source [:inline source]}]}))))
-  nil)
+  ([db item-id container-id text source]
+   (save-relation-revision! db item-id container-id text source false))
+  ([db item-id container-id text source tombstone?]
+   (when (or tombstone? (present? text))
+     (let [next-version
+             (inc (:max_version
+                    (jdbc/execute-one!
+                      db
+                      (sql/format {:select [[[:coalesce [:max :version] 0] :max_version]]
+                                   :from [:relation_history]
+                                   :where [:and [:= :owner_id [:inline container-id]]
+                                           [:= :target_id [:inline item-id]]]}))))]
+       (jdbc/execute-one! db
+                          (sql/format {:insert-into [:relation_history]
+                                       :values [{:owner_id [:inline container-id]
+                                                 :target_id [:inline item-id]
+                                                 :text [:inline text]
+                                                 :version [:inline next-version]
+                                                 :source [:inline source]
+                                                 :tombstone [:inline (if tombstone? 1 0)]}]}))))
+   nil))
+
+(defn- edge-rows
+  "The rows a tombstoning is about to lose, whichever way it is selecting them."
+  [db where]
+  (jdbc/execute! db
+                 (sql/format {:select [:owner_id :target_id :description :description_source]
+                              :from [:relations]
+                              :where where})))
+
+(defn- tombstone-rows!
+  "Archive each of `rows` as the last version of its edge, marked as the cut.
+
+   Every row, and not only the ones carrying text. An edge that was never written
+   on was still an edge, and the version this leaves is a record that it was here
+   and is not any more -- which is the whole of what a delete leaves behind, and
+   the one thing a reader cannot work out from a table it is missing from."
+  [db rows]
+  (doseq [{:relations/keys [owner_id target_id description description_source]} rows]
+    (save-relation-revision! db target_id owner_id description description_source true)))
+
+(defn tombstone-inbound-relations!
+  "Tombstone every edge that points AT `item-id`, for a delete of the item that
+   is about to take those rows with it (et.vp.ds/delete-item).
+
+   Inbound only, because that is the set that delete deletes. The bulk path
+   clears both directions and tombstones them itself, before this ever runs --
+   see tombstone-relations-touching!."
+  [db item-id]
+  (tombstone-rows! db (edge-rows db [:= :target_id [:inline item-id]])))
+
+(defn- tombstone-dropped-inbound-relations!
+  "Tombstone the inbound edges of `item-id` that `keep-ids` does not name: the
+   ones a rewrite of the item's containers is about to drop.
+
+   The filtering is here and not in the WHERE because `keep-ids` is routinely
+   empty -- an item can be taken out of its last container by a delete -- and
+   `[:not-in :owner_id []]` is not SQL."
+  [db item-id keep-ids]
+  (let [keep? (set keep-ids)]
+    (tombstone-rows! db
+                     (remove (fn [row] (contains? keep? (:relations/owner_id row)))
+                             (edge-rows db [:= :target_id [:inline item-id]])))))
+
+(defn tombstone-relations-touching!
+  "Tombstone every edge with one end in `ids`, in either direction, for a bulk
+   delete about to remove those rows (repository.deletion/execute!).
+
+   Both directions, unlike the single-item path: a bulk delete can take a
+   container and the things in it in one gesture, so an edge can lose the end it
+   runs from as easily as the end it runs to, and the text hangs on the edge
+   either way."
+  [db ids]
+  (when (seq ids)
+    (tombstone-rows! db (edge-rows db [:or [:in :owner_id (vec ids)]
+                                       [:in :target_id (vec ids)]]))))
 
 (defn- texts-of-inbound-rows
   "The body text of each of an item's inbound relations and the source that wrote
@@ -261,15 +326,13 @@
                                 containers))
   (let [texts (texts-of-inbound-rows db (:id item))]
     ;; An edge the new map does not mention is being taken away, and the delete
-    ;; below takes its text with it. Archived first, so it is still recoverable
+    ;; below takes its text with it. Tombstoned first, so it is still recoverable
     ;; afterwards: this is the one write in the system that can destroy a
     ;; relation's text without anyone having typed over it, and a field a delete
-    ;; can carry off unrecorded is not a versioned field. The edge that comes
-    ;; back if it is ever re-linked then starts out blank with a history under it,
-    ;; which is what happened.
-    (doseq [[container-id {:keys [description source]}] texts
-            :when (not (contains? containers container-id))]
-      (save-relation-revision! db (:id item) container-id description source))
+    ;; can carry off unrecorded is not a versioned field. The edge that comes back
+    ;; if it is ever re-linked then starts out blank on top of one history with the
+    ;; cut marked in the middle of it, which is what happened.
+    (tombstone-dropped-inbound-relations! db (:id item) (keys containers))
     (jdbc/execute! db
                    (sql/format {:delete-from [:relations]
                                 :where [:= :target_id [:inline (:id item)]]}))
@@ -618,16 +681,24 @@
    An edge that is gone still answers with its archive, and with no current
    version at the head. Unlinking takes the row and its text away, having archived
    the text on the way out (set-containers-of-item!), and what is left is the
-   history -- which is the honest answer to what this relation's text was."
+   history -- which is the honest answer to what this relation's text was. The
+   version it went out on carries `:tombstone true`, and so does every earlier cut:
+   an edge that was unlinked and linked again answers with one list, and the marks
+   say where in it the edge was not there."
   [db item-id container-id]
   (let [row (relation-text-row db item-id container-id)
         archived (mapv (fn [r]
                          {:text (:relation_history/text r)
                           :version (:relation_history/version r)
                           :created_at (:relation_history/created_at r)
-                          :source (:relation_history/source r)})
+                          :source (:relation_history/source r)
+                          ;; A boolean and not the column's 0/1: the client is
+                          ;; cljs, where 0 is truthy, and a version bar that
+                          ;; called every version a deletion is what that costs.
+                          :tombstone (= 1 (:relation_history/tombstone r))})
                    (jdbc/execute! db
-                                  (sql/format {:select [:text :version :created_at :source]
+                                  (sql/format {:select [:text :version :created_at :source
+                                                        :tombstone]
                                                :from [:relation_history]
                                                :where [:and [:= :owner_id [:inline container-id]]
                                                        [:= :target_id [:inline item-id]]]
@@ -637,6 +708,7 @@
                            :version (inc (or (:version (first archived)) 0))
                            :created_at nil
                            :source (:relations/description_source row)
+                           :tombstone false
                            :current true}]
                          archived)
                    archived)]

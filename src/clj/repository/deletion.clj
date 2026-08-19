@@ -7,7 +7,8 @@
             [config :as config]
             [datastore.dialect :as dialect]
             [repository.homefolder :as home]
-            [et.vp.ds :as datastore]))
+            [et.vp.ds :as datastore]
+            [et.vp.ds.relations :as datastore.relations]))
 
 (defn- folder [k] (get-in config/config [:folders k]))
 
@@ -289,6 +290,12 @@
 (defn- delete-relations-touching!
   [db ids]
   (when (seq ids)
+    ;; The text on each of these edges goes to the relation history first, marked
+    ;; as the cut, exactly as a single unlink does it
+    ;; (et.vp.ds.relations/set-containers-of-item!). A delete that carried the
+    ;; text off unrecorded would make bulk the one gesture that can destroy a
+    ;; versioned field.
+    (datastore.relations/tombstone-relations-touching! db ids)
     (jdbc/execute! db
                    (sql/format {:delete-from [:relations]
                                 :where [:or

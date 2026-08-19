@@ -266,6 +266,13 @@ ul.cards {
     opacity: 0.6;
 }
 
+/* A tombstoned version says so above the text it went out on, so the note needs
+   to sit off the paragraph under it rather than against it. The blank cases are
+   a note on their own and have nothing to clear. */
+#modal-component .relation-version-note:not(:only-child) {
+    margin-bottom: 0.75em;
+}
+
 /* The provenance rows are drawn for the dark page they were written for
    (#provenance-page), where the text colour comes off the panel. In here the
    modal is light, so the pane says what colour its text is rather than letting

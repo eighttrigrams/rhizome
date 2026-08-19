@@ -12,7 +12,11 @@
    - a save that did not change the text does not earn a version, because the
      modal that saves the text also saves a badge and a sibling index;
    - an unlink archives the text it takes away, because that is the one write that
-     can destroy a relation's text with nobody having typed over it."
+     can destroy a relation's text with nobody having typed over it;
+   - and the version an unlink leaves is MARKED as the cut, because an edge can
+     come back: the pair is the key, so a re-linked edge answers with one history,
+     and without the mark it would read as a run of texts that each gave way to
+     the next rather than as an edge that was severed and made again."
   (:require [clojure.test :refer [deftest is]]
             [et.vp.ds :as ds]
             [et.vp.ds.relations :as relations]
@@ -68,7 +72,7 @@
    through the read that assembles the answer."
   [item whole]
   (jdbc/execute! db
-                 ["SELECT text, version, source FROM relation_history
+                 ["SELECT text, version, source, tombstone FROM relation_history
                    WHERE owner_id = ? AND target_id = ? ORDER BY version"
                   (:id whole) (:id item)]))
 
@@ -124,6 +128,16 @@
         (is (nil? (:created_at newer))
             "and the current one says nothing: a relation has no updated_at of its
              own, and a date borrowed off either item would be about something else")))))
+
+(deftest replacing-a-text-is-not-a-cut
+  (with-fresh-history "an ordinary edit leaves the version it supersedes unmarked"
+    (let [[book chapter] (book-with-chapter)]
+      (write! chapter book "the first thing said")
+      (write! chapter book "the second thing said")
+      (is (= [0] (mapv :relation_history/tombstone (archived-rows chapter book)))
+          "straight off the table: the column is 0, and not merely falsy")
+      (is (= [false false] (mapv :tombstone (versions chapter book)))
+          "and the answer the modal reads says so of both of them"))))
 
 (deftest a-save-that-changed-nothing-earns-no-version
   (with-fresh-history
@@ -258,6 +272,8 @@
         (is (= 1 total))
         (is (= ["why it was ever in this book"] (mapv :text versions)))
         (is (= ["api"] (mapv :source versions)) "with the source it was written by")
+        (is (= [true] (mapv :tombstone versions))
+            "and marked as the cut: nothing superseded this version, the edge went")
         (is (not-any? :current versions)
             "and no current version at the head: there is no text standing on an
              edge that is not there"))))
@@ -273,13 +289,24 @@
                                             true)
       (is (= [nil "said the first time round"] (texts chapter book))
           "which is what happened: nothing is written on it now, and something was")
-      (is (true? (:current (first (versions chapter book)))))))
-  (with-fresh-history "unlinking an edge nobody wrote on archives nothing"
+      (is (true? (:current (first (versions chapter book)))))
+      (is (= [false true] (mapv :tombstone (versions chapter book)))
+          "and the cut is still marked where it happened, under the edge that came
+           back -- which is what makes the two versions readable as one edge
+           severed and made again rather than as a text that was blanked")))
+  (with-fresh-history
+    "unlinking an edge nobody wrote on still leaves the cut. There is no text to
+     recover, and that is not what this row is for: an edge that carried nothing
+     was still an edge, and a table it is simply missing from cannot say whether it
+     was ever there"
     (let [[book chapter] (book-with-chapter)
           shelf (ds/new-context db {:title "Shelf"})]
       (relations/link-item-to-another-item! db (ds/get-item db {:id (:id chapter)}) shelf true)
       (relations/unlink-item-from-another-item! db (ds/get-item db {:id (:id chapter)}) book)
-      (is (= {:versions [] :total 0} (history chapter book)))))
+      (let [{:keys [versions total]} (history chapter book)]
+        (is (= 1 total))
+        (is (= [nil] (mapv :text versions)) "empty, because that is what it was")
+        (is (= [true] (mapv :tombstone versions)) "and marked, because that is the point"))))
   (with-fresh-history "and unlinking one edge leaves the other one's history alone"
     (let [[book chapter] (book-with-chapter)
           shelf (ds/new-context db {:title "Shelf"})]
@@ -290,6 +317,31 @@
       (relations/unlink-item-from-another-item! db (ds/get-item db {:id (:id chapter)}) shelf)
       (is (= ["the edge that stays, revised" "the edge that stays"] (texts chapter book)))
       (is (= ["the edge that goes"] (texts chapter shelf))))))
+
+(deftest the-history-carries-on-across-a-cut
+  (with-fresh-history
+    "an edge that was unlinked and made again is one edge with a marked cut in its
+     history, and not two edges with a history each. The pair is the key, so there
+     is nowhere else for the earlier text to be -- which is what makes a re-link a
+     reawakening rather than a fresh start: what it used to say is a step back"
+    (let [[book chapter] (book-with-chapter)
+          shelf (ds/new-context db {:title "Shelf"})]
+      (relations/link-item-to-another-item! db (ds/get-item db {:id (:id chapter)}) shelf true)
+      (write! chapter book "before the cut" "app")
+      (relations/unlink-item-from-another-item! db (ds/get-item db {:id (:id chapter)}) book)
+      (relations/link-item-to-another-item! db
+                                            (ds/get-item db {:id (:id chapter)})
+                                            (ds/get-item db {:id (:id book)})
+                                            true)
+      (write! chapter book "after the cut" "app")
+      (let [versions (versions chapter book)]
+        (is (= ["after the cut" "before the cut"] (mapv :text versions)))
+        (is (= [2 1] (mapv :version versions))
+            "the numbering counts on across the cut: the blank the re-linked edge
+             opened with was not worth a version, and never became one")
+        (is (= [true nil] (mapv :current versions)))
+        (is (= [false true] (mapv :tombstone versions))
+            "and the mark says which of the two the edge went out on")))))
 
 ;; -- provenance over a relation's history ------------------------------------
 

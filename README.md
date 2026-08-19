@@ -394,13 +394,47 @@ Two differences from an item's history, both deliberate:
   anything was written. Unticking a badge four times is not four versions.
 
 An unlink is the one write that can destroy a relation's text with nobody having
-typed over it — the row goes and the text goes with it — so the text is archived
-on the way out. Re-link the edge later and it starts blank with its history
-underneath, which is what happened.
+typed over it — the row goes and the text goes with it — so the text is written to
+the history on the way out, and marked. See the next section.
 
 Only the web UI writes this text today, so every version of it reads as
 hand-written; there is no `/api` route that replaces a relation's description the
 way `PUT /api/items/:id` replaces an item's.
+
+### Deletion is a tombstoning
+
+Deleting used to keep the versions and take the text. The history an item had
+accumulated stayed behind, the description it was actually carrying went with the
+row, and nothing in the table said the item had been deleted rather than left
+alone since its last edit — so the one version certain to be missing from a dead
+item's history was its last one.
+
+Now a delete **preserves before it scraps**. The standing text goes to the
+history under one more version number, stamped with the source that wrote it, and
+that row is marked `tombstone`. What is left under a dead id is a history whose
+newest version was superseded by nothing, which is what makes it readable as a
+deletion. It holds for both texts and for every way of deleting: the item's own
+description, the text on every edge that pointed at it, a single delete, an
+unlink, and the danger-mode bulk delete — which is the one gesture that can take
+an edge's *owner*, so it tombstones edges in both directions.
+
+The mark is written **whether or not there was anything to preserve**. An item
+with an empty description was still an item, and an edge nobody wrote on was
+still an edge; the event is what is being recorded, and a table a thing is simply
+missing from cannot say whether it was ever there.
+
+For an item that is archaeology — ids are never handed out twice, so a deleted
+item's history is not reachable from the UI at all. For a relation it is not
+archaeology, because **an edge can come back**. The history is keyed on the two
+items, so unlinking and linking again leaves one version list with the cut marked
+in the middle of it: the edge that returns opens blank, and a step back on its
+version bar reads `Version 1 · app · unlinked` over the text it went out on. That
+is the difference the mark buys — without it, the same list would read as a text
+that had been blanked rather than an edge severed and made again.
+
+Nothing reaps these rows, and nothing undeletes from them yet. What the
+tombstones give today is that a deletion is recorded rather than silent, and that
+the text a delete carried off is still there to read.
 
 ## Configuration Options
 

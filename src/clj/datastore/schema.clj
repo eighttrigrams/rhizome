@@ -136,6 +136,8 @@
      (ensure-column! db "relations" "description_source" "TEXT")
      (ensure-column! db "history" "source" "TEXT")
      (ensure-column! db "history" "title" "TEXT")
+     (ensure-column! db "history" "tombstone" "INTEGER NOT NULL DEFAULT 0")
+     (ensure-column! db "relation_history" "tombstone" "INTEGER NOT NULL DEFAULT 0")
      (ensure-column! db "youtube_poll_channels" "min_duration_minutes" "INTEGER")
      (when connection/vec-available?
        (ensure-vec-dim! db sql))

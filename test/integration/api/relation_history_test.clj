@@ -123,6 +123,37 @@
       (is (= [{:id (:id chapter)}] (:items resp))
           "it is a query, and the modal is open over the list it must not move"))))
 
+(deftest a-cut-edge-answers-with-the-cut-marked-test
+  (with-fresh-history "the version an unlink left says so, and the client is told in a boolean"
+    (let [[book chapter] (book-with-chapter!)
+          shelf (ds/new-context db {:title "Shelf"})]
+      (relations/link-item-to-another-item! db (ds/get-item db {:id (:id chapter)}) shelf true)
+      (write! chapter book "why it was ever in this book")
+      (relations/unlink-item-from-another-item! db (ds/get-item db {:id (:id chapter)}) book)
+      (let [{:keys [versions]} (history! chapter book)]
+        (is (= [true] (mapv :tombstone versions)))
+        ;; The column is an INTEGER and the reader is cljs, where 0 is truthy. A
+        ;; 0 that travelled would light up every version in the bar as a deletion.
+        (is (every? boolean? (mapv :tombstone versions))
+            "a boolean and not the column's 0/1, because the bar tests it for truth"))))
+  (with-fresh-history "and an edge that came back answers with one list, cut and all"
+    (let [[book chapter] (book-with-chapter!)
+          shelf (ds/new-context db {:title "Shelf"})]
+      (relations/link-item-to-another-item! db (ds/get-item db {:id (:id chapter)}) shelf true)
+      (write! chapter book "said the first time round")
+      (relations/unlink-item-from-another-item! db (ds/get-item db {:id (:id chapter)}) book)
+      (relations/link-item-to-another-item! db
+                                            (ds/get-item db {:id (:id chapter)})
+                                            (ds/get-item db {:id (:id book)})
+                                            true)
+      (let [{:keys [text versions]} (history! chapter book)]
+        (is (nil? text) "nothing is written on the edge that came back")
+        (is (= [nil "said the first time round"] (mapv :text versions)))
+        (is (= [true nil] (mapv :current versions)))
+        (is (= [false true] (mapv :tombstone versions))
+            "so the modal can say where the edge was not there, which is the whole
+             of what a re-linked edge's version bar has to explain")))))
+
 ;; -- the Provenance button ---------------------------------------------------
 
 (deftest fetching-one-relations-provenance-test

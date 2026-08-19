@@ -130,6 +130,7 @@
       (jdbc/execute-one! db ["DELETE FROM relations"])
       (jdbc/execute-one! db ["DELETE FROM items"])
       (jdbc/execute-one! db ["DELETE FROM history"])
+      (jdbc/execute-one! db ["DELETE FROM relation_history"])
       (jdbc/execute-one! db ["DELETE FROM youtube_poll_channels"])
       (jdbc/execute-one! db ["DELETE FROM youtube_poll_seen"])
       (jdbc/execute-one! db ["DELETE FROM atom_poll_feeds"])

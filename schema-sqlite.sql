@@ -32,6 +32,13 @@ CREATE TABLE IF NOT EXISTS relations (
     FOREIGN KEY (target_id) REFERENCES items(id)
 );
 
+-- `tombstone` marks the one version that was written BECAUSE the thing was
+-- deleted: the text as it stood at that moment, archived on the way out. Every
+-- other version was superseded by a later one; a tombstoned version was
+-- superseded by nothing, which is what makes it readable as a deletion. It is
+-- written whether or not there was any text to preserve -- the event is the
+-- point, and an item deleted with an empty description would otherwise leave no
+-- trace of ever having been here.
 CREATE TABLE IF NOT EXISTS history (
     id INTEGER NOT NULL,
     text TEXT,
@@ -39,6 +46,7 @@ CREATE TABLE IF NOT EXISTS history (
     version INTEGER NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     source TEXT,
+    tombstone INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (id, version),
     FOREIGN KEY (id) REFERENCES items(id) ON DELETE CASCADE
 );
@@ -53,6 +61,11 @@ CREATE TABLE IF NOT EXISTS history (
 -- No `title` column, unlike history above. There it records what the item was
 -- called when that version was superseded; a relation has no name of its own --
 -- it is identified by the two items it joins, and those are the primary key here.
+--
+-- `tombstone` as in history above, and here it does one thing more: an edge can
+-- come back. The pair is the key, so an unlink and a re-link leave one history
+-- with the cut marked in the middle of it -- the text the edge carried when it
+-- was severed, and under it whatever it carried before that.
 CREATE TABLE IF NOT EXISTS relation_history (
     owner_id INTEGER NOT NULL,
     target_id INTEGER NOT NULL,
@@ -60,6 +73,7 @@ CREATE TABLE IF NOT EXISTS relation_history (
     version INTEGER NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     source TEXT,
+    tombstone INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (owner_id, target_id, version),
     FOREIGN KEY (owner_id) REFERENCES items(id) ON DELETE CASCADE,
     FOREIGN KEY (target_id) REFERENCES items(id) ON DELETE CASCADE
