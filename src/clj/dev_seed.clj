@@ -9,6 +9,7 @@
    `make start` + nothing else."
   (:require [cambium.core :as log]
             [clojure.edn :as edn]
+            [et.vp.ds.relations :as relations]
             [next.jdbc :as jdbc]
             [repository.insertion.file :as file]))
 
@@ -60,7 +61,17 @@
   (jdbc/execute-one!
    db
    ["INSERT INTO relations (owner_id, target_id, show_badge) VALUES (?, ?, 1)"
-    owner-id target-id]))
+    owner-id target-id])
+  ;; The row is half a relation. Everything that reads one reads the `contexts`
+  ;; mirror inside items.data instead -- the badges under a card, the related
+  ;; contexts in the item's edit modal, the aggregated contexts -- so a row
+  ;; seeded without its entry describes a relation nothing in the UI can see:
+  ;; the demo articles sat under Articles wearing no badge, and their edit modal
+  ;; listed no related context at all.
+  ;;
+  ;; Built out of the table rather than written by hand here, so the seed cannot
+  ;; say a relation differently from the way every other write channel says it.
+  (relations/set-collection-titles-of-new-item db target-id))
 
 (defn- seed-contexts! [db]
   (log/info (str "Seeding " (count contexts) " contexts"))

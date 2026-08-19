@@ -39,11 +39,15 @@
     (reset! *fields
       {:global-annotation (or (:annotation item-data) "")
        :relation-annotation (or (:annotation item) "")
-       ;; nil is not `no badge`: the mirror only carries the flag once something
-       ;; has written it, and the column it mirrors defaults to shown. Reading a
-       ;; missing flag as false would put the modal in front of the user with
-       ;; the badge already unticked and take it away on the next save.
-       :show-badge? (not (false? (:show-badge? standing)))
+       ;; Read exactly the way the badge itself is read, nil and missing entry
+       ;; included: ui.main.context-badges draws a badge only for an entry that
+       ;; says so, so an item whose mirror has no entry for this whole -- which
+       ;; is the shape a relation row written without its mirror leaves, see
+       ;; dev-seed -- shows no badge, and the modal has to say the same. It said
+       ;; the opposite while it defaulted a missing flag to the column's default
+       ;; of shown: ticked, over a card carrying no badge. Ticking it here is
+       ;; then what puts the badge there, and writes the missing entry with it.
+       :show-badge? (boolean (:show-badge? standing))
        :is-part-of? (boolean (:is-part-of? standing))
        :part-of-sort-idx (link-context-item/part-of-idx->display
                            (or (:part-of-sort-idx standing) -1))})))
