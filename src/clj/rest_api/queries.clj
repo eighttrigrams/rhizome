@@ -288,6 +288,212 @@
          (log/error e "REST API: get-item-with-related failed")
          (json-response 500 {:error (.getMessage e)}))))
 
+;; --- item images -------------------------------------------------------------
+
+;; The three kinds of image an item can carry, in the order they are reported.
+;; Each is a separate mechanism and no two share a path template: `image` is the
+;; file the item *is*, sitting under :images named as whatever it was imported
+;; as; the two previews are drag-and-drop uploads under :preview-images, always
+;; "<id>.png", the lowres one in a `Lowres/` subfolder. That subfolder is not
+;; configurable -- it is hardcoded in upload/upload-preview-file and in
+;; repository.deletion, and hardcoded here for the same reason.
+(def ^:private image-kind-names ["image" "preview-highres" "preview-lowres"])
+
+(defn- declared-images
+  "The images an item's `data` says it has: one descriptor per kind present, in
+   `image-kind-names` order.
+
+   Reads three keys and pointedly not a fourth. `:resource-links` `:file` is set
+   for every imported file whatever its type -- audio, docs, video -- and is what
+   the green-dot badge in the UI goes by. It means \"there is a file behind this
+   item\" and says nothing about images, so it has no business here; the marker
+   for an item that *is* an image is `:resource-links` `:image`.
+
+   Both preview keys can be present at once. upload/upload-preview-file dissocs
+   the one it is not writing, but et.vp.ds/update-item merges `:data`, so the
+   dissoc never lands -- there is a comment there admitting it. `:lowres?` is the
+   tie-breaker the UI reads to choose between them. On disk both files exist, and
+   both are reported."
+  [data]
+  (let [own-image (-> data :resource-links :image)]
+    (cond-> []
+      own-image
+        (conj {:kind "image" :filename own-image
+               :root :images :url-prefix "/imgs/"})
+      (:preview-image data)
+        (conj {:kind "preview-highres" :filename (:preview-image data)
+               :root :preview-images :url-prefix "/imgs/Preview/"})
+      (:preview-image-lowres data)
+        (conj {:kind "preview-lowres" :filename (:preview-image-lowres data)
+               :root :preview-images :subdir "Lowres"
+               :url-prefix "/imgs/Preview/Lowres/"}))))
+
+(defn- content-type-for
+  "The content type a filename's suffix implies.
+
+   Only the previews are guaranteed png. The file an item *is* carries whatever
+   suffix it was imported with -- the classifier files jpg, jpeg, png and webp
+   under `images` (repository.insertion.file) -- and an old row can hold anything
+   at all. Hence a fallback rather than a refusal: the bytes are still the item's
+   image, and refusing to serve them over a suffix this list has not heard of
+   would be answering a question nobody asked."
+  [filename]
+  (case (str/lower-case (or (second (re-find #"\.([^.]+)\z" filename)) ""))
+    "png" "image/png"
+    ("jpg" "jpeg") "image/jpeg"
+    "webp" "image/webp"
+    "application/octet-stream"))
+
+(defn- image-file
+  "The file a descriptor names, or nil when its folder is unconfigured or the
+   name would escape it.
+
+   The filename comes from the database and not from the request, but it is still
+   free-form text -- `:resource-links` `:image` is whatever the file was called
+   on import -- so the canonical path is checked to fall under its root. wrap-imgs
+   gets that check for free from ring's :root; this read goes straight at the
+   filesystem, so it has to make the check itself. (GET /img-by-id/:item-id reads
+   straight at it too and does *not* make the check -- not a model to copy.)
+
+   Any failure to work out the path at all is nil for the same reason a name that
+   escapes is: this endpoint's answer to \"the row and the filesystem disagree\"
+   is `missing`, not an exception, and an unresolvable name is one more way for
+   them to disagree."
+  [folders {:keys [filename root subdir]}]
+  (when-let [root-path (get folders root)]
+    (try
+      (let [base (if subdir (io/file root-path subdir) (io/file root-path))
+            f (io/file base filename)]
+        (when (str/starts-with? (.getCanonicalPath f)
+                                (str (.getCanonicalPath base) java.io.File/separator))
+          f))
+      (catch Exception _ nil))))
+
+(defn- image-url
+  "The URL wrap-imgs already serves this file at, percent-encoded. Reported so a
+   caller that can take raw bytes over HTTP -- the frontend, curl -- can skip the
+   base64 round trip entirely. Built through java.net.URI so a filename with a
+   space in it (routine for imported files) comes back usable."
+  [{:keys [url-prefix filename]}]
+  (str url-prefix (.toASCIIString (java.net.URI. nil nil filename nil))))
+
+(defn- image-entry
+  [descriptor ^java.io.File f data?]
+  (cond-> {:kind (:kind descriptor)
+           :filename (:filename descriptor)
+           :content-type (content-type-for (:filename descriptor))
+           ;; The size of the file, not of its base64 -- that is the number a
+           ;; caller deciding whether to ask for the bytes needs, and the manifest
+           ;; gear exists so it can be read without them.
+           :bytes (.length f)
+           :url (image-url descriptor)}
+    data? (assoc :data-base64
+                 (.encodeToString (java.util.Base64/getEncoder)
+                                  (java.nio.file.Files/readAllBytes (.toPath f))))))
+
+(defn item-images
+  "GET /api/items/:id/images[?data=true][&kinds=<csv>] — every image the item
+  has, in one answer.
+
+  An item can carry images in three unrelated ways, and this reports all of them
+  together:
+
+  - `image` — the item *is* an image: a file imported and classified as one.
+  - `preview-highres` — a full-size preview uploaded onto the item.
+  - `preview-lowres` — a downscaled (200px tall) preview. Scraped pages get one
+    of these automatically from their og:image, so it is by far the commonest.
+
+  Two gears, because a caller cannot know in advance whether an item has any
+  images or how large they are:
+
+      GET /api/items/34696/images              -> the manifest alone. Small; always safe.
+      GET /api/items/34696/images?data=true    -> the same, plus the bytes.
+
+  Under `?data=true` each entry gains `data-base64`: the file, base64-encoded.
+  Base64 and not raw bytes because the client this exists for reaches the API
+  through plurama-cli, which decodes every response body as text -- raw image
+  bytes do not survive that, and one JSON document does.
+
+  **Redirect that to a file.** A 1 MB image is ~1.4 MB of base64, and read into
+  an agent's context it is simply gone. From a sandbox:
+
+      plurama-cli rhizome '/items/34696/images'                                # what is there?
+      plurama-cli rhizome '/items/34696/images?data=true' --raw > /tmp/i.json   # not to stdout
+      jq -r '.images[0].\"data-base64\"' /tmp/i.json | base64 -d > /tmp/a.png
+
+  `kinds` is an optional CSV of the names above, so a caller that only wants
+  something to look at can ask for `preview-lowres` alone and pull ~20 KB instead
+  of a megabyte. Absent means all three. An unrecognised name is refused with 400
+  rather than ignored: silently dropping it would answer a narrower question than
+  the one asked and look like the item simply had no such image.
+
+      {\"item-id\": 34696,
+       \"lowres?\": true,
+       \"images\": [{\"kind\": \"preview-lowres\", \"filename\": \"34696.png\",
+                   \"content-type\": \"image/png\", \"bytes\": 18422,
+                   \"url\": \"/imgs/Preview/Lowres/34696.png\",
+                   \"data-base64\": \"iVBORw0KGgo…\"}],
+       \"missing\": []}
+
+  `bytes` is the size of the file itself, not of its base64 (which runs about a
+  third larger). `url` is the route the browser already fetches this file from,
+  given so a caller able to take raw bytes over HTTP can skip base64 altogether.
+
+  **`images` reports what is on disk, not what the UI would show.** An item can
+  genuinely hold both preview files at once — `:lowres?` is only the tie-breaker
+  the UI picks between them by, and it is echoed here as a hint and nothing more.
+  Both are returned. Replaying the UI's precedence would mean hiding a file the
+  item really has.
+
+  **`missing` is the other half of that honesty.** These folders live on external
+  volumes that get unmounted, and files get moved by hand, so an item's `data`
+  can name a file that is not there. Such an entry is listed under `missing`
+  (`kind` and `filename` only) rather than raising: the item and the disk
+  disagreeing is a fact about the graph worth reporting, not a server error.
+  `images` therefore holds exactly what can be fetched.
+
+  Both `images` and `missing` are always present, empty rather than absent, so
+  neither has to be nil-checked before it is walked.
+
+  400 if :id is not an integer or `kinds` names something unknown. 404 if there
+  is no such item — deliberately unlike GET /api/items/:id, which answers a
+  nonexistent id with 200 and an empty shell. An empty image list for an item
+  that does not exist would be a wrong answer rather than an empty one."
+  [db folders id-str {:keys [data kinds]}]
+  (try
+    (let [requested (when-not (str/blank? kinds)
+                      (mapv str/trim (str/split kinds #",")))
+          unknown (vec (remove (set image-kind-names) requested))]
+      (if (seq unknown)
+        (json-response 400 {:error (str "unknown image kind(s): " (str/join ", " unknown))
+                            :valid-kinds image-kind-names})
+        (let [id (Integer/parseInt id-str)
+              item (datastore/get-item db {:id id})]
+          ;; get-item passes its query result through post-process, which builds a
+          ;; map out of nil rather than staying nil -- so a missing item arrives
+          ;; here as a truthy shell and it is :id that says whether there is an
+          ;; item at all.
+          (if-not (:id item)
+            (json-response 404 {:error "Item not found"})
+            (let [data? (= "true" data)
+                  wanted? (if (seq requested) (set requested) (constantly true))
+                  resolved (for [d (declared-images (:data item))
+                                 :when (wanted? (:kind d))]
+                             (let [f (image-file folders d)]
+                               [d (when (and f (.isFile f)) f)]))]
+              (json-response
+                (cond-> {:item-id id
+                         :images (vec (for [[d f] resolved :when f]
+                                        (image-entry d f data?)))
+                         :missing (vec (for [[d f] resolved :when (nil? f)]
+                                         {:kind (:kind d) :filename (:filename d)}))}
+                  (contains? (:data item) :lowres?)
+                    (assoc :lowres? (:lowres? (:data item))))))))))
+    (catch NumberFormatException _ (json-response 400 {:error "Invalid item ID"}))
+    (catch Exception e
+      (log/error e "REST API: item-images failed")
+      (json-response 500 {:error (.getMessage e)}))))
+
 (defn status
   "GET /api/status — this instance's role: {\"read-only-replica\": true|false}.
   True when it booted as a read-only replica (prod mode, no primary.nosync

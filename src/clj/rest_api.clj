@@ -44,6 +44,11 @@
            (GET "/items/:id/with-related" [id search_mode]
                 (queries/get-item-with-related (:db config/config) id
                                                {:search-mode search_mode}))
+           (GET "/items/:id/images" [id data kinds]
+                (queries/item-images (:db config/config)
+                                     (:folders config/config)
+                                     id
+                                     {:data data :kinds kinds}))
            (GET "/items/:id" [id] (queries/get-item (:db config/config) id))
            (PUT "/items/:id" [id :as req]
                 (mutations/update-item-description (:db config/config) id req))
