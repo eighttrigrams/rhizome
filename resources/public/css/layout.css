@@ -96,6 +96,29 @@ html, body {
     width: 720px;
 }
 
+/* The box the one-line editor draws (see ui.codemirror) sits in here, and the
+   <input> is laid over it, transparent -- so the rule above still describes the
+   element the cascade, getElementById and Playwright all see. The width has to be
+   said twice for that reason: .active-search-input-container is absolutely
+   positioned with no width of its own and takes the widest thing inside it, and
+   what is in the flow now is this div. */
+#search-input-host {
+    position: relative;
+    width: 720px;
+}
+
+/* Vector mode's ring, on the box that can be seen. The <input> keeps the class as
+   well -- it is what the e2e suite asserts on -- but an outline on something with
+   opacity 0 draws nothing. */
+#search-input-host.vector-search-mode .cm-editor {
+    outline: 2px solid #2ecc71;
+    outline-offset: -2px;
+}
+
+#search-input-host.vector-search-mode.blue .cm-editor {
+    outline-color: #3498db;
+}
+
 #search-input.vector-search-mode {
     outline: 2px solid #2ecc71;
     outline-offset: -2px;

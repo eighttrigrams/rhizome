@@ -71,14 +71,37 @@ Apply this on **every** keypress, not just Enter — `c` and `i` both kick off
 state changes whose responses pass through `reset-state!` and can clobber
 later state if the test moves on too soon.
 
-### 3. `cljs-text-editor` runs its own keydown listener first
+### 3. The single-line fields are CodeMirror, and the `<input>` is a mirror
 
-The search input is wrapped by `net.eighttrigrams.cljs-text-editor`, which
-attaches a `keydown` listener via `addEventListener` directly on the input.
-That fires at target phase, *before* React's root-level bubble delegate. For
-unbound keys (plain Enter, no modifiers) the editor's handler is a no-op
-(`:dont-prevent-default true`) and React's handler runs after — but if you
-ever see a key fire twice or get swallowed, this is the order to remember.
+`#search-input` and the edit modal's seven `input.line` fields each carry a
+one-line editor from `@eighttrigrams/kw-codemirror` (see `ui.codemirror`). The
+`<input>` you select is still there and still the thing to select — it keeps its
+id, and every change to the editor's document is written into its `.value` — but
+it is transparent, `pointer-events: none`, and out of the tab order. The visible
+box is the `.cm-editor` beside it, inside `#search-input-host` or `.line-host`.
+
+What that means for a step:
+
+- `fill()` and `toHaveValue()` keep working, and are still the way to do this.
+  `fill()` sets `.value` and fires `input`; a listener reads that back into the
+  document, so the two agree afterwards. Note that Playwright counts `opacity: 0`
+  as visible, so a *broken* mirror would not fail here — it would fill a field
+  the editor never reads. If a value assertion disagrees with the screen, that is
+  the first thing to suspect.
+- `press()` keeps working on the `<input>`. The app's key handler moved to the
+  wrapper (`#search-input-host`, and the modal's own div), and React dispatches an
+  event from either child there — the `<input>` because it is a React element, the
+  editor's contenteditable because React walks up to the nearest managed ancestor.
+- The scheme's own chords never arrive. `install()` puts a capture-phase listener
+  on the editor and calls `stopPropagation` on everything in its table, so
+  `Alt+KeyJ`, `Control+KeyL`, `Meta+KeyI` and the rest are the editor's and not
+  the app's. `Alt+KeyA` and `Alt+KeyC` are deliberately taken back out of that
+  table for the search box, because the app owns them there. `Enter`, `Escape`,
+  `Tab`, `Alt+Digit9` and the arrows are in no table at all and always get
+  through.
+- To read the text as the editor holds it, the view is on the `<input>` as
+  `__codemirror` — the same handle `#description-editor` carries, and the same one
+  `provenance.ts` and `relation-description.ts` already use.
 
 ### 4. `fetch-and-reset!` is a state clobber — drain it before the next action
 

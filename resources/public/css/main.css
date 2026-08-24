@@ -136,6 +136,17 @@ ul.cards {
     outline: none;
 }
 
+/* Each .line field wears a one-line editor (see ui.codemirror), which draws in the
+   div that wraps it while the <input> is laid over that, transparent. Only the two
+   properties that place the box in the flow have to move here -- the input can no
+   longer contribute either, being out of the flow. Everything *inside* the box
+   (height, padding, border, colours, font) is still read off the input's computed
+   style, so the rule above stays the single answer to what these fields look like. */
+#modal-component .line-host {
+    width: calc(100% - 20px);
+    margin-bottom: 10px;
+}
+
 /* One relation target in the edit modal. The line carries four controls now
    (badge, part-of, sibling index, annotation), so it is laid out over three
    rows with a rule between relations rather than run together on one. */

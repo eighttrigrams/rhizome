@@ -1,5 +1,6 @@
 (ns ui.main.input.key-handler
   (:require [ui.actions :as actions]
+            [ui.codemirror :as codemirror]
             [ui.key-handler.common :refer [handle-keys*] :as common]))
 
 ;; TODO shouldn't be part of key-handler
@@ -35,7 +36,7 @@
                  (= :contexts active-search)
                  (or shift-pressed? (= 0 (count (:contexts @*state)))))
               (do (actions/new-context! *state {:title (.-value (get-title-el))})
-                  (set! (.-value (get-title-el)) ""))
+                  (codemirror/set-field-value! (get-title-el) ""))
             (and (= :items active-search)
                  (not (:enter-pressed? @*state))
                  selected-item
@@ -44,7 +45,7 @@
                  (item-creation-permitted? @*state))
               (do (swap! *state assoc :enter-pressed? true)
                   (actions/new-item! *state {:title (.-value (get-title-el))})
-                  (set! (.-value (get-title-el)) ""))
+                  (codemirror/set-field-value! (get-title-el) ""))
             #_(swap! *state dissoc nil)
             (= :contexts active-search)
               (actions/select-first-context! *state shift-pressed? alt-pressed?)
@@ -99,7 +100,7 @@
         (when (and (= "KeyA" code) selected-item alt-pressed?)
           (.preventDefault e)
           (when-not in-notes-mode?
-            (set! (.-value (get-title-el)) "")
+            (codemirror/set-field-value! (get-title-el) "")
             (actions/link-item-to-selected-item! *state)))
         (when (and (= "KeyQ" code) alt-pressed?)
           (swap! *state assoc :active-search :contexts)

@@ -1,8 +1,14 @@
 (ns ui.main.lhs.context-detail
   (:require [ui.actions :as actions]
+            [ui.codemirror :as codemirror]
             ["react-markdown$default" :as ReactMarkdown]))
 
-(defn re-focus [] (when-let [el (.getElementById js/document "search-input")] (.focus el)))
+;; The editor in front of the box, when there is one -- .focus() on the element
+;; itself would land on the transparent mirror and leave the caret nowhere the
+;; user can see. See ui.codemirror/focus-field!.
+(defn re-focus
+  []
+  (codemirror/focus-field! (.getElementById js/document "search-input")))
 
 (defn- select-secondary-context
   [*state id]

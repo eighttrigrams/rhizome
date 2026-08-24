@@ -1,6 +1,6 @@
 (ns ui.modals.item-edit
   (:require [reagent.core :as r]
-            [net.eighttrigrams.cljs-text-editor.editor :as editor]
+            [ui.codemirror :as codemirror]
             [ui.modals.link-context-item :as link-context-item]
             [clojure.string :as str]
             [utils :as utils]
@@ -68,38 +68,63 @@
    [:button {:on-click (fn [_] (swap! *resource-links conj {:id (random-uuid) :k "" :v ""}))}
     "+ Add Resource Link"]])
 
+;; ---------------------------------------------------------------------------
+;; The one-line editors
+;;
+;; The keyboard scheme reached three of these fields before -- title, short title
+;; and tags -- through the hand-written editor that used to be vendored under
+;; src/cljs/net/eighttrigrams. It is the library's input mode now (see
+;; ui.codemirror), and it is on all seven, because there was never a reason for
+;; the other four to be the odd ones out: they are the same `input.line` in the
+;; same column, read back the same way at save time.
+
+(defn- line-fields
+  []
+  [(get-title-el) (get-short-title-el) (get-human-readable-id-el) (get-annotation-el)
+   (get-sort-idx-el) (get-tags-el) (get-highlighted-secondary-contexts-el)])
+
+(defn- editor-on!
+  "A one-line editor in front of field `el`, drawn in the div that wraps it.
+
+   The wrapper is already there in the markup -- every one of these fields sits in
+   its own [:div] -- and carries .line-host, whose CSS is the two properties the
+   transparent input can no longer contribute to the flow. See main.css."
+  [el]
+  (codemirror/create-input-editor (.-parentElement el) el {}))
+
+(def ^:private *editors (atom []))
+
 (defn basic-elements-component
   [item]
   (r/create-class
-    {:component-did-mount #(do (editor/create (get-title-el) {:input-field-mode? true})
-                               (editor/create (get-short-title-el) {:input-field-mode? true})
-                               (editor/create (get-tags-el) {:input-field-mode? true}))
+    {:component-did-mount #(reset! *editors (mapv editor-on! (line-fields)))
+     :component-will-unmount #(do (doseq [view @*editors] (.destroy view)) (reset! *editors []))
      :reagent-render ;
        (fn [_item]
          [:<> [:div {:style {:margin-bottom "10px"}} "id: " (:id item)]
-          [:div
+          [:div.line-host
            [:input#item-title.line
             {:autoComplete :off :defaultValue (:title item) :placeholder "Title"}]]
-          [:div
+          [:div.line-host
            [:input#item-short-title.line
             {:autoComplete :off :defaultValue (:short_title item) :placeholder "Short title"}]]
-          [:div
+          [:div.line-host
            [:input#item-human-readable-id.line
             {:autoComplete :off
              :defaultValue (:human_readable_id item)
              :placeholder "Human-readable id (must contain a non-digit)"}]]
-          [:div
+          [:div.line-host
            [:input#item-annotation.line
             {:autoComplete :off :defaultValue (:annotation item) :placeholder "Annotation"}]]
-          [:div
+          [:div.line-host
            [:input#item-sort-idx.line
             {:autoComplete :off
              :defaultValue (utils/sort-idx->display (:sort_idx item))
              :placeholder "Sort index (number or roman numeral)"}]]
-          [:div
+          [:div.line-host
            [:input#item-tags.line
             {:autoComplete :off :defaultValue (:tags item) :placeholder "Tags"}]]
-          [:div
+          [:div.line-host
            [:input#item-highlighted-secondary-contexts.line
             {:autoComplete :off
              :defaultValue (str/join " " (:highlighted-secondary-contexts (:data item)))
@@ -128,7 +153,7 @@
                                  (map (fn [{:keys [id title]}] [id title]) (:related_items item))))
     (reset! *resource-links (mapv (fn [[k v]] {:id (random-uuid) :k (name k) :v v})
                               (or (get-in item [:data :resource-links]) {})))
-    (r/create-class {:component-did-mount #(.focus (get-title-el))
+    (r/create-class {:component-did-mount #(codemirror/focus-field! (get-title-el))
                      :reagent-render ;
                        (fn [_item notice]
                          [:<>
