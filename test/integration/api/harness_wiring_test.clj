@@ -16,14 +16,37 @@
             [next.jdbc :as jdbc]))
 
 (deftest what-the-harness-hands-the-app-is-a-db-server-over-http
-  (is (db/remote? db-harness/remote)
-      "a map naming a db-server, not a DataSource")
-  (testing "and it is genuinely used, not merely configured"
-    ;; Point the harness at nothing and a dispatched call cannot reach a
-    ;; database. A regression that quietly handed the app a local DataSource
-    ;; would sail past this, and past nothing else in the suite.
-    (with-redefs [db-harness/remote {:db-server/url "http://127.0.0.1:9"}]
-      (is (thrown? Exception (harness/call! :insert-context nil {:title "Nowhere"}))))))
+  (testing "the /ui half: what call! injects as the dispatcher's server-args"
+    (is (db/remote? db-harness/remote)
+        "a map naming a db-server, not a DataSource"))
+  (testing "the REST half: what the handlers get as config/config"
+    ;; The half this test used to miss entirely. Every REST suite builds its
+    ;; handler config out of `db-harness/app-config`, so there is one thing to
+    ;; assert about and reverting the switch cannot hide in one of seven files.
+    (is (db/remote? (:db db-harness/app-config)))
+    (is (db/remote? (:db (db-harness/app-config-with {:folders {} :dev? true})))
+        "and adding to it does not lose it")))
+
+(deftest the-remote-handle-is-used-and-not-merely-configured
+  ;; Both directions in one test, because either alone proves little. That the
+  ;; call fails when the db-server is not there says the handle is really being
+  ;; dialled; that the same call succeeds against the real one says the failure
+  ;; was about the wire and not about the command being wrong. `thrown?` on its
+  ;; own would be satisfied by a typo in the command name.
+  (with-fresh-db "insert-context, against nothing and against the db-server"
+    (testing "pointed at a port with nothing behind it"
+      (let [thrown (with-redefs [db-harness/remote {:db-server/url "http://127.0.0.1:9"}]
+                     (try (harness/call! :insert-context nil {:title "Nowhere"})
+                          nil
+                          (catch Throwable t t)))]
+        (is (some? thrown))
+        (is (re-find #"(?i)connection refused" (str (.getMessage thrown)))
+            (str "the failure has to be the wire, not the command; got: "
+                 (.getMessage thrown)))))
+    (testing "and the very same call against the db-server that is there"
+      (let [ctx (:selected-item (harness/call! :insert-context nil {:title "Somewhere"}))]
+        (is (= "Somewhere" (:title ctx))
+            ":insert-context is a live command, so the refusal above meant what it said")))))
 
 (deftest two-names-one-database
   ;; The whole arrangement in one test: a write that entered through the app and

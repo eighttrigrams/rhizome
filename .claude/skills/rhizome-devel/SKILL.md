@@ -74,9 +74,17 @@ Run a single Clojure test (or namespace) as a fallback by invoking the
 test-runner directly:
 
 ```bash
-clj -X:test :vars '[rest-api.queries-test/get-related-items-vector-test]'
-clj -X:test :nses '[et.vp.ds.search-test]'
+clj -M:test -v rest-api.queries-test/get-related-items-vector-test
+clj -M:test -n et.vp.ds.search-test
 ```
+
+Use the `-M` forms, not `clj -X:test :vars/:nses`. The integration suites
+boot a db-server in-process (`test/integration/db_harness.clj`), and its
+jetty and its idle-transaction sweeper both run non-daemon threads, so a JVM
+that reaches the end of a run does not exit on its own. `-M:test` goes
+through the runner's `-main`, which calls `System/exit` and takes the server
+down with it; `-X` calls the function and returns, so the results print and
+then the process hangs.
 
 Run a single Playwright scenario by name:
 

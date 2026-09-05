@@ -12,8 +12,10 @@
    differ only in which side of a wire they are on, and compares."
   (:require [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
+            [config :as config]
             [datastore.connection :as connection]
             [db :as db]
+            [db-harness]
             [db-server])
   (:import [java.sql SQLException]))
 
@@ -339,7 +341,12 @@
   ;; the `file::memory:` prefix, and without one SQLite drops the database the
   ;; moment the last borrowed connection closes -- which here would be between
   ;; the CREATE and the SELECT.
-  (let [server (db-server/start! {:port 0 :db-path "file::memory:?cache=shared"})
+  ;;
+  ;; Which is why it is read off the suite's own datasource rather than written
+  ;; down here. A test about not letting the two names drift onto two databases
+  ;; had no business restating the name of the one.
+  (let [server (db-server/start!
+                 {:port 0 :db-path (db-harness/dbname-of (:db config/config))})
         remote {:db-server/url (:url server)}]
     (try
       (db/execute-one! remote ["CREATE TABLE IF NOT EXISTS probe (n INTEGER)"])

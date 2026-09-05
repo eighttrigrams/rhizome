@@ -55,7 +55,7 @@
 
 (defn- GET*
   [folders path]
-  (with-redefs [config/config {:db db-harness/remote :folders folders}]
+  (with-redefs [config/config (db-harness/app-config-with {:folders folders})]
     (@handler (mock/request :get path))))
 
 (defn- body-json [resp] (json/parse-string (:body resp) true))

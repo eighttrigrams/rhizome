@@ -33,14 +33,14 @@
 
 (defn- POST*
   [path body]
-  (with-redefs [config/config {:db db-harness/remote}]
+  (with-redefs [config/config db-harness/app-config]
     (@handler (-> (mock/request :post path)
                   (mock/content-type "application/json")
                   (mock/body (json/generate-string (with-default-reason body)))))))
 
 (defn- PUT*
   [path body]
-  (with-redefs [config/config {:db db-harness/remote}]
+  (with-redefs [config/config db-harness/app-config]
     (@handler (-> (mock/request :put path)
                   (mock/content-type "application/json")
                   (mock/body (json/generate-string (with-default-reason body)))))))
@@ -48,7 +48,7 @@
 (defn- POST-raw*
   "POST without auto-injecting :reason — for testing the missing-reason path."
   [path body]
-  (with-redefs [config/config {:db db-harness/remote}]
+  (with-redefs [config/config db-harness/app-config]
     (@handler (-> (mock/request :post path)
                   (mock/content-type "application/json")
                   (mock/body (json/generate-string body))))))
@@ -304,7 +304,7 @@
 
 (defn- GET*
   [path]
-  (with-redefs [config/config {:db db-harness/remote}]
+  (with-redefs [config/config db-harness/app-config]
     (@handler (mock/request :get path))))
 
 (defn- ids-with-status

@@ -43,11 +43,11 @@
 
 (defn- GET*
   [path]
-  ;; The handle the REST handlers are given is the remote one: everything they
-  ;; do to the database leaves this process. What this test does to the database
-  ;; on its own account -- `reset-db`, the seeding above, every assertion below
-  ;; -- stays on `db`, the DataSource. See `db-harness`.
-  (with-redefs [config/config {:db db-harness/remote}]
+  ;; The handlers run on `db-harness/app-config`, whose `:db` is the remote
+  ;; handle: everything they do to the database leaves this process. What this
+  ;; test does on its own account -- `reset-db`, the seeding above, every
+  ;; assertion below -- stays on `db`, the DataSource. See `db-harness`.
+  (with-redefs [config/config db-harness/app-config]
     (@handler (mock/request :get path))))
 
 (defn- body-json [resp] (json/parse-string (:body resp) true))

@@ -16,11 +16,17 @@
 
 (def ^:private handler (delay (wrap-params (rest-api/rest-routes))))
 
-;; prod mode (no :dev?) plus the role the marker check produced. The handle is
-;; the remote one, so what the primary's writes actually do goes over the wire
-;; -- the replica's are refused before they reach a handle of either kind.
-(def ^:private replica-config {:db db-harness/remote :read-only-replica? true})
-(def ^:private primary-config {:db db-harness/remote :read-only-replica? false})
+;; prod mode (no :dev?) plus the role the marker check produced.
+;;
+;; These two, and the dev-mode config built further down, all come from
+;; `db-harness/app-config`: every handler this file stands up is given the
+;; remote handle, so the writes that are supposed to land go over the wire, and
+;; the ones that are supposed to be refused are refused before they reach a
+;; handle of either kind. Said here rather than implied, because a comment over
+;; two of three configs once read as speaking for all of them, and the third
+;; was quietly writing to the local DataSource.
+(def ^:private replica-config (db-harness/app-config-with {:read-only-replica? true}))
+(def ^:private primary-config (db-harness/app-config-with {:read-only-replica? false}))
 
 (defn- request*
   [cfg method path body]
@@ -103,6 +109,7 @@
 (deftest dev-mode-is-unaffected-test
   (test-with-fresh-db "dev needs no marker: no guard, and writes pass as before"
     (is (false? (:read-only-replica? config/config)))
-    (let [resp (request* {:db db :dev? true} :post "/api/contexts" {:title "DevWrite" :reason "test"})]
+    (let [resp (request* (db-harness/app-config-with {:dev? true})
+                         :post "/api/contexts" {:title "DevWrite" :reason "test"})]
       (is (= 201 (:status resp)))
       (is (= "DevWrite" (:title (ds/get-item db {:id (:id (body-json resp))})))))))

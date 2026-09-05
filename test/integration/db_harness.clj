@@ -25,10 +25,14 @@
             [db-server])
   (:import [org.sqlite SQLiteDataSource]))
 
-(defn- dbname-of
+(defn dbname-of
   "The SQLite dbname behind a datasource. `datastore.connection` may hand back
    its vec-loading wrapper rather than the SQLiteDataSource itself, and that
-   wrapper implements `unwrap` for exactly this kind of question."
+   wrapper implements `unwrap` for exactly this kind of question.
+
+   Public because anything else that wants to open the database the suite is
+   running on should ask it the same way rather than writing the name down a
+   second time."
   [ds]
   (let [inner (if (instance? SQLiteDataSource ds)
                 ds
@@ -49,3 +53,24 @@
 (def remote
   "The handle the app is given. Not the one the tests use on themselves."
   {:db-server/url (:url server)})
+
+(def app-config
+  "The `config/config` the REST handlers are given while they are under test.
+
+   One definition, and every suite that stands a handler up uses it, because
+   seven separate `{:db …}` literals were seven places a switch could be
+   reverted without anything noticing -- which is exactly what happened: the
+   REST half was quietly running local while `api.harness-wiring-test`, which
+   only ever looked at the /ui half, went on passing. A guard that cannot reach
+   the thing it guards is not a guard. Now there is one thing to reach."
+  {:db remote})
+
+(defn app-config-with
+  "`app-config` and whatever else a suite's handlers need in their config --
+   `:folders` for the image routes, the role flags for the replica ones.
+
+   A function rather than seven hand-built maps, for the same reason: the
+   handle comes from one place, and a caller adds to it rather than restating
+   it."
+  [m]
+  (merge app-config m))
