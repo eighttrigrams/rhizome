@@ -8,12 +8,25 @@ description: How to start, stop, and inspect the Rhizome dev environment (JVM ba
 ## Dev (interactive)
 
 ```bash
-make start    # boots JVM (foreground) + shadow-cljs watch; ports come from
-              # exported $PORT/$SHADOW_PORT if set (via direnv loading
+make start    # boots the db-server (background), then JVM (foreground) +
+              # shadow-cljs watch; ports come from exported
+              # $PORT/$SHADOW_PORT/$DB_PORT if set (via direnv loading
               # .envrc, manual export, etc.); otherwise from config.edn /
-              # shadow-cljs.edn (defaults 3140 / 9804)
-make stop     # kills both (only what this project bound)
+              # shadow-cljs.edn (defaults 3140 / 9804 / 3141)
+make start-db # the db-server alone, in the foreground
+make stop     # kills all of them (only what this project bound)
 ```
+
+**Two processes since the app/db split.** The db-server owns the SQLite
+file and speaks statements; the app-server holds no datasource at all and
+reaches it over loopback HTTP at `http://127.0.0.1:$DB_PORT`, derived from
+`:db-server :port` in config.edn (an explicit top-level `:db-url` overrides
+it). `make start` starts the inner one first and waits for its `/health`;
+if one is already answering there it connects to that instead of starting a
+second. An app-server started with nothing behind it refuses to boot and
+says so — it does not come up and fail at the first statement.
+
+The db-server also applies the schema, which the app-server no longer does.
 
 `make start` runs the JVM in the foreground, with shadow-cljs watch
 backgrounded into the same TTY — both stdouts interleave. Ctrl-C kills the
@@ -62,9 +75,11 @@ make e2e NO_BUILD=1                       # skip the shadow-cljs release
 make e2e NO_BUILD=1 T="creates a context" # fast loop on a single scenario
 ```
 
-`make test` reads `:semsearch :vec-path` from `config.edn` and adds
+`make test` reads `:db-server :vec-path` from `config.edn` and adds
 `--exclude :vector` if the dylib it points at isn't on disk. To force-skip
-even when vec is installed, remove `:semsearch` from `config.edn`.
+even when vec is installed, remove `:vec-path` from the `:db-server` block.
+(The key sat under `:semsearch` until the app/db split; `:semsearch` keeps
+`:ollama-url` and `:ollama-model`, which are the app-side embedder's.)
 
 `make e2e` and `make start` are mutually exclusive — whichever starts
 first claims `.dev-server.lock` (with mode, env, headed). The other
@@ -100,5 +115,6 @@ up — same mutual-exclusion rule as `make start`.
 
 | Port | Owner |
 |---|---|
-| 3140 | dev JVM (`make start`) |
+| 3140 | dev JVM, the app-server (`make start`) |
+| 3141 | db-server (`make start`, or `make start-db` alone) — loopback only, never published out of a container |
 | 9804 | shadow-cljs primary (REPL/HMR/Inspect) |
