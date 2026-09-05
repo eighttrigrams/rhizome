@@ -1,6 +1,6 @@
 (ns db
   "The seam between the app and the database: every statement the app runs
-   goes through these four functions.
+   goes through here.
 
    Today it is a passthrough. A handle is a `javax.sql.DataSource` (or, inside
    a transaction, the `java.sql.Connection` that transaction is holding), and

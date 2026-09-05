@@ -5,8 +5,9 @@
             ;; and it is the lint-as next.jdbc gives its own on-connection,
             ;; which has this shape. It stays now that the macro validates its
             ;; own binding: with-open is strict about the binding vector too,
-            ;; so kondo flags at edit time the [sym handle opts] form that
-            ;; with-transaction refuses at macroexpansion.
+            ;; so kondo should flag at edit time the [sym handle opts] form
+            ;; that with-transaction refuses at macroexpansion. Should: none of
+            ;; this has been run -- clj-kondo is not installed in the box.
             db/with-transaction clojure.core/with-open}
  :linters {:unresolved-symbol {:exclude [(server http-server)]}
            :unused-private-var {:exclude [server/http-server]}}

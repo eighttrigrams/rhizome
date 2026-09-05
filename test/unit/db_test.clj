@@ -58,8 +58,19 @@
       (testing "execute-one! refuses it too, and not only execute!"
         (is (thrown? clojure.lang.ExceptionInfo
                      (db/execute-one! handle ["SELECT 1"] {:concurrency :updatable}))))
-      (testing ":return-keys is on the list, so it goes through"
-        (is (= [] (db/execute! handle ["SELECT n FROM t"] {:return-keys true})))))))
+      (testing ":return-keys is on the list, and asking for it changes the answer"
+        ;; Not merely "it does not throw": that would pass just as well if the
+        ;; option were dropped on the floor, which is the bug being guarded
+        ;; against. An INSERT answers with next.jdbc's update count normally and
+        ;; with the generated key when the keys were asked for, so the two
+        ;; results have to differ, and the second has to be the new rowid.
+        (let [plain (db/execute-one! handle ["INSERT INTO t (n) VALUES (1)"])
+              keyed (db/execute-one! handle ["INSERT INTO t (n) VALUES (2)"]
+                                     {:return-keys true})]
+          (is (= #:next.jdbc{:update-count 1} plain))
+          (is (not= plain keyed) "dropping the option silently would make these equal")
+          (is (= [2] (vals keyed))
+              "the generated rowid, which is what asking for the keys asks for"))))))
 
 (deftest the-builder-is-looked-up-by-name-because-a-name-is-what-travels
   (with-probe-db
@@ -139,8 +150,18 @@
           "and because it threw instead of committing, the outer one rolled back"))))
 
 (deftest the-prohibition-is-scoped-to-transact-and-not-set-globally
-  (is (= :allow jdbc-tx/*nested-tx*)
-      "next.jdbc's own default is left alone everywhere outside a db transaction"))
+  ;; Both halves, and neither of them naming next.jdbc's default: what this has
+  ;; to pin is that `transact` binds rather than sets, not what the value it
+  ;; leaves alone happens to be today.
+  (let [outside-before jdbc-tx/*nested-tx*
+        inside (atom ::never-ran)]
+    (with-probe-db
+      (fn [handle]
+        (db/with-transaction [_tx handle]
+          (reset! inside jdbc-tx/*nested-tx*))))
+    (is (= :prohibit @inside) "inside a db transaction, nesting is prohibited")
+    (is (= outside-before jdbc-tx/*nested-tx*)
+        "and outside it, whatever next.jdbc's default is, transact left it alone")))
 
 ;; -- and switching it on changed nothing -----------------------------------
 
@@ -171,6 +192,11 @@
                                                           :is-part-of? true
                                                           :part-of-sort-idx 1}}
                                              false)
+      (is (= {:is-part-of? true :part-of-sort-idx 1}
+             (-> (ds/get-item handle {:id (:id chapter)})
+                 (get-in [:data :contexts (:id book)])
+                 (select-keys [:is-part-of? :part-of-sort-idx])))
+          "the containers save, whose transaction covers the rows and the mirror together")
       (relations/link-item-to-another-item! handle
                                             (ds/get-item handle {:id (:id chapter)})
                                             shelf
