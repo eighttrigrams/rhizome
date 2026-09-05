@@ -86,8 +86,40 @@ token names a database connection that is held open for you, so:
 When the db-server was booted read-only, `/health` says `:read-only? true` and
 every write fails at the driver with `SQLITE_READONLY`. The ban is structural:
 the file is opened read-only, so there is no request that can get around it.
+The schema is left exactly as it arrived, since applying it would be a write.
 
-It is told which to be, at boot, by whoever started it. Deciding that from the
-`primary.nosync` marker in the start directory — the way the app-server decides
-its own role today — is not wired up yet; nothing in this process reads that
-marker.
+**It decides which to be for itself, from the directory it was started in.**
+Prod mode — no `:dev? true` in the config.edn it read — and no `primary.nosync`
+marker next to that file means read-only. That is the same rule, off the same
+marker, that the app-server in front of it reaches independently, and the two
+share the code that states it rather than each carrying a copy. Promoting a
+replica means placing the marker and restarting **both** processes; neither
+re-reads it while running.
+
+A caller that boots one in-process — the test suites do — passes `:read-only?`
+explicitly instead, and no marker is consulted.
+
+## Starting one
+
+```bash
+clj -M:dev -m db-server                       # from a checkout
+java -cp server.jar clojure.main -m db-server # from the built jar
+```
+
+Both read `./config.edn` in the directory they are launched from, and take the
+whole of their configuration from its `:db-server` section:
+
+```clojure
+:db-server {:port     #long #or [#env DB_PORT 3141]
+            :db-path  #or [#env DB_PATH "./rhizome.db"]
+            :vec-path "./.sqlite-vec/vec0"}
+```
+
+That is the only key read as configuration, which is why the same reader serves
+both arrangements: the config.edn the app-server also reads, and a standalone
+file holding nothing but that section. The one thing read outside it is the
+top-level `:dev?`, because the primary/replica rule above needs it and both
+processes have to reach the same verdict.
+
+Wait for `GET /health` before starting anything in front of it. `make start`
+does; so does `scripts/e2e.sh`.

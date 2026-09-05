@@ -1,0 +1,84 @@
+(ns db-server-config-test
+  "`db-server/config-opts`: the one place the inner server reads a file.
+
+   What it has to get right is narrow and load-bearing. It reads the
+   `:db-server` section and nothing else of its own -- which is what makes the
+   shared config.edn and a standalone `{:db-server {…}}` the same file format,
+   read by the same reader -- plus the top-level `:dev?`, because the
+   primary/replica rule needs it and the two processes have to reach the same
+   verdict about the same directory."
+  (:require [clojure.test :refer [deftest is testing]]
+            [db-server]
+            [role :as role])
+  (:import [java.io File]))
+
+(defn- config-file
+  "A config.edn holding `content`, somewhere a test can point a reader at."
+  ^File [content]
+  (let [f (File/createTempFile "config" ".edn")]
+    (.deleteOnExit f)
+    (spit f content)
+    f))
+
+(defn- opts-for [content]
+  (db-server/config-opts (.getPath (config-file content))))
+
+(deftest reads-the-section-and-nothing-else-of-its-own-test
+  (testing "the shared file: the app's keys are there and none of them arrives"
+    (let [opts (opts-for (str "{:port 3140 :dev? true"
+                              " :semsearch {:ollama-url \"http://127.0.0.1:11434\"}"
+                              " :folders {:images \"./files/x\"}"
+                              " :db-server {:port 3141 :db-path \"./rhizome.db\""
+                              "             :vec-path \"./.sqlite-vec/vec0\"}}"))]
+      (is (= {:port 3141 :db-path "./rhizome.db" :vec-path "./.sqlite-vec/vec0"
+              :read-only? false}
+             opts)
+          "the app's :port is 3140 and the db-server's is 3141: it took its own")))
+  (testing "the standalone file: same reader, nothing else required"
+    (is (= {:port 3008 :db-path "/db/rhizome.db.nosync" :vec-path nil :read-only? true}
+           (opts-for "{:db-server {:port 3008 :db-path \"/db/rhizome.db.nosync\"}}"))
+        "no :dev? in the file means prod, and prod with no marker is read-only")))
+
+(deftest the-role-comes-from-the-marker-and-the-mode-test
+  ;; The same rule the app-server reaches, from the same directory -- `role` owns
+  ;; it precisely so the two cannot drift.
+  (testing "prod without the marker is read-only: the structural ban"
+    (with-redefs [role/primary-marker-present? (constantly false)]
+      (is (true? (:read-only? (opts-for "{:db-server {:db-path \"./x.db\"}}"))))))
+  (testing "prod with the marker is the primary"
+    (with-redefs [role/primary-marker-present? (constantly true)]
+      (is (false? (:read-only? (opts-for "{:db-server {:db-path \"./x.db\"}}"))))))
+  (testing "dev needs no marker, which is why :dev? is read at all"
+    (with-redefs [role/primary-marker-present? (constantly false)]
+      (is (false? (:read-only? (opts-for "{:dev? true :db-server {:db-path \"./x.db\"}}")))))))
+
+(deftest the-port-defaults-to-the-one-the-scripts-fall-back-to-test
+  (is (= 3141 (:port (opts-for "{:db-server {:db-path \"./x.db\"}}"))))
+  (is (= db-server/default-port 3141)
+      "scripts/detect-ports.sh falls back to the same number, on purpose"))
+
+(deftest moved-keys-are-refused-by-name-test
+  ;; Both are silent failures if merely ignored: a top-level :db-path leaves this
+  ;; server pointed at nothing, and a :vec-path still under :semsearch turns the
+  ;; vec extension off with nothing to see anywhere.
+  (testing "a top-level :db-path from before the split"
+    (let [t (try (opts-for "{:db-path \"./rhizome.db\" :db-server {:db-path \"./x.db\"}}")
+                 nil (catch Throwable t t))]
+      (is (some? t))
+      (is (re-find #":db-path moved into the :db-server section" (.getMessage t)))))
+  (testing ":vec-path still under :semsearch"
+    (let [t (try (opts-for (str "{:semsearch {:vec-path \"./v/vec0\"}"
+                                " :db-server {:db-path \"./x.db\"}}"))
+                 nil (catch Throwable t t))]
+      (is (some? t))
+      (is (re-find #":vec-path moved from :semsearch" (.getMessage t)))))
+  (testing "and :semsearch keeping only the embedder's keys is fine"
+    (is (map? (opts-for (str "{:semsearch {:ollama-url \"u\" :ollama-model \"m\"}"
+                             " :db-server {:db-path \"./x.db\"}}"))))))
+
+(deftest a-file-with-no-section-is-refused-test
+  (let [t (try (opts-for "{:port 3140 :dev? true}") nil (catch Throwable t t))]
+    (is (some? t))
+    (is (re-find #"no :db-server section" (.getMessage t)))
+    (is (re-find #"make onboard" (.getMessage t))
+        "the message says how to get one rather than only that there is none")))

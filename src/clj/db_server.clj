@@ -16,12 +16,14 @@
    -- those two are read by start scripts and by prober, and neither should
    have to speak the statement protocol to ask whether the database is up.
 
-   Boot with `start!` and an opts map shaped like the plan's `:db-server`
-   config section; `stop!` takes what it returns. Reading that section out of
-   `config.edn`, and the `-main` that would do it, are step 4: nothing here
-   reads configuration, which is what lets a test boot as many of these as it
-   likes on ephemeral ports."
-  (:require [cambium.core :as log]
+   Boot with `start!` and an opts map shaped like the `:db-server` config
+   section; `stop!` takes what it returns. **`start!` itself still reads no
+   configuration** -- that is what lets a test boot as many of these as it
+   likes on ephemeral ports -- so the file is read by `config-opts` and the
+   `-main` below it, and nowhere else."
+  (:require log-init ;; first: sets LOGS_DIR before any logging ns initialises logback
+            [aero.core :as aero]
+            [cambium.core :as log]
             [cheshire.core :as json]
             [clojure.java.io :as io]
             [clojure.string :as str]
@@ -31,7 +33,8 @@
             [datastore.schema :as schema]
             [db :as db]
             [next.jdbc :as jdbc]
-            [ring.adapter.jetty :as jetty])
+            [ring.adapter.jetty :as jetty]
+            [role :as role])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
            [java.sql Connection SQLException]
            [java.util.concurrent Executors TimeUnit]
@@ -472,17 +475,19 @@
   "Refuse to boot on a `:vec-path` this process cannot honour.
 
    `datastore.connection` resolves the extension path once, at load, out of
-   config.edn -- it takes no argument yet, and giving it one is step 4's job
-   along with moving the key into the `:db-server` section. Until then the
-   option is accepted for the shape of the map and checked against what was
-   actually loaded, because the alternative is accepting it and silently
-   ignoring it, which is the failure this whole seam is arranged to prevent."
+   `:db-server :vec-path` in config.edn -- the same key `config-opts` reads
+   below, so a server booted from the file agrees with it by construction and
+   this check has nothing to say. What it is for is a caller that passes a
+   *different* path explicitly: the extension is loaded on every connection
+   this datasource hands out, and no option here can change that after the
+   fact. Accepting the argument and silently ignoring it is the failure this
+   whole seam is arranged to prevent, so it is refused instead."
   [vec-path]
   (when (and vec-path (not= vec-path connection/vec-extension-path))
     (throw (ex-info (str "db-server: :vec-path " (pr-str vec-path) " but datastore.connection "
-                         "loaded " (pr-str connection/vec-extension-path) ". The extension path "
-                         "is still read from config.edn at load time; moving it into the "
-                         ":db-server section is step 4.")
+                         "loaded " (pr-str connection/vec-extension-path) " from :db-server "
+                         ":vec-path in config.edn. The extension path is resolved once, at "
+                         "load; a different one here could not take effect.")
                     {:vec-path vec-path :loaded connection/vec-extension-path}))))
 
 (defn start!
@@ -583,3 +588,82 @@
     (try (close-transaction! server token false true)
          (catch Throwable t (log/error t "db-server: could not roll back on shutdown"))))
   nil)
+
+;; -- boot from config.edn ---------------------------------------------------
+
+(def ^:private config-path "./config.edn")
+
+(def default-port
+  "The port when the `:db-server` section names none. onboard.sh writes
+   `#long #or [#env DB_PORT 3141]`, so this is only reached by a hand-written
+   section; `scripts/detect-ports.sh` falls back to the same number, and it is
+   the same number on purpose."
+  3141)
+
+(defn config-opts
+  "The `:db-server` section of a `config.edn`, as `start!` takes it.
+
+   **It reads that one key, and one flag outside it.** The key is this
+   server's entire configuration -- `:port`, `:db-path`, `:vec-path` -- which
+   is what makes the two arrangements one file format: the shared config.edn
+   the app-server also reads, or a standalone one holding nothing but
+   `{:db-server {…}}`. Neither needs a reader of its own.
+
+   The flag is the top-level `:dev?`, and it is read because the primary /
+   replica rule is `(and (not dev?) (not marker))` and **both processes have to
+   reach the same verdict about the same directory** -- see `role`. A mode the
+   whole deployment is in is not this server's private configuration, which is
+   why it is not in the section; a standalone file that says nothing is prod,
+   which is the right default for a file written for a deployment.
+
+   The two keys that moved into the section are refused by name where they used
+   to live. Ignoring them would be silent: an old top-level `:db-path` would
+   leave this server pointed at nothing, and an old `:semsearch :vec-path` would
+   turn the vec extension off everywhere without a word."
+  ([] (config-opts config-path))
+  ([path]
+   (let [c       (aero/read-config path)
+         section (:db-server c)]
+     (when (:db-path c)
+       (throw (ex-info (str "db-server: :db-path moved into the :db-server section. "
+                            "Write :db-server {:db-path \"…\"} in " path ".")
+                       {:config-path path})))
+     (when (get-in c [:semsearch :vec-path])
+       (throw (ex-info (str "db-server: :vec-path moved from :semsearch into the :db-server "
+                            "section -- loading the extension is this process's business now. "
+                            ":semsearch keeps :ollama-url and :ollama-model, which are the "
+                            "app-side embedder's.")
+                       {:config-path path})))
+     (when-not (map? section)
+       (throw (ex-info (str "db-server: no :db-server section in " path
+                            ". It needs at least a :db-path; `make onboard` writes the "
+                            "whole block.")
+                       {:config-path path})))
+     {:port       (or (:port section) default-port)
+      :db-path    (:db-path section)
+      :vec-path   (:vec-path section)
+      :read-only? (role/read-only-replica? c (role/primary-marker-present?))})))
+
+(defn -main
+  "Start the db-server from the config.edn in the directory it was launched in,
+   and stay up.
+
+   There is nothing to join and no daemon flag anywhere. Jetty's thread pool is
+   not made of daemon threads, so the JVM stays alive after this returns -- and
+   so does the sweeper's executor, which is the same reason `clj -X:test` does
+   not exit once a test has booted one of these. That was measured when a
+   `:daemon? true` option was proposed and then withdrawn; see step 3's handoff.
+
+   `stop!` hangs on a shutdown hook rather than being left to the process dying,
+   so a `kill` from `scripts/stop.sh` rolls back whatever transaction was open
+   instead of taking SQLite's write lock down with it. `start!` installs no hook
+   of its own: the test harness boots servers inside a JVM that goes on running,
+   and hangs its own."
+  [& _args]
+  (let [server (start! (config-opts))]
+    (.addShutdownHook (Runtime/getRuntime)
+                      (Thread. ^Runnable (fn [] (stop! server))))
+    (log/info {:url (:url server)}
+              (str "db-server: listening on " (:url server) " -- that is the url the "
+                   "app-server derives, and nothing off this machine can reach it."))
+    nil))

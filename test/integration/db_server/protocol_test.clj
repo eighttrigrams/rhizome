@@ -462,15 +462,19 @@
 
 (deftest a-vec-path-this-process-cannot-honour-is-refused
   ;; The one option `start!` takes and does not act on. `datastore.connection`
-  ;; resolves the extension path once at load out of config.edn and takes no
-  ;; argument; moving that key into the :db-server section is step 4. Until
-  ;; then the option is checked rather than accepted-and-ignored, and this is
-  ;; the assertion that says so -- the deviation is worth nothing without it.
-  (is (thrown-with-msg? clojure.lang.ExceptionInfo #"step 4"
+  ;; resolves the extension path once, at load, out of `:db-server :vec-path`
+  ;; in config.edn -- the same key `config-opts` reads, so a server booted from
+  ;; the file agrees with it and this never fires there. What it is for is a
+  ;; caller passing a *different* path: the extension is loaded on every
+  ;; connection the datasource hands out, and no argument here could change
+  ;; that after the fact. Checked rather than accepted-and-ignored, and this is
+  ;; the assertion that says so.
+  (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                        #"could not take effect"
                         (db-server/start! {:port 0
                                            :db-path (temp-db-path)
                                            :vec-path "/nowhere/in/particular/vec0"})))
-  (testing "and the path that WAS loaded is accepted, so step 4 can pass it"
+  (testing "and the path that WAS loaded is accepted, which is what `-main` passes"
     (with-server-at (temp-db-path) {:vec-path connection/vec-extension-path}
       (fn [server] (is (= 200 (first (get-json server "/health"))))))))
 
