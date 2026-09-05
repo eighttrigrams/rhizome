@@ -247,13 +247,22 @@
   ;; moment the statement returned, and the very next gap would lose it.
   (with-table {:tx-idle-ms 400}
     (fn [server]
-      (let [a (:tx (second (post! server "/tx/begin" {})))]
-        (is (= 200 (first (post! server "/execute-one"
-                                 {:stmt [(str "WITH RECURSIVE c(x) AS "
-                                              "(SELECT 1 UNION ALL SELECT x+1 FROM c WHERE x < 4000000) "
-                                              "SELECT count(*) AS n FROM c")]
-                                  :tx   a})))
-            "a statement that takes longer than the window")
+      (let [a     (:tx (second (post! server "/tx/begin" {})))
+            began (System/currentTimeMillis)
+            slow  (post! server "/execute-one"
+                         {:stmt [(str "WITH RECURSIVE c(x) AS "
+                                      "(SELECT 1 UNION ALL SELECT x+1 FROM c WHERE x < 4000000) "
+                                      "SELECT count(*) AS n FROM c")]
+                          :tx   a})
+            took  (- (System/currentTimeMillis) began)]
+        (is (= 200 (first slow)))
+        ;; The premise, asserted rather than assumed. On hardware fast enough
+        ;; to run that CTE inside 400ms this test would go on passing while
+        ;; testing nothing at all -- the gap after a short statement is not the
+        ;; case it exists for. Make the count bigger if this ever fires.
+        (is (> took 400)
+            (str "the statement has to outlast the idle window to mean anything; took "
+                 took "ms"))
         (Thread/sleep 150)
         (is (= 200 (first (post! server "/execute-one"
                                  {:stmt ["INSERT INTO t (n) VALUES (1)"] :tx a})))

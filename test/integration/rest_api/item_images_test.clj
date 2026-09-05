@@ -8,6 +8,7 @@
    is redefined per request to point :folders at them, the same way queries-test
    redefines it to point :db at the test database."
   (:require [clojure.test :refer [deftest is testing]]
+            [db-harness]
             [clojure.java.io :as io]
             [cheshire.core :as json]
             [ring.mock.request :as mock]
@@ -54,7 +55,7 @@
 
 (defn- GET*
   [folders path]
-  (with-redefs [config/config {:db db :folders folders}]
+  (with-redefs [config/config {:db db-harness/remote :folders folders}]
     (@handler (mock/request :get path))))
 
 (defn- body-json [resp] (json/parse-string (:body resp) true))

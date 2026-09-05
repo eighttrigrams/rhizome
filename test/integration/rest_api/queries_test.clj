@@ -1,5 +1,6 @@
 (ns rest-api.queries-test
   (:require [clojure.test :refer [deftest is testing]]
+            [db-harness]
             [clojure.string :as str]
             [cheshire.core :as json]
             [next.jdbc :as jdbc]
@@ -42,7 +43,11 @@
 
 (defn- GET*
   [path]
-  (with-redefs [config/config {:db db}]
+  ;; The handle the REST handlers are given is the remote one: everything they
+  ;; do to the database leaves this process. What this test does to the database
+  ;; on its own account -- `reset-db`, the seeding above, every assertion below
+  ;; -- stays on `db`, the DataSource. See `db-harness`.
+  (with-redefs [config/config {:db db-harness/remote}]
     (@handler (mock/request :get path))))
 
 (defn- body-json [resp] (json/parse-string (:body resp) true))

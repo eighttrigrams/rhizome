@@ -1,5 +1,6 @@
 (ns rest-api.mutations-test
   (:require [clojure.test :refer [deftest is testing use-fixtures]]
+            [db-harness]
             [cheshire.core :as json]
             [next.jdbc :as jdbc]
             [ring.mock.request :as mock]
@@ -32,14 +33,14 @@
 
 (defn- POST*
   [path body]
-  (with-redefs [config/config {:db db}]
+  (with-redefs [config/config {:db db-harness/remote}]
     (@handler (-> (mock/request :post path)
                   (mock/content-type "application/json")
                   (mock/body (json/generate-string (with-default-reason body)))))))
 
 (defn- PUT*
   [path body]
-  (with-redefs [config/config {:db db}]
+  (with-redefs [config/config {:db db-harness/remote}]
     (@handler (-> (mock/request :put path)
                   (mock/content-type "application/json")
                   (mock/body (json/generate-string (with-default-reason body)))))))
@@ -47,7 +48,7 @@
 (defn- POST-raw*
   "POST without auto-injecting :reason — for testing the missing-reason path."
   [path body]
-  (with-redefs [config/config {:db db}]
+  (with-redefs [config/config {:db db-harness/remote}]
     (@handler (-> (mock/request :post path)
                   (mock/content-type "application/json")
                   (mock/body (json/generate-string body))))))
@@ -303,7 +304,7 @@
 
 (defn- GET*
   [path]
-  (with-redefs [config/config {:db db}]
+  (with-redefs [config/config {:db db-harness/remote}]
     (@handler (mock/request :get path))))
 
 (defn- ids-with-status

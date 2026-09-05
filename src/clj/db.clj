@@ -246,7 +246,8 @@
      (jdbc/execute-one! handle stmt (jdbc-opts opts)))))
 
 (defn- rollback-after!
-  "Roll `token` back because `t` came out of the body, and then throw `t`.
+  "Roll `token` back because `t` came out of the body or out of the commit, and
+   then throw `t`.
 
    A rollback the db-server refuses *because the token names nothing* is not a
    rollback failure. There is nothing left to roll back: the transaction was

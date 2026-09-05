@@ -4,6 +4,7 @@
    startup, see config/read-only-replica?), so redefining that map is exactly
    what a replica -- or a primary -- looks like from the routes' side."
   (:require [clojure.test :refer [deftest is testing]]
+            [db-harness]
             [cheshire.core :as json]
             [ring.mock.request :as mock]
             [ring.middleware.params :refer [wrap-params]]
@@ -15,9 +16,11 @@
 
 (def ^:private handler (delay (wrap-params (rest-api/rest-routes))))
 
-;; prod mode (no :dev?) plus the role the marker check produced
-(def ^:private replica-config {:db db :read-only-replica? true})
-(def ^:private primary-config {:db db :read-only-replica? false})
+;; prod mode (no :dev?) plus the role the marker check produced. The handle is
+;; the remote one, so what the primary's writes actually do goes over the wire
+;; -- the replica's are refused before they reach a handle of either kind.
+(def ^:private replica-config {:db db-harness/remote :read-only-replica? true})
+(def ^:private primary-config {:db db-harness/remote :read-only-replica? false})
 
 (defn- request*
   [cfg method path body]
