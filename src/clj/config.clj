@@ -1,7 +1,8 @@
 (ns config
   (:require [aero.core :as aero]
             [clojure.java.io :as io]
-            [datastore.connection :as connection])
+            [datastore.connection :as connection]
+            [role :as role])
   (:import [ch.qos.logback.classic LoggerContext]
            [ch.qos.logback.classic.joran JoranConfigurator]
            [org.slf4j LoggerFactory]))
@@ -26,14 +27,21 @@
    :docs           (str dev-files "Documents/Tracked/")
    :images         (str dev-files "Pictures/Tracked/")
    :preview-images (str dev-files "Pictures/Tracked/Preview/")})
-(def ^:private dev-dbname  "./rhizome.db")
 ;; Unit / integration tests run against an in-memory SQLite — no file is
 ;; created and nothing leaks between runs. Users cannot opt into this via
 ;; config.edn; it's forced by the :test alias (see test-overrides). To
 ;; share one in-memory db across multiple JDBC connections we need
 ;; SQLite's shared-cache URI form rather than the bare ":memory:".
+;;
+;; **The only db path this process still knows.** The dev and e2e paths that
+;; used to sit beside it are the db-server's business since the split -- they
+;; are `:db-server :db-path` in config.edn, written by onboard.sh as
+;; `#or [#env DB_PATH "./rhizome.db"]`, which is how `scripts/e2e.sh` points
+;; its own db-server at ./test/rhizome-e2e.db without a second config file.
+;; This one cannot follow them there, and that is not an oversight: a
+;; shared-cache in-memory SQLite lives inside one JVM, so no separate process
+;; could open it. See the `:db` handle in `ds` below.
 (def ^:private test-dbname "file::memory:?cache=shared")
-(def ^:private e2e-dbname  "./test/rhizome-e2e.db")
 
 (defn- e2e-mode? []
   (= "1" (System/getProperty "rhizome.e2e")))
@@ -49,11 +57,6 @@
 (def ^:private test-overrides
   {:dev?  true
    :test? true})
-
-(defn- dev-dbname-for [c]
-  (cond (:e2e? c)  e2e-dbname
-        (:test? c) test-dbname
-        :else      dev-dbname))
 
 (defn- check-mode-flags [c]
   (when (and (:test? c) (:e2e? c))
@@ -125,52 +128,86 @@
     (assoc-in c [:folders :logs] dir)))
 
 ;; --- primary vs replica -----------------------------------------------------
-;; The owner syncs the rhizome directory between machines, and the sync
-;; excludes files ending in `.nosync`. A marker named `primary.nosync` in the
-;; directory the app starts from (sibling to config.edn) therefore exists on
-;; exactly one machine -- the primary. Every other, synced copy is a replica
-;; and must never write to the db.
-(def primary-marker
-  "File name of the primary marker, looked up in the start directory."
-  "primary.nosync")
+;; The marker, and the rule that reads it, moved to `role` when the db-server
+;; became a process of its own: it decides the same thing about the same
+;; directory and cannot require this namespace (loading `config` builds the
+;; app's whole configuration, folders and all, out of a file the db-server may
+;; not even share). One rule, two readers -- see `role`.
+;;
+;; The three names stay here, because `server`, `replica` and config_test have
+;; always called them this and none of them cares where the rule lives.
+(def primary-marker role/primary-marker)
+(def primary-marker-present? role/primary-marker-present?)
+(def read-only-replica? role/read-only-replica?)
 
-(defn primary-marker-present?
-  "Is the primary marker in the directory the app was started from? The path is
-   relative (like config-path), so it resolves against the process's working
-   directory."
-  ([] (primary-marker-present? (str "./" primary-marker)))
-  ([path] (.exists (io/file path))))
-
-(defn read-only-replica?
-  "Must this instance run as a read-only replica? True in prod mode when the
-   primary marker is absent.
-
-   Evaluated exactly ONCE per process -- in `ds` below, which `config` calls at
-   namespace load -- and then held for the process lifetime: an instance's role
-   does not flip mid-run. Nothing re-reads the filesystem afterwards, so a sync
-   that adds or drops the marker underneath a running app cannot silently change
-   what that process may do. Promoting a replica to primary means placing
-   `primary.nosync` next to config.edn and RESTARTING; a primary likewise stays
-   one until it is restarted without the marker.
-
-   Dev mode (including :test? / :e2e?, which force :dev? true) is never a
-   replica: no marker needed, no guards, no banner."
-  [c marker-present?]
-  (and (not (:dev? c)) (not marker-present?)))
-
-(defn- resolve-dbname [c]
-  (let [hardcoded (when (:dev? c) (dev-dbname-for c))]
-    (cond
-      hardcoded
-      (do (when (:db-path c)
-            (throw (ex-info
-                    (str "config invalid: :db-path must not be set when :dev? is true "
-                         "(hardcoded to " hardcoded ")")
+;; --- the database, which is not in this process any more --------------------
+;; Two keys moved into the `:db-server` section when the db-server became its
+;; own process, and both would fail *silently* if a config.edn from before the
+;; split were simply read: a top-level `:db-path` would be ignored by an app
+;; that no longer opens a file at all, and a `:semsearch :vec-path` would leave
+;; `datastore.connection` with no extension path -- semantic search quietly off
+;; and the ^:vector tests quietly skipped. So they are refused, by name, with
+;; the move spelled out.
+(defn- check-moved-keys [c]
+  (when (:db-path c)
+    (throw (ex-info (str "config invalid: :db-path moved into the :db-server section. "
+                         "The app-server holds no database; the db-server opens the file. "
+                         "Write :db-server {:db-path \"…\"} instead.")
                     {:config c})))
-          hardcoded)
-      (:db-path c) (:db-path c)
-      :else (throw (ex-info "config invalid: :db-path is required in prod mode"
-                            {:config c})))))
+  (when (get-in c [:semsearch :vec-path])
+    (throw (ex-info (str "config invalid: :vec-path moved from :semsearch into the "
+                         ":db-server section. Loading the sqlite-vec extension is the "
+                         "db-server's business now; :semsearch keeps :ollama-url and "
+                         ":ollama-model, which are the app-side embedder's.")
+                    {:config c})))
+  c)
+
+(defn- db-url
+  "Where this app-server's db-server is. `:db-url` wins when it is set -- that
+   is the separate-files arrangement, and the hook the later remote-machine
+   step needs -- otherwise it is derived from the `:db-server :port` in the
+   file both processes share.
+
+   Neither present is a refusal rather than a default. A guessed port would
+   come up green and fail on the first statement with a connection refused,
+   which is the confusing version of exactly this message."
+  [c]
+  (or (:db-url c)
+      (when-let [port (get-in c [:db-server :port])]
+        (str "http://127.0.0.1:" port))
+      (throw (ex-info (str "config invalid: no :db-server section and no :db-url. "
+                           "The app-server reaches its database over HTTP, so it needs "
+                           "either :db-server {:port …} to derive http://127.0.0.1:<port> "
+                           "from, or an explicit :db-url. `make onboard` writes the "
+                           "section; a config.edn from before the split has to gain it.")
+                      {:config c}))))
+
+(defn- db-handle
+  "The `:db` every call site is given.
+
+   **Test mode is the one arrangement that keeps a local DataSource, and it is
+   not a shortcut.** The test database is a shared-cache in-memory SQLite, which
+   lives inside one JVM: no separate process could open it, so there is no
+   db-server for this handle to point at. The one the integration suites run
+   against is booted *in* the test JVM by `db-harness`, on an ephemeral port,
+   against this very datasource's file name -- and every test's own setup
+   statements and assertions go on using this handle directly. That is the
+   two-names-onto-one-database decision from step 3, and 88 statements across 19
+   files rest on `(:db config/config)` still being a DataSource here.
+
+   Everywhere else -- dev, e2e, prod -- it is a remote handle, and this process
+   holds no datasource at all."
+  [c replica?]
+  (if (:test? c)
+    ;; A replica's structural write ban -- the datasource opened in SQLite's
+    ;; read-only mode, so that even a code path which forgot to check cannot
+    ;; write -- is the db-server's to make now, and it makes it from the same
+    ;; marker (see `role`). Here `replica?` is always false, because :test?
+    ;; forces :dev?; it is passed anyway so that this handle is built from the
+    ;; decision rather than from an assumption about it. The graceful refusals
+    ;; in front of it (see the `replica` ns) are still this process's.
+    (connection/make-datasource {:dbname test-dbname :read-only? replica?})
+    {:db-server/url (db-url c)}))
 
 (defn ds []
   (let [c (aero/read-config config-path)
@@ -178,18 +215,13 @@
             (e2e-mode?)  (merge e2e-overrides)
             (test-mode?) (merge test-overrides))
         c (check-mode-flags c)
+        c (check-moved-keys c)
         c (apply-dev-folders c)
         c (check-folders c)
         c (apply-logs-dir c)
-        dbname (resolve-dbname c)
         replica? (read-only-replica? c (primary-marker-present?))]
     (-> c
-        (dissoc :db-path)
         (assoc :read-only-replica? replica?)
-        ;; The write ban is structural, not just behavioural: a replica's
-        ;; datasource is opened in SQLite's read-only mode, so even a code path
-        ;; that forgot to check cannot write. The graceful refusals (see the
-        ;; `replica` ns) sit in front of it.
-        (assoc :db (connection/make-datasource {:dbname dbname :read-only? replica?})))))
+        (assoc :db (db-handle c replica?)))))
 
 (def config (ds))
