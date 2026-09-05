@@ -117,6 +117,30 @@
   ;; eventually closes the sockets of the ones that have been stopped.
   (delay (conn-mgr/make-reusable-conn-manager {:timeout 30 :threads 32 :default-per-route 8})))
 
+(def ^:private request-defaults
+  "How long to wait to *reach* the db-server, no limit on how long it may then
+   take to answer, and no retries.
+
+   All three are deliberate. A db-server that is not there -- not started
+   yet, stopped, or on a machine that is gone -- must fail rather than hang the
+   thread that asked, and over loopback a connection is either immediate or
+   never. But a statement has no bound worth guessing at: contention alone
+   costs the driver's three seconds, a backfill sweep costs more, and a socket
+   timeout is a stopwatch on the database's work that would turn a slow query
+   into a failure. If a hung db-server ever needs a ceiling, it wants one that
+   knows what statement it is timing, which is not this.
+
+   Retries are off. Apache HttpClient retries a request whose connection died without answering, on the reasoning
+   that a pooled connection the server had already closed never delivered it --
+   usually true, and unknowable from this end. Every request here is a
+   statement, so the case where it is wrong is a write that ran and is run
+   again. A visible error on a stale connection is the better trade: this seam
+   exists to keep failures from being silent, and a duplicated INSERT is as
+   silent as they come."
+  {:connection-timeout         2000
+   :connection-request-timeout 5000
+   :retry-handler              (fn [_ex _try-count _context] false)})
+
 (defn- fail!
   "Turn a non-2xx answer into the exception the caller would have got locally.
 
@@ -129,41 +153,72 @@
         msg    (or (:error answer)
                    (str "db-server " path " answered " status))]
     (if (:sql? answer)
-      (throw (SQLException. ^String msg))
+      (throw (SQLException. ^String msg
+                            ^String (:sql-state answer)
+                            ^int (int (or (:error-code answer) 0))))
       (throw (ex-info msg (cond-> {:db-server/url url :db-server/path path :status status}
                             (:type answer) (assoc :type (:type answer))))))))
 
 (defn- post!
   [handle path body]
   (let [url  (str (:db-server/url handle) path)
-        resp (http/post url {:body               (write-transit body)
-                             :content-type       transit-type
-                             :accept             transit-type
-                             :as                 :byte-array
-                             :throw-exceptions   false
-                             :connection-manager @connections})]
+        resp (http/post url (merge request-defaults
+                                   {:body               (write-transit body)
+                                    :content-type       transit-type
+                                    :accept             transit-type
+                                    :as                 :byte-array
+                                    :throw-exceptions   false
+                                    :connection-manager @connections}))]
     (if (<= 200 (:status resp) 299)
       (read-transit (:body resp))
       (fail! (:db-server/url handle) path resp))))
 
+(def ^:private health-ttl-ms
+  "How long a `/health` answer is believed.
+
+   It cannot be forever, which is what this was. The db-server is a process
+   that can be restarted on its own -- that is the whole point of it being a
+   process -- and the answer it gives is read once at ITS startup, so the two
+   go out of step exactly when someone installs the vec extension and restarts
+   the inner server. The app would then go on saying `vec-available? false`
+   until it was restarted too, and `et.vp.ds/clear-item-embedding!` would stop
+   deleting superseded embeddings, with nothing failing anywhere: semantic
+   search matching text that is no longer in the item. That is the silent
+   failure this seam exists to prevent, so the cache gets a lifetime.
+
+   A minute, because the caller is `clear-item-embedding!` on every description
+   save and a round trip per save is what the cache is for."
+  60000)
+
 (defonce ^:private remote-health (atom {}))
 
+(defn- ask-health
+  [url]
+  (let [resp (http/get (str url "/health")
+                       (merge request-defaults {:as :string :throw-exceptions false
+                                        :connection-manager @connections}))]
+    (when-not (<= 200 (:status resp) 299)
+      (throw (ex-info (str "db-server /health answered " (:status resp))
+                      {:db-server/url url :status (:status resp)})))
+    (json/parse-string (:body resp) true)))
+
 (defn- health
-  "The db-server's `/health`, read once per url and remembered. JSON rather
-   than transit: this is the route a start script waits on and a prober reads,
-   and neither of those should have to speak the statement protocol."
+  "The db-server's `/health`, remembered per url for `health-ttl-ms`. JSON
+   rather than transit: this is the route a start script waits on and a prober
+   reads, and neither of those should have to speak the statement protocol.
+
+   Nothing is cached that was not answered: a db-server that cannot be reached,
+   or that answers 503 because it cannot reach its own database, throws here and
+   is asked again next time."
   [handle]
-  (let [url (:db-server/url handle)]
-    (or (get @remote-health url)
-        (let [resp (http/get (str url "/health")
-                             {:as :string :throw-exceptions false
-                              :connection-manager @connections})]
-          (when-not (<= 200 (:status resp) 299)
-            (throw (ex-info (str "db-server /health answered " (:status resp))
-                            {:db-server/url url :status (:status resp)})))
-          (let [answer (json/parse-string (:body resp) true)]
-            (swap! remote-health assoc url answer)
-            answer)))))
+  (let [url   (:db-server/url handle)
+        now   (System/currentTimeMillis)
+        entry (get @remote-health url)]
+    (if (and entry (< (- now (:at entry)) health-ttl-ms))
+      (:answer entry)
+      (let [answer (ask-health url)]
+        (swap! remote-health assoc url {:at now :answer answer})
+        answer))))
 
 (defn- remote-vec-available? [handle] (boolean (:vec-available? (health handle))))
 
@@ -190,6 +245,27 @@
      (remote-execute handle "/execute-one" stmt opts)
      (jdbc/execute-one! handle stmt (jdbc-opts opts)))))
 
+(defn- rollback-after!
+  "Roll `token` back because `t` came out of the body, and then throw `t`.
+
+   A rollback the db-server refuses *because the token names nothing* is not a
+   rollback failure. There is nothing left to roll back: the transaction was
+   already ended -- swept for being idle, or closed by a commit that threw --
+   and the exception worth carrying is the one that started this. Reporting a
+   rollback failure there would replace a true error with a false one, which is
+   how a SQLITE_BUSY on commit used to reach the app as
+   `Rollback failed handling ...`.
+
+   A rollback that fails for any other reason is reported the way next.jdbc
+   reports it, carrying both exceptions rather than losing the first."
+  [handle token t]
+  (try (post! handle "/tx/rollback" {:tx token})
+       (catch Throwable rb
+         (when-not (= :db-server/unknown-transaction (:type (ex-data rb)))
+           (throw (ex-info (str "Rollback failed handling \"" (.getMessage t) "\"")
+                           {:rollback rb :handling t})))))
+  (throw t))
+
 (defn- remote-transact
   "A transaction over the wire: a token opened before the body, and committed
    or rolled back after it.
@@ -201,23 +277,20 @@
    carries a token as well; this one is here so the refusal costs no round trip
    and reads identically to the local one.
 
-   A rollback that itself fails is reported the way next.jdbc reports it, with
-   both exceptions, rather than losing the one that started it."
+   The commit is deliberately outside the body's catch. A commit the database
+   refuses is already rolled back and closed on the far side -- `db-server`'s
+   `finish!` does that, which is what next.jdbc does locally -- so there is
+   nothing here to compensate for, and the exception the caller gets is the
+   database's own, with its message, its SQLSTATE and its vendor code intact."
   [handle f]
   (when (:db-server/tx handle)
     (throw (IllegalStateException. "Nested transactions are prohibited")))
   (let [token     (:tx (post! handle "/tx/begin" {}))
-        tx-handle (assoc handle :db-server/tx token)]
-    (try
-      (let [result (f tx-handle)]
-        (post! handle "/tx/commit" {:tx token})
-        result)
-      (catch Throwable t
-        (try (post! handle "/tx/rollback" {:tx token})
-             (catch Throwable rb
-               (throw (ex-info (str "Rollback failed handling \"" (.getMessage t) "\"")
-                               {:rollback rb :handling t}))))
-        (throw t)))))
+        tx-handle (assoc handle :db-server/tx token)
+        result    (try (f tx-handle)
+                       (catch Throwable t (rollback-after! handle token t)))]
+    (post! handle "/tx/commit" {:tx token})
+    result))
 
 (defn transact
   "`with-transaction` with the body as a one-argument function. Public because
@@ -291,10 +364,17 @@
    the dylib is on the far side of the wire, so the answer comes off the
    db-server's `/health`.
 
-   Cached per db-server, and for the life of the process. The far side's answer
-   is a `def` read once at ITS startup and cannot change while it is running, so
-   there is nothing to re-ask; and this is asked on every description save
-   (`et.vp.ds/clear-item-embedding!`), which is not a place to put a round trip."
+   Cached per db-server for a minute, not for the life of the process: the
+   db-server can be restarted under a running app, and an answer believed
+   forever would be wrong from then on. See `health-ttl-ms`.
+
+   This is the one question at the seam a remote handle can fail to answer.
+   Everywhere else a local handle can throw too -- a statement can always be
+   refused -- but this one is a `def` locally and a round trip remotely, so a
+   db-server that is not reachable turns a question that could not fail into one
+   that can. The caller is `et.vp.ds/clear-item-embedding!`, which runs inside
+   a description save; a db-server that is down fails that save, which is what
+   it was going to do at the next statement anyway."
   [handle]
   (if (remote? handle)
     (remote-vec-available? handle)

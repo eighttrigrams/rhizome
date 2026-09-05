@@ -38,6 +38,14 @@
            [javax.sql DataSource]
            [org.eclipse.jetty.server ServerConnector]))
 
+(def ^:private loopback
+  "The only address this ever binds. Not an option: the routes below run
+   arbitrary SQL with no authentication of any kind, so a `:host` argument
+   would be a one-word way to publish the database to the network. The plan
+   puts LAN exposure and the auth that has to come with it in a later step
+   than this one."
+  "127.0.0.1")
+
 (def default-tx-idle-ms
   "How long a transaction may go untouched before it is rolled back and its
    connection freed. A held transaction holds SQLite's write lock, so an
@@ -91,61 +99,118 @@
         conn  (.getConnection ds)]
     (try
       (.setAutoCommit ^Connection conn false)
-      (swap! transactions assoc token {:conn conn :touched-ms (System/currentTimeMillis)})
+      (swap! transactions assoc token {:conn       conn
+                                       :touched-ms (System/currentTimeMillis)
+                                       :in-flight  0})
       token
       (catch Throwable t
+        ;; Nothing was registered, and after a BEGIN that failed there is no
+        ;; transaction on this connection to roll back -- SQLite says so in as
+        ;; many words if you try. Close it and let the failure out.
         (try (.close ^Connection conn) (catch Throwable _))
         (throw t)))))
 
+(defn- finish!
+  "Commit or roll back `conn` and close it, whatever happens.
+
+   A commit the database refuses is rolled back before the connection goes, and
+   the commit's own exception is what comes out -- next.jdbc does the same
+   locally, and the point of this seam is that the two are indistinguishable."
+  [^Connection conn commit?]
+  (try
+    (if commit?
+      (try (.commit conn)
+           (catch Throwable t
+             (try (.rollback conn) (catch Throwable _))
+             (throw t)))
+      (.rollback conn))
+    (finally (try (.close conn) (catch Throwable _)))))
+
 (defn- close-transaction!
   "Commit or roll back the transaction `token` names and free its connection.
-   False when there is no such transaction. The entry is taken out of the
-   registry first, so the idle sweeper and a `/tx/commit` racing for the same
-   token cannot both close the connection."
+   False when there is no such transaction.
+
+   The entry is taken out of the registry before the connection is touched, so
+   the idle sweeper and a `/tx/commit` racing for the same token cannot both
+   close it. That the token is freed even when the commit throws is deliberate:
+   `finish!` has rolled back and closed by then, so there is nothing left for a
+   second call to do."
   [{:keys [transactions]} token commit?]
   (let [[before _] (swap-vals! transactions dissoc token)]
     (if-let [^Connection conn (:conn (get before token))]
-      (do (try (if commit? (.commit conn) (.rollback conn))
-               (finally (try (.close conn) (catch Throwable _))))
-          true)
+      (do (finish! conn commit?) true)
       false)))
 
-(defn- touch-transaction!
-  "The connection `token` names, its idle clock reset. Nil when unknown."
+(defn- acquire!
+  "The connection `token` names, with its idle clock reset and its in-flight
+   count raised. Nil when the token names nothing.
+
+   Raising the count is what keeps the sweeper off a transaction that is in the
+   middle of a statement. Resetting the clock on the way in is not enough on its
+   own: a statement can outlive the idle window all by itself, and the sweeper
+   would then close the connection out from under it -- which surfaces as
+   `stmt pointer is closed`, an error about nothing the caller did."
   [{:keys [transactions]} token]
-  (let [now (System/currentTimeMillis)
-        m   (swap! transactions
-                   (fn [m] (if (contains? m token)
-                             (assoc-in m [token :touched-ms] now)
-                             m)))]
+  (let [m (swap! transactions
+                 (fn [m]
+                   (if (contains? m token)
+                     (-> m
+                         (assoc-in [token :touched-ms] (System/currentTimeMillis))
+                         (update-in [token :in-flight] inc))
+                     m)))]
     (:conn (get m token))))
 
-(defn sweep-idle-transactions!
-  "Roll back and free every transaction untouched for longer than the idle
-   timeout, and answer how many there were.
+(defn- release!
+  "Give the transaction back after a statement, its idle clock starting from
+   now -- from when the statement ENDED, which is when it actually went quiet."
+  [{:keys [transactions]} token]
+  (swap! transactions
+         (fn [m]
+           (if (contains? m token)
+             (-> m
+                 (update-in [token :in-flight] dec)
+                 (assoc-in [token :touched-ms] (System/currentTimeMillis)))
+             m)))
+  nil)
 
-   Run on a timer by `start!`; public so that an operator at a REPL can free a
-   stuck transaction without waiting the minute out. The tests do not call it
-   -- what they watch is the timer."
-  [{:keys [transactions tx-idle-ms] :as server}]
-  (let [cutoff (- (System/currentTimeMillis) tx-idle-ms)
-        stale  (vec (keep (fn [[token {:keys [touched-ms]}]]
-                            (when (< touched-ms cutoff) token))
-                          @transactions))]
-    (doseq [token stale]
+(defn sweep-idle-transactions!
+  "Roll back and free every transaction that has gone quiet for longer than the
+   idle timeout, and answer how many there were.
+
+   A transaction with a statement in flight is never taken, however long it has
+   been running: the selection and the removal are one `swap!`, so a statement
+   that arrives while the sweep is deciding either raises the count before the
+   swap lands -- and the transaction is left alone -- or arrives after it and
+   finds the token gone, which is a clean refusal rather than a closed
+   connection under a running query.
+
+   What this cannot protect is a transaction whose CLIENT has gone quiet: a body
+   that spends longer than the window between statements is indistinguishable
+   from one that died, and is rolled back. That is the timeout doing its job, and
+   the app is told the truth about it -- see `db/transact`'s remote half.
+
+   Run on a timer by `start!`; public so an operator at a REPL can free a stuck
+   transaction without waiting the window out. The tests do not call it -- what
+   they watch is the timer."
+  [{:keys [transactions tx-idle-ms]}]
+  (let [cutoff  (- (System/currentTimeMillis) tx-idle-ms)
+        idle?   (fn [[_ {:keys [touched-ms in-flight]}]]
+                  (and (zero? in-flight) (< touched-ms cutoff)))
+        [before after] (swap-vals! transactions #(into {} (remove idle?) %))
+        taken   (apply dissoc before (keys after))]
+    (doseq [[token {:keys [conn]}] taken]
       (log/warn {:tx token :idle-ms tx-idle-ms}
                 "db-server: rolling back a transaction nobody came back for")
-      (try (close-transaction! server token false)
+      (try (finish! conn false)
            (catch Throwable t
              (log/error t "db-server: could not roll back an idle transaction"))))
-    (count stale)))
+    (count taken)))
 
-(defn- transaction-connection!
-  [server token]
-  (or (touch-transaction! server token)
-      (throw (ex-info (str "db-server: no such transaction: " token
-                           " -- it was committed, rolled back, or left idle too long")
-                      {:db-server/status 410 :type :db-server/unknown-transaction}))))
+(defn- unknown-transaction!
+  [token]
+  (throw (ex-info (str "db-server: no such transaction: " token
+                       " -- it was committed, rolled back, or rolled back for being idle")
+                  {:db-server/status 410 :type :db-server/unknown-transaction})))
 
 ;; -- routes ----------------------------------------------------------------
 ;;
@@ -162,15 +227,30 @@
                     {:type :db-server/bad-request})))
   (vec stmt))
 
+(defn- run
+  [target one? statement options]
+  (if one?
+    (jdbc/execute-one! target statement options)
+    (jdbc/execute! target statement options)))
+
 (defn- run-statement
+  "Run one statement, on a transaction's held connection when a token names one
+   and on a connection of its own otherwise.
+
+   The token is acquired and released around the statement rather than merely
+   touched before it, so the sweeper cannot close the connection while the
+   statement is still on it."
   [server one? req]
   (let [{:keys [stmt opts tx]} (transit-body req)
         statement (check-stmt! stmt)
-        options   (db/jdbc-opts (or opts {}))
-        target    (if tx (transaction-connection! server tx) (:ds server))]
-    (transit-response 200 {:result (if one?
-                                     (jdbc/execute-one! target statement options)
-                                     (jdbc/execute! target statement options))})))
+        options   (db/jdbc-opts (or opts {}))]
+    (transit-response 200
+      {:result (if tx
+                 (if-let [conn (acquire! server tx)]
+                   (try (run conn one? statement options)
+                        (finally (release! server tx)))
+                   (unknown-transaction! tx))
+                 (run (:ds server) one? statement options))})))
 
 (defn ^:endpoint execute
   "POST /execute — run a statement and answer every row it returns.
@@ -247,6 +327,15 @@
                       {:db-server/status 410 :type :db-server/unknown-transaction})))
     (transit-response 200 {:ok true})))
 
+(defn- reach-the-database!
+  "Run the smallest possible statement, to find out whether the database is
+   actually there. Building a datasource proves nothing: SQLite opens lazily,
+   and a read-only datasource in particular never creates or touches the file,
+   so a db-server pointed at a path that does not exist comes up perfectly and
+   fails on its first real statement."
+  [{:keys [ds]}]
+  (jdbc/execute-one! ds ["SELECT 1"]))
+
 (defn ^:endpoint health
   "GET /health — `{:ok true :read-only? b :vec-available? b}`, as JSON.
 
@@ -255,11 +344,24 @@
   line. `:read-only?` is whether this process opened the database read-only --
   a replica, where every write fails at the driver. `:vec-available?` is
   whether the sqlite-vec extension loaded, which is what decides whether the
-  items_vec statements can run at all."
+  items_vec statements can run at all.
+
+  It asks the database rather than reporting this process's own opinion of
+  itself. A health check that says `ok` while the first statement will fail with
+  SQLITE_CANTOPEN is worse than none, because what waits on it starts the thing
+  in front. 503 and the reason, when the database cannot be reached."
   [server]
-  (json-response 200 {:ok             true
-                      :read-only?     (boolean (:read-only? server))
-                      :vec-available? connection/vec-available?}))
+  (try
+    (reach-the-database! server)
+    (json-response 200 {:ok             true
+                        :read-only?     (boolean (:read-only? server))
+                        :vec-available? connection/vec-available?})
+    (catch Throwable t
+      (log/error t "db-server: /health could not reach the database")
+      (json-response 503 {:ok             false
+                          :error          (str (.getMessage t))
+                          :read-only?     (boolean (:read-only? server))
+                          :vec-available? connection/vec-available?}))))
 
 (def ^:private skill-resource "rhizome-db/SKILL.md")
 
@@ -302,10 +404,17 @@
       (catch SQLException e
         (log/warn {:uri (:uri req)} (str "db-server: the database refused a statement: "
                                          (.getMessage e)))
-        (transit-response 500 {:error (.getMessage e)
-                               :type  :db-server/sql-error
-                               :sql?  true
-                               :class (.getName (class e))}))
+        ;; The state and the vendor code travel with the message so the facade
+        ;; can rebuild a SQLException that answers `.getSQLState` and
+        ;; `.getErrorCode` the way the local one would. A caller that reads
+        ;; those is reading the database's own words, and losing them here
+        ;; would be a difference between the two handles.
+        (transit-response 500 {:error      (.getMessage e)
+                               :type       :db-server/sql-error
+                               :sql?       true
+                               :class      (.getName (class e))
+                               :sql-state  (.getSQLState e)
+                               :error-code (.getErrorCode e)}))
       (catch clojure.lang.ExceptionInfo e
         (let [data (ex-data e)]
           (transit-response (or (:db-server/status data) 400)
@@ -364,27 +473,40 @@
                     ban. Schema application is skipped, since a replica's schema
                     arrives with the file it was synced from. Step 4 decides
                     this from the `primary.nosync` marker; here it is explicit.
-   - `:host`        defaults to 127.0.0.1, and there is no reason yet to pass
-                    anything else: this plan never exposes the seam beyond the
-                    machine.
    - `:tx-idle-ms`  how long an abandoned transaction is left before it is
-                    rolled back. Defaults to a minute."
-  [{:keys [port db-path vec-path read-only? host tx-idle-ms]}]
+                    rolled back. Defaults to a minute, and is swept for at
+                    quarter-window intervals, so the real window is one to
+                    one-and-a-quarter of it.
+
+   There is no `:host`. This endpoint runs arbitrary SQL and has no
+   authentication of any kind, and the plan says loopback always for this
+   phase; an option would be a way to hand the database to the network by
+   passing one argument. Binding beyond the machine comes with the auth that
+   has to arrive alongside it, and neither is in this step."
+  [{:keys [port db-path vec-path read-only? tx-idle-ms]}]
   (when (str/blank? (str db-path))
     (throw (ex-info "db-server: :db-path is required" {})))
   (when (nil? port)
     (throw (ex-info "db-server: :port is required (0 for an ephemeral one)" {})))
   (check-vec-path! vec-path)
-  (let [host   (or host "127.0.0.1")
-        ds     (connection/make-datasource {:dbname db-path :read-only? (boolean read-only?)})
+  (let [ds     (connection/make-datasource {:dbname db-path :read-only? (boolean read-only?)})
         server {:ds           ds
                 :read-only?   (boolean read-only?)
                 :transactions (atom {})
                 :tx-idle-ms   (or tx-idle-ms default-tx-idle-ms)}]
+    ;; Before anything else, and before the port is open: prove the database is
+    ;; actually there. Applying the schema would prove it for a writable one,
+    ;; but a read-only server skips that and would otherwise come up green
+    ;; against a path that does not exist.
+    (try (reach-the-database! server)
+         (catch Throwable t
+           (throw (ex-info (str "db-server: cannot reach the database at " (pr-str db-path)
+                                ": " (.getMessage t))
+                           {:db-path db-path :read-only? (boolean read-only?)} t))))
     (if read-only?
       (log/info "db-server: read-only, so the schema is left as it arrived")
       (schema/apply-schema! ds))
-    (let [jetty   (jetty/run-jetty (app server) {:port port :host host :join? false})
+    (let [jetty   (jetty/run-jetty (app server) {:port port :host loopback :join? false})
           bound   (.getLocalPort ^ServerConnector (first (.getConnectors jetty)))
           sweeper (doto (Executors/newSingleThreadScheduledExecutor)
                     (.scheduleWithFixedDelay
@@ -404,16 +526,23 @@
         :jetty   jetty
         :sweeper sweeper
         :port    bound
-        :url     (str "http://" host ":" bound)))))
+        :url     (str "http://" loopback ":" bound)))))
 
 (defn stop!
   "Stop a server `start!` returned. Every transaction still open is rolled
    back, not left to the sweeper: the process is going away and a held
-   connection would take the write lock with it."
+   connection would take the write lock with it.
+
+   Jetty goes first, and the order is the whole point: while it is still
+   answering, a request can open a transaction after the loop has passed, and
+   that connection would then be leaked with the write lock in its hand. In a
+   process that is exiting anyway that is invisible; in the test harness of step
+   3, where a db-server is started and stopped inside the JVM the next test runs
+   in, it is a locked database."
   [{:keys [jetty sweeper transactions] :as server}]
+  (when jetty (.stop jetty))
   (when sweeper (.shutdownNow sweeper))
   (doseq [token (keys @transactions)]
     (try (close-transaction! server token false)
          (catch Throwable t (log/error t "db-server: could not roll back on shutdown"))))
-  (when jetty (.stop jetty))
   nil)

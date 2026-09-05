@@ -15,7 +15,9 @@
             [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
             [cognitect.transit :as transit]
-            [db-server])
+            [datastore.connection :as connection]
+            [db-server]
+            [next.jdbc :as jdbc])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]))
 
 ;; -- talking to it ---------------------------------------------------------
@@ -238,6 +240,73 @@
 
 ;; -- read-only -------------------------------------------------------------
 
+(deftest the-sweeper-never-takes-a-transaction-that-is-still-working
+  ;; The idle clock says when a transaction last went quiet, and a statement
+  ;; that is still running has not. Without an in-flight count the sweeper
+  ;; closes the connection under it, and what comes back is
+  ;; "stmt pointer is closed" -- an error about nothing the caller did, on a
+  ;; transaction that was alive the whole time.
+  (with-table {:tx-idle-ms 200}
+    (fn [server]
+      (let [a (:tx (second (post! server "/tx/begin" {})))]
+        (result (post! server "/execute-one" {:stmt ["INSERT INTO t (n) VALUES (1)"] :tx a}))
+        (testing "a statement that outlives the idle window several times over"
+          (let [[status answer]
+                (post! server "/execute-one"
+                       {:stmt [(str "WITH RECURSIVE c(x) AS "
+                                    "(SELECT 1 UNION ALL SELECT x+1 FROM c WHERE x < 4000000) "
+                                    "SELECT count(*) AS n FROM c")]
+                        :tx   a})]
+            (is (= 200 status) (str "the statement ran to the end: " (pr-str answer)))))
+        (testing "and the transaction it was running in is still there"
+          (is (= 200 (first (post! server "/execute" {:stmt ["SELECT n FROM t"] :tx a}))))
+          (is (= {:ok true} (second (post! server "/tx/commit" {:tx a})))))
+        (is (= [#:t{:n 1}] (result (post! server "/execute" {:stmt ["SELECT n FROM t"]})))
+            "and committed what it wrote")))))
+
+(deftest a-commit-the-database-refuses-comes-back-as-the-database-refusing-it
+  ;; The db-server rolls back and closes behind a commit that throws, and the
+  ;; commit's own exception is what comes out -- next.jdbc's local outcome. The
+  ;; token is freed either way, so a client's compensating rollback finds
+  ;; nothing; that it must not then report a rollback failure is pinned next
+  ;; door, in db-server.remote-handle-test.
+  (let [path (temp-db-path)]
+    (with-server-at path {}
+      (fn [server]
+        (result (post! server "/execute" {:stmt ["CREATE TABLE t (n INTEGER)"]}))))
+    (with-server-at path {}
+      (fn [server]
+        ;; A DEFERRED reader holding SHARED: the writer may begin and insert,
+        ;; and is refused when its COMMIT reaches for EXCLUSIVE.
+        (let [reader (connection/make-datasource {:dbname path :read-only? true})
+              rc     (.getConnection reader)]
+          (try
+            (.setAutoCommit rc false)
+            (jdbc/execute! rc ["SELECT n FROM t"])
+            (let [a (:tx (second (post! server "/tx/begin" {})))]
+              (result (post! server "/execute-one" {:stmt ["INSERT INTO t (n) VALUES (1)"] :tx a}))
+              (let [[status answer] (post! server "/tx/commit" {:tx a})]
+                (is (= 500 status))
+                (is (true? (:sql? answer)) "it is the database refusing, not the protocol")
+                (is (str/includes? (:error answer) "SQLITE_BUSY")))
+              (is (= 410 (first (post! server "/execute" {:stmt ["SELECT 1"] :tx a})))
+                  "and the token is freed, because the rollback behind it already ran"))
+            (finally (try (.rollback rc) (catch Throwable _)) (.close rc))))))))
+
+(deftest a-sql-failure-carries-the-state-and-code-the-driver-gave-it
+  (with-table {}
+    (fn [server]
+      (let [[_ answer] (post! server "/execute" {:stmt ["SELECT * FROM nope"]})]
+        (is (true? (:sql? answer)))
+        (is (contains? answer :sql-state) "so the facade can rebuild what the driver raised")
+        (is (integer? (:error-code answer)))
+        (is (= (:error-code answer)
+               (-> (try (jdbc/execute! (connection/make-datasource {:dbname (temp-db-path)})
+                                       ["SELECT * FROM nope"])
+                        (catch java.sql.SQLException e e))
+                   .getErrorCode))
+            "the same code the local driver reports for the same statement")))))
+
 (deftest a-read-only-server-reads-and-refuses-to-write
   (let [path (temp-db-path)]
     (with-server-at path {} (fn [server]
@@ -256,6 +325,35 @@
             (is (re-find #"(?i)readonly|read-only" (:error answer)))))))))
 
 ;; -- the JSON surface ------------------------------------------------------
+
+(deftest a-server-cannot-boot-against-a-database-it-cannot-open
+  ;; A read-only datasource never creates or touches the file, and SQLite opens
+  ;; lazily, so before this the server came up perfectly against a path that was
+  ;; not there and failed on its first statement. Step 4's start script waits on
+  ;; /health and then starts the app-server in front of it, so a green boot has
+  ;; to mean the database is actually reachable.
+  (let [missing (str (System/getProperty "java.io.tmpdir")
+                     "/rhizome-db-server-test-absent-" (rand-int 1000000) ".db")]
+    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"cannot reach the database"
+                          (db-server/start! {:port 0 :db-path missing :read-only? true})))))
+
+(deftest health-refuses-to-say-ok-for-a-database-it-cannot-reach
+  ;; Driven at the handler rather than over HTTP, because `start!` now refuses
+  ;; to come up against an unreachable database at all -- there is no way left
+  ;; to get a running server into this state, which is the point. What is pinned
+  ;; here is that /health asks the database instead of reporting the process's
+  ;; own opinion of itself, so a start script cannot be told `ok` about a
+  ;; database that will refuse its first statement.
+  (let [missing (str (System/getProperty "java.io.tmpdir")
+                     "/rhizome-db-server-test-absent-" (rand-int 1000000) ".db")
+        unreachable {:ds         (connection/make-datasource {:dbname missing :read-only? true})
+                     :read-only? true}
+        {:keys [status body]} (db-server/health unreachable)]
+    (is (= 503 status))
+    (let [answer (json/parse-string body true)]
+      (is (false? (:ok answer)))
+      (is (re-find #"(?i)unable to open" (:error answer))
+          "and it says what the database said"))))
 
 (deftest health-says-what-it-is
   (with-server {}

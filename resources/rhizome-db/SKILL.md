@@ -20,7 +20,15 @@ and never interpolated — this is the only way to get values into a statement.
 
 Every successful statement call answers `{:result …}`. The wrapper is there so
 that a row of `nil` (no such row) is distinguishable from an empty response.
-Every failure answers a non-2xx status with `{:error "…" :type …}`.
+Every failure answers a non-2xx status with `{:error "…" :type …}`; a failure
+that came from the database itself is additionally marked `:sql? true` and
+carries its `:sql-state` and `:error-code`, so a client can rebuild the
+exception its own driver would have raised.
+
+`GET /health` asks the database before answering, so a 200 from it means
+statements will actually run. It answers 503 when the database cannot be
+reached — which is what a start script waiting on it needs, since a health
+check that says `ok` for a database it has never touched is worse than none.
 
 ## Routes
 
@@ -31,7 +39,7 @@ Every failure answers a non-2xx status with `{:error "…" :type …}`.
 | `POST /tx/begin` | `{}` | `{:tx "token"}` |
 | `POST /tx/commit` | `{:tx "token"}` | `{:ok true}` |
 | `POST /tx/rollback` | `{:tx "token"}` | `{:ok true}` |
-| `GET /health` | — | `{:ok true :read-only? b :vec-available? b}` |
+| `GET /health` | — | `{:ok true :read-only? b :vec-available? b}`, or 503 |
 | `GET /api/describe` | — | this document, and the routes above |
 
 ## Options
@@ -52,9 +60,16 @@ ignored:
 belongs to the transaction, then `POST /tx/commit` or `/tx/rollback`. The
 token names a database connection that is held open for you, so:
 
-- **A transaction left open is rolled back.** After 60 seconds without a
-  statement the connection is rolled back and freed, and its token starts
-  answering `410`. Nothing half-written survives that.
+- **A transaction left open is rolled back.** A transaction that goes a minute
+  without a statement is rolled back and freed, and its token starts answering
+  `410`. The window is a boot option and the sweep runs at quarter-window
+  intervals, so the real wait is between one and one and a quarter of it.
+  Nothing half-written survives that.
+- **A statement that is still running is never swept**, however long it takes:
+  the clock is on the gap between statements, and it starts again when one
+  ends. What the timeout is for is a client that went away, and a body that
+  spends longer than the window between two statements is indistinguishable
+  from one -- so keep whatever the transaction is waiting on outside it.
 - **A token cannot begin another transaction.** `/tx/begin` refuses a request
   that carries one. A handle that is already a transaction may not be made one
   again — the same rule the app-side facade enforces locally.
@@ -65,8 +80,11 @@ token names a database connection that is held open for you, so:
 
 ## Read-only mode
 
-When the db-server booted against a read-only database — a replica, which is
-decided by the absence of the `primary.nosync` marker in its start directory —
-`/health` says `:read-only? true` and every write fails at the driver with
-`SQLITE_READONLY`. The ban is structural: the file is opened read-only, so
-there is no request that can get around it.
+When the db-server was booted read-only, `/health` says `:read-only? true` and
+every write fails at the driver with `SQLITE_READONLY`. The ban is structural:
+the file is opened read-only, so there is no request that can get around it.
+
+It is told which to be, at boot, by whoever started it. Deciding that from the
+`primary.nosync` marker in the start directory — the way the app-server decides
+its own role today — is not wired up yet; nothing in this process reads that
+marker.

@@ -58,6 +58,40 @@
         (is (= (script local) (script remote))
             "statements, parameters, both builders, a nil row, an empty result and a transaction")))))
 
+(deftest what-equality-cannot-see-between-the-two-handles
+  ;; The parity test above compares with `=`, and `=` is blind to two real
+  ;; differences. Naming them here is the point: they are acceptable, and a
+  ;; reader should not have to discover that they exist.
+  (with-remote
+    (fn [remote _server]
+      (let [local (local-handle)]
+        (doseq [h [local remote]]
+          (db/execute-one! h ["CREATE TABLE t (n INTEGER, d REAL, s TEXT)"])
+          (db/execute-one! h ["INSERT INTO t (n, d, s) VALUES (?, ?, ?)" 42 1.5 "x"]))
+        (let [l (db/execute-one! local ["SELECT n, d, s FROM t"])
+              r (db/execute-one! remote ["SELECT n, d, s FROM t"])]
+          (is (= l r) "equal, which is what every caller asks")
+          (testing "an integer widens on the way through transit"
+            (is (instance? Integer (:t/n l)))
+            (is (instance? Long (:t/n r)))
+            (is (= (:t/n l) (:t/n r))
+                ;; Harmless because nothing reads these through Java interop:
+                ;; = , arithmetic, zero? and number? do not distinguish the two,
+                ;; and the /ui path serializes them through transit anyway.
+                "which Clojure's = does not distinguish, and nothing here does either"))
+          (testing "doubles and strings come back as themselves"
+            (is (instance? Double (:t/d r)))
+            (is (instance? String (:t/s r))))
+          (testing "and next.jdbc's row metadata does not survive the wire"
+            ;; datafy/nav, which make a row navigable at a REPL. Keyed by
+            ;; SYMBOL and not keyword -- next.jdbc attaches them syntax-quoted,
+            ;; which is the convention those two protocols are looked up by.
+            ;; Nothing in rhizome reads them, and they are functions, which is
+            ;; the one thing that cannot be sent.
+            (is (some? (get (meta l) 'clojure.core.protocols/datafy)))
+            (is (some? (get (meta l) 'clojure.core.protocols/nav)))
+            (is (nil? (meta r)))))))))
+
 (deftest a-transaction-that-throws-rolls-back-over-the-wire-too
   (with-remote
     (fn [remote _server]
@@ -110,6 +144,68 @@
                   "a caller that discriminates on the type cannot tell which side it is on")
               (is (str/includes? (.getMessage thrown) "no such table")))))))))
 
+(deftest a-commit-the-database-refuses-is-a-SQLException-and-not-a-story-about-rollback
+  ;; The commit used to be inside the body's catch, so a refused COMMIT was
+  ;; followed by a compensating /tx/rollback, which 410'd because the failed
+  ;; commit had already freed the token -- and the caller was handed
+  ;; `Rollback failed handling "…"`, an ExceptionInfo asserting something that
+  ;; had not happened, in place of the database's own refusal.
+  (let [path (temp-db-path)]
+    (let [ds (connection/make-datasource {:dbname path})]
+      (db/execute-one! ds ["CREATE TABLE t (n INTEGER)"]))
+    (let [server (db-server/start! {:port 0 :db-path path})
+          remote {:db-server/url (:url server)}
+          local  (connection/make-datasource {:dbname path})
+          ;; A DEFERRED reader holding SHARED: a writer may begin and insert,
+          ;; and is refused when its COMMIT reaches for EXCLUSIVE.
+          reader (connection/make-datasource {:dbname path :read-only? true})
+          rc     (.getConnection reader)
+          refuse (fn [handle]
+                   (try (db/with-transaction [tx handle]
+                          (db/execute-one! tx ["INSERT INTO t (n) VALUES (1)"]))
+                        nil
+                        (catch Throwable t t)))]
+      (try
+        (.setAutoCommit rc false)
+        (db/execute! rc ["SELECT n FROM t"])
+        (let [l (refuse local)
+              r (refuse remote)]
+          (is (instance? SQLException l) "locally the database's refusal comes out as it is")
+          (is (instance? SQLException r) "and it has to come out as it is remotely too")
+          (is (= (.getMessage l) (.getMessage r)) "with the message the driver wrote")
+          (is (not (instance? clojure.lang.ExceptionInfo r))
+              "and not as a claim about a rollback that never failed")
+          (is (= (.getErrorCode l) (.getErrorCode r)) "the driver's own vendor code")
+          (is (= (.getSQLState l) (.getSQLState r)) "and its SQLSTATE"))
+        (finally
+          (try (.rollback rc) (catch Throwable _))
+          (.close rc)
+          (db-server/stop! server))))))
+
+(deftest a-transaction-swept-while-its-body-was-slow-says-so-plainly
+  ;; What the timeout is for is a client that went away, and a body that spends
+  ;; longer than the window between statements is indistinguishable from one.
+  ;; So this transaction does lose its rows -- but the app has to hear the
+  ;; truth about it, and not `Rollback failed handling …`, which is what it
+  ;; heard before: the compensating rollback 410s on a token the sweeper has
+  ;; already taken, and a 410 there means there is nothing left to roll back.
+  (with-remote {:tx-idle-ms 200}
+    (fn [remote server]
+      (db/execute-one! remote ["CREATE TABLE t (n INTEGER)"])
+      (let [thrown (try (db/with-transaction [tx remote]
+                          (db/execute-one! tx ["INSERT INTO t (n) VALUES (1)"])
+                          (while (seq @(:transactions server)) (Thread/sleep 50))
+                          (db/execute-one! tx ["INSERT INTO t (n) VALUES (2)"]))
+                        nil
+                        (catch Throwable t t))]
+        (is (instance? clojure.lang.ExceptionInfo thrown))
+        (is (= :db-server/unknown-transaction (:type (ex-data thrown)))
+            "the true error: the transaction it was using is gone")
+        (is (re-find #"idle" (.getMessage thrown)) "and it names why")
+        (is (not (re-find #"Rollback failed" (.getMessage thrown)))
+            "and does not assert a rollback failure that did not happen"))
+      (is (= [] (rows remote)) "the sweep did roll it back"))))
+
 (deftest an-option-off-the-whitelist-is-refused-before-it-is-sent
   (with-remote
     (fn [remote _server]
@@ -145,6 +241,27 @@
     ;; fail, which is exactly the difference being pinned: after the split the
     ;; dylib is on the far side of the wire and the app does not get to guess.
     (is (thrown? Exception (db/vec-available? {:db-server/url "http://127.0.0.1:9"})))))
+
+(deftest the-health-answer-is-not-believed-forever
+  ;; A db-server is a process and can be restarted on its own. An answer cached
+  ;; for the life of the app goes out of step exactly then -- install the vec
+  ;; extension, restart the inner server, and the app goes on saying it is not
+  ;; there, with `clear-item-embedding!` quietly no longer deleting superseded
+  ;; embeddings. Nothing fails; semantic search just starts matching text the
+  ;; item no longer has.
+  ;;
+  ;; This cannot install a dylib mid-test, so what it pins is the mechanism: an
+  ;; answer given by a db-server that is gone is not still being served after
+  ;; the lifetime is up.
+  (with-remote
+    (fn [remote server]
+      (is (boolean? (db/vec-available? remote)) "asked and answered")
+      (db-server/stop! server)
+      (testing "within the lifetime the remembered answer stands"
+        (is (boolean? (db/vec-available? remote))))
+      (testing "and once it is up, the question goes back to a db-server that is not there"
+        (with-redefs [db/health-ttl-ms 0]
+          (is (thrown? Exception (db/vec-available? remote))))))))
 
 (deftest a-token-that-names-nothing-is-a-clear-refusal
   (with-remote
