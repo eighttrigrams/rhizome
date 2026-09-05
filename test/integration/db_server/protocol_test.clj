@@ -239,6 +239,36 @@
           (is (= 6 (count (result (post! server "/execute" {:stmt ["SELECT n FROM t"]}))))))))
     ))
 
+(def ^:private counting-cte
+  "A statement whose only property of interest is that it takes a while: count
+   to `n` in SQLite and report how far it got."
+  (fn [n]
+    (str "WITH RECURSIVE c(x) AS "
+         "(SELECT 1 UNION ALL SELECT x+1 FROM c WHERE x < " n ") "
+         "SELECT count(*) AS n FROM c")))
+
+(defn- rows-that-outlast
+  "How far this machine has to count for the statement to take longer than
+   `ms`, measured here rather than written down.
+
+   It was written down once -- four million, which took just over 400ms on the
+   machine of the day -- and by the next box it was 320ms, so the test that
+   depends on the statement outlasting the window started failing on its own
+   premise. Which is what that premise is asserted for; but a number that has
+   to be re-tuned per machine will rot again on the next one, and the loop that
+   finds it costs a second at most.
+
+   Doubling, from the old constant, with a ceiling so a pathological machine
+   fails the test rather than running forever."
+  [server ms]
+  (loop [n 4000000]
+    (let [began (System/currentTimeMillis)
+          _     (result (post! server "/execute-one" {:stmt [(counting-cte n)]}))
+          took  (- (System/currentTimeMillis) began)]
+      (cond (> took ms)     n
+            (>= n 512000000) n
+            :else           (recur (* 2 n))))))
+
 (deftest the-clock-restarts-when-a-statement-ENDS-not-when-it-starts
   ;; The other half of the same rule, and the one that catches `release!`
   ;; specifically: after a statement that itself outlasted the window, the
@@ -247,22 +277,20 @@
   ;; moment the statement returned, and the very next gap would lose it.
   (with-table {:tx-idle-ms 400}
     (fn [server]
-      (let [a     (:tx (second (post! server "/tx/begin" {})))
+      (let [n     (rows-that-outlast server 400)
+            a     (:tx (second (post! server "/tx/begin" {})))
             began (System/currentTimeMillis)
-            slow  (post! server "/execute-one"
-                         {:stmt [(str "WITH RECURSIVE c(x) AS "
-                                      "(SELECT 1 UNION ALL SELECT x+1 FROM c WHERE x < 4000000) "
-                                      "SELECT count(*) AS n FROM c")]
-                          :tx   a})
+            slow  (post! server "/execute-one" {:stmt [(counting-cte n)] :tx a})
             took  (- (System/currentTimeMillis) began)]
         (is (= 200 (first slow)))
-        ;; The premise, asserted rather than assumed. On hardware fast enough
-        ;; to run that CTE inside 400ms this test would go on passing while
-        ;; testing nothing at all -- the gap after a short statement is not the
-        ;; case it exists for. Make the count bigger if this ever fires.
+        ;; The premise, asserted rather than assumed. A statement that came in
+        ;; under the window would leave this test passing while testing nothing
+        ;; at all -- the gap after a SHORT statement is not the case it exists
+        ;; for. `rows-that-outlast` calibrated for exactly this a moment ago, so
+        ;; this firing now means the machine got faster between two statements.
         (is (> took 400)
             (str "the statement has to outlast the idle window to mean anything; took "
-                 took "ms"))
+                 took "ms at " n " rows"))
         (Thread/sleep 150)
         (is (= 200 (first (post! server "/execute-one"
                                  {:stmt ["INSERT INTO t (n) VALUES (1)"] :tx a})))
