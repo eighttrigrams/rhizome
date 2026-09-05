@@ -29,7 +29,8 @@
      silently stop working remotely cannot get in."
   (:require [datastore.connection :as connection]
             [next.jdbc :as jdbc]
-            [next.jdbc.result-set :as rs]))
+            [next.jdbc.result-set :as rs]
+            [next.jdbc.transaction :as jdbc-tx]))
 
 (def ^:private builders
   "The result-set builders a caller may ask for, by name. Named rather than
@@ -74,9 +75,25 @@
    the macro below expands into it, and a function because that is the form the
    dispatch will take: a remote transaction is a token opened before the body
    and closed after it, which is a call around a call rather than something a
-   macro can stay all the way down."
+   macro can stay all the way down.
+
+   Nesting is prohibited rather than allowed. next.jdbc's default is `:allow`,
+   and `:allow` is a trap: opening a second transaction on a handle that is
+   already one COMMITS the outer transaction when the inner one ends. An outer
+   transaction that then throws leaves everything it wrote before the inner one
+   standing -- a partial commit, with nothing raised anywhere to say so. No
+   call path nests today (see db-test); this is so that the day one does, it
+   says so instead of half-writing.
+
+   next.jdbc detects this per Connection object, which is exactly the case
+   worth refusing -- handing a `tx` back into `with-transaction` -- and not an
+   independent transaction taken on the DataSource, which borrows a connection
+   of its own and is unaffected. Step 2 has to reproduce that rule for remote
+   tokens itself: next.jdbc's guard is tied to a Connection and does not
+   survive the wire."
   [handle f]
-  (jdbc/with-transaction [tx handle] (f tx)))
+  (binding [jdbc-tx/*nested-tx* :prohibit]
+    (jdbc/with-transaction [tx handle] (f tx))))
 
 (defmacro with-transaction
   "Run `body` with `sym` bound to a handle inside a transaction on `handle`,
@@ -86,9 +103,31 @@
    the handle the transaction was opened on. That is true of next.jdbc's
    transactions already, and is about to be true in a harder way: `sym` is a
    handle rather than necessarily a Connection, and once a handle can be
-   remote it is the thing carrying the transaction's token."
-  [[sym handle] & body]
-  `(transact ~handle (fn [~sym] ~@body)))
+   remote it is the thing carrying the transaction's token.
+
+   The binding is exactly two forms, and anything else is refused here rather
+   than accepted and quietly ignored. next.jdbc's binding takes an optional
+   third -- `{:isolation … :read-only … :rollback-only …}` -- and a facade that
+   dropped one on the floor would be the very bug the statement-option
+   whitelist above exists to prevent, one level up: it would read as working
+   and change nothing. No call site passes one; the seam carries none of them,
+   and the step-2 protocol has nowhere to put them."
+  [binding-form & body]
+  (when-not (vector? binding-form)
+    (throw (ex-info (str "db/with-transaction wants a vector binding, [sym handle] -- got "
+                         (pr-str binding-form))
+                    {:binding binding-form})))
+  (let [[sym handle & more] binding-form]
+    (when (seq more)
+      (throw (ex-info (str "db/with-transaction takes no transaction options: "
+                           (pr-str (vec more)) " would be dropped here, and there is "
+                           "nothing on the wire to carry it in step 2.")
+                      {:binding binding-form :options (vec more)})))
+    (when-not (= 2 (count binding-form))
+      (throw (ex-info (str "db/with-transaction wants a binding of exactly two forms, "
+                           "[sym handle] -- got " (pr-str binding-form))
+                      {:binding binding-form})))
+    `(transact ~handle (fn [~sym] ~@body))))
 
 (defn vec-available?
   "Whether the database behind this handle can run the sqlite-vec SQL --
