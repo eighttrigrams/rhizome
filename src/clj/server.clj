@@ -10,7 +10,6 @@
             [env :refer [wrap-env-defaults]]
             [config :as config]
             [dev-seed :as dev-seed]
-            [datastore.schema :as schema]
             [db :as db]
             [repository :as r]
             [repository.insertion.file :as file]
@@ -216,21 +215,48 @@
 (defn- prepare-for-writing!
   "The startup steps that only make sense where this instance may write, skipped
   wholesale on a read-only replica:
-  - the schema and the seed write. A replica's db is owned by the primary and
-    arrives through the sync with its schema already applied; its datasource
-    would refuse them anyway.
+  - the seed write. A replica's db is owned by the primary and arrives through
+    the sync already seeded; its datasource would refuse the write anyway.
   - `ensure-convert!` gates startup on ImageMagick, which only preview
     downscaling needs. A replica can never convert anything -- /upload is
     refused and the pollers are not scheduled -- so gating it there would refuse
-    to boot over a capability it cannot use."
+    to boot over a capability it cannot use.
+
+  **The schema is not applied here any more.** The db-server owns the file and
+  applies it as it opens it, before this process is started at all -- and on a
+  replica it skips it there for the same reason it was skipped here. The seed
+  stays: it is a write of *items*, which is app-side business, and it travels
+  over the wire like every other statement."
   []
   (when-not (replica/read-only?)
     (upload/ensure-convert!)
-    (schema/apply-schema! (:db config/config))
     (dev-seed/maybe-seed! {:db         (:db config/config)
                            :dev?       (:dev? config/config)
                            :e2e?       (:e2e? config/config)
                            :skip-seed? (:skip-seed? config/config)})))
+
+(defn- check-db-server-reachable!
+  "One statement, before anything else needs one, so that a db-server that is
+  not there says so in one line instead of surfacing as a connection refused in
+  the middle of seeding.
+
+  It is not a health check with a retry loop: waiting for the db-server is
+  `scripts/start.sh`'s job, which polls `/health` before it starts this process
+  at all. This is the message for when that did not happen -- an app-server
+  started by hand, or pointed at the wrong port."
+  []
+  (let [handle (:db config/config)]
+    (when (db/remote? handle)
+      (try (db/execute-one! handle ["SELECT 1"])
+           (log/info {:db-server (:db-server/url handle)}
+                     (str "app-server: database reached over " (:db-server/url handle)))
+           (catch Throwable t
+             (let [msg (str "Refusing to start: no db-server answering at "
+                            (:db-server/url handle) " (" (.getMessage t) "). "
+                            "Start it first -- 'make start' does, and 'make start-db' "
+                            "runs it alone.")]
+               (log/error t msg)
+               (throw (ex-info msg {:db-server/url (:db-server/url handle)} t))))))))
 
 (defn start-http-server!
   []
@@ -239,6 +265,7 @@
                  (not (string? (:private-addr config/config)))))
     (throw (Exception. "config invalid")))
   (log-instance-role!)
+  (check-db-server-reachable!)
   (prepare-for-writing!)
   ;; A missing file-type context silently drops files of that type on import,
   ;; so refuse to come up unless every named id is present. The only exemption
