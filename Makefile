@@ -7,6 +7,12 @@
 # and the generated docker overlay so both sides agree.
 PORT        ?= $(shell ./scripts/detect-ports.sh PORT)
 SHADOW_PORT ?= $(shell ./scripts/detect-ports.sh SHADOW_PORT)
+# The db-server's port, same `?=` rule: an exported DB_PORT wins, otherwise it
+# comes out of config.edn's :db-server section (final fallback 3141, which is
+# db-server/default-port). Deliberately absent from COMPOSE_ENV below -- the
+# seam is internal, the db-server binds loopback inside the container, and its
+# port is not published to the host.
+DB_PORT     ?= $(shell ./scripts/detect-ports.sh DB_PORT)
 # DEPLOY_TARGET has no default and is deliberately NOT read from the
 # environment: `deploy` requires it to be passed on the command line
 # (make deploy DEPLOY_TARGET=/path) so a stray exported value can't
@@ -18,7 +24,7 @@ $(error DEPLOY_TARGET is required and must be passed on the command line: make d
 endif
 endif
 
-.PHONY: start stop test e2e deploy install-sqlite-vec box backfill-embeddings clean
+.PHONY: start start-db stop test e2e deploy install-sqlite-vec box backfill-embeddings clean
 
 onboard:
 	./scripts/onboard.sh
@@ -98,6 +104,15 @@ backfill-embeddings:
 
 start:
 	@./scripts/start.sh
+
+# The db-server on its own, in the foreground, so Ctrl-C stops it. `make start`
+# afterwards finds it answering /health and connects to that one instead of
+# starting a second -- two processes on one SQLite file is what the split
+# exists to prevent. The port check refuses when a dev session already holds
+# the lock, which is the case where a db-server is already running for you.
+start-db:
+	@./scripts/detect-ports.sh check DB_PORT || exit 0; \
+	DB_PORT=$(DB_PORT) clj -M:dev -m db-server
 
 stop:
 	@./scripts/stop.sh

@@ -1,10 +1,11 @@
 #!/bin/bash
 # Usage:
-#   detect-ports.sh PORT|SHADOW_PORT
+#   detect-ports.sh PORT|SHADOW_PORT|DB_PORT
 #     Print the resolved port value, checking in order:
 #       1. for PORT: the :port fallback in config.edn
 #          for SHADOW_PORT: the :default in shadow-cljs.edn's :http :port
-#       2. hardcoded final fallback (3140 / 9804)
+#          for DB_PORT: the :port inside config.edn's :db-server section
+#       2. hardcoded final fallback (3140 / 9804 / 3141)
 #
 #     Note: this script does NOT read .envrc. Env-var overrides are the
 #     caller's responsibility — if PORT/SHADOW_PORT are exported (by
@@ -13,7 +14,7 @@
 #     empty we fall straight through to the in-repo config defaults; a
 #     dropped-but-unloaded .envrc is treated as "not set."
 #
-#   detect-ports.sh check PORT [SHADOW_PORT ...]
+#   detect-ports.sh check PORT [SHADOW_PORT DB_PORT ...]
 #     Report-only. For each var, resolve and then lsof-check the port. If
 #     anything is listening, print it and exit 1 without touching anything.
 #     Used by `make start` (refuses to come up while an e2e run or another
@@ -24,12 +25,39 @@ set -e
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
+# config.edn flattened to one line with the :db-server block cut out. That
+# block carries a :port of its own -- the inner server's -- and it is NOT the
+# app's. The two differ by which map they sit in and by nothing else, so
+# anything resolving the app port by pattern has to remove it rather than rely
+# on which comes first in the file. test/e2e/port.ts does the same, for the
+# same reason.
+config_edn_without_db_server() {
+  tr '\n' ' ' < "$ROOT/config.edn" \
+    | sed -E 's/:db-server[[:space:]]*\{[^}]*\}//'
+}
+
 resolve_from_config_edn() {
   [ -f "$ROOT/config.edn" ] || return 1
   # Match either a literal int (`:port 3140`) or aero's fallback in
-  # `#or [#env PORT 3140]`; both end with the integer we want. Loose
-  # anchor so an opening `{` on the line doesn't break the match.
-  grep -E '(^|[[:space:]{]):port' "$ROOT/config.edn" \
+  # `#or [#env PORT 3140]`; both end with the integer we want. `-o` now,
+  # because the source above is one flattened line: the match has to be cut
+  # out before the digits are read off it.
+  config_edn_without_db_server \
+    | grep -oE '(^|[[:space:]{]):port[^:}]*' \
+    | head -1 \
+    | grep -oE '[0-9]+' \
+    | tail -1
+}
+
+# The db-server's port, out of its own section: same two shapes, a literal
+# `:port 3141` or aero's `#long #or [#env DB_PORT 3141]`. The section holds no
+# nested maps, so `\{[^}]*\}` isolates it -- the same form run-tests.sh uses on
+# it to find :vec-path.
+resolve_db_port_from_config_edn() {
+  [ -f "$ROOT/config.edn" ] || return 1
+  tr '\n' ' ' < "$ROOT/config.edn" \
+    | grep -oE ':db-server[[:space:]]*\{[^}]*\}' \
+    | grep -oE ':port[^:}]*' \
     | head -1 \
     | grep -oE '[0-9]+' \
     | tail -1
@@ -51,8 +79,18 @@ resolve_port() {
     SHADOW_PORT)
       val=$(resolve_from_shadow_cljs) || val=9804
       ;;
+    DB_PORT)
+      # 3141 is `db-server/default-port` in src/clj/db_server.clj. A config.edn
+      # whose :db-server section names no port and this script have to land on
+      # the same number, or `make start` waits for /health at a port nothing is
+      # bound to. The pipeline yields an empty string rather than a non-zero
+      # status when the section is absent, so the fallback is tested for, not
+      # chained onto `||`.
+      val=$(resolve_db_port_from_config_edn || true)
+      [ -n "$val" ] || val=3141
+      ;;
     *)
-      echo "unknown var: $var (expected PORT or SHADOW_PORT)" >&2
+      echo "unknown var: $var (expected PORT, SHADOW_PORT or DB_PORT)" >&2
       return 2
       ;;
   esac
@@ -61,7 +99,7 @@ resolve_port() {
 
 if [ "$1" = "check" ]; then
   shift
-  [ $# -ge 1 ] || { echo "usage: detect-ports.sh check PORT|SHADOW_PORT [...]" >&2; exit 2; }
+  [ $# -ge 1 ] || { echo "usage: detect-ports.sh check PORT|SHADOW_PORT|DB_PORT [...]" >&2; exit 2; }
 
   # The dev and e2e tracks are mutually exclusive -- only one of them may
   # hold the ports at any time. The lockfile is claimed before any slow
@@ -141,5 +179,5 @@ if [ "$1" = "check" ]; then
   exit 1
 fi
 
-VAR="${1:?usage: detect-ports.sh PORT|SHADOW_PORT  |  detect-ports.sh check PORT [...]}"
+VAR="${1:?usage: detect-ports.sh PORT|SHADOW_PORT|DB_PORT  |  detect-ports.sh check PORT [...]}"
 resolve_port "$VAR"

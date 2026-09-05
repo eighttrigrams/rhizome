@@ -12,23 +12,37 @@ echo "Creating SQLite configuration..."
 # :port reads from $PORT via aero's #env so the actual port is driven by
 # whatever sets the env at runtime (Makefile, docker env, direnv-loaded
 # .envrc, manual export). 3140 is the fallback when $PORT is unset.
-# :semsearch is only written when this onboard was launched with WITH_VEC=1
-# (either `make box WITH_VEC=1 && make onboard` inside the container, or
-# `WITH_VEC=1 ./scripts/onboard.sh` on the host). Without it, semsearch is
-# disabled, which is what we want for users who don't need vector search.
+#
+# :db-server is the inner server's whole configuration, and the only key it
+# reads as such -- the same block serves a config.edn shared with the app and a
+# standalone one holding nothing else. Its :port is its own (3141, not the
+# app's 3140); the app derives http://127.0.0.1:<that> as its db handle. Its
+# :db-path goes through $DB_PATH so scripts/e2e.sh can point a db-server at
+# ./test/rhizome-e2e.db without a second config file.
+#
+# :vec-path (inside :db-server -- loading the extension is the database's
+# business) and :semsearch (the app-side embedder's ollama url and model) are
+# only written when this onboard was launched with WITH_VEC=1 (either
+# `make box WITH_VEC=1 && make onboard` inside the container, or
+# `WITH_VEC=1 ./scripts/onboard.sh` on the host). Without them, semantic search
+# is disabled, which is what we want for users who don't need vector search.
 if [ "${WITH_VEC:-0}" = "1" ]; then
     # :vec-path resolves through aero #or so the *same* config.edn works on
     # host and inside docker without re-running onboard. $VEC_PATH wins (set
     # by the Dockerfile to /usr/local/lib/sqlite-vec/vec0 in the container);
     # otherwise it falls back to the host install path written by
     # scripts/install-sqlite-vec.sh.
-    SEMSEARCH_LINE=$'\n :semsearch {:vec-path #or [#env VEC_PATH "./.sqlite-vec/vec0"]\n             :ollama-url #or [#env VEC_URL "http://127.0.0.1:11434"]\n             :ollama-model "qwen3-embedding:0.6b"}'
+    VEC_PATH_LINE=$'\n             :vec-path #or [#env VEC_PATH "./.sqlite-vec/vec0"]'
+    SEMSEARCH_LINE=$'\n :semsearch {:ollama-url #or [#env VEC_URL "http://127.0.0.1:11434"]\n             :ollama-model "qwen3-embedding:0.6b"}'
 else
+    VEC_PATH_LINE=""
     SEMSEARCH_LINE=""
 fi
 cat > config.edn <<EOF
 {:port #long #or [#env PORT 3140]
- :dev? true${SEMSEARCH_LINE}}
+ :dev? true
+ :db-server {:port    #long #or [#env DB_PORT 3141]
+             :db-path #or [#env DB_PATH "./rhizome.db"]${VEC_PATH_LINE}}${SEMSEARCH_LINE}}
 EOF
 
 echo "Creating directories..."
@@ -49,7 +63,7 @@ echo "Done. Next:"
 if [ ! -f /.dockerenv ]; then
     echo "  npm install      # one time"
 fi
-echo "  make start       # boots JVM (auto-creates+seeds dev db) + shadow-cljs"
+echo "  make start       # boots db-server + JVM (auto-creates+seeds dev db) + shadow-cljs"
 case "$(uname -s)" in
     Darwin) VEC_EXT="dylib" ;;
     Linux)  VEC_EXT="so" ;;

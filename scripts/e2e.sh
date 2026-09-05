@@ -51,10 +51,57 @@ fi
 # (and Make) don't get a "*** [e2e] Error 1" tail under what is, from
 # the user's point of view, a clean no-op. STRICT=1 makes this a hard
 # failure so `make deploy` can't silently skip e2e on a held lock.
-./scripts/detect-ports.sh check PORT SHADOW_PORT || exit "$refuse_exit"
+# DB_PORT is in the check here and NOT in `make start`'s, and the asymmetry is
+# the point. `make start` connects to a healthy db-server if it finds one --
+# that is the sharing this split allows. An e2e run must not: the one it would
+# find is pointed at ./rhizome.db, and this suite would then run its scenarios
+# against the developer's own database and delete rows out of it. So anything
+# on that port is a refusal, and this run brings up its own.
+./scripts/detect-ports.sh check PORT SHADOW_PORT DB_PORT || exit "$refuse_exit"
 
-./scripts/write-lock.sh e2e "$HEADED"
+DB_PORT="${DB_PORT:-$(./scripts/detect-ports.sh DB_PORT)}"
+export DB_PORT
+
+DB_PORT="$DB_PORT" ./scripts/write-lock.sh e2e "$HEADED"
 trap 'rm -f .dev-server.lock' EXIT INT TERM
+
+# --- the db-server for this run ---------------------------------------------
+# The app-server holds no datasource since the split and refuses to boot with
+# nothing behind it, so playwright's webServer would time out with a message
+# about a port. This is the process it talks to, and it is pointed at the e2e
+# database by DB_PATH: config.edn writes `:db-path #or [#env DB_PATH "./rhizome.db"]`,
+# so exporting the variable is the whole of it -- no second config file, and
+# the app inherits the variable and has no use for it.
+#
+# It applies the schema as it opens the file, which is what the app-server used
+# to do at its own startup. A fresh ./test/rhizome-e2e.db is therefore still
+# created and populated by this line and not by the JVM playwright spawns.
+export DB_PATH="./test/rhizome-e2e.db"
+echo "Starting db-server for e2e on :$DB_PORT (db: $DB_PATH)..."
+clj -M:e2e -m db-server &
+# By port, not by $!: `clj` is a bash wrapper that forks the JVM as a child, so
+# $! is the wrapper and it is gone before this trap ever runs. Whatever holds
+# DB_PORT is this run's -- the check above refused to start if anything already
+# did. SIGTERM, so the shutdown hook rolls back anything open rather than
+# leaving SQLite's write lock behind.
+stop_e2e_db_server() {
+  pids=$(lsof -nP -iTCP:"$DB_PORT" -sTCP:LISTEN -t 2>/dev/null | tr '\n' ' ' || true)
+  # shellcheck disable=SC2086
+  [ -n "$pids" ] && kill $pids 2>/dev/null || true
+}
+# Replaces the trap above: same lock cleanup, plus this server.
+trap 'stop_e2e_db_server; rm -f .dev-server.lock' EXIT INT TERM
+
+for _ in $(seq 1 60); do
+  curl -sf -m 2 "http://127.0.0.1:$DB_PORT/health" >/dev/null 2>&1 && break
+  sleep 0.5
+done
+if ! curl -sf -m 2 "http://127.0.0.1:$DB_PORT/health" >/dev/null 2>&1; then
+  echo "db-server did not answer /health on :$DB_PORT within 30s -- see its output above." >&2
+  exit 1
+fi
+echo "db-server up on :$DB_PORT."
+
 
 if [ "$NO_BUILD" = "1" ]; then
   echo "Skipping shadow-cljs release build (NO_BUILD=1)."

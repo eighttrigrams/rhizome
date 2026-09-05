@@ -1,7 +1,8 @@
 #!/bin/bash
 # Tear down whichever side currently owns the dev/e2e ports, refusing if
 # the lock says they were started in a different environment (host vs.
-# container). Also clears `.shadow-cljs.pid` and the lockfile.
+# container). Also stops the db-server this project started, and clears
+# `.shadow-cljs.pid`, `.db-server.pid` and the lockfile.
 #
 # Cross-env refusal matters on macOS: `lsof -ti:$PORT` from the host
 # returns Docker's port-forward proxy PIDs and killing those tears down
@@ -18,8 +19,50 @@ LOCK="$ROOT/.dev-server.lock"
 # and that one honors $PORT/$SHADOW_PORT first too.
 PORT="${PORT:-$(./scripts/detect-ports.sh PORT)}"
 SHADOW_PORT="${SHADOW_PORT:-$(./scripts/detect-ports.sh SHADOW_PORT)}"
+DB_PORT="${DB_PORT:-$(./scripts/detect-ports.sh DB_PORT)}"
 
 if [ -f /.dockerenv ]; then here=container; else here=host; fi
+
+DB_PID_FILE="$ROOT/.db-server.pid"
+
+# The db-server is stopped only when THIS project started it: start.sh writes
+# .db-server.pid when it spawned one and writes nothing when it connected to
+# one that was already up. A db-server someone is watching in the foreground
+# with `make start-db` is theirs, and killing it from here would be a surprise.
+#
+# The file carries the env that wrote it for the same reason the lock does:
+# the repo is bind-mounted, so a pid written in a container is readable on the
+# host, where that number is a different process.
+#
+# It is read for *ownership*, not for a pid to kill. `clj` forks the JVM as a
+# child, so the recorded pid is the bash wrapper and it exited long ago -- the
+# thing holding the port is its orphan. So the kill goes by port, exactly as it
+# does for the app and shadow-cljs above.
+stop_db_server() {
+  if [ -f "$DB_PID_FILE" ]; then
+    db_env=$(grep -E '^ENV='  "$DB_PID_FILE" | cut -d= -f2)
+    db_port=$(grep -E '^DB_PORT=' "$DB_PID_FILE" | cut -d= -f2)
+    db_port="${db_port:-$DB_PORT}"
+    if [ "$db_env" != "$here" ]; then
+      echo "  db-server was started in '$db_env'; stop it there (you are on the $here)."
+      return 0
+    fi
+    db_pids=$(lsof -nP -iTCP:"$db_port" -sTCP:LISTEN -t 2>/dev/null | tr '\n' ' ' | sed 's/ $//' || true)
+    if [ -n "$db_pids" ]; then
+      echo "  killing db-server $db_pids on :$db_port"
+      # SIGTERM, not -9: the db-server hangs stop! on a shutdown hook, which
+      # rolls back whatever transaction was open instead of leaving SQLite's
+      # write lock behind.
+      # shellcheck disable=SC2086
+      kill $db_pids 2>/dev/null || true
+    else
+      echo "  db-server was already gone from :$db_port"
+    fi
+    rm -f "$DB_PID_FILE"
+  elif lsof -nP -iTCP:"$DB_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+    echo "  a db-server is on :$DB_PORT but this project did not start it -- left alone."
+  fi
+}
 
 listening=0
 for p in "$PORT" "$SHADOW_PORT"; do
@@ -41,7 +84,15 @@ if [ -f "$LOCK" ]; then
 fi
 
 if [ "$listening" -eq 0 ] && [ -z "$lock_mode" ]; then
-  echo "Nothing to stop."
+  # A db-server outlives the app on purpose, and start.sh's EXIT trap drops the
+  # lock once the app's ports are free -- so "no listeners, no lock" is the
+  # ordinary state in which one is still running. Say what was found either way.
+  if [ -f "$DB_PID_FILE" ] || lsof -nP -iTCP:"$DB_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+    echo "No app server or shadow-cljs to stop."
+    stop_db_server
+  else
+    echo "Nothing to stop."
+  fi
   rm -f "$LOCK" .shadow-cljs.pid
   exit 0
 fi
@@ -64,6 +115,7 @@ if [ "$listening" -eq 0 ] && [ -n "$lock_mode" ]; then
       if [ "$lock_env" = "$here" ]; then
         rm -f "$LOCK" .shadow-cljs.pid
         echo "Lock claimed a dev server (env=$lock_env, pid=$lock_pid) but nothing was listening. Cleared .dev-server.lock${lock_pid:+ and .shadow-cljs.pid}."
+        stop_db_server
       else
         echo "Lock claims a dev server (env=$lock_env, pid=$lock_pid) but nothing is listening on this side. Run 'make stop' from the $lock_env (or 'rm .dev-server.lock' there) if it's stale."
       fi
@@ -107,5 +159,7 @@ for p in "$PORT" "$SHADOW_PORT"; do
     kill $pids 2>/dev/null || true
   fi
 done
+
+stop_db_server
 
 rm -f "$LOCK" .shadow-cljs.pid
