@@ -72,6 +72,24 @@ only one machine, while the files sync to every machine via iCloud.
 | app-server → file folders | filesystem | iCloud-synced dirs + `Music`/`Movies`; imports, previews, deletion |
 | poll/scrapers → internet | HTTP | youtube, atom feeds, substack, websites |
 
+### The wire carries SQL, deliberately
+
+The app-server → db-server edge is statement-level — real SQL with
+parameters — and that was examined and confirmed, not inherited by
+accident. This wire is not an API: it is the spinal cord of one program cut
+into two halves, and nothing but the app-server is ever meant to speak it.
+Agents and people talk to `/api` and `/ui`, where the gates live. The inner
+server encapsulates what can only exist on one machine — the file, the
+connections, the transactions, the vec extension — while the knowledge of
+*what to ask* stays in `et.vp.ds`, where it always lived (the search SQL is
+composed dynamically, so a fixed vocabulary could not hold it anyway).
+Today the trust boundary equals the old one: only loopback can reach the
+port (any other bind is refused), so whoever could speak SQL to it could
+equally have opened the db file. When the wire later crosses machines, the
+control that matters is **authentication** — *who* may speak — not
+vocabulary: an unauthenticated higher-level endpoint would still delete
+anything on request.
+
 ## Who talks to the vector embedder
 
 **The app-server, and only the app-server.** `semsearch.embedder` is the
