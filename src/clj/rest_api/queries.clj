@@ -1,5 +1,5 @@
 (ns rest-api.queries
-  (:require [next.jdbc :as jdbc]
+  (:require [db :as db]
             [honey.sql :as sql]
             [clojure.java.io :as io]
             [clojure.string :as str]
@@ -145,7 +145,7 @@
                                                         :where [:= :owner_id [:inline cid]]}])
                                          context-ids))]
                          :limit 1}
-             rows (jdbc/execute! db (sql/format base-query))]
+             rows (db/execute! db (sql/format base-query))]
          (if (seq rows)
            (let [r (first rows)]
              (json-response

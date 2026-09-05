@@ -1,6 +1,6 @@
 (ns et.vp.ds.search
   (:require [cambium.core :as log]
-            [next.jdbc :as jdbc]
+            [db :as db]
             [honey.sql :as sql]
             [et.vp.ds.search.core :as core]
             [et.vp.ds.helpers :refer [un-namespace-keys post-process-base] :as helpers]))
@@ -44,7 +44,7 @@
   (when (and link-item (not all-items?))
     (throw (IllegalArgumentException. "Must set 'all-items?' on 'link-item'")))
   (try (->> (core/search-items q opts ctx)
-            (jdbc/execute! db)
+            (db/execute! db)
             (map post-process)
             (map post-process-contexts))
        (catch Exception e
@@ -67,7 +67,7 @@
                              :from [:items]
                              :where (into [:or] conds)
                              :order-by [[:items.updated_at_ctx :desc]]})
-                (jdbc/execute! db)
+                (db/execute! db)
                 (map post-process)
                 (map post-process-contexts))
            (catch Exception e
@@ -79,7 +79,7 @@
 (defn- do-query
   [db formatted-query]
   #_(prn "???" formatted-query)
-  (let [items (jdbc/execute! db formatted-query)]
+  (let [items (db/execute! db formatted-query)]
     (log/info (str "count: " (count items)))
     items))
 
@@ -237,7 +237,7 @@
    is filtered by it, so a bound that ignored it would go on offering steps into
    the part of the tree the filter just removed."
   [db q selected-item-id]
-  (:depth (un-namespace-keys (jdbc/execute-one! db (core/part-of-depth q selected-item-id)))))
+  (:depth (un-namespace-keys (db/execute-one! db (core/part-of-depth q selected-item-id)))))
 
 (defn search-related-items-vector-threshold
   "Blue-mode retrieval. Same relational filters + INNER JOIN items_vec as
@@ -265,7 +265,7 @@
    Requires :vector-qjson in opts."
   [db q selected-item-id {:keys [search-mode] :as opts}]
   (let [opts (modify opts)
-        row (jdbc/execute-one! db (core/vector-similarity-bounds q (->core-opts selected-item-id search-mode opts)))]
+        row (db/execute-one! db (core/vector-similarity-bounds q (->core-opts selected-item-id search-mode opts)))]
     (un-namespace-keys row)))
 
 (defn- try-parse [item] (try (Integer/parseInt item) (catch Exception _e nil)))
@@ -283,7 +283,7 @@
        :group-by [:items.id]
        :order-by [[:items.updated_at :desc]]}
       sql/format
-      (#(jdbc/execute-one! db % {:return-keys true}))
+      (#(db/execute-one! db % {:return-keys true}))
       un-namespace-keys
       :title))
 

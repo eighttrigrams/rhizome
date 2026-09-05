@@ -1,6 +1,10 @@
 {:lint-as {mount.core/defstate clojure.core/def
             net.eighttrigrams.defn-over-http.core/defdispatch clojure.core/def
-            cambium.core/deflevel clojure.core/defmacro}
+            cambium.core/deflevel clojure.core/defmacro
+            ;; Without this the tx name reads as unresolved in every body.
+            ;; One name bound to one value is with-open's shape, and the
+            ;; lint-as next.jdbc gives its own next.jdbc/on-connection.
+            db/with-transaction clojure.core/with-open}
  :linters {:unresolved-symbol {:exclude [(server http-server)]}
            :unused-private-var {:exclude [server/http-server]}}
  :hooks {:analyze-call {cambium.core/deflevel hooks.cambium/deflevel}}}

@@ -1,7 +1,6 @@
 (ns et.vp.ds.helpers
   (:require [cheshire.core :as json]
-            [next.jdbc :as jdbc]
-            [next.jdbc.result-set :as rs]
+            [db :as db]
             [tick.core :as t]
             [datastore.dialect :as dialect]))
 
@@ -31,10 +30,10 @@
    SELECT last_insert_rowid() in a transaction so they share a
    connection (SQLite's last_insert_rowid is per-connection)."
   [db sql-vec]
-  (jdbc/with-transaction [tx db]
-    (jdbc/execute-one! tx sql-vec)
-    (-> (jdbc/execute-one! tx ["SELECT last_insert_rowid() AS id"]
-                           {:builder-fn rs/as-unqualified-lower-maps})
+  (db/with-transaction [tx db]
+    (db/execute-one! tx sql-vec)
+    (-> (db/execute-one! tx ["SELECT last_insert_rowid() AS id"]
+                         {:builder :unqualified-lower})
         :id)))
 
 (defn- parse-data

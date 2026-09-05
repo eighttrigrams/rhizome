@@ -1,5 +1,5 @@
 (ns rest-api.mutations
-  (:require [next.jdbc :as jdbc]
+  (:require [db :as db]
             [honey.sql :as sql]
             [clojure.string :as str]
             [cambium.core :as log]
@@ -26,10 +26,10 @@
 (defn- patch-item!
   "Run an UPDATE on items SET <set-map> WHERE id=<id> and re-fetch."
   [db id set-map]
-  (jdbc/execute! db
-                 (sql/format {:update [:items]
-                              :set set-map
-                              :where [:= :id [:inline id]]}))
+  (db/execute! db
+               (sql/format {:update [:items]
+                            :set set-map
+                            :where [:= :id [:inline id]]}))
   (datastore/get-item db {:id id}))
 
 (defn- apply-sort-idx
@@ -311,10 +311,10 @@
   (let [item (datastore/get-item db {:id source-id})
         data (assoc-in (or (:data item) {})
                        [:contexts target-id :show-badge?] show-badge?)]
-    (jdbc/execute! db
-                   (sql/format {:update [:items]
-                                :set {:data [:inline (json/generate-string data)]}
-                                :where [:= :id [:inline source-id]]}))))
+    (db/execute! db
+                 (sql/format {:update [:items]
+                              :set {:data [:inline (json/generate-string data)]}
+                              :where [:= :id [:inline source-id]]}))))
 
 (defn- upsert-relation-impl
   [db source-item target-item show-badge? part-of]

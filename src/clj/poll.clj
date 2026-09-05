@@ -1,6 +1,6 @@
 (ns poll
   (:require [clojure.string :as str]
-            [next.jdbc :as jdbc]
+            [db :as db]
             [honey.sql :as sql]
             [cambium.core :as log]
             [et.vp.ds :as datastore]
@@ -23,34 +23,34 @@
   (or (:id (first (search/find-items-by-ids db {:human-readable-ids ["imports"]})))
       (let [id (or (imports-by-title db)
                    (:id (datastore/new-context db {:title "Imports"} "scraper")))]
-        (jdbc/execute-one! db
-                           (sql/format {:update [:items]
-                                        :set {:human_readable_id [:inline "imports"]}
-                                        :where [:= :id [:inline id]]}))
+        (db/execute-one! db
+                         (sql/format {:update [:items]
+                                      :set {:human_readable_id [:inline "imports"]}
+                                      :where [:= :id [:inline id]]}))
         id)))
 
 (defn- seen?
   [db table column id]
-  (boolean (seq (jdbc/execute! db
-                               (sql/format {:select [column]
-                                            :from [table]
-                                            :where [:= column [:inline id]]})))))
+  (boolean (seq (db/execute! db
+                             (sql/format {:select [column]
+                                          :from [table]
+                                          :where [:= column [:inline id]]})))))
 
 (defn- mark-seen!
   [db table column id]
-  (jdbc/execute-one! db
-                     (sql/format {:insert-into [table]
-                                  :columns [column]
-                                  :values [[[:inline id]]]})))
+  (db/execute-one! db
+                   (sql/format {:insert-into [table]
+                                :columns [column]
+                                :values [[[:inline id]]]})))
 
 ;; --- YouTube channels -------------------------------------------------------
 
 (defn list-channels
   [db]
-  (->> (jdbc/execute! db
-                      (sql/format {:select [:id :channel_id :name :min_duration_minutes]
-                                   :from [:youtube_poll_channels]
-                                   :order-by [[:added_at :desc]]}))
+  (->> (db/execute! db
+                    (sql/format {:select [:id :channel_id :name :min_duration_minutes]
+                                 :from [:youtube_poll_channels]
+                                 :order-by [[:added_at :desc]]}))
        (mapv (fn [row]
                {:id (:youtube_poll_channels/id row)
                 :channel-id (:youtube_poll_channels/channel_id row)
@@ -59,34 +59,34 @@
 
 (defn- channel-exists?
   [db channel-id]
-  (boolean (seq (jdbc/execute! db
-                               (sql/format {:select [:id]
-                                            :from [:youtube_poll_channels]
-                                            :where [:= :channel_id [:inline channel-id]]})))))
+  (boolean (seq (db/execute! db
+                             (sql/format {:select [:id]
+                                          :from [:youtube_poll_channels]
+                                          :where [:= :channel_id [:inline channel-id]]})))))
 
 (defn add-channel!
   [db input min-duration]
   (when-let [channel-id (youtube-feed/resolve-channel-id input)]
     (when-not (channel-exists? db channel-id)
       (let [title (try (:title (youtube-feed/fetch-channel channel-id)) (catch Exception _ nil))]
-        (jdbc/execute-one! db
-                           (sql/format {:insert-into [:youtube_poll_channels]
-                                        :columns [:channel_id :name :min_duration_minutes]
-                                        :values [[[:inline channel-id] [:inline title]
-                                                  [:inline min-duration]]]}))))))
+        (db/execute-one! db
+                         (sql/format {:insert-into [:youtube_poll_channels]
+                                      :columns [:channel_id :name :min_duration_minutes]
+                                      :values [[[:inline channel-id] [:inline title]
+                                                [:inline min-duration]]]}))))))
 
 (defn update-channel-duration!
   [db id min-duration]
-  (jdbc/execute-one! db
-                     (sql/format {:update [:youtube_poll_channels]
-                                  :set {:min_duration_minutes [:inline min-duration]}
-                                  :where [:= :id [:inline id]]})))
+  (db/execute-one! db
+                   (sql/format {:update [:youtube_poll_channels]
+                                :set {:min_duration_minutes [:inline min-duration]}
+                                :where [:= :id [:inline id]]})))
 
 (defn delete-channel!
   [db id]
-  (jdbc/execute-one! db
-                     (sql/format {:delete-from [:youtube_poll_channels]
-                                  :where [:= :id [:inline id]]})))
+  (db/execute-one! db
+                   (sql/format {:delete-from [:youtube_poll_channels]
+                                :where [:= :id [:inline id]]})))
 
 (defn- too-short?
   [url min-duration]
@@ -123,10 +123,10 @@
 
 (defn list-feeds
   [db]
-  (->> (jdbc/execute! db
-                      (sql/format {:select [:id :feed_url :name]
-                                   :from [:atom_poll_feeds]
-                                   :order-by [[:added_at :desc]]}))
+  (->> (db/execute! db
+                    (sql/format {:select [:id :feed_url :name]
+                                 :from [:atom_poll_feeds]
+                                 :order-by [[:added_at :desc]]}))
        (mapv (fn [row]
                {:id (:atom_poll_feeds/id row)
                 :feed-url (:atom_poll_feeds/feed_url row)
@@ -134,10 +134,10 @@
 
 (defn- feed-exists?
   [db feed-url]
-  (boolean (seq (jdbc/execute! db
-                               (sql/format {:select [:id]
-                                            :from [:atom_poll_feeds]
-                                            :where [:= :feed_url [:inline feed-url]]})))))
+  (boolean (seq (db/execute! db
+                             (sql/format {:select [:id]
+                                          :from [:atom_poll_feeds]
+                                          :where [:= :feed_url [:inline feed-url]]})))))
 
 (defn add-feed!
   [db input]
@@ -145,16 +145,16 @@
     (when (re-matches #"https?://\S+" feed-url)
       (when-not (feed-exists? db feed-url)
         (let [title (try (:title (atom-feed/fetch-feed feed-url)) (catch Exception _ nil))]
-          (jdbc/execute-one! db
-                             (sql/format {:insert-into [:atom_poll_feeds]
-                                          :columns [:feed_url :name]
-                                          :values [[[:inline feed-url] [:inline title]]]})))))))
+          (db/execute-one! db
+                           (sql/format {:insert-into [:atom_poll_feeds]
+                                        :columns [:feed_url :name]
+                                        :values [[[:inline feed-url] [:inline title]]]})))))))
 
 (defn delete-feed!
   [db id]
-  (jdbc/execute-one! db
-                     (sql/format {:delete-from [:atom_poll_feeds]
-                                  :where [:= :id [:inline id]]})))
+  (db/execute-one! db
+                   (sql/format {:delete-from [:atom_poll_feeds]
+                                :where [:= :id [:inline id]]})))
 
 (defn- fill-description!
   [db item summary]

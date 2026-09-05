@@ -9,8 +9,8 @@
    `make start` + nothing else."
   (:require [cambium.core :as log]
             [clojure.edn :as edn]
+            [db :as db]
             [et.vp.ds.relations :as relations]
-            [next.jdbc :as jdbc]
             [repository.insertion.file :as file]))
 
 (def ^:private contexts
@@ -27,14 +27,14 @@
 (def ^:private demo-articles-path "./scripts/demo-articles.edn")
 
 (defn items-empty? [db]
-  (zero? (-> (jdbc/execute-one! db ["SELECT count(*) AS n FROM items"])
+  (zero? (-> (db/execute-one! db ["SELECT count(*) AS n FROM items"])
              :n)))
 
 (defn- insert-context! [db title]
   ;; File-type contexts get their stable named id (human_readable_id) so file
   ;; ingestion can match them by id rather than title. Other contexts get NULL
   ;; (the unique index is partial, so NULLs don't collide).
-  (jdbc/execute-one!
+  (db/execute-one!
    db
    ["INSERT INTO items
        (title, short_title, data, is_context, human_readable_id, inserted_at, updated_at, updated_at_ctx)
@@ -42,13 +42,13 @@
     title (get file/file-contexts title)]))
 
 (defn- articles-context-id [db]
-  (-> (jdbc/execute-one!
+  (-> (db/execute-one!
        db
        ["SELECT id FROM items WHERE is_context=1 AND title='Articles' LIMIT 1"])
       :items/id))
 
 (defn- insert-article! [db {:keys [title description]}]
-  (-> (jdbc/execute-one!
+  (-> (db/execute-one!
        db
        ["INSERT INTO items
            (title, short_title, description, data, is_context, inserted_at, updated_at, updated_at_ctx)
@@ -58,7 +58,7 @@
       :items/id))
 
 (defn- link! [db owner-id target-id]
-  (jdbc/execute-one!
+  (db/execute-one!
    db
    ["INSERT INTO relations (owner_id, target_id, show_badge) VALUES (?, ?, 1)"
     owner-id target-id])

@@ -1,7 +1,7 @@
 (ns repository.insertion.common
   (:require [et.vp.ds :as datastore]
             [et.vp.ds.helpers :as helpers]
-            [next.jdbc :as jdbc]
+            [db :as db]
             [honey.sql :as sql]))
 
 (defn get-item-or-throw-error
@@ -16,12 +16,12 @@
    (insert-item db title short-title context-ids-set resource-links "scraper"))
   ([db title short-title context-ids-set resource-links source]
    (let [item (datastore/new-item db title short-title context-ids-set nil source)
-         contexts (doall (->> (jdbc/execute! db
-                                             (sql/format {:select [:id :short_title :title
-                                                                   :is_context]
-                                                          :from [:items]
-                                                          :where [:in :items.id
-                                                                  [:inline (seq context-ids-set)]]}))
+         contexts (doall (->> (db/execute! db
+                                           (sql/format {:select [:id :short_title :title
+                                                                 :is_context]
+                                                        :from [:items]
+                                                        :where [:in :items.id
+                                                                [:inline (seq context-ids-set)]]}))
                               (map (fn [{:items/keys [id short_title title is_context]}]
                                      [id
                                       {:title (if (seq short_title) short_title title)

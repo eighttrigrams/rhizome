@@ -1,5 +1,5 @@
 (ns et.vp.ds.relations
-  (:require [next.jdbc :as jdbc]
+  (:require [db :as db]
             [honey.sql :as sql]
             [cambium.core :as log]
             [cheshire.core :as json]
@@ -28,11 +28,11 @@
    off the row it is stored in. A missing row reads as the column defaults --
    not-part-of, unplaced, badge shown."
   [db whole-id part-id]
-  (let [r (jdbc/execute-one! db
-                             (sql/format {:select [:is_part_of :part_of_sort_idx :show_badge]
-                                          :from [:relations]
-                                          :where [:and [:= :owner_id [:inline whole-id]]
-                                                  [:= :target_id [:inline part-id]]]}))]
+  (let [r (db/execute-one! db
+                           (sql/format {:select [:is_part_of :part_of_sort_idx :show_badge]
+                                        :from [:relations]
+                                        :where [:and [:= :owner_id [:inline whole-id]]
+                                                [:= :target_id [:inline part-id]]]}))]
     {:is-part-of? (boolean (helpers/int->bool (:relations/is_part_of r)))
      :part-of-sort-idx (->part-of-sort-idx (:relations/part_of_sort_idx r))
      ;; nil is the column's default too (show_badge DEFAULT 1), and the mirror
@@ -44,11 +44,11 @@
 
 (defn set-collection-titles-of-new-item
   [db item-id]
-  (let [data (:items/data (jdbc/execute-one! db
-                                             (sql/format {:select [:data]
-                                                          :from [:items]
-                                                          :where [:= :id [:inline item-id]]})
-                                             {:return-keys true}))
+  (let [data (:items/data (db/execute-one! db
+                                           (sql/format {:select [:data]
+                                                        :from [:items]
+                                                        :where [:= :id [:inline item-id]]})
+                                           {:return-keys true}))
         data (cond (nil? data) {}
                    :else (json/parse-string (dialect/parse-json-value data)))
         data (if (get data "contexts") data (assoc data "contexts" {}))
@@ -67,7 +67,7 @@
                                         :is-context? (helpers/int->bool is_context)
                                         :is-part-of? (helpers/int->bool is_part_of)
                                         :part-of-sort-idx (->part-of-sort-idx part_of_sort_idx)}])
-                                 (jdbc/execute!
+                                 (db/execute!
                                    db
                                    (sql/format {:select [:items.id :title :short_title :is_context
                                                          :relations.is_part_of
@@ -78,7 +78,7 @@
                                    {:return-keys true})))
                    item-id)]
     (log/info (str "item-id: " item-id ". contexts: " contexts "."))
-    (jdbc/execute-one!
+    (db/execute-one!
       db
       (sql/format {:update [:items]
                    :where [:= :id [:inline item-id]]
@@ -95,11 +95,11 @@
   [db item-id id
    {:keys [short_title title new-contexts show-badge? remove-from-container? is-context?
            is-part-of? part-of-sort-idx]}]
-  (let [data (:items/data (jdbc/execute-one! db
-                                             (sql/format {:select [:data]
-                                                          :from [:items]
-                                                          :where [:= :id [:inline item-id]]})
-                                             {:return-keys true}))
+  (let [data (:items/data (db/execute-one! db
+                                           (sql/format {:select [:data]
+                                                        :from [:items]
+                                                        :where [:= :id [:inline item-id]]})
+                                           {:return-keys true}))
         data (cond (nil? data) {}
                    :else (json/parse-string (dialect/parse-json-value data)))
         data (if (get data "contexts") data (assoc data "contexts" {}))
@@ -148,20 +148,20 @@
                                                                (:part-of-sort-idx row))}
                                                     (not (nil? is-context?))
                                                       (assoc :is-context? is-context?))))))))]
-    (jdbc/execute-one! db
-                       (sql/format {:update [:items]
-                                    :where [:= :id [:inline item-id]]
-                                    :set {:data [:inline (json/generate-string data)]}})
-                       {:return-keys true})))
+    (db/execute-one! db
+                     (sql/format {:update [:items]
+                                  :where [:= :id [:inline item-id]]
+                                  :set {:data [:inline (json/generate-string data)]}})
+                     {:return-keys true})))
 
 (defn update-collection-title-in-collection-items-for-children
   [db id title short_title]
   (let [item-ids (doall (map :relations/target_id
-                          (jdbc/execute! db
-                                         (sql/format {:select [:target_id]
-                                                      :from [:relations]
-                                                      :where [:= :owner_id [:inline id]]})
-                                         {:return-keys true})))]
+                          (db/execute! db
+                                       (sql/format {:select [:target_id]
+                                                    :from [:relations]
+                                                    :where [:= :owner_id [:inline id]]})
+                                       {:return-keys true})))]
     (doall (for [item-id item-ids]
              (update-collection-title-in-collection-items db
                                                           item-id
@@ -209,29 +209,29 @@
    (when (or tombstone? (present? text))
      (let [next-version
              (inc (:max_version
-                    (jdbc/execute-one!
+                    (db/execute-one!
                       db
                       (sql/format {:select [[[:coalesce [:max :version] 0] :max_version]]
                                    :from [:relation_history]
                                    :where [:and [:= :owner_id [:inline container-id]]
                                            [:= :target_id [:inline item-id]]]}))))]
-       (jdbc/execute-one! db
-                          (sql/format {:insert-into [:relation_history]
-                                       :values [{:owner_id [:inline container-id]
-                                                 :target_id [:inline item-id]
-                                                 :text [:inline text]
-                                                 :version [:inline next-version]
-                                                 :source [:inline source]
-                                                 :tombstone [:inline (if tombstone? 1 0)]}]}))))
+       (db/execute-one! db
+                        (sql/format {:insert-into [:relation_history]
+                                     :values [{:owner_id [:inline container-id]
+                                               :target_id [:inline item-id]
+                                               :text [:inline text]
+                                               :version [:inline next-version]
+                                               :source [:inline source]
+                                               :tombstone [:inline (if tombstone? 1 0)]}]}))))
    nil))
 
 (defn- edge-rows
   "The rows a tombstoning is about to lose, whichever way it is selecting them."
   [db where]
-  (jdbc/execute! db
-                 (sql/format {:select [:owner_id :target_id :description :description_source]
-                              :from [:relations]
-                              :where where})))
+  (db/execute! db
+               (sql/format {:select [:owner_id :target_id :description :description_source]
+                            :from [:relations]
+                            :where where})))
 
 (defn- tombstone-rows!
   "Archive each of `rows` as the last version of its edge, marked as the cut.
@@ -303,10 +303,10 @@
         (keep (fn [{:relations/keys [owner_id description description_source]}]
                 (when description
                   [owner_id {:description description :source description_source}])))
-        (jdbc/execute! db
-                       (sql/format {:select [:owner_id :description :description_source]
-                                    :from [:relations]
-                                    :where [:= :target_id [:inline item-id]]}))))
+        (db/execute! db
+                     (sql/format {:select [:owner_id :description :description_source]
+                                  :from [:relations]
+                                  :where [:= :target_id [:inline item-id]]}))))
 
 (defn- set-containers-of-item!
   "Rewrite an item's inbound relations from `containers`. Every caller must run
@@ -333,35 +333,35 @@
     ;; if it is ever re-linked then starts out blank on top of one history with the
     ;; cut marked in the middle of it, which is what happened.
     (tombstone-dropped-inbound-relations! db (:id item) (keys containers))
-    (jdbc/execute! db
-                   (sql/format {:delete-from [:relations]
-                                :where [:= :target_id [:inline (:id item)]]}))
+    (db/execute! db
+                 (sql/format {:delete-from [:relations]
+                              :where [:= :target_id [:inline (:id item)]]}))
     (doall
       (for [[container-id
              {:keys [show-badge? annotation is-part-of? part-of-sort-idx] :as container}]
               containers]
         (let [{:keys [description source]} (get texts container-id)]
-          (jdbc/execute! db
-                         (sql/format {:insert-into [:relations]
-                                      :columns [:target_id :owner_id :annotation :description
-                                                :description_source :show_badge :is_part_of
-                                                :part_of_sort_idx]
-                                      :values [[[:inline (:id item)] [:inline container-id]
-                                                [:inline annotation]
-                                                ;; A caller that carries the key
-                                                ;; has the text in hand and wins.
-                                                ;; The source stays the row's
-                                                ;; either way: nothing here knows
-                                                ;; who that caller is, and a
-                                                ;; rewrite is not an edit.
-                                                [:inline (if (contains? container :description)
-                                                           (:description container)
-                                                           description)]
-                                                [:inline source]
-                                                [:inline show-badge?]
-                                                [:inline (boolean is-part-of?)]
-                                                [:inline (->part-of-sort-idx
-                                                           part-of-sort-idx)]]]})))))))
+          (db/execute! db
+                       (sql/format {:insert-into [:relations]
+                                    :columns [:target_id :owner_id :annotation :description
+                                              :description_source :show_badge :is_part_of
+                                              :part_of_sort_idx]
+                                    :values [[[:inline (:id item)] [:inline container-id]
+                                              [:inline annotation]
+                                              ;; A caller that carries the key
+                                              ;; has the text in hand and wins.
+                                              ;; The source stays the row's
+                                              ;; either way: nothing here knows
+                                              ;; who that caller is, and a
+                                              ;; rewrite is not an edit.
+                                              [:inline (if (contains? container :description)
+                                                         (:description container)
+                                                         description)]
+                                              [:inline source]
+                                              [:inline show-badge?]
+                                              [:inline (boolean is-part-of?)]
+                                              [:inline (->part-of-sort-idx
+                                                         part-of-sort-idx)]]]})))))))
 
 (defn set-the-containers-of-item!
   "@param containers - map {:container-id {:annotation \"annotation\"
@@ -390,7 +390,7 @@
   ;; not survive the round trip.
   (let [containers (normalize-part-of containers)]
     (if (or is_context (seq (keys containers)))
-      (jdbc/with-transaction [tx db]
+      (db/with-transaction [tx db]
         (set-containers-of-item! tx item containers)
         (update-collection-title-in-collection-items
           tx
@@ -421,7 +421,7 @@
                                               :is-context? (helpers/int->bool (:is_context another-item))
                                               :is-part-of? is-part-of?
                                               :part-of-sort-idx part-of-sort-idx}})]
-     (jdbc/with-transaction [tx db]
+     (db/with-transaction [tx db]
        (set-containers-of-item! tx item contexts)
        (update-collection-title-in-collection-items tx
                                                     (:id item)
@@ -472,7 +472,7 @@
                      :container (select-keys item [:id :title])}
                     "can't unlink item from another item")
           false)
-      (do (jdbc/with-transaction [tx db]
+      (do (db/with-transaction [tx db]
             (set-containers-of-item! tx selected-item containers)
             (update-collection-title-in-collection-items
               tx
@@ -483,11 +483,11 @@
 
 (defn update-relation-annotation!
   [db item-id context-id annotation]
-  (jdbc/execute-one! db
-                     (sql/format {:update [:relations]
-                                  :set {:annotation [:inline annotation]}
-                                  :where [:and [:= :target_id [:inline item-id]]
-                                          [:= :owner_id [:inline context-id]]]})))
+  (db/execute-one! db
+                   (sql/format {:update [:relations]
+                                :set {:annotation [:inline annotation]}
+                                :where [:and [:= :target_id [:inline item-id]]
+                                        [:= :owner_id [:inline context-id]]]})))
 
 (defn- container-entry
   "A mirror entry for `container-id` built from the container itself: what the
@@ -496,10 +496,10 @@
    the mirror, and the human's dev db is full of items in that shape."
   [db container-id]
   (let [{:items/keys [title short_title is_context]}
-          (jdbc/execute-one! db
-                             (sql/format {:select [:title :short_title :is_context]
-                                          :from [:items]
-                                          :where [:= :id [:inline container-id]]}))]
+          (db/execute-one! db
+                           (sql/format {:select [:title :short_title :is_context]
+                                        :from [:items]
+                                        :where [:= :id [:inline container-id]]}))]
     {"title" (if (seq short_title) short_title title)
      "is-context?" (boolean (helpers/int->bool is_context))}))
 
@@ -510,11 +510,11 @@
    here disagreeing whatever the caller sent."
   [db item-id container-id]
   (let [row (standing-of-row db container-id item-id)
-        data (:items/data (jdbc/execute-one! db
-                                             (sql/format {:select [:data]
-                                                          :from [:items]
-                                                          :where [:= :id [:inline item-id]]})
-                                             {:return-keys true}))
+        data (:items/data (db/execute-one! db
+                                           (sql/format {:select [:data]
+                                                        :from [:items]
+                                                        :where [:= :id [:inline item-id]]})
+                                           {:return-keys true}))
         data (if (nil? data) {} (json/parse-string (dialect/parse-json-value data)))
         data (if (get data "contexts") data (assoc data "contexts" {}))
         entry (get-in data ["contexts" (str container-id)])
@@ -522,7 +522,7 @@
                      {"show-badge?" (:show-badge? row)
                       "is-part-of?" (:is-part-of? row)
                       "part-of-sort-idx" (:part-of-sort-idx row)})]
-    (jdbc/execute-one!
+    (db/execute-one!
       db
       (sql/format {:update [:items]
                    :where [:= :id [:inline item-id]]
@@ -566,21 +566,21 @@
                     (assoc :part_of_sort_idx [:inline (->part-of-sort-idx part-of-sort-idx)]))]
     (if (empty? set-map)
       false
-      (jdbc/with-transaction [tx db]
-        (if-not (jdbc/execute-one! tx
-                                   (sql/format {:select [:id]
-                                                :from [:relations]
-                                                :where [:and [:= :owner_id [:inline container-id]]
-                                                        [:= :target_id [:inline item-id]]]}))
+      (db/with-transaction [tx db]
+        (if-not (db/execute-one! tx
+                                 (sql/format {:select [:id]
+                                              :from [:relations]
+                                              :where [:and [:= :owner_id [:inline container-id]]
+                                                      [:= :target_id [:inline item-id]]]}))
           (do (log/info {:item-id item-id :container-id container-id}
                         "no such relation to set the standing of")
               false)
           (do (when is-part-of? (part-of/check-acyclic! tx item-id [container-id]))
-              (jdbc/execute-one! tx
-                                 (sql/format {:update [:relations]
-                                              :set set-map
-                                              :where [:and [:= :target_id [:inline item-id]]
-                                                      [:= :owner_id [:inline container-id]]]}))
+              (db/execute-one! tx
+                               (sql/format {:update [:relations]
+                                            :set set-map
+                                            :where [:and [:= :target_id [:inline item-id]]
+                                                    [:= :owner_id [:inline container-id]]]}))
               (set-mirror-standing! tx item-id container-id)
               true))))))
 
@@ -595,21 +595,21 @@
    when a pointer comes to rest on it."
   [db item-id container-id]
   (:relations/description
-    (jdbc/execute-one! db
-                       (sql/format {:select [:description]
-                                    :from [:relations]
-                                    :where [:and [:= :target_id [:inline item-id]]
-                                            [:= :owner_id [:inline container-id]]]}))))
+    (db/execute-one! db
+                     (sql/format {:select [:description]
+                                  :from [:relations]
+                                  :where [:and [:= :target_id [:inline item-id]]
+                                          [:= :owner_id [:inline container-id]]]}))))
 
 (defn- relation-text-row
   "The two columns a relation's text is held in -- the text and who wrote it --
    or nil when there is no such edge."
   [db item-id container-id]
-  (jdbc/execute-one! db
-                     (sql/format {:select [:description :description_source]
-                                  :from [:relations]
-                                  :where [:and [:= :target_id [:inline item-id]]
-                                          [:= :owner_id [:inline container-id]]]})))
+  (db/execute-one! db
+                   (sql/format {:select [:description :description_source]
+                                :from [:relations]
+                                :where [:and [:= :target_id [:inline item-id]]
+                                        [:= :owner_id [:inline container-id]]]})))
 
 (defn update-relation-description!
   "Replace the body text of one relation, keeping the text it replaces.
@@ -641,7 +641,7 @@
   ([db item-id container-id description]
    (update-relation-description! db item-id container-id description "app"))
   ([db item-id container-id description source]
-   (jdbc/with-transaction [tx db]
+   (db/with-transaction [tx db]
      (when-let [row (relation-text-row tx item-id container-id)]
        (when (not= (:relations/description row) description)
          (save-relation-revision! tx
@@ -649,12 +649,12 @@
                                   container-id
                                   (:relations/description row)
                                   (:relations/description_source row))
-         (jdbc/execute-one! tx
-                            (sql/format {:update [:relations]
-                                         :set {:description [:inline description]
-                                               :description_source [:inline source]}
-                                         :where [:and [:= :target_id [:inline item-id]]
-                                                 [:= :owner_id [:inline container-id]]]}))
+         (db/execute-one! tx
+                          (sql/format {:update [:relations]
+                                       :set {:description [:inline description]
+                                             :description_source [:inline source]}
+                                       :where [:and [:= :target_id [:inline item-id]]
+                                               [:= :owner_id [:inline container-id]]]}))
          true)))))
 
 (defn get-relation-description-history
@@ -696,13 +696,13 @@
                           ;; cljs, where 0 is truthy, and a version bar that
                           ;; called every version a deletion is what that costs.
                           :tombstone (= 1 (:relation_history/tombstone r))})
-                   (jdbc/execute! db
-                                  (sql/format {:select [:text :version :created_at :source
-                                                        :tombstone]
-                                               :from [:relation_history]
-                                               :where [:and [:= :owner_id [:inline container-id]]
-                                                       [:= :target_id [:inline item-id]]]
-                                               :order-by [[:version :desc]]})))
+                   (db/execute! db
+                                (sql/format {:select [:text :version :created_at :source
+                                                      :tombstone]
+                                             :from [:relation_history]
+                                             :where [:and [:= :owner_id [:inline container-id]]
+                                                     [:= :target_id [:inline item-id]]]
+                                             :order-by [[:version :desc]]})))
         versions (if row
                    (into [{:text (:relations/description row)
                            :version (inc (or (:version (first archived)) 0))

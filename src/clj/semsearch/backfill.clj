@@ -1,6 +1,6 @@
 (ns semsearch.backfill
   (:require [clojure.string :as str]
-            [next.jdbc :as jdbc]
+            [db :as db]
             [cambium.core :as log]
             [semsearch.embedder :as embedder]))
 
@@ -8,13 +8,13 @@
   "Write an item's embedding to items_vec. vec0 doesn't accept INSERT OR
    REPLACE on its primary key, so we DELETE then INSERT in a transaction."
   [db id v]
-  (jdbc/with-transaction [tx db]
-    (jdbc/execute-one! tx ["DELETE FROM items_vec WHERE item_id = ?" id])
-    (jdbc/execute-one! tx ["INSERT INTO items_vec(item_id, embedding) VALUES (?, ?)"
-                           id (embedder/vec->json v)])))
+  (db/with-transaction [tx db]
+    (db/execute-one! tx ["DELETE FROM items_vec WHERE item_id = ?" id])
+    (db/execute-one! tx ["INSERT INTO items_vec(item_id, embedding) VALUES (?, ?)"
+                         id (embedder/vec->json v)])))
 
 (defn- mark-skipped! [db id]
-  (jdbc/execute-one! db ["INSERT OR IGNORE INTO items_vec_skipped(item_id) VALUES (?)" id]))
+  (db/execute-one! db ["INSERT OR IGNORE INTO items_vec_skipped(item_id) VALUES (?)" id]))
 
 (defn embed-and-store!
   "Embed one item's description and store it in items_vec. Titles are
@@ -38,7 +38,7 @@
    and no row in items_vec_skipped. Logs per-item progress. Returns
    {:embedded N :failed M}."
   [db]
-  (let [rows (jdbc/execute! db
+  (let [rows (db/execute! db
                [(str "SELECT i.id, i.description FROM items i "
                      "LEFT JOIN items_vec v ON v.item_id = i.id "
                      "LEFT JOIN items_vec_skipped s ON s.item_id = i.id "

@@ -11,7 +11,7 @@
    about the database rather than about one client. Plain relations are not
    constrained -- they may go on forming cycles exactly as they always have."
   (:require [clojure.string :as str]
-            [next.jdbc :as jdbc]))
+            [db :as db]))
 
 (defn- edges
   "The part-of edge set as {whole-id #{part-id …}}, leaving out every edge into
@@ -21,10 +21,10 @@
   (reduce (fn [acc {:relations/keys [owner_id target_id]}]
             (update acc owner_id (fnil conj #{}) target_id))
     {}
-    (jdbc/execute! db
-                   ["SELECT owner_id, target_id FROM relations
+    (db/execute! db
+                 ["SELECT owner_id, target_id FROM relations
                      WHERE is_part_of = 1 AND target_id <> ?"
-                    replaced-part-id])))
+                  replaced-part-id])))
 
 (defn- path-down
   "A path from `from` down to `to` along the part-of edges: a vector of ids
@@ -76,11 +76,11 @@
   (let [titles (into {}
                      (map (fn [{:items/keys [id title short_title]}]
                             [id {:id id :title title :short_title short_title}]))
-                     (jdbc/execute! db
-                                    (into [(str "SELECT id, title, short_title FROM items WHERE id IN ("
-                                                (str/join "," (repeat (count (set path)) "?"))
-                                                ")")]
-                                          (sort (set path)))))]
+                     (db/execute! db
+                                  (into [(str "SELECT id, title, short_title FROM items WHERE id IN ("
+                                              (str/join "," (repeat (count (set path)) "?"))
+                                              ")")]
+                                        (sort (set path)))))]
     (str/join " → " (map #(name-of (get titles % {:id %})) path))))
 
 (defn check-acyclic!

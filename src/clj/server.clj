@@ -11,7 +11,7 @@
             [config :as config]
             [dev-seed :as dev-seed]
             [datastore.schema :as schema]
-            [next.jdbc :as jdbc]
+            [db :as db]
             [repository :as r]
             [repository.insertion.file :as file]
             [poll :as poll]
@@ -127,14 +127,14 @@
   [_req]
   (if (true? (:dev? config/config))
     (let [db (:db config/config)]
-      (jdbc/execute-one! db ["DELETE FROM relations"])
-      (jdbc/execute-one! db ["DELETE FROM items"])
-      (jdbc/execute-one! db ["DELETE FROM history"])
-      (jdbc/execute-one! db ["DELETE FROM relation_history"])
-      (jdbc/execute-one! db ["DELETE FROM youtube_poll_channels"])
-      (jdbc/execute-one! db ["DELETE FROM youtube_poll_seen"])
-      (jdbc/execute-one! db ["DELETE FROM atom_poll_feeds"])
-      (jdbc/execute-one! db ["DELETE FROM atom_poll_seen"])
+      (db/execute-one! db ["DELETE FROM relations"])
+      (db/execute-one! db ["DELETE FROM items"])
+      (db/execute-one! db ["DELETE FROM history"])
+      (db/execute-one! db ["DELETE FROM relation_history"])
+      (db/execute-one! db ["DELETE FROM youtube_poll_channels"])
+      (db/execute-one! db ["DELETE FROM youtube_poll_seen"])
+      (db/execute-one! db ["DELETE FROM atom_poll_feeds"])
+      (db/execute-one! db ["DELETE FROM atom_poll_seen"])
       {:status 200 :body "ok"})
     {:status 403 :body "not in dev mode"}))
 

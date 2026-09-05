@@ -1,9 +1,8 @@
 (ns et.vp.ds
-  (:require [next.jdbc :as jdbc]
+  (:require [db :as db]
             [honey.sql :as sql]
             [cheshire.core :as json]
             [cambium.core :as log]
-            [datastore.connection :as connection]
             [et.vp.ds.relations :as datastore.relations]
             [et.vp.ds.helpers :refer [un-namespace-keys post-process-base] :as helpers]
             [datastore.dialect :as dialect]))
@@ -13,19 +12,19 @@
    next backfill treats it as unembedded. Called on every description version
    bump so the embedding tracks the latest text."
   [db id]
-  (when connection/vec-available?
-    (jdbc/execute-one! db ["DELETE FROM items_vec WHERE item_id = ?" id]))
-  (jdbc/execute-one! db ["DELETE FROM items_vec_skipped WHERE item_id = ?" id]))
+  (when (db/vec-available? db)
+    (db/execute-one! db ["DELETE FROM items_vec WHERE item_id = ?" id]))
+  (db/execute-one! db ["DELETE FROM items_vec_skipped WHERE item_id = ?" id]))
 
 (defn delete-date
   [db item-id]
-  (jdbc/execute! db
-                 (sql/format
-                   {:update [:items] :set {:date nil} :where [:= :id [:inline item-id]]})))
+  (db/execute! db
+               (sql/format
+                 {:update [:items] :set {:date nil} :where [:= :id [:inline item-id]]})))
 
 (defn insert-date
   [db item-id date]
-  (jdbc/execute!
+  (db/execute!
     db
     (sql/format {:update [:items] :set {:date [:inline date]} :where [:= :id [:inline item-id]]})))
 
@@ -70,19 +69,19 @@
                      :contexts)]
     (if (or (not is_context) (seq contexts))
       (do (log/info "Update the item's is_context status")
-          (jdbc/execute-one! db
-                             (sql/format {:update [:items]
-                                          :where [:= :id [:inline id]]
-                                          :set {:is_context (not is_context)
-                                                :updated_at_ctx (dialect/now-sql)
-                                                :updated_at (dialect/now-sql)}})
-                             {:return-keys true})
+          (db/execute-one! db
+                           (sql/format {:update [:items]
+                                        :where [:= :id [:inline id]]
+                                        :set {:is_context (not is_context)
+                                              :updated_at_ctx (dialect/now-sql)
+                                              :updated_at (dialect/now-sql)}})
+                           {:return-keys true})
           (log/info "Update all items that have this item in their contexts")
-          (let [related-items (jdbc/execute! db
-                                             (sql/format {:select [:target_id]
-                                                          :from [:relations]
-                                                          :where [:= :owner_id [:inline id]]})
-                                             {:return-keys true})]
+          (let [related-items (db/execute! db
+                                           (sql/format {:select [:target_id]
+                                                        :from [:relations]
+                                                        :where [:= :owner_id [:inline id]]})
+                                           {:return-keys true})]
             (log/info "Updating related items")
             (doseq [{:relations/keys [target_id]} related-items]
               (log/info {:target_id target_id} "Updating related item")
@@ -98,9 +97,9 @@
 
 (defn get-contained-items-count
   [db id]
-  (count (jdbc/execute! db
-                        (sql/format {:select :* :from [:relations] :where [:= :owner_id id]})
-                        {:return-keys true})))
+  (count (db/execute! db
+                      (sql/format {:select :* :from [:relations] :where [:= :owner_id id]})
+                      {:return-keys true})))
 
 (declare save-revision-to-history!)
 
@@ -123,17 +122,17 @@
    delete clears both directions and tombstones them on its own way past --
    repository.deletion/execute!."
   [db {:keys [id]}]
-  (when-let [row (jdbc/execute-one! db
-                                    (sql/format {:select [:title :description
-                                                          :description_source]
-                                                 :from [:items]
-                                                 :where [:= :id [:inline id]]}))]
+  (when-let [row (db/execute-one! db
+                                  (sql/format {:select [:title :description
+                                                        :description_source]
+                                               :from [:items]
+                                               :where [:= :id [:inline id]]}))]
     (datastore.relations/tombstone-inbound-relations! db id)
     (save-revision-to-history! db id (:items/description row) (:items/title row)
                                (:items/description_source row) true))
   (delete-date db id)
-  (jdbc/execute! db (sql/format {:delete-from [:relations] :where [:= :target_id [:inline id]]}))
-  (jdbc/execute! db (sql/format {:delete-from [:items] :where [:= :id [:inline id]]})))
+  (db/execute! db (sql/format {:delete-from [:relations] :where [:= :target_id [:inline id]]}))
+  (db/execute! db (sql/format {:delete-from [:items] :where [:= :id [:inline id]]})))
 
 (declare get-item)
 
@@ -160,10 +159,10 @@
   [db id]
   (or (-> (basic-items-query id)
           sql/format
-          (#(jdbc/execute-one! db % {:return-keys true})))
+          (#(db/execute-one! db % {:return-keys true})))
       (-> (simple-items-query id)
           sql/format
-          (#(jdbc/execute-one! db % {:return-keys true})))))
+          (#(db/execute-one! db % {:return-keys true})))))
 
 (defn get-item
   [db {:keys [id]}]
@@ -182,7 +181,7 @@
   [db id]
   (-> (basic-title-query id)
       sql/format
-      (#(jdbc/execute-one! db % {:return-keys true}))))
+      (#(db/execute-one! db % {:return-keys true}))))
 
 (defn get-item-by-title
   [db {:keys [title]}]
@@ -199,7 +198,7 @@
   [db path url]
   (-> (basic-find-query [:raw path] url)
       sql/format
-      (#(jdbc/execute-one! db % {:return-keys true}))))
+      (#(db/execute-one! db % {:return-keys true}))))
 
 (defn get-item-by-path
   [db path url]
@@ -212,7 +211,7 @@
   [db path url]
   (-> (basic-find-query [:raw path] url)
       sql/format
-      (#(jdbc/execute! db % {:return-keys true}))))
+      (#(db/execute! db % {:return-keys true}))))
 
 (defn- present? [s] (and s (not (clojure.string/blank? s))))
 
@@ -229,35 +228,35 @@
    (save-revision-to-history! db id description title source false))
   ([db id description title source tombstone?]
    (when (or tombstone? (present? description) (present? title))
-     (let [max-version-result (jdbc/execute-one! db
-                                                 (sql/format {:select [[[:coalesce [:max :version] 0]
-                                                                        :max_version]]
-                                                              :from [:history]
-                                                              :where [:= :id [:inline id]]})
-                                                 {:return-keys true})
+     (let [max-version-result (db/execute-one! db
+                                               (sql/format {:select [[[:coalesce [:max :version] 0]
+                                                                      :max_version]]
+                                                            :from [:history]
+                                                            :where [:= :id [:inline id]]})
+                                               {:return-keys true})
            new-version (inc (:max_version max-version-result))]
-       (jdbc/execute-one! db
-                          (sql/format {:insert-into [:history]
-                                       :values [{:id [:inline id]
-                                                 :text [:inline description]
-                                                 :title [:inline title]
-                                                 :version [:inline new-version]
-                                                 :source [:inline source]
-                                                 :tombstone [:inline (if tombstone? 1 0)]}]})
-                          {:return-keys true})))
+       (db/execute-one! db
+                        (sql/format {:insert-into [:history]
+                                     :values [{:id [:inline id]
+                                               :text [:inline description]
+                                               :title [:inline title]
+                                               :version [:inline new-version]
+                                               :source [:inline source]
+                                               :tombstone [:inline (if tombstone? 1 0)]}]})
+                        {:return-keys true})))
    nil))
 
 (defn get-description-history
   [db {:keys [id]}]
   (let [current-item (get-item db {:id id})
         current-description (:description current-item)
-        history-items (jdbc/execute! db
-                                     (sql/format {:select [:text :title :version :created_at
-                                                           :source :tombstone]
-                                                  :from [:history]
-                                                  :where [:= :id [:inline id]]
-                                                  :order-by [[:version :desc]]})
-                                     {:return-keys true})
+        history-items (db/execute! db
+                                   (sql/format {:select [:text :title :version :created_at
+                                                         :source :tombstone]
+                                                :from [:history]
+                                                :where [:= :id [:inline id]]
+                                                :order-by [[:version :desc]]})
+                                   {:return-keys true})
         history-items-as-maps (map (fn [row]
                                      {:text (:history/text row)
                                       :title (:history/title row)
@@ -327,7 +326,7 @@
                                              "-" (:sort_idx old-item)))
                              (if (integer? (:sort_idx old-item)) (:sort_idx old-item) -1))))]}))
         formatted-sql (sql/format {:update [:items] :where [:= :id [:inline id]] :set set})
-        _result (jdbc/execute-one! db formatted-sql {:return-keys true})]
+        _result (db/execute-one! db formatted-sql {:return-keys true})]
     {:old-item old-item
      :title-changed? title-changed?
      :display-title-changed? (or title-changed? (not= (:short_title old-item) short_title))}))
@@ -360,13 +359,13 @@
         old-description (:description old-item)]
     (save-revision-to-history! db id old-description (:title old-item)
                                (:description_source old-item))
-    (jdbc/execute-one! db
-                       (sql/format {:update [:items]
-                                    :set {:description [:inline description]
-                                          :description_source [:inline source]
-                                          :updated_at_ctx (dialect/now-sql)}
-                                    :where [:= :id [:inline id]]})
-                       {:return-keys true})
+    (db/execute-one! db
+                     (sql/format {:update [:items]
+                                  :set {:description [:inline description]
+                                        :description_source [:inline source]
+                                        :updated_at_ctx (dialect/now-sql)}
+                                  :where [:= :id [:inline id]]})
+                     {:return-keys true})
     (clear-item-embedding! db id)
     (get-item db {:id id})))
 
@@ -374,10 +373,10 @@
   [db {:keys [id] :as selected-item} {:keys [title]}]
   (let [data (:data (get-item db selected-item))
         data (update-in data [:views :stored] conj {:title title :view (:current (:views data))})]
-    (jdbc/execute-one! db
-                       (sql/format {:update [:items]
-                                    :set {:data [:inline (json/generate-string data)]}
-                                    :where [:= :id [:inline id]]})))
+    (db/execute-one! db
+                     (sql/format {:update [:items]
+                                  :set {:data [:inline (json/generate-string data)]}
+                                  :where [:= :id [:inline id]]})))
   (get-item db selected-item))
 
 (defn load-stored-context
@@ -390,10 +389,10 @@
                    :stored
                    (get idx)
                    :view))]
-    (jdbc/execute-one! db
-                       (sql/format {:update [:items]
-                                    :set {:data [:inline (json/generate-string data)]}
-                                    :where [:= :id [:inline id]]})))
+    (db/execute-one! db
+                     (sql/format {:update [:items]
+                                  :set {:data [:inline (json/generate-string data)]}
+                                  :where [:= :id [:inline id]]})))
   (get-item db selected-item))
 
 ;; https://stackoverflow.com/a/18319708
@@ -406,10 +405,10 @@
   [db {:keys [id] :as selected-item} idx]
   (let [data (:data (get-item db selected-item))
         data (update-in data [:views :stored] #(vec-remove idx %))]
-    (jdbc/execute-one! db
-                       (sql/format {:update [:items]
-                                    :set {:data [:inline (json/generate-string data)]}
-                                    :where [:= :id [:inline id]]})))
+    (db/execute-one! db
+                     (sql/format {:update [:items]
+                                  :set {:data [:inline (json/generate-string data)]}
+                                  :where [:= :id [:inline id]]})))
   (get-item db selected-item))
 
 (defn cycle-search-mode
@@ -417,25 +416,25 @@
   (let [data (-> (get-item db context)
                  :data
                  (update-in [:views :current :search-mode] #(mod (inc (or % 0)) 6)))]
-    (jdbc/execute-one! db
-                       (sql/format {:update [:items]
-                                    :set {:data [:inline (json/generate-string data)]}
-                                    :where [:= :id [:inline id]]}))
+    (db/execute-one! db
+                     (sql/format {:update [:items]
+                                  :set {:data [:inline (json/generate-string data)]}
+                                  :where [:= :id [:inline id]]}))
     (get-item db context)))
 
 (defn reprioritize-context
   [db {:keys [id]}]
-  (jdbc/execute! db
-                 (sql/format {:update [:items]
-                              :set {:updated_at_ctx (dialect/now-sql)}
-                              :where [:= :id [:inline id]]})))
+  (db/execute! db
+               (sql/format {:update [:items]
+                            :set {:updated_at_ctx (dialect/now-sql)}
+                            :where [:= :id [:inline id]]})))
 
 (defn reprioritize-item
   [db {:keys [id]}]
-  (jdbc/execute! db
-                 (sql/format {:update [:items]
-                              :set {:updated_at (dialect/now-sql)}
-                              :where [:= :id [:inline id]]})))
+  (db/execute! db
+               (sql/format {:update [:items]
+                            :set {:updated_at (dialect/now-sql)}
+                            :where [:= :id [:inline id]]})))
 
 (defn- create-new-item!
   [db title short_title sort_idx source]
@@ -454,9 +453,9 @@
 
 (defn- insert-item-relations!
   [db values]
-  (jdbc/execute! db
-                 (sql/format
-                   {:insert-into [:relations] :columns [:owner_id :target_id] :values values})))
+  (db/execute! db
+               (sql/format
+                 {:insert-into [:relations] :columns [:owner_id :target_id] :values values})))
 
 (defn new-item
   ([db title short-title context-ids-set sort-idx]
@@ -482,6 +481,6 @@
                            :values [[[:raw now]
                                      [:raw now] [:raw now] [:inline title] true
                                      [:inline source]]]}))]
-     (-> (jdbc/execute-one! db
+     (-> (db/execute-one! db
            (sql/format {:select [:*] :from [:items] :where [:= :id [:inline id]]}))
          post-process-base))))

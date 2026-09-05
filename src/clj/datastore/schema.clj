@@ -7,7 +7,7 @@
    so trigger creation comes through as a single statement."
   (:require [clojure.string :as str]
             [datastore.connection :as connection]
-            [next.jdbc :as jdbc]))
+            [db :as db]))
 
 (def ^:private schema-path "schema-sqlite.sql")
 
@@ -79,12 +79,12 @@
   (boolean (re-find #"(?i)\busing\s+vec0\b" stmt)))
 
 (defn- table-exists? [db table]
-  (boolean (seq (jdbc/execute! db
-                               ["SELECT name FROM sqlite_master WHERE type='table' AND name=?"
-                                table]))))
+  (boolean (seq (db/execute! db
+                             ["SELECT name FROM sqlite_master WHERE type='table' AND name=?"
+                              table]))))
 
 (defn- column-exists? [db table column]
-  (->> (jdbc/execute! db [(str "PRAGMA table_info(" table ")")])
+  (->> (db/execute! db [(str "PRAGMA table_info(" table ")")])
        (some (fn [row]
                (= column (or (:table_info/name row) (:name row)))))))
 
@@ -95,7 +95,7 @@
    column see it on pre-existing dev DBs."
   [db table column decl]
   (when (and (table-exists? db table) (not (column-exists? db table column)))
-    (jdbc/execute-one! db [(str "ALTER TABLE " table " ADD COLUMN " column " " decl)])))
+    (db/execute-one! db [(str "ALTER TABLE " table " ADD COLUMN " column " " decl)])))
 
 (defn- vec-dim
   "FLOAT[N] dimension declared in a CREATE statement (or whole schema —
@@ -109,14 +109,14 @@
    new dimension. Rows come back via the next embeddings backfill."
   [db schema-sql]
   (let [target (vec-dim schema-sql)
-        current (some-> (jdbc/execute-one! db
+        current (some-> (db/execute-one! db
                           ["SELECT sql FROM sqlite_master WHERE type='table' AND name='items_vec'"])
                         :sqlite_master/sql
                         vec-dim)]
     (when (and target current (not= target current))
-      (jdbc/execute-one! db ["DROP TABLE items_vec"])
+      (db/execute-one! db ["DROP TABLE items_vec"])
       (when (table-exists? db "items_vec_skipped")
-        (jdbc/execute-one! db ["DELETE FROM items_vec_skipped"])))))
+        (db/execute-one! db ["DELETE FROM items_vec_skipped"])))))
 
 (defn apply-schema!
   "Apply schema-sqlite.sql to the given db spec. All CREATEs use
@@ -143,4 +143,4 @@
        (ensure-vec-dim! db sql))
      (doseq [stmt (split-statements sql)
              :when (or connection/vec-available? (not (vec-statement? stmt)))]
-       (jdbc/execute-one! db [stmt])))))
+       (db/execute-one! db [stmt])))))

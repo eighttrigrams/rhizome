@@ -1,6 +1,6 @@
 (ns repository.deletion
   (:require [clojure.java.io :as io]
-            [next.jdbc :as jdbc]
+            [db :as db]
             [honey.sql :as sql]
             [cheshire.core :as json]
             [cambium.core :as log]
@@ -93,12 +93,12 @@
   "All relation rows where owner_id or target_id is in `ids`."
   [db ids]
   (when (seq ids)
-    (jdbc/execute! db
-                   (sql/format {:select [:owner_id :target_id]
-                                :from [:relations]
-                                :where [:or
-                                        [:in :owner_id (vec ids)]
-                                        [:in :target_id (vec ids)]]}))))
+    (db/execute! db
+                 (sql/format {:select [:owner_id :target_id]
+                              :from [:relations]
+                              :where [:or
+                                      [:in :owner_id (vec ids)]
+                                      [:in :target_id (vec ids)]]}))))
 
 (defn- count-by
   "Aggregate count of relations grouped by `col` (one of :owner_id, :target_id),
@@ -108,11 +108,11 @@
     {}
     (let [k-id (keyword "relations" (name col))
           k-c  :c]
-      (->> (jdbc/execute! db
-                          (sql/format {:select [col [[:count :*] :c]]
-                                       :from [:relations]
-                                       :where [:in col (vec ids)]
-                                       :group-by [col]}))
+      (->> (db/execute! db
+                        (sql/format {:select [col [[:count :*] :c]]
+                                     :from [:relations]
+                                     :where [:in col (vec ids)]
+                                     :group-by [col]}))
            (map (fn [r] [(k-id r) (k-c r)]))
            (into {})))))
 
@@ -120,10 +120,10 @@
   [db ids]
   (if-not (seq ids)
     []
-    (let [rows (jdbc/execute! db
-                              (sql/format {:select [:id :title :is_context :data]
-                                           :from [:items]
-                                           :where [:in :id (vec ids)]}))]
+    (let [rows (db/execute! db
+                            (sql/format {:select [:id :title :is_context :data]
+                                         :from [:items]
+                                         :where [:in :id (vec ids)]}))]
       (map (fn [r]
              {:id (:items/id r)
               :title (:items/title r)
@@ -275,17 +275,17 @@
   [db unlink-edits]
   (doseq [[neighbor-id primary-ids] unlink-edits
           :when (seq primary-ids)]
-    (let [row (jdbc/execute-one! db
-                                 (sql/format {:select [:data]
-                                              :from [:items]
-                                              :where [:= :id [:inline neighbor-id]]}))
+    (let [row (db/execute-one! db
+                               (sql/format {:select [:data]
+                                            :from [:items]
+                                            :where [:= :id [:inline neighbor-id]]}))
           raw (:items/data row)
           data (if raw (json/parse-string (dialect/parse-json-value raw) true) {})
           new-data (drop-context-keys data primary-ids)]
-      (jdbc/execute! db
-                     (sql/format {:update [:items]
-                                  :set {:data [:inline (json/generate-string new-data)]}
-                                  :where [:= :id [:inline neighbor-id]]})))))
+      (db/execute! db
+                   (sql/format {:update [:items]
+                                :set {:data [:inline (json/generate-string new-data)]}
+                                :where [:= :id [:inline neighbor-id]]})))))
 
 (defn- delete-relations-touching!
   [db ids]
@@ -296,17 +296,17 @@
     ;; text off unrecorded would make bulk the one gesture that can destroy a
     ;; versioned field.
     (datastore.relations/tombstone-relations-touching! db ids)
-    (jdbc/execute! db
-                   (sql/format {:delete-from [:relations]
-                                :where [:or
-                                        [:in :owner_id (vec ids)]
-                                        [:in :target_id (vec ids)]]}))))
+    (db/execute! db
+                 (sql/format {:delete-from [:relations]
+                              :where [:or
+                                      [:in :owner_id (vec ids)]
+                                      [:in :target_id (vec ids)]]}))))
 
 (defn execute!
   "Carry out a plan from `plan`. Wraps writes in a transaction. Caller is
    responsible for branching on dry-run? (we never enter execute! in dry-run)."
   [db plan-result primary-ids-for-relations]
-  (jdbc/with-transaction [tx db]
+  (db/with-transaction [tx db]
     (write-unlink-edits! tx (:unlink-edits plan-result))
     (delete-relations-touching! tx primary-ids-for-relations)
     (doseq [id (:delete-ids plan-result)]
