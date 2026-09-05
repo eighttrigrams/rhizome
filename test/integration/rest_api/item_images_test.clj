@@ -54,8 +54,11 @@
   (byte-array (map #(byte (- (mod (+ seed %) 251) 125)) (range n))))
 
 (defn- GET*
+  "The only place in this file that hands a handler a config: `:folders` on top
+   of `db-harness/app-config`, whose `:db` is the remote handle.
+   `api.harness-wiring-test` drives this very function to prove that."
   [folders path]
-  (with-redefs [config/config (db-harness/app-config-with {:folders folders})]
+  (with-redefs [config/config (db-harness/app-config {:folders folders})]
     (@handler (mock/request :get path))))
 
 (defn- body-json [resp] (json/parse-string (:body resp) true))

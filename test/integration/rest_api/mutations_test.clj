@@ -31,27 +31,40 @@
   [body]
   (if (and (map? body) (contains? body :reason)) body (assoc body :reason "test")))
 
+(defn- send*
+  "Where this file's requests leave from, with the handlers running on
+   `(db-harness/app-config)` -- the remote handle, so everything they do to the
+   database leaves this process too. What the tests do on their own account
+   stays on `db`, the DataSource. See `db-harness`.
+
+   One place rather than four, and `POST*`, `PUT*`, `POST-raw*` and `GET*` all
+   go through it, so `api.harness-wiring-test` reaching `GET*` reaches what the
+   other three use as well. The only two requests in this file that do not come
+   through here are the ones that build `{:db db}` inline in a test body and
+   call `GET /api/describe` -- introspection over `ns-publics`, which reaches no
+   database at all."
+  [req]
+  (with-redefs [config/config (db-harness/app-config)]
+    (@handler req)))
+
 (defn- POST*
   [path body]
-  (with-redefs [config/config db-harness/app-config]
-    (@handler (-> (mock/request :post path)
-                  (mock/content-type "application/json")
-                  (mock/body (json/generate-string (with-default-reason body)))))))
+  (send* (-> (mock/request :post path)
+             (mock/content-type "application/json")
+             (mock/body (json/generate-string (with-default-reason body))))))
 
 (defn- PUT*
   [path body]
-  (with-redefs [config/config db-harness/app-config]
-    (@handler (-> (mock/request :put path)
-                  (mock/content-type "application/json")
-                  (mock/body (json/generate-string (with-default-reason body)))))))
+  (send* (-> (mock/request :put path)
+             (mock/content-type "application/json")
+             (mock/body (json/generate-string (with-default-reason body))))))
 
 (defn- POST-raw*
   "POST without auto-injecting :reason — for testing the missing-reason path."
   [path body]
-  (with-redefs [config/config db-harness/app-config]
-    (@handler (-> (mock/request :post path)
-                  (mock/content-type "application/json")
-                  (mock/body (json/generate-string body))))))
+  (send* (-> (mock/request :post path)
+             (mock/content-type "application/json")
+             (mock/body (json/generate-string body)))))
 
 (defn- body-json [resp] (json/parse-string (:body resp) true))
 
@@ -304,8 +317,7 @@
 
 (defn- GET*
   [path]
-  (with-redefs [config/config db-harness/app-config]
-    (@handler (mock/request :get path))))
+  (send* (mock/request :get path)))
 
 (defn- ids-with-status
   "Return the ids of rows in the given bucket whose :status equals `status`."

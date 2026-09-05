@@ -54,23 +54,36 @@
   "The handle the app is given. Not the one the tests use on themselves."
   {:db-server/url (:url server)})
 
-(def app-config
+(defn app-config
   "The `config/config` the REST handlers are given while they are under test.
 
-   One definition, and every suite that stands a handler up uses it, because
-   seven separate `{:db …}` literals were seven places a switch could be
-   reverted without anything noticing -- which is exactly what happened: the
-   REST half was quietly running local while `api.harness-wiring-test`, which
-   only ever looked at the /ui half, went on passing. A guard that cannot reach
-   the thing it guards is not a guard. Now there is one thing to reach."
-  {:db remote})
+   Every suite that stands a handler up builds its config from here -- four
+   places, one request helper per REST suite, where there used to be seven
+   `{:db …}` literals. (Two spots in `mutations_test` still build config inline
+   in a test body; they call only `GET /api/describe`, which reaches no
+   database, and the reasoning for leaving them is in the step-3 handoff.)
 
-(defn app-config-with
-  "`app-config` and whatever else a suite's handlers need in their config --
-   `:folders` for the image routes, the role flags for the replica ones.
+   Seven literals were seven places a switch could be reverted without anything
+   noticing, which is exactly what had happened: the REST half was quietly
+   running local while `api.harness-wiring-test`, which only ever looked at the
+   /ui half, went on passing.
 
-   A function rather than seven hand-built maps, for the same reason: the
-   handle comes from one place, and a caller adds to it rather than restating
-   it."
-  [m]
-  (merge app-config m))
+   Consolidating them was not enough on its own, and it is worth being exact
+   about why. As a `def` this was `{:db remote}` evaluated when the namespace
+   loaded, and the wiring test asserted about the definition. Reverting all
+   seven literals therefore *still* left the suite green -- one place to look
+   at, and nothing that failed if a suite looked elsewhere. A convention, not
+   a guard.
+
+   So it is a function, and it reads `remote` when it is **called**. That is
+   what lets `api.harness-wiring-test` point the REST half at a dead port and
+   watch each of the four helpers fail to reach a database -- the same redef
+   that has always covered the /ui half now covers this one too, and a helper
+   that had gone back to the local DataSource answers 200 instead, which is
+   the failure.
+
+   The one-argument arity carries whatever else a suite's handlers need in
+   their config: `:folders` for the image routes, the role flags for the
+   replica ones. A caller adds to the config rather than restating the handle."
+  ([] (app-config nil))
+  ([m] (merge {:db remote} m)))

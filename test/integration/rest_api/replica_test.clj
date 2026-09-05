@@ -16,21 +16,28 @@
 
 (def ^:private handler (delay (wrap-params (rest-api/rest-routes))))
 
-;; prod mode (no :dev?) plus the role the marker check produced.
+;; The role the marker check produced, and nothing else: prod mode is the
+;; absence of :dev?, and the handle is not stated here at all.
 ;;
-;; These two, and the dev-mode config built further down, all come from
-;; `db-harness/app-config`: every handler this file stands up is given the
-;; remote handle, so the writes that are supposed to land go over the wire, and
-;; the ones that are supposed to be refused are refused before they reach a
-;; handle of either kind. Said here rather than implied, because a comment over
-;; two of three configs once read as speaking for all of them, and the third
-;; was quietly writing to the local DataSource.
-(def ^:private replica-config (db-harness/app-config-with {:read-only-replica? true}))
-(def ^:private primary-config (db-harness/app-config-with {:read-only-replica? false}))
+;; `request*` puts whichever of these it is given on top of
+;; `db-harness/app-config`, so every handler this file stands up is given the
+;; remote handle, from one place, at the moment of the call. The writes that
+;; are supposed to land go over the wire, and the ones that are supposed to be
+;; refused are refused before they reach a handle of either kind. Said here
+;; rather than implied, because a comment over two of three configs once read
+;; as speaking for all of them, and the third was quietly writing to the local
+;; DataSource.
+(def ^:private replica-config {:read-only-replica? true})
+(def ^:private primary-config {:read-only-replica? false})
 
 (defn- request*
-  [cfg method path body]
-  (with-redefs [config/config cfg]
+  "`role` is what this instance *is* -- its role, or dev mode for the one test
+   that needs it. The handle is not the caller's business: it comes from
+   `db-harness/app-config` here, and this is the only place in this file that
+   hands a handler a config. `api.harness-wiring-test` drives this very
+   function to prove the handle that arrives is the remote one."
+  [role method path body]
+  (with-redefs [config/config (db-harness/app-config role)]
     (@handler (cond-> (mock/request method path)
                 body (-> (mock/content-type "application/json")
                          (mock/body (json/generate-string body)))))))
@@ -109,7 +116,7 @@
 (deftest dev-mode-is-unaffected-test
   (test-with-fresh-db "dev needs no marker: no guard, and writes pass as before"
     (is (false? (:read-only-replica? config/config)))
-    (let [resp (request* (db-harness/app-config-with {:dev? true})
+    (let [resp (request* {:dev? true}
                          :post "/api/contexts" {:title "DevWrite" :reason "test"})]
       (is (= 201 (:status resp)))
       (is (= "DevWrite" (:title (ds/get-item db {:id (:id (body-json resp))})))))))

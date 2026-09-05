@@ -43,11 +43,15 @@
 
 (defn- GET*
   [path]
-  ;; The handlers run on `db-harness/app-config`, whose `:db` is the remote
+  ;; The handlers run on `(db-harness/app-config)`, whose `:db` is the remote
   ;; handle: everything they do to the database leaves this process. What this
   ;; test does on its own account -- `reset-db`, the seeding above, every
   ;; assertion below -- stays on `db`, the DataSource. See `db-harness`.
-  (with-redefs [config/config db-harness/app-config]
+  ;;
+  ;; The only place in this file that hands a handler a config, and
+  ;; `api.harness-wiring-test` drives this very function to prove it is the
+  ;; remote handle that arrives here.
+  (with-redefs [config/config (db-harness/app-config)]
     (@handler (mock/request :get path))))
 
 (defn- body-json [resp] (json/parse-string (:body resp) true))
