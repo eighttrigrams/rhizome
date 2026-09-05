@@ -1,0 +1,290 @@
+(ns db-server.protocol-test
+  "The db-server's own suite, against the protocol rather than through the
+   client that speaks it.
+
+   The requests here are built by hand -- transit in, transit out, over real
+   HTTP -- deliberately: `db`'s remote handles are one client, and a protocol
+   that only works when talked to by its own client is not a protocol. The
+   facade's half is tested next door, in db-server.remote-handle-test.
+
+   Every test boots a server of its own on an ephemeral port against a
+   throwaway file database, so nothing here shares state with anything else in
+   the suite."
+  (:require [cheshire.core :as json]
+            [clj-http.client :as http]
+            [clojure.string :as str]
+            [clojure.test :refer [deftest is testing]]
+            [cognitect.transit :as transit]
+            [db-server])
+  (:import [java.io ByteArrayInputStream ByteArrayOutputStream]))
+
+;; -- talking to it ---------------------------------------------------------
+
+(def ^:private transit-type "application/transit+json")
+
+(defn- write-transit ^bytes [v]
+  (let [os (ByteArrayOutputStream. 1024)]
+    (transit/write (transit/writer os :json) v)
+    (.toByteArray os)))
+
+(defn- read-transit [^bytes b]
+  (transit/read (transit/reader (ByteArrayInputStream. b) :json)))
+
+(defn- post!
+  "POST a transit body to `path`, and answer `[status answer]`."
+  [server path body]
+  (let [resp (http/post (str (:url server) path)
+                        {:body             (write-transit body)
+                         :content-type     transit-type
+                         :accept           transit-type
+                         :as               :byte-array
+                         :throw-exceptions false})]
+    [(:status resp) (read-transit (:body resp))]))
+
+(defn- get-json
+  [server path]
+  (let [resp (http/get (str (:url server) path) {:as :string :throw-exceptions false})]
+    [(:status resp) (json/parse-string (:body resp) true)]))
+
+(defn- result
+  "The `:result` of a call that must have succeeded."
+  [[status answer]]
+  (is (= 200 status) (str "expected a 200, got " status ": " (pr-str answer)))
+  (:result answer))
+
+(defn- temp-db-path []
+  (.getAbsolutePath (doto (java.io.File/createTempFile "rhizome-db-server-test" ".db")
+                      (.deleteOnExit))))
+
+(defn- with-server-at
+  [db-path opts f]
+  (let [server (db-server/start! (merge {:port 0 :db-path db-path} opts))]
+    (try (f server) (finally (db-server/stop! server)))))
+
+(defn- with-server
+  ([f] (with-server {} f))
+  ([opts f] (with-server-at (temp-db-path) opts f)))
+
+(defn- with-table
+  "A server with an empty `t (n INTEGER, s TEXT)` in it."
+  [opts f]
+  (with-server opts
+    (fn [server]
+      (result (post! server "/execute" {:stmt ["CREATE TABLE t (n INTEGER, s TEXT)"]}))
+      (f server))))
+
+(defn- wait-for
+  "Poll `pred` until it answers truthy or `ms` runs out. Answers what it last
+   saw, so a failed wait fails the assertion that reads it rather than here."
+  [ms pred]
+  (let [deadline (+ (System/currentTimeMillis) ms)]
+    (loop []
+      (let [v (pred)]
+        (if (or v (> (System/currentTimeMillis) deadline))
+          v
+          (do (Thread/sleep 50) (recur)))))))
+
+;; -- statements ------------------------------------------------------------
+
+(deftest statements-carry-their-parameters
+  (with-table {}
+    (fn [server]
+      (result (post! server "/execute-one"
+                     {:stmt ["INSERT INTO t (n, s) VALUES (?, ?)" 1 "it's quoted"]}))
+      (testing "the parameter went through the driver, not through the SQL"
+        (is (= [#:t{:n 1 :s "it's quoted"}]
+               (result (post! server "/execute" {:stmt ["SELECT n, s FROM t"]})))))
+      (testing "a write answers next.jdbc's update count"
+        (is (= #:next.jdbc{:update-count 1}
+               (result (post! server "/execute-one"
+                              {:stmt ["UPDATE t SET s = ? WHERE n = ?" "x" 1]})))))
+      (testing "and a row that is not there is nil, which is why :result is wrapped"
+        (let [[status answer] (post! server "/execute-one" {:stmt ["SELECT n FROM t WHERE n = 99"]})]
+          (is (= 200 status))
+          (is (contains? answer :result) "the wrapper is present")
+          (is (nil? (:result answer)) "and what it carries is nil, not nothing"))))))
+
+(deftest the-builder-option-is-a-name-and-not-code
+  (with-table {}
+    (fn [server]
+      (result (post! server "/execute-one" {:stmt ["INSERT INTO t (n) VALUES (7)"]}))
+      (testing "the default qualifies the key with the table and keeps its case"
+        (is (= #:t{:MiXeD 7}
+               (result (post! server "/execute-one" {:stmt ["SELECT n AS MiXeD FROM t"]})))))
+      (testing ":unqualified-lower, resolved on this side out of the same whitelist"
+        (is (= {:mixed 7}
+               (result (post! server "/execute-one"
+                              {:stmt ["SELECT n AS MiXeD FROM t"]
+                               :opts {:builder :unqualified-lower}}))))))))
+
+(deftest return-keys-answers-with-the-generated-key
+  (with-table {}
+    (fn [server]
+      (let [plain (result (post! server "/execute-one" {:stmt ["INSERT INTO t (n) VALUES (1)"]}))
+            keyed (result (post! server "/execute-one" {:stmt ["INSERT INTO t (n) VALUES (2)"]
+                                                        :opts {:return-keys true}}))]
+        (is (= #:next.jdbc{:update-count 1} plain))
+        (is (not= plain keyed) "the option has to make a difference on this side too")
+        (is (= [2] (vals keyed)) "the rowid the insert generated")))))
+
+(deftest an-option-off-the-whitelist-is-refused-over-the-wire
+  (with-table {}
+    (fn [server]
+      (testing "an option next.jdbc understands and the protocol does not"
+        (let [[status answer] (post! server "/execute" {:stmt ["SELECT 1"] :opts {:timeout 5}})]
+          (is (= 400 status))
+          (is (re-find #"unsupported statement option" (:error answer)))))
+      (testing "and a builder name that is not on the list"
+        (let [[status answer] (post! server "/execute"
+                                     {:stmt ["SELECT 1"] :opts {:builder :qualified-kebab}})]
+          (is (= 400 status))
+          (is (re-find #"unknown result-set builder" (:error answer)))))
+      (testing "a statement that is not [sql & params]"
+        (is (= 400 (first (post! server "/execute" {:stmt "SELECT 1"}))))))))
+
+(deftest a-statement-the-database-refuses-comes-back-marked-as-the-database-refusing
+  (with-table {}
+    (fn [server]
+      (let [[status answer] (post! server "/execute" {:stmt ["SELECT * FROM nope"]})]
+        (is (= 500 status))
+        (is (true? (:sql? answer))
+            "the marking is what lets the client rethrow it as the SQLException it would be locally")
+        (is (re-find #"no such table" (:error answer)))))))
+
+;; -- transactions ----------------------------------------------------------
+
+(deftest a-transaction-commits-and-another-rolls-back
+  (with-table {}
+    (fn [server]
+      (let [a (:tx (second (post! server "/tx/begin" {})))]
+        (is (string? a))
+        (result (post! server "/execute-one" {:stmt ["INSERT INTO t (n) VALUES (1)"] :tx a}))
+        (testing "nothing is visible outside the transaction while it is open"
+          (is (= [] (result (post! server "/execute" {:stmt ["SELECT n FROM t"]})))))
+        (is (= {:ok true} (second (post! server "/tx/commit" {:tx a}))))
+        (is (= [#:t{:n 1}] (result (post! server "/execute" {:stmt ["SELECT n FROM t"]})))))
+      (let [b (:tx (second (post! server "/tx/begin" {})))]
+        (result (post! server "/execute-one" {:stmt ["INSERT INTO t (n) VALUES (2)"] :tx b}))
+        (is (= {:ok true} (second (post! server "/tx/rollback" {:tx b}))))
+        (is (= [#:t{:n 1}] (result (post! server "/execute" {:stmt ["SELECT n FROM t"]})))
+            "the rolled-back row is gone and the committed one is not")))))
+
+(deftest begin-refuses-a-request-that-already-carries-a-transaction
+  (with-table {}
+    (fn [server]
+      (let [a (:tx (second (post! server "/tx/begin" {})))
+            [status answer] (post! server "/tx/begin" {:tx a})]
+        (is (= 409 status))
+        (is (= :db-server/nested-transaction (:type answer)))
+        (is (re-find #"already a transaction" (:error answer))
+            "the same rule the facade enforces locally, stated the same way")
+        (post! server "/tx/rollback" {:tx a})))))
+
+(deftest a-token-that-names-no-transaction-is-refused-clearly
+  (with-table {}
+    (fn [server]
+      (doseq [[path body] [["/execute" {:stmt ["SELECT 1"] :tx "not-a-token"}]
+                           ["/execute-one" {:stmt ["SELECT 1"] :tx "not-a-token"}]
+                           ["/tx/commit" {:tx "not-a-token"}]
+                           ["/tx/rollback" {:tx "not-a-token"}]]]
+        (let [[status answer] (post! server path body)]
+          (is (= 410 status) (str path " should answer 410"))
+          (is (= :db-server/unknown-transaction (:type answer)) (str path))))
+      (testing "and a token that has been used up is in exactly that state"
+        (let [a (:tx (second (post! server "/tx/begin" {})))]
+          (post! server "/tx/commit" {:tx a})
+          (is (= 410 (first (post! server "/execute" {:stmt ["SELECT 1"] :tx a})))))))))
+
+(deftest a-transaction-nobody-came-back-for-is-rolled-back-and-freed
+  (with-table {:tx-idle-ms 300}
+    (fn [server]
+      (let [a (:tx (second (post! server "/tx/begin" {})))]
+        (result (post! server "/execute-one" {:stmt ["INSERT INTO t (n) VALUES (1)"] :tx a}))
+        ;; Watched through the registry rather than by asking the server about
+        ;; the token: a statement on a transaction resets its idle clock, which
+        ;; is what "untouched" means, so a poll that went over the wire would
+        ;; keep the thing it is waiting for alive. Nothing here calls the sweep
+        ;; -- what this waits on is the timer inside `start!`.
+        (let [gone? (wait-for 15000 #(empty? @(:transactions server)))]
+          (is gone? "the sweeper took the abandoned transaction away"))
+        (is (= 410 (first (post! server "/execute" {:stmt ["SELECT 1"] :tx a})))
+            "and its token now names nothing")
+        (is (= [] (result (post! server "/execute" {:stmt ["SELECT n FROM t"]})))
+            "and rolled it back on the way, so nothing half-written survived it")
+        (is (= 410 (first (post! server "/tx/commit" {:tx a})))
+            "committing it afterwards is refused rather than quietly doing nothing")))))
+
+(deftest two-write-transactions-do-not-interleave
+  ;; SQLite's law, inherited rather than reimplemented: the datasource begins
+  ;; IMMEDIATE, so the write lock is taken as a transaction opens and the second
+  ;; one waits out the driver's 3s busy_timeout and is then refused. There is no
+  ;; queue in front of that here -- this test pins the absence of one.
+  (with-table {}
+    (fn [server]
+      (let [a (:tx (second (post! server "/tx/begin" {})))]
+        (result (post! server "/execute-one" {:stmt ["INSERT INTO t (n) VALUES (1)"] :tx a}))
+        (let [[status answer] (post! server "/tx/begin" {})]
+          (is (= 500 status) "the second transaction cannot open while the first holds the lock")
+          (is (true? (:sql? answer)))
+          (is (str/includes? (:error answer) "SQLITE_BUSY")))
+        (post! server "/tx/commit" {:tx a})
+        (testing "and once the first is done, the next one opens"
+          (let [b (:tx (second (post! server "/tx/begin" {})))]
+            (is (string? b))
+            (result (post! server "/execute-one" {:stmt ["INSERT INTO t (n) VALUES (2)"] :tx b}))
+            (post! server "/tx/commit" {:tx b})
+            (is (= [#:t{:n 1} #:t{:n 2}]
+                   (result (post! server "/execute" {:stmt ["SELECT n FROM t ORDER BY n"]}))))))))))
+
+;; -- read-only -------------------------------------------------------------
+
+(deftest a-read-only-server-reads-and-refuses-to-write
+  (let [path (temp-db-path)]
+    (with-server-at path {} (fn [server]
+                              (result (post! server "/execute" {:stmt ["CREATE TABLE t (n INTEGER)"]}))
+                              (result (post! server "/execute-one" {:stmt ["INSERT INTO t (n) VALUES (1)"]}))))
+    (with-server-at path {:read-only? true}
+      (fn [server]
+        (testing "it says so"
+          (is (true? (:read-only? (second (get-json server "/health"))))))
+        (testing "reads work"
+          (is (= [#:t{:n 1}] (result (post! server "/execute" {:stmt ["SELECT n FROM t"]})))))
+        (testing "and a write is refused by the driver, not by a rule up here"
+          (let [[status answer] (post! server "/execute-one" {:stmt ["INSERT INTO t (n) VALUES (2)"]})]
+            (is (= 500 status))
+            (is (true? (:sql? answer)))
+            (is (re-find #"(?i)readonly|read-only" (:error answer)))))))))
+
+;; -- the JSON surface ------------------------------------------------------
+
+(deftest health-says-what-it-is
+  (with-server {}
+    (fn [server]
+      (let [[status body] (get-json server "/health")]
+        (is (= 200 status))
+        (is (= true (:ok body)))
+        (is (false? (:read-only? body)))
+        (is (contains? body :vec-available?))
+        (is (boolean? (:vec-available? body)))))))
+
+(deftest describe-answers-the-family-shape
+  (with-server {}
+    (fn [server]
+      (let [[status body] (get-json server "/api/describe")]
+        (is (= 200 status))
+        (is (= #{:endpoints :skill} (set (keys body))) "the shape the family answers")
+        (is (string? (:skill body)))
+        (is (str/includes? (:skill body) "transit"))
+        (testing "every route is listed, named, and documented"
+          (is (= ["describe" "execute" "execute-one" "health" "tx-begin" "tx-commit" "tx-rollback"]
+                 (mapv :name (:endpoints body))))
+          (is (every? (comp seq :doc) (:endpoints body))))
+        (testing "and each doc leads with the method and path it documents"
+          (is (every? #(re-find #"\A(GET|POST) /\S+ " (:doc %)) (:endpoints body))))))))
+
+(deftest a-route-that-is-not-there-says-so
+  (with-server {}
+    (fn [server]
+      (let [[status body] (get-json server "/nope")]
+        (is (= 404 status))
+        (is (re-find #"no such route" (:error body)))))))
