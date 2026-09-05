@@ -33,6 +33,18 @@
 
 (defn- rows [handle] (mapv :t/n (db/execute! handle ["SELECT n FROM t ORDER BY n"])))
 
+(defn- wait-for
+  "Poll `pred` until it answers truthy or `ms` runs out, and answer what it last
+   saw. Bounded on purpose: an unbounded wait on a condition a regression has
+   just broken is a test suite that hangs instead of failing."
+  [ms pred]
+  (let [deadline (+ (System/currentTimeMillis) ms)]
+    (loop []
+      (let [v (pred)]
+        (if (or v (> (System/currentTimeMillis) deadline))
+          v
+          (do (Thread/sleep 50) (recur)))))))
+
 ;; -- the same answers ------------------------------------------------------
 
 (defn- script
@@ -182,6 +194,35 @@
           (.close rc)
           (db-server/stop! server))))))
 
+(deftest a-commit-that-never-arrives-does-not-leave-the-write-lock-held
+  ;; Moving the commit out of the body's catch fixed a lie and introduced this:
+  ;; a transport failure on /tx/commit left the transaction open on the far
+  ;; side, holding SQLite's single write lock, until the idle sweep got to it a
+  ;; minute later. Everyone else met SQLITE_BUSY in the meantime. The commit
+  ;; goes through `rollback-after!` now, whose treatment of a 410 is right for
+  ;; all three ways a commit can fail -- see its docstring.
+  (with-remote
+    (fn [remote server]
+      (db/execute-one! remote ["CREATE TABLE t (n INTEGER)"])
+      (let [real @#'db/post!
+            thrown (with-redefs [db/post! (fn [handle path body]
+                                            (if (= path "/tx/commit")
+                                              (throw (java.io.IOException.
+                                                       "connection reset by peer"))
+                                              (real handle path body)))]
+                     (try (db/with-transaction [tx remote]
+                            (db/execute-one! tx ["INSERT INTO t (n) VALUES (1)"]))
+                          nil
+                          (catch Throwable t t)))]
+        (is (instance? java.io.IOException thrown)
+            "the transport failure is what the caller hears, unchanged")
+        (is (empty? @(:transactions server))
+            "and the transaction was rolled back at once rather than left for the sweeper")
+        (testing "so the next writer is not locked out"
+          (is (= #:next.jdbc{:update-count 1}
+                 (db/execute-one! remote ["INSERT INTO t (n) VALUES (2)"]))))
+        (is (= [2] (rows remote)) "and what the failed transaction wrote is not there")))))
+
 (deftest a-transaction-swept-while-its-body-was-slow-says-so-plainly
   ;; What the timeout is for is a client that went away, and a body that spends
   ;; longer than the window between statements is indistinguishable from one.
@@ -194,7 +235,8 @@
       (db/execute-one! remote ["CREATE TABLE t (n INTEGER)"])
       (let [thrown (try (db/with-transaction [tx remote]
                           (db/execute-one! tx ["INSERT INTO t (n) VALUES (1)"])
-                          (while (seq @(:transactions server)) (Thread/sleep 50))
+                          (is (wait-for 15000 #(empty? @(:transactions server)))
+                              "the sweeper took it while the body was thinking")
                           (db/execute-one! tx ["INSERT INTO t (n) VALUES (2)"]))
                         nil
                         (catch Throwable t t))]

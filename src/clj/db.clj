@@ -277,11 +277,22 @@
    carries a token as well; this one is here so the refusal costs no round trip
    and reads identically to the local one.
 
-   The commit is deliberately outside the body's catch. A commit the database
-   refuses is already rolled back and closed on the far side -- `db-server`'s
-   `finish!` does that, which is what next.jdbc does locally -- so there is
-   nothing here to compensate for, and the exception the caller gets is the
-   database's own, with its message, its SQLSTATE and its vendor code intact."
+   The commit goes through `rollback-after!` as well, and that one call covers
+   three quite different failures because of what it does with a 410:
+
+   - the commit **never arrived** -- the connection died on the way -- and the
+     transaction is still open on the far side with the write lock in its hand.
+     The rollback lands, frees it now rather than in a minute's time, and the
+     transport error goes on. Without this the database is locked against every
+     other writer until the idle sweep gets to it.
+   - the commit **arrived and was refused** by the database. `db-server`'s
+     `finish!` has already rolled back and freed the token, so the rollback
+     answers 410, which is swallowed, and the database's own exception goes on
+     with its message, its SQLSTATE and its vendor code intact.
+   - the commit **arrived and succeeded** but the answer was lost. The token is
+     gone, the rollback answers 410 and is swallowed, and the caller is told the
+     commit failed. It did not, and nothing at this end can know that; being
+     told a write may not have landed is the safe direction to be wrong in."
   [handle f]
   (when (:db-server/tx handle)
     (throw (IllegalStateException. "Nested transactions are prohibited")))
@@ -289,7 +300,8 @@
         tx-handle (assoc handle :db-server/tx token)
         result    (try (f tx-handle)
                        (catch Throwable t (rollback-after! handle token t)))]
-    (post! handle "/tx/commit" {:tx token})
+    (try (post! handle "/tx/commit" {:tx token})
+         (catch Throwable t (rollback-after! handle token t)))
     result))
 
 (defn transact

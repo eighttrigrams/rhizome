@@ -216,6 +216,74 @@
         (is (= 410 (first (post! server "/tx/commit" {:tx a})))
             "committing it afterwards is refused rather than quietly doing nothing")))))
 
+(deftest the-idle-clock-restarts-with-every-statement
+  ;; The window is on the gap between statements, not on the transaction's
+  ;; whole life, and this is what says so. Take the touches out of `acquire!`
+  ;; and `release!` and the registry's clock never moves after `/tx/begin` --
+  ;; at which point a transaction doing perfectly ordinary work dies as soon as
+  ;; it has been alive for the window, which is every transaction of any size.
+  ;; Nothing else in this suite notices that, because nothing else keeps a
+  ;; transaction open across more than one gap.
+  (with-table {:tx-idle-ms 400}
+    (fn [server]
+      (testing "a transaction that lives far longer than the window, in short steps"
+        (let [a (:tx (second (post! server "/tx/begin" {})))]
+          (dotimes [n 6]
+            (Thread/sleep 150)                       ; each gap well inside the window
+            (let [[status answer] (post! server "/execute-one"
+                                         {:stmt ["INSERT INTO t (n) VALUES (?)" n] :tx a})]
+              (is (= 200 status) (str "statement " n " after " (* 150 (inc n)) "ms: "
+                                      (pr-str answer)))))
+          (is (= {:ok true} (second (post! server "/tx/commit" {:tx a})))
+              "and it is still there to commit, 900ms into a 400ms window")
+          (is (= 6 (count (result (post! server "/execute" {:stmt ["SELECT n FROM t"]}))))))))
+    ))
+
+(deftest the-clock-restarts-when-a-statement-ENDS-not-when-it-starts
+  ;; The other half of the same rule, and the one that catches `release!`
+  ;; specifically: after a statement that itself outlasted the window, the
+  ;; transaction has to get a full window of quiet before it is reaped. If the
+  ;; clock were only set on the way IN, it would already be past the cutoff the
+  ;; moment the statement returned, and the very next gap would lose it.
+  (with-table {:tx-idle-ms 400}
+    (fn [server]
+      (let [a (:tx (second (post! server "/tx/begin" {})))]
+        (is (= 200 (first (post! server "/execute-one"
+                                 {:stmt [(str "WITH RECURSIVE c(x) AS "
+                                              "(SELECT 1 UNION ALL SELECT x+1 FROM c WHERE x < 4000000) "
+                                              "SELECT count(*) AS n FROM c")]
+                                  :tx   a})))
+            "a statement that takes longer than the window")
+        (Thread/sleep 150)
+        (is (= 200 (first (post! server "/execute-one"
+                                 {:stmt ["INSERT INTO t (n) VALUES (1)"] :tx a})))
+            "and a short gap after it is a short gap, not an expired transaction")
+        (post! server "/tx/commit" {:tx a})))))
+
+(deftest a-commit-while-a-statement-is-running-is-refused-rather-than-closing-under-it
+  ;; Not reachable through the facade, which is single-threaded per transaction
+  ;; -- but the protocol is open to anything that can speak it, and closing a
+  ;; connection with a statement on it is the same "stmt pointer is closed" the
+  ;; sweeper used to cause. The in-flight count is read inside the swap that
+  ;; takes the entry out, so the refusal is a decision and not a guess.
+  (with-table {}
+    (fn [server]
+      (let [a       (:tx (second (post! server "/tx/begin" {})))
+            slow    (future (post! server "/execute-one"
+                                   {:stmt [(str "WITH RECURSIVE c(x) AS "
+                                                "(SELECT 1 UNION ALL SELECT x+1 FROM c WHERE x < 8000000) "
+                                                "SELECT count(*) AS n FROM c")]
+                                    :tx   a}))
+            running (wait-for 10000 #(pos? (:in-flight (get @(:transactions server) a) 0)))]
+        (is running "the slow statement is on the connection")
+        (let [[status answer] (post! server "/tx/commit" {:tx a})]
+          (is (= 409 status))
+          (is (= :db-server/transaction-busy (:type answer)))
+          (is (re-find #"let it finish" (:error answer))))
+        (is (= 200 (first @slow)) "and the statement it would have cut off ran to the end")
+        (is (= {:ok true} (second (post! server "/tx/commit" {:tx a})))
+            "committing once it is quiet works, as it always did")))))
+
 (deftest two-write-transactions-do-not-interleave
   ;; SQLite's law, inherited rather than reimplemented: the datasource begins
   ;; IMMEDIATE, so the write lock is taken as a transaction opens and the second
@@ -354,6 +422,57 @@
       (is (false? (:ok answer)))
       (is (re-find #"(?i)unable to open" (:error answer))
           "and it says what the database said"))))
+
+(deftest a-vec-path-this-process-cannot-honour-is-refused
+  ;; The one option `start!` takes and does not act on. `datastore.connection`
+  ;; resolves the extension path once at load out of config.edn and takes no
+  ;; argument; moving that key into the :db-server section is step 4. Until
+  ;; then the option is checked rather than accepted-and-ignored, and this is
+  ;; the assertion that says so -- the deviation is worth nothing without it.
+  (is (thrown-with-msg? clojure.lang.ExceptionInfo #"step 4"
+                        (db-server/start! {:port 0
+                                           :db-path (temp-db-path)
+                                           :vec-path "/nowhere/in/particular/vec0"})))
+  (testing "and the path that WAS loaded is accepted, so step 4 can pass it"
+    (with-server-at (temp-db-path) {:vec-path connection/vec-extension-path}
+      (fn [server] (is (= 200 (first (get-json server "/health"))))))))
+
+(deftest a-host-that-is-not-loopback-is-refused-rather-than-ignored
+  (is (thrown-with-msg? clojure.lang.ExceptionInfo #":host is not an option"
+                        (db-server/start! {:port 0 :db-path (temp-db-path) :host "0.0.0.0"}))))
+
+(deftest a-body-that-is-not-transit-is-a-refusal-and-not-a-crash
+  (with-server {}
+    (fn [server]
+      (doseq [[label body] [["nonsense bytes" (.getBytes "{not transit at all" "UTF-8")]
+                            ["nothing at all" (byte-array 0)]]]
+        (testing label
+          (let [resp (http/post (str (:url server) "/execute")
+                                {:body             body
+                                 :content-type     transit-type
+                                 :as               :byte-array
+                                 :throw-exceptions false})]
+            (is (= 400 (:status resp)))
+            (is (= :db-server/bad-request (:type (read-transit (:body resp)))))))))))
+
+(deftest stopping-rolls-back-the-transactions-that-were-still-open
+  ;; A held connection holds the write lock. In a process that is exiting that
+  ;; is invisible; in step 3's harness, where a db-server is started and stopped
+  ;; inside the JVM the next test runs in, it is a database nobody can write to.
+  (let [path   (temp-db-path)
+        server (db-server/start! {:port 0 :db-path path})]
+    (result (post! server "/execute" {:stmt ["CREATE TABLE t (n INTEGER)"]}))
+    (let [a (:tx (second (post! server "/tx/begin" {})))]
+      (result (post! server "/execute-one" {:stmt ["INSERT INTO t (n) VALUES (1)"] :tx a}))
+      (is (= 1 (count @(:transactions server))) "one transaction open, holding the write lock")
+      (db-server/stop! server)
+      (is (empty? @(:transactions server)) "and stop! did not leave it there"))
+    (testing "it was rolled back, and the database is writable again"
+      (with-server-at path {}
+        (fn [server]
+          (is (= [] (result (post! server "/execute" {:stmt ["SELECT n FROM t"]}))))
+          (is (= 200 (first (post! server "/execute-one"
+                                   {:stmt ["INSERT INTO t (n) VALUES (2)"]})))))))))
 
 (deftest health-says-what-it-is
   (with-server {}

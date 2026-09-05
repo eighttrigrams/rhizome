@@ -128,18 +128,36 @@
 
 (defn- close-transaction!
   "Commit or roll back the transaction `token` names and free its connection.
-   False when there is no such transaction.
+   Answers `:closed`, `:busy` -- a statement is running on it -- or `:unknown`.
 
-   The entry is taken out of the registry before the connection is touched, so
-   the idle sweeper and a `/tx/commit` racing for the same token cannot both
-   close it. That the token is freed even when the commit throws is deliberate:
-   `finish!` has rolled back and closed by then, so there is nothing left for a
-   second call to do."
-  [{:keys [transactions]} token commit?]
-  (let [[before _] (swap-vals! transactions dissoc token)]
-    (if-let [^Connection conn (:conn (get before token))]
-      (do (finish! conn commit?) true)
-      false)))
+   Taking the entry out and deciding whether it may be taken are one `swap!`,
+   which buys two distinct things. No two callers can both close the same
+   connection: exactly one of them finds the entry in `before` and the others
+   get `:unknown`. And nothing closes a connection with a statement still on
+   it: `:in-flight` is read inside the swap, so a statement that arrives while
+   this is deciding either raises the count first -- and this answers `:busy` --
+   or arrives to find the token gone.
+
+   `force?` skips the in-flight check, for `stop!`: at shutdown a held
+   connection has to go whatever it is doing, because the alternative is
+   leaking it with the write lock in its hand.
+
+   That the token is freed even when the commit throws is deliberate: `finish!`
+   has rolled back and closed by then, so there is nothing left to do a second
+   time."
+  ([server token commit?] (close-transaction! server token commit? false))
+  ([{:keys [transactions]} token commit? force?]
+   (let [[before after] (swap-vals! transactions
+                                    (fn [m]
+                                      (let [entry (get m token)]
+                                        (if (and entry
+                                                 (or force? (zero? (:in-flight entry))))
+                                          (dissoc m token)
+                                          m))))]
+     (cond
+       (not (contains? before token)) :unknown
+       (contains? after token)        :busy
+       :else (do (finish! (:conn (get before token)) commit?) :closed)))))
 
 (defn- acquire!
   "The connection `token` names, with its idle clock reset and its in-flight
@@ -205,6 +223,18 @@
            (catch Throwable t
              (log/error t "db-server: could not roll back an idle transaction"))))
     (count taken)))
+
+(defn- close-or-refuse!
+  "Close the transaction, or say why not."
+  [server token commit?]
+  (case (close-transaction! server token commit?)
+    :closed  true
+    :busy    (throw (ex-info (str "db-server: transaction " token
+                                  " has a statement running on it -- let it finish first")
+                             {:db-server/status 409 :type :db-server/transaction-busy}))
+    :unknown (throw (ex-info (str "db-server: no such transaction: " token
+                                  " -- it was committed, rolled back, or rolled back for being idle")
+                             {:db-server/status 410 :type :db-server/unknown-transaction}))))
 
 (defn- unknown-transaction!
   [token]
@@ -307,9 +337,7 @@
     (when-not tx
       (throw (ex-info "db-server: /tx/commit needs a :tx token"
                       {:type :db-server/bad-request})))
-    (when-not (close-transaction! server tx true)
-      (throw (ex-info (str "db-server: no such transaction: " tx)
-                      {:db-server/status 410 :type :db-server/unknown-transaction})))
+    (close-or-refuse! server tx true)
     (transit-response 200 {:ok true})))
 
 (defn ^:endpoint tx-rollback
@@ -322,9 +350,7 @@
     (when-not tx
       (throw (ex-info "db-server: /tx/rollback needs a :tx token"
                       {:type :db-server/bad-request})))
-    (when-not (close-transaction! server tx false)
-      (throw (ex-info (str "db-server: no such transaction: " tx)
-                      {:db-server/status 410 :type :db-server/unknown-transaction})))
+    (close-or-refuse! server tx false)
     (transit-response 200 {:ok true})))
 
 (defn- reach-the-database!
@@ -408,11 +434,13 @@
         ;; can rebuild a SQLException that answers `.getSQLState` and
         ;; `.getErrorCode` the way the local one would. A caller that reads
         ;; those is reading the database's own words, and losing them here
-        ;; would be a difference between the two handles.
+        ;; would be a difference between the two handles. The driver's class
+        ;; name does NOT travel: the facade cannot construct it, nothing reads
+        ;; it, and a field on a wire that nobody reads is a field that will
+        ;; quietly stop being true.
         (transit-response 500 {:error      (.getMessage e)
                                :type       :db-server/sql-error
                                :sql?       true
-                               :class      (.getName (class e))
                                :sql-state  (.getSQLState e)
                                :error-code (.getErrorCode e)}))
       (catch clojure.lang.ExceptionInfo e
@@ -478,12 +506,21 @@
                     quarter-window intervals, so the real window is one to
                     one-and-a-quarter of it.
 
-   There is no `:host`. This endpoint runs arbitrary SQL and has no
-   authentication of any kind, and the plan says loopback always for this
-   phase; an option would be a way to hand the database to the network by
-   passing one argument. Binding beyond the machine comes with the auth that
-   has to arrive alongside it, and neither is in this step."
-  [{:keys [port db-path vec-path read-only? tx-idle-ms]}]
+   There is no `:host`, and passing one is refused rather than ignored -- the
+   rule the option whitelist and `check-vec-path!` are both keeping. This
+   endpoint runs arbitrary SQL and has no authentication of any kind, and the
+   plan says loopback always for this phase; an option would be a way to hand
+   the database to the network by passing one argument, and silently dropping
+   it would be a caller who thinks he has bound elsewhere and has not. Binding
+   beyond the machine comes with the auth that has to arrive alongside it, and
+   neither is in this step."
+  [{:keys [port db-path vec-path read-only? tx-idle-ms] :as opts}]
+  (when (contains? opts :host)
+    (throw (ex-info (str "db-server: :host is not an option -- this binds " loopback
+                         " and nothing else. These routes run arbitrary SQL with no "
+                         "authentication, so exposing them beyond the machine is a step "
+                         "that has to arrive with the auth for it.")
+                    {:host (:host opts)})))
   (when (str/blank? (str db-path))
     (throw (ex-info "db-server: :db-path is required" {})))
   (when (nil? port)
@@ -543,6 +580,6 @@
   (when jetty (.stop jetty))
   (when sweeper (.shutdownNow sweeper))
   (doseq [token (keys @transactions)]
-    (try (close-transaction! server token false)
+    (try (close-transaction! server token false true)
          (catch Throwable t (log/error t "db-server: could not roll back on shutdown"))))
   nil)

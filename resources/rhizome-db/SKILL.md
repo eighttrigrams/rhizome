@@ -37,8 +37,8 @@ check that says `ok` for a database it has never touched is worse than none.
 | `POST /execute` | `{:stmt [sql & params] :opts {…} :tx "token"?}` | `{:result [row …]}` |
 | `POST /execute-one` | same | `{:result row}` |
 | `POST /tx/begin` | `{}` | `{:tx "token"}` |
-| `POST /tx/commit` | `{:tx "token"}` | `{:ok true}` |
-| `POST /tx/rollback` | `{:tx "token"}` | `{:ok true}` |
+| `POST /tx/commit` | `{:tx "token"}` | `{:ok true}`, 409 while busy, 410 if unknown |
+| `POST /tx/rollback` | `{:tx "token"}` | `{:ok true}`, 409 while busy, 410 if unknown |
 | `GET /health` | — | `{:ok true :read-only? b :vec-available? b}`, or 503 |
 | `GET /api/describe` | — | this document, and the routes above |
 
@@ -73,6 +73,9 @@ token names a database connection that is held open for you, so:
 - **A token cannot begin another transaction.** `/tx/begin` refuses a request
   that carries one. A handle that is already a transaction may not be made one
   again — the same rule the app-side facade enforces locally.
+- **A commit or rollback while one of your statements is still running** is
+  refused with `409`, rather than closing the connection out from under it.
+  Let the statement answer first.
 - **One writer at a time.** This is SQLite: a write transaction takes the write
   lock when it begins, and a second one waits for it and then fails with
   `SQLITE_BUSY` rather than interleaving. That is the database's own law, and
