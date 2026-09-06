@@ -96,8 +96,55 @@ share the code that states it rather than each carrying a copy. Promoting a
 replica means placing the marker and restarting **both** processes; neither
 re-reads it while running.
 
+### The two verdicts have to match, or the app-server will not boot
+
+Reaching the rule independently is not the same as reaching the same answer.
+Only the *marker* is shared by construction — it is a file, and each process
+looks for it in its own working directory. `:dev?` is per **file**. So a
+db-server handed a config.edn of its own sees no `:dev?` in it, concludes prod,
+finds no marker beside itself, and opens the database **read-only** — under an
+app-server that read a different file, believes it is a primary, and will write.
+
+Nothing about that is visible until the first write. `SELECT 1` succeeds against
+a read-only database, so a reachability check passes; `/api/status` reports
+`read-only-replica: false`; and the failure arrives much later as a bare
+`SQLITE_READONLY` with nothing connecting it to a marker file in another
+directory.
+
+So the app-server reads this server's `/health` at startup, compares
+`:read-only?` against its own verdict, and **refuses to boot on disagreement** —
+in both directions. What it prints is worth knowing, because it is the whole
+constraint in three lines:
+
+```
+Refusing to start: this app-server and its db-server disagree about whether
+this instance may write.
+  app-server: primary -- dev mode (:dev? true in /srv/rhizome/config.edn),
+    which is never a replica: no marker is consulted and none would change it
+  db-server:  read-only -- it read its own config.edn and looked for
+    primary.nosync in the directory IT was started in (http://127.0.0.1:3141)
+A db-server reading a config.edn of its own sees no :dev? in it, so it concludes
+prod, looks for primary.nosync beside itself, does not find one, and opens the
+database read-only. Add :dev? true to that file, or start both processes from
+this directory so they read this config.edn.
+```
+
+**Whoever runs the two processes owns this.** The rule for the standalone
+arrangement, and for the day the app-server runs on another machine and reaches
+this one over `:db-url`: *the db-server's config.edn must say what the
+app-server's says* about the two inputs to the verdict — `:dev?`, and whether
+`primary.nosync` sits beside it. Anything else is a refusal to start, which is
+the point: over a network, two directories that disagree stop being exotic.
+
+The check runs **at startup only**, like the verdict it checks. Restarting just
+this server under a running app-server puts the pair back where they were
+without anything noticing — which is the same reason promotion means restarting
+both.
+
 A caller that boots one in-process — the test suites do — passes `:read-only?`
-explicitly instead, and no marker is consulted.
+explicitly instead, and no marker is consulted. No comparison happens there
+either: the app-side handle in test mode is a local DataSource, so there is no
+`/health` to ask.
 
 ## Starting one
 
