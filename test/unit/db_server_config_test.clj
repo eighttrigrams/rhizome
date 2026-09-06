@@ -82,3 +82,40 @@
     (is (re-find #"no :db-server section" (.getMessage t)))
     (is (re-find #"make onboard" (.getMessage t))
         "the message says how to get one rather than only that there is none")))
+
+;; --- the e2e alias must not be able to open the developer's database --------
+;; Before the split, `-Drhizome.e2e=1` picked the file, so an e2e JVM physically
+;; could not reach ./rhizome.db. Now the file is the db-server's :db-path and
+;; scripts/e2e.sh points it here by exporting DB_PATH -- which is a thing that
+;; can be forgotten. e2e's globalSetup POSTs /test/reset, and that deletes every
+;; row in whatever database is behind it, so the old guarantee is kept by
+;; refusal instead.
+
+(defn- as-e2e-jvm
+  "Run `f` with the sysprop the `:e2e` alias sets, and put it back after."
+  [f]
+  (let [before (System/getProperty "rhizome.e2e")]
+    (try (System/setProperty "rhizome.e2e" "1")
+         (f)
+         (finally (if before
+                    (System/setProperty "rhizome.e2e" before)
+                    (System/clearProperty "rhizome.e2e"))))))
+
+(deftest an-e2e-db-server-refuses-any-other-database-test
+  (with-redefs [role/primary-marker-present? (constantly true)]
+    (testing "the dev database, which is the mistake that costs something"
+      (let [t (as-e2e-jvm
+                #(try (opts-for "{:dev? true :db-server {:db-path \"./rhizome.db\"}}")
+                      nil (catch Throwable t t)))]
+        (is (some? t))
+        (is (re-find #"refusing to open .* under -Drhizome\.e2e=1" (.getMessage t)))
+        (is (re-find #"/test/reset" (.getMessage t))
+            "and says what would have happened, not just that it refused")))
+    (testing "the e2e database is accepted, spelled either way"
+      (doseq [p ["./test/rhizome-e2e.db" "test/rhizome-e2e.db"]]
+        (is (= p (:db-path (as-e2e-jvm
+                             #(opts-for (str "{:dev? true :db-server {:db-path \"" p "\"}}")))))
+            (str "canonical paths, so " p " is the same answer"))))
+    (testing "and outside an e2e JVM the db-path is nobody's business but the config's"
+      (is (= "./rhizome.db"
+             (:db-path (opts-for "{:dev? true :db-server {:db-path \"./rhizome.db\"}}")))))))

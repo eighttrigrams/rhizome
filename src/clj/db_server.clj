@@ -600,6 +600,36 @@
    the same number on purpose."
   3141)
 
+(def e2e-db-path
+  "The only database a db-server started under the `:e2e` alias may open.
+
+   Before the split, `-Drhizome.e2e=1` picked the file: `config.clj` hardcoded
+   it, so an e2e JVM physically could not reach the developer's database. Since
+   the split the file is the db-server's `:db-path`, which `scripts/e2e.sh`
+   points here by exporting `DB_PATH` -- and an export is a thing that can be
+   forgotten. A db-server hand-started with `-M:e2e` and no `DB_PATH` would open
+   `./rhizome.db`, and e2e's `globalSetup` POSTs `/test/reset`, which deletes
+   every row it can see. So the old guarantee is kept, by refusal rather than by
+   hardcoding."
+  "./test/rhizome-e2e.db")
+
+(defn- check-e2e-db-path!
+  "Refuse to open anything but `e2e-db-path` when this JVM was started under the
+   `:e2e` alias. Compared as canonical paths, so `test/rhizome-e2e.db` and
+   `./test/rhizome-e2e.db` are the same answer."
+  [db-path]
+  (when (= "1" (System/getProperty "rhizome.e2e"))
+    (let [canon #(.getCanonicalPath (io/file %))]
+      (when-not (= (canon db-path) (canon e2e-db-path))
+        (throw (ex-info (str "db-server: refusing to open " (pr-str db-path)
+                             " under -Drhizome.e2e=1. An e2e run may only touch "
+                             (pr-str e2e-db-path) ", because its globalSetup POSTs "
+                             "/test/reset and that deletes every row in whatever "
+                             "database is behind it. Export DB_PATH=" e2e-db-path
+                             " (scripts/e2e.sh does), or start this db-server "
+                             "without the :e2e alias.")
+                        {:db-path db-path :e2e-db-path e2e-db-path}))))))
+
 (defn config-opts
   "The `:db-server` section of a `config.edn`, as `start!` takes it.
 
@@ -639,6 +669,7 @@
                             ". It needs at least a :db-path; `make onboard` writes the "
                             "whole block.")
                        {:config-path path})))
+     (check-e2e-db-path! (:db-path section))
      {:port       (or (:port section) default-port)
       :db-path    (:db-path section)
       :vec-path   (:vec-path section)

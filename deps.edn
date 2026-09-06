@@ -31,9 +31,14 @@
            tick/tick                         {:mvn/version "1.0.1"}
            aero/aero                         {:mvn/version "1.1.6"}}
  :aliases {:dev   {:extra-paths ["env/dev" "test/unit" "test/integration"]}
-           ;; e2e mode reuses config.edn (same port, same :semsearch). The
-           ;; sysprop signals config.clj to force :dev? :e2e? :bind-host and
-           ;; hardcode the db to ./test/rhizome-e2e.db.
+           ;; e2e mode reuses config.edn (same port, same :db-server section).
+           ;; The sysprop signals config.clj to force :dev? :e2e? :bind-host.
+           ;; It no longer picks the database: since the app/db split that is
+           ;; the db-server's :db-path, and scripts/e2e.sh points it at
+           ;; ./test/rhizome-e2e.db by exporting DB_PATH. The guarantee this
+           ;; comment used to make -- that an e2e run cannot touch the dev db --
+           ;; is still kept, by db-server/config-opts refusing any other file
+           ;; under this alias, rather than by the sysprop hardcoding one.
            :e2e   {:jvm-opts ["-Drhizome.e2e=1"]}
            :test  {:extra-paths ["test/unit" "test/integration" "env/test"]
                    :extra-deps  {io.github.cognitect-labs/test-runner {:git/tag "v0.5.1"

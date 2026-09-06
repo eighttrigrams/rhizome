@@ -104,7 +104,16 @@ explicitly instead, and no marker is consulted.
 ```bash
 clj -M:dev -m db-server                       # from a checkout
 java -cp server.jar clojure.main -m db-server # from the built jar
+
+DB_PATH=./test/rhizome-e2e.db clj -M:e2e -m db-server   # for an e2e run
 ```
+
+**The e2e line needs its `DB_PATH`**, and a db-server started under `-M:e2e`
+refuses to open anything else. An e2e run's `globalSetup` posts `/test/reset`,
+which deletes every row in whatever database is behind it, so pointing one at
+`./rhizome.db` by forgetting an export would empty the developer's own. Before
+the app/db split the `-Drhizome.e2e=1` sysprop chose the file and the mistake
+was not reachable; now the refusal is what keeps it that way.
 
 Both read `./config.edn` in the directory they are launched from, and take the
 whole of their configuration from its `:db-server` section:
