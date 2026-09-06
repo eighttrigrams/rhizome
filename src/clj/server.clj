@@ -235,6 +235,33 @@
                            :e2e?       (:e2e? config/config)
                            :skip-seed? (:skip-seed? config/config)})))
 
+(defn- app-role-reason
+  "What this process concluded about its own role, and *why*, in the words the
+   reader needs to check it.
+
+   Three cases, not two. An app-server is a primary either because it is in dev
+   mode -- which is never a replica, marker or no marker -- or because it is in
+   prod mode WITH the marker; only prod-without-marker is the replica. Saying
+   \"prod mode and <marker> in <dir>\" for every primary was false in exactly the
+   scenario the refusal below exists for: a dev app-server in front of a
+   standalone db-server, where it denied the mode the reader is in and sent them
+   hunting a marker file that is not there.
+
+   `log-instance-role!` above has always had this right, and says why in one
+   line: dev mode has no primary/replica distinction."
+  []
+  (let [dir (System/getProperty "user.dir")]
+    (cond
+      (:dev? config/config)
+      (str "primary -- dev mode (:dev? true in " dir "/config.edn), which is never a "
+           "replica: no marker is consulted and none would change it")
+
+      (config/primary-marker-present?)
+      (str "primary -- prod mode and " config/primary-marker " in " dir)
+
+      :else
+      (str "read-only replica -- prod mode and no " config/primary-marker " in " dir))))
+
 (defn- check-db-server-role!
   "**The two processes decide primary-vs-replica independently, so the startup
   check is where they are made to agree.**
@@ -264,16 +291,26 @@
     (when-not (= db-read-only? app-read-only?)
       (let [msg (str "Refusing to start: this app-server and its db-server disagree about "
                      "whether this instance may write.\n"
-                     "  app-server: " (if app-read-only? "read-only replica" "primary")
-                     " -- prod mode " (if app-read-only? "and no " "and ")
-                     config/primary-marker " in " (System/getProperty "user.dir") "\n"
+                     "  app-server: " (app-role-reason) "\n"
                      "  db-server:  " (if db-read-only? "read-only" "writable")
                      " -- it read its own config.edn and looked for "
                      config/primary-marker " in the directory IT was started in ("
                      (:db-server/url handle) ")\n"
-                     "Both decide this from the same rule and the same marker file, but each "
-                     "in its own working directory. Start them from the same one, or give the "
-                     "db-server a config.edn that says what this one says.")]
+                     (if (:dev? config/config)
+                       ;; The flagship case, and the one where naming the remedy
+                       ;; is worth more than restating the rule: a db-server
+                       ;; handed a config.edn of its own sees no `:dev?` in it,
+                       ;; concludes prod, finds no marker beside itself, and opens
+                       ;; the database read-only.
+                       (str "A db-server reading a config.edn of its own sees no :dev? in it, "
+                            "so it concludes prod, looks for " config/primary-marker
+                            " beside itself, does not find one, and opens the database "
+                            "read-only. Add :dev? true to that file, or start both processes "
+                            "from this directory so they read this config.edn.")
+                       (str "Both decide this from the same rule and the same marker file, but "
+                            "each in its own working directory. Start them from the same one, "
+                            "or give the db-server a config.edn that says what this one "
+                            "says.")))]
         (log/error msg)
         (throw (ex-info msg {:db-server/url        (:db-server/url handle)
                              :db-server/read-only? db-read-only?

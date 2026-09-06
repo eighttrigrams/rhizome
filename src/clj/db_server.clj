@@ -618,7 +618,10 @@
    `:e2e` alias. Compared as canonical paths, so `test/rhizome-e2e.db` and
    `./test/rhizome-e2e.db` are the same answer."
   [db-path]
-  (when (= "1" (System/getProperty "rhizome.e2e"))
+  ;; A missing :db-path is `start!`'s to refuse, in its own words. Reaching
+  ;; `getCanonicalPath` with nil here turned that clean message into an NPE.
+  (when (and (not (str/blank? (str db-path)))
+             (= "1" (System/getProperty "rhizome.e2e")))
     (let [canon #(.getCanonicalPath (io/file %))]
       (when-not (= (canon db-path) (canon e2e-db-path))
         (throw (ex-info (str "db-server: refusing to open " (pr-str db-path)

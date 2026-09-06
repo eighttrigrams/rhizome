@@ -124,3 +124,19 @@
     (testing "and outside an e2e JVM the db-path is nobody's business but the config's"
       (is (= "./rhizome.db"
              (:db-path (opts-for "{:dev? true :db-server {:db-path \"./rhizome.db\"}}")))))))
+
+(deftest a-missing-db-path-is-start-s-refusal-not-an-npe-test
+  ;; `check-e2e-db-path!` ran before anything established there was a :db-path
+  ;; at all, so a section without one met getCanonicalPath with nil and the
+  ;; clean ":db-path is required" from `start!` never got the chance. Reachable
+  ;; with a hand-edited config plus the :e2e alias, which is exactly the
+  ;; combination someone debugging an e2e run is in.
+  (with-redefs [role/primary-marker-present? (constantly true)]
+    (let [opts (as-e2e-jvm #(opts-for "{:dev? true :db-server {:port 3199}}"))]
+      (is (nil? (:db-path opts))
+          "the reader gets out of the way and lets start! say it"))
+    (let [t (as-e2e-jvm
+              #(try (db-server/start! (opts-for "{:dev? true :db-server {:port 0}}"))
+                    nil (catch Throwable t t)))]
+      (is (some? t))
+      (is (re-find #":db-path is required" (.getMessage t))))))

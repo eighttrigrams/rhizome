@@ -5,6 +5,7 @@
             [config :as config]
             [datastore.schema :as schema]
             [db :as db]
+            [role :as role]
             [dev-seed :as dev-seed]
             [poll :as poll]
             [server :as server]
@@ -95,17 +96,35 @@
 (def ^:private remote {:db-server/url "http://127.0.0.1:65535"})
 
 (defn- role-check-with
-  "Run the startup role check with the app believing `app-replica?` and the
-   db-server answering `db-read-only?`. Answers the exception, or nil."
-  [app-replica? db-read-only?]
-  (with-redefs [config/config       {:db remote :read-only-replica? app-replica?}
-                db/remote-read-only? (constantly db-read-only?)]
-    (try (#'server/check-db-server-role! remote) nil (catch Throwable t t))))
+  "Run the startup role check. `app` is what THIS process's world says --
+   `:dev?`, and whether the marker is beside it -- and `db-read-only?` is what
+   the db-server answers. Answers the exception, or nil.
+
+   The app's verdict is **derived with the real rule** rather than passed in, so
+   a fixture cannot describe a world that could not exist. It could before: the
+   verdict was a boolean set independently of the `:dev?` and the marker the
+   message is built from, and the first version of this helper duly asserted
+   against a config that said primary and prod-without-marker at once."
+  [app db-read-only?]
+  (let [{:keys [dev? marker?]} app
+        app-replica? (role/read-only-replica? {:dev? dev?} (boolean marker?))]
+    (with-redefs [config/config                  {:db remote
+                                                  :read-only-replica? app-replica?
+                                                  :dev? dev?}
+                  config/primary-marker-present? (constantly (boolean marker?))
+                  db/remote-read-only?           (constantly db-read-only?)]
+      (try (#'server/check-db-server-role! remote) nil (catch Throwable t t)))))
+
+;; The three worlds, named once. `dev` is the flagship repro: a dev app-server
+;; in front of a db-server that read a config.edn of its own.
+(def ^:private dev-primary     {:dev? true})
+(def ^:private prod-primary    {:dev? false :marker? true})
+(def ^:private prod-replica    {:dev? false :marker? false})
 
 (deftest the-app-and-its-db-server-must-agree-about-the-role-test
   (testing "a read-only db-server under an app that thinks it may write is refused"
     ;; The standalone-config case, and the one that used to boot fully green.
-    (let [t (role-check-with false true)]
+    (let [t (role-check-with dev-primary true)]
       (is (some? t))
       (is (re-find #"disagree about whether this instance may write" (.getMessage t)))
       (is (re-find #"app-server: primary" (.getMessage t))
@@ -117,10 +136,33 @@
   (testing "and the milder half -- a writable db-server under a replica -- too"
     ;; Less dangerous (the app refuses every write in front of it) but the same
     ;; confusion, and the same fix.
-    (let [t (role-check-with true false)]
+    (let [t (role-check-with prod-replica false)]
       (is (some? t))
       (is (re-find #"app-server: read-only replica" (.getMessage t)))
       (is (re-find #"db-server:  writable" (.getMessage t)))))
   (testing "two primaries agree, and two replicas agree"
-    (is (nil? (role-check-with false false)))
-    (is (nil? (role-check-with true true)))))
+    (is (nil? (role-check-with dev-primary false)))
+    (is (nil? (role-check-with prod-replica true)))))
+
+(deftest the-refusal-says-truthfully-why-this-process-is-what-it-is-test
+  ;; A primary is a primary for one of TWO reasons -- dev mode, or prod plus the
+  ;; marker -- and the first version of this message asserted the second for
+  ;; both. In the very scenario it was written for (a dev app-server in front of
+  ;; a standalone db-server) that made it doubly false: it denied the mode the
+  ;; reader is in and sent them looking for a marker file that is not there.
+  ;; Which is the failure the F2 fix was about, shipped by the F1 fix.
+  (testing "dev mode: never a replica, and no marker is claimed"
+    (let [m (.getMessage (role-check-with dev-primary true))]
+      (is (re-find #"primary -- dev mode" m))
+      (is (re-find #"never a\s+replica: no marker is consulted" m))
+      (is (not (re-find #"prod mode and primary\.nosync" m))
+          "the old message claimed exactly this, with :dev? true and no marker on disk")
+      (testing "and it names the remedy, which is what the reader actually needs"
+        (is (re-find #"Add :dev\? true to that file" m)))))
+  (testing "prod with the marker: primary, and it says where the marker is"
+    (let [m (.getMessage (role-check-with prod-primary true))]
+      (is (re-find #"primary -- prod mode and primary\.nosync in " m))
+      (is (not (re-find #"dev mode" m)))))
+  (testing "prod without it: the replica case, which was right all along"
+    (let [m (.getMessage (role-check-with prod-replica false))]
+      (is (re-find #"read-only replica -- prod mode and no primary\.nosync in " m)))))
