@@ -166,3 +166,33 @@
   (testing "prod without it: the replica case, which was right all along"
     (let [m (.getMessage (role-check-with prod-replica false))]
       (is (re-find #"read-only replica -- prod mode and no primary\.nosync in " m)))))
+
+(deftest the-startup-check-consults-both-halves-test
+  ;; The one part of the F1 wiring nothing covered: `check-db-server-role!` was
+  ;; tested directly, so deleting its CALL SITE in `check-db-server!` left the
+  ;; suite green. e2e does not catch it either -- there the two agree, and
+  ;; agreement is silent whether or not anything asked.
+  (testing "the role check is reached: a disagreement refuses through the front door"
+    (let [t (with-redefs [config/config        {:db remote :dev? true :read-only-replica? false}
+                          config/primary-marker-present? (constantly false)
+                          db/execute-one!      (constantly nil)
+                          db/remote-read-only? (constantly true)]
+              (try (#'server/check-db-server!) nil (catch Throwable t t)))]
+      (is (some? t)
+          "if this passes, `check-db-server!` is no longer calling the role check")
+      (is (re-find #"disagree about whether this instance may write" (.getMessage t)))))
+  (testing "and so is the reachability check, with the statement it claims to run"
+    (let [asked (atom [])]
+      (with-redefs [config/config        {:db remote :dev? true :read-only-replica? false}
+                    config/primary-marker-present? (constantly false)
+                    db/execute-one!      (fn [_ stmt] (swap! asked conj stmt) nil)
+                    db/remote-read-only? (constantly false)]
+        (#'server/check-db-server!))
+      (is (= [["SELECT 1"]] @asked))))
+  (testing "a local handle is asked nothing at all -- which is what test mode rests on"
+    (let [asked (atom [])]
+      (with-redefs [config/config        {:db ::a-datasource :read-only-replica? false}
+                    db/execute-one!      (fn [& _] (swap! asked conj :statement) nil)
+                    db/remote-read-only? (fn [& _] (swap! asked conj :health) nil)]
+        (#'server/check-db-server!))
+      (is (empty? @asked)))))
