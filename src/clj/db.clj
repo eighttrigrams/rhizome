@@ -222,6 +222,24 @@
 
 (defn- remote-vec-available? [handle] (boolean (:vec-available? (health handle))))
 
+(defn remote-read-only?
+  "Whether the db-server behind a remote `handle` opened its database
+   read-only -- its half of the primary/replica verdict, as `/health` reports
+   it.
+
+   Only remote handles have an answer here, which is why this is not the
+   `vec-available?` shape: a local DataSource's open mode is not a question you
+   can put to it, and the caller that wants this -- `server`'s startup check --
+   is looking at the far side of a wire by definition.
+
+   The point of asking is that the two processes decide this **independently**,
+   from the same rule but each in its own working directory (see `role`). Being
+   able to compare the answers is what turns a silent disagreement -- an app
+   that believes it may write, in front of a database opened read-only -- into
+   a refusal to start."
+  [handle]
+  (boolean (:read-only? (health handle))))
+
 (defn- remote-execute
   [handle path stmt opts]
   (check-opts! opts)

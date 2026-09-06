@@ -235,10 +235,59 @@
                            :e2e?       (:e2e? config/config)
                            :skip-seed? (:skip-seed? config/config)})))
 
-(defn- check-db-server-reachable!
+(defn- check-db-server-role!
+  "**The two processes decide primary-vs-replica independently, so the startup
+  check is where they are made to agree.**
+
+  Same rule, `role`'s, and the same marker file -- but each reads it in ITS OWN
+  working directory, and only the marker is shared by construction. `:dev?` is
+  per-file, so a db-server started against a config.edn of its own (the
+  standalone `{:db-server {…}}` arrangement the plan allows, and the one the
+  later remote-machine step is built on) reads no `:dev?`, calls itself prod,
+  finds no marker beside itself, and opens the database READ-ONLY -- while this
+  process, reading the dev config.edn it was started with, believes it is a
+  primary and may write.
+
+  Nothing about that is visible until the first write: `SELECT 1` succeeds
+  perfectly well against a read-only database, `/api/status` reports
+  `read-only-replica: false`, and the failure arrives much later as a bare
+  SQLITE_READONLY with nothing to connect it to a marker file in another
+  directory. Which is precisely the drift `role` exists to prevent, and the
+  reason a shared *rule* is not the same thing as a shared *verdict*.
+
+  So the verdicts are compared, and any disagreement is a refusal -- in both
+  directions. A db-server that is writable under an app that refuses every write
+  is the milder half, but it is the same confusion and the same fix."
+  [handle]
+  (let [db-read-only?  (db/remote-read-only? handle)
+        app-read-only? (replica/read-only?)]
+    (when-not (= db-read-only? app-read-only?)
+      (let [msg (str "Refusing to start: this app-server and its db-server disagree about "
+                     "whether this instance may write.\n"
+                     "  app-server: " (if app-read-only? "read-only replica" "primary")
+                     " -- prod mode " (if app-read-only? "and no " "and ")
+                     config/primary-marker " in " (System/getProperty "user.dir") "\n"
+                     "  db-server:  " (if db-read-only? "read-only" "writable")
+                     " -- it read its own config.edn and looked for "
+                     config/primary-marker " in the directory IT was started in ("
+                     (:db-server/url handle) ")\n"
+                     "Both decide this from the same rule and the same marker file, but each "
+                     "in its own working directory. Start them from the same one, or give the "
+                     "db-server a config.edn that says what this one says.")]
+        (log/error msg)
+        (throw (ex-info msg {:db-server/url        (:db-server/url handle)
+                             :db-server/read-only? db-read-only?
+                             :app/read-only?       app-read-only?}))))
+    (log/info {:db-server (:db-server/url handle) :read-only? db-read-only?}
+              (str "app-server: database reached over " (:db-server/url handle)
+                   ", and both processes call this instance "
+                   (if db-read-only? "a read-only replica" "a primary")))))
+
+(defn- check-db-server!
   "One statement, before anything else needs one, so that a db-server that is
   not there says so in one line instead of surfacing as a connection refused in
-  the middle of seeding.
+  the middle of seeding. Then `check-db-server-role!`, which is the other half
+  and the less obvious one.
 
   It is not a health check with a retry loop: waiting for the db-server is
   `scripts/start.sh`'s job, which polls `/health` before it starts this process
@@ -248,15 +297,14 @@
   (let [handle (:db config/config)]
     (when (db/remote? handle)
       (try (db/execute-one! handle ["SELECT 1"])
-           (log/info {:db-server (:db-server/url handle)}
-                     (str "app-server: database reached over " (:db-server/url handle)))
            (catch Throwable t
              (let [msg (str "Refusing to start: no db-server answering at "
                             (:db-server/url handle) " (" (.getMessage t) "). "
                             "Start it first -- 'make start' does, and 'make start-db' "
                             "runs it alone.")]
                (log/error t msg)
-               (throw (ex-info msg {:db-server/url (:db-server/url handle)} t))))))))
+               (throw (ex-info msg {:db-server/url (:db-server/url handle)} t)))))
+      (check-db-server-role! handle))))
 
 (defn start-http-server!
   []
@@ -265,7 +313,7 @@
                  (not (string? (:private-addr config/config)))))
     (throw (Exception. "config invalid")))
   (log-instance-role!)
-  (check-db-server-reachable!)
+  (check-db-server!)
   (prepare-for-writing!)
   ;; A missing file-type context silently drops files of that type on import,
   ;; so refuse to come up unless every named id is present. The only exemption

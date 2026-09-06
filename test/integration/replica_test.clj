@@ -4,6 +4,7 @@
   (:require [clojure.test :refer [deftest is testing]]
             [config :as config]
             [datastore.schema :as schema]
+            [db :as db]
             [dev-seed :as dev-seed]
             [poll :as poll]
             [server :as server]
@@ -78,3 +79,48 @@
       (let [resp (server/upload-handler {:multipart-params {}})]
         (is (= 403 (:status resp)))
         (is (re-find #"read-only replica" (:body resp)))))))
+
+;; --- the two processes have to agree about the role -------------------------
+;; Same rule (`role`), same marker file, but each process reads it in its own
+;; working directory -- and only the MARKER is shared by construction. `:dev?`
+;; is per-file, so a db-server started against a standalone `{:db-server {…}}`
+;; config reads no `:dev?`, calls itself prod, finds no marker beside itself and
+;; opens the database read-only, under an app-server that believes it may write.
+;;
+;; That combination is invisible until the first write: `SELECT 1` succeeds on a
+;; read-only database, `/api/status` says `read-only-replica: false`, and the
+;; failure arrives later as a bare SQLITE_READONLY. So the verdicts are compared
+;; at startup instead.
+
+(def ^:private remote {:db-server/url "http://127.0.0.1:65535"})
+
+(defn- role-check-with
+  "Run the startup role check with the app believing `app-replica?` and the
+   db-server answering `db-read-only?`. Answers the exception, or nil."
+  [app-replica? db-read-only?]
+  (with-redefs [config/config       {:db remote :read-only-replica? app-replica?}
+                db/remote-read-only? (constantly db-read-only?)]
+    (try (#'server/check-db-server-role! remote) nil (catch Throwable t t))))
+
+(deftest the-app-and-its-db-server-must-agree-about-the-role-test
+  (testing "a read-only db-server under an app that thinks it may write is refused"
+    ;; The standalone-config case, and the one that used to boot fully green.
+    (let [t (role-check-with false true)]
+      (is (some? t))
+      (is (re-find #"disagree about whether this instance may write" (.getMessage t)))
+      (is (re-find #"app-server: primary" (.getMessage t))
+          "the message names what THIS process decided")
+      (is (re-find #"db-server:  read-only" (.getMessage t))
+          "and what the other one did")
+      (is (re-find #"primary\.nosync" (.getMessage t))
+          "and the marker both of them looked for")))
+  (testing "and the milder half -- a writable db-server under a replica -- too"
+    ;; Less dangerous (the app refuses every write in front of it) but the same
+    ;; confusion, and the same fix.
+    (let [t (role-check-with true false)]
+      (is (some? t))
+      (is (re-find #"app-server: read-only replica" (.getMessage t)))
+      (is (re-find #"db-server:  writable" (.getMessage t)))))
+  (testing "two primaries agree, and two replicas agree"
+    (is (nil? (role-check-with false false)))
+    (is (nil? (role-check-with true true)))))
