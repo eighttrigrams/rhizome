@@ -81,3 +81,19 @@
     (let [c {:semsearch {:ollama-url "http://127.0.0.1:11434" :ollama-model "m"}
              :db-server {:port 3141 :db-path "./rhizome.db"}}]
       (is (= c (#'config/check-moved-keys c))))))
+
+(deftest a-section-without-a-port-says-so-test
+  ;; Not "no :db-server section" -- there is one, and a message that sends the
+  ;; reader looking for something already in front of them costs more than a
+  ;; missing message. The db-server defaults its own port when the section omits
+  ;; one; this process deliberately does not follow it there, because a guess
+  ;; that happened to be wrong comes up green and fails on the first statement.
+  (let [t (try (#'config/db-url {:db-server {:db-path "./rhizome.db"}}) nil
+               (catch Throwable t t))]
+    (is (some? t))
+    (is (re-find #"the :db-server section has no :port" (.getMessage t)))
+    (is (not (re-find #"no :db-server section and no :db-url" (.getMessage t)))
+        "the message for an absent section is a different message"))
+  (testing "and an absent section still gets that other one"
+    (let [t (try (#'config/db-url {:port 3140}) nil (catch Throwable t t))]
+      (is (re-find #"no :db-server section and no :db-url" (.getMessage t))))))

@@ -175,11 +175,23 @@
   (or (:db-url c)
       (when-let [port (get-in c [:db-server :port])]
         (str "http://127.0.0.1:" port))
-      (throw (ex-info (str "config invalid: no :db-server section and no :db-url. "
-                           "The app-server reaches its database over HTTP, so it needs "
-                           "either :db-server {:port …} to derive http://127.0.0.1:<port> "
-                           "from, or an explicit :db-url. `make onboard` writes the "
-                           "section; a config.edn from before the split has to gain it.")
+      (throw (ex-info (if (contains? c :db-server)
+                        ;; There IS a section; it just does not name a port. Saying
+                        ;; "no :db-server section" here was simply false, and a false
+                        ;; message costs more than a missing one -- it sends the reader
+                        ;; to look for something that is in front of them.
+                        (str "config invalid: the :db-server section has no :port, so there "
+                             "is nothing to derive this app-server's db handle from. Add "
+                             ":port to it (that is what `make onboard` writes), or set a "
+                             "top-level :db-url. Note that the db-server defaults its own "
+                             "port when the section omits one -- this process does not "
+                             "guess at it, because a guess that happened to be wrong would "
+                             "come up green and fail on the first statement.")
+                        (str "config invalid: no :db-server section and no :db-url. "
+                             "The app-server reaches its database over HTTP, so it needs "
+                             "either :db-server {:port …} to derive http://127.0.0.1:<port> "
+                             "from, or an explicit :db-url. `make onboard` writes the "
+                             "section; a config.edn from before the split has to gain it."))
                       {:config c}))))
 
 (defn- db-handle
