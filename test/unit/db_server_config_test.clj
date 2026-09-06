@@ -35,9 +35,14 @@
              opts)
           "the app's :port is 3140 and the db-server's is 3141: it took its own")))
   (testing "the standalone file: same reader, nothing else required"
-    (is (= {:port 3008 :db-path "/db/rhizome.db.nosync" :vec-path nil :read-only? true}
-           (opts-for "{:db-server {:port 3008 :db-path \"/db/rhizome.db.nosync\"}}"))
-        "no :dev? in the file means prod, and prod with no marker is read-only")))
+    ;; The marker is redefined for the same reason its siblings below do it: the
+    ;; real lookup is a file in the checkout, so without this a developer who
+    ;; drops ./primary.nosync in to exercise prod behaviour reddens a test that
+    ;; is about which keys are read.
+    (with-redefs [role/primary-marker-present? (constantly false)]
+      (is (= {:port 3008 :db-path "/db/rhizome.db.nosync" :vec-path nil :read-only? true}
+             (opts-for "{:db-server {:port 3008 :db-path \"/db/rhizome.db.nosync\"}}"))
+          "no :dev? in the file means prod, and prod with no marker is read-only"))))
 
 (deftest the-role-comes-from-the-marker-and-the-mode-test
   ;; The same rule the app-server reaches, from the same directory -- `role` owns

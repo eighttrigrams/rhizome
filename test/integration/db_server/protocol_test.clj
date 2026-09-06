@@ -259,15 +259,26 @@
    finds it costs a second at most.
 
    Doubling, from the old constant, with a ceiling so a pathological machine
-   fails the test rather than running forever."
+   fails the test rather than running forever.
+
+   **It calibrates against half again the window, not the window itself.** The
+   number this hands back is used for a statement run a second time, inside the
+   transaction, on a JVM that has just been warmed by this very loop -- so the
+   re-run is the faster of the two. Stopping at the first `n` to cross `ms`
+   would leave a machine whose doubling landed marginally (410ms here, then 390
+   in the transaction) failing on a premise that has nothing to do with the
+   sweeper this test is about. The margin is what the doubling gives away for
+   free: the step before was under, so the answer is somewhere between 1.5x and
+   3x the window."
   [server ms]
-  (loop [n 4000000]
-    (let [began (System/currentTimeMillis)
-          _     (result (post! server "/execute-one" {:stmt [(counting-cte n)]}))
-          took  (- (System/currentTimeMillis) began)]
-      (cond (> took ms)     n
-            (>= n 512000000) n
-            :else           (recur (* 2 n))))))
+  (let [target (* 1.5 ms)]
+    (loop [n 4000000]
+      (let [began (System/currentTimeMillis)
+            _     (result (post! server "/execute-one" {:stmt [(counting-cte n)]}))
+            took  (- (System/currentTimeMillis) began)]
+        (cond (> took target)  n
+              (>= n 512000000) n
+              :else            (recur (* 2 n)))))))
 
 (deftest the-clock-restarts-when-a-statement-ENDS-not-when-it-starts
   ;; The other half of the same rule, and the one that catches `release!`
