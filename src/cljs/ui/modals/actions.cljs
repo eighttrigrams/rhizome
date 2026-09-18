@@ -36,18 +36,6 @@
                                 api/update-item
                                 {:context context :item-contexts item-contexts}))
 
-(defn discard-obsidian-and-close!
-  [*state]
-  (fetch-and-reset-with-method! *state
-                                (dissoc @*state :modal :show-confirm-discard)
-                                api/discard-obsidian-changes))
-
-(defn sync-obsidian-and-close!
-  [*state item]
-  (fetch-and-reset-with-method! *state
-                                (dissoc @*state :modal :show-confirm-discard)
-                                api/sync-obsidian-changes
-                                item))
 
 (defn save-relation!
   "The relation modal's save. The modal stays open across it and the server

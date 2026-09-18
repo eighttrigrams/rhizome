@@ -62,14 +62,6 @@
 
 (defn-over-http fetch-item-provenance :return-value {})
 
-(defn-over-http edit-item-in-obsidian :return-value {})
-
-(defn-over-http sync-obsidian-changes :return-value {})
-
-(defn-over-http discard-obsidian-changes :return-value {})
-
-(defn-over-http get-obsidian-file-content :return-value {})
-
 (defn-over-http update-annotations :return-value {})
 
 (defn-over-http fetch-relation-description :return-value {})

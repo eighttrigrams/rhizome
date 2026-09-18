@@ -23,7 +23,6 @@
             [dispatch :as dispatch]
             [et.vp.ds :as ds]
             [et.vp.ds.relations :as relations]
-            [opener :as opener]
             [semsearch.backfill :as backfill]
             [semsearch.embedder :as embedder])
   (:import [java.io File]))
@@ -73,8 +72,6 @@
                              [{} {:item-id (:id ctx) :context-id (:id item)}]]
    "fetch-relation-provenance" [[{} {:item-id (:id item) :context-id (:id ctx)}]
                                 [{} {:item-id (:id ctx) :context-id (:id item)}]]
-   "get-obsidian-file-content" [[{}]]
-   "discard-obsidian-changes"  [[{}]]
    "list-youtube-poll-channels" [[{}]]
    "list-atom-poll-feeds"      [[{}]]
    ;; The two vector searches need the sqlite-vec extension, so they are swept in
@@ -142,15 +139,14 @@
         ;; Only the db and the role change: the rest of the config stays as the
         ;; test env has it, so the query paths see what they normally do.
         ;;
-        ;; The one exception is the Obsidian temp file: `discard-obsidian-changes`
-        ;; calls opener/delete-obsidian-temp-file, which deletes a path hardcoded
-        ;; into the owner's vault -- on the owner's machine that is a real in-flight
-        ;; edit, so a test run must not be able to reach it. Stubbing the delete
-        ;; keeps what this sweep is about (the command still runs against the
-        ;; read-only db) and drops only the filesystem side effect, which could not
-        ;; write a db row anyway.
-        (with-redefs [config/config (assoc config/config :db ro :read-only-replica? true)
-                      opener/delete-obsidian-temp-file (fn [] nil)]
+        ;; This used to stub opener/delete-obsidian-temp-file as well: the one
+        ;; classified query that reached the filesystem was
+        ;; `discard-obsidian-changes`, which deleted a path hardcoded into the
+        ;; owner's vault -- a real in-flight edit on his machine, which a test
+        ;; run must not be able to touch. Obsidian support was removed on
+        ;; 2026-09-18 (see `opener`) and with it the only query in this sweep
+        ;; that did anything outside the database.
+        (with-redefs [config/config (assoc config/config :db ro :read-only-replica? true)]
           (doall
             (for [[command arg-vectors] (query-calls seeded)
                   :when (contains? names command)

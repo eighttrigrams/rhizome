@@ -9,8 +9,7 @@
             [replica :as replica]
             [repository.insertion :as insertion]
             [repository.deletion :as deletion]
-            [semsearch.query :as semsearch]
-            [opener]))
+            [semsearch.query :as semsearch]))
 
 (defn search-aggregated-contexts
   [db {{{:keys [highlighted-secondary-contexts]} :data} :selected-item :as opts}]
@@ -421,59 +420,6 @@
         :provenance {:item-id (:id item)
                      :description (:description item)
                      :caution (provenance/of-item db (:id item))}))))
-
-(defn edit-item-in-obsidian
-  [{:keys [db]}]
-  (fn [state item-ref]
-    (let [item (datastore/get-item db item-ref)
-          result (opener/create-obsidian-temp-file item)]
-      (if (:error result)
-        (assoc state :error (:error result))
-        (if (:file-already-exists? result)
-          ;; If file existed, don't show modal - just return current state
-          state
-          ;; If file didn't exist, show modal as usual
-          (assoc state :modal :external-edit))))))
-
-(defn- sync-from-obsidian
-  [{:keys [db]} item-id]
-  (try (when-let [description (opener/parse-obsidian-temp-file)]
-         (let [item (datastore/get-item db {:id item-id})]
-           (when item
-             (log/info (str "Synced changes from Obsidian for item" item-id
-                            "- saved:" (pr-str description)))
-             ;; Use the same update method as regular description updates
-             (datastore/update-context-description db {:id item-id :description description} "obsidian"))))
-       (catch Exception e
-         (log/error {:error-context :obsidian-sync} e "Failed to sync from Obsidian")
-         nil)))
-
-(defn sync-obsidian-changes
-  [{:keys [db]}]
-  (fn [state arg]
-    (log/info (str "Sync obsidian changes back" 1))
-    (let [item-id (:id arg)]
-      (sync-from-obsidian {:db db} item-id)
-      (opener/delete-obsidian-temp-file)
-      (let [fresh-item (datastore/get-item db {:id item-id})
-            history (datastore/get-description-history db {:id item-id})
-            descriptions (:versions history)
-            new-state (-> state
-                          (assoc :modal nil)
-                          (assoc :selected-item fresh-item)
-                          (assoc :item-descriptions descriptions)
-                          (assoc :description-version-idx 0))]
-        (log/info (str "Updated selected-item with:" (pr-str (:description fresh-item))))
-        new-state))))
-
-(defn get-obsidian-file-content
-  [{:keys [_db]}]
-  (fn [state]
-    (let [content (opener/parse-obsidian-temp-file)] (assoc state :obsidian-file-content content))))
-
-(defn discard-obsidian-changes
-  [{:keys [_db]}]
-  (fn [state] (opener/delete-obsidian-temp-file) (assoc state :modal nil)))
 
 (defn link-selected-context-to-context
   "link selected context as an item to a container"

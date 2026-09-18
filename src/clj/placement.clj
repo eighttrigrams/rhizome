@@ -39,41 +39,30 @@
 
 
 (def machine-local-commands
-  "The `/ui` commands that must run on the machine with the browser. Everything
-   else in dispatch's list goes to the hub -- `api.placement-sweep-test` asserts
-   the two sets together cover that list exactly, so a command added to
-   `dispatch` cannot default silently into either half.
+  "The `/ui` commands that must run on the machine with the browser.
 
-   All four entries are one workflow: the Obsidian round trip. The human's
-   editor opens a temp file on *his* machine, he edits it there, and a later
-   command reads it back. The file is the state, it is not in a synced folder,
-   and `opener/open-in-obsidian` shells out to the local OS -- so the whole
-   sequence has to stay on one machine, and that machine is his.
+   **It is empty, and that is the current truth rather than an oversight.** Its
+   only members were the four Obsidian commands (`edit-item-in-obsidian`,
+   `sync-obsidian-changes`, `discard-obsidian-changes`,
+   `get-obsidian-file-content`), and Obsidian support was removed on 2026-09-18
+   -- see `opener`, and the cookbook recipe it points at. So every `/ui` command
+   is the hub's, and `route-placement` says `/ui` is `:hub` rather than
+   `:split`. `placement-sweep-test` ties those two statements together, so they
+   cannot come apart.
 
-   - `edit-item-in-obsidian` writes the temp file and opens the editor;
-   - `sync-obsidian-changes` reads it back -- and this one also *writes the
-     description*, so it is the one command in this set that needs the hub too.
-     It is local because of where the file is, and it calls the hub for the
-     write (see `handoffs/RHIZOME_ARCH_REWORK_2.md`, the Obsidian protocol);
-   - `discard-obsidian-changes` deletes the temp file;
-   - `get-obsidian-file-content` reads it.
+   **The set stays, and so does the mechanism.** What is left is not a leftover
+   but the guard: `api.placement-sweep-test` demands that this set and
+   `hub-commands` together cover dispatch's list exactly, so the next command
+   that touches this machine's disk has to be named here rather than defaulting
+   into the hub in silence -- where its file work would run against the wrong
+   disk and nothing would say so. An empty whitelist with a live guard is worth
+   more than a deleted one.
 
-   Note what is deliberately NOT here, because each looks like a candidate:
-
-   - `insert-item` -- the scrapers write preview images, but to the synced
-     `:preview-images` folder. See the namespace docstring: synced is free.
-   - `delete-item` / `delete-context` -- `repository.deletion` removes files
-     beside the item, again in synced folders, and the deletion has to be
-     atomic with the db rows. Splitting it would risk a half-deletion across a
-     network.
-   - `list-resources` -- the import branches scan the drop folder, which *is*
-     machine-local. But import is not reached through `/ui` today (it runs from
-     `/api` and the batch path), so nothing in the `/ui` classification turns
-     on it. If an import command is ever added to `dispatch`, it belongs here."
-  #{"edit-item-in-obsidian"
-    "sync-obsidian-changes"
-    "discard-obsidian-changes"
-    "get-obsidian-file-content"})
+   What belongs here, if something does again: work on *this* disk that no sync
+   can carry -- an OS `open`, a temp file the human edits, an HTTP multipart
+   tempfile, bytes for this browser. Not work in a synced folder; see the
+   namespace docstring for why that distinction is the whole axis."
+  #{})
 
 (def hub-commands
   "The `/ui` commands that run on the hub -- listed, not derived.
@@ -136,8 +125,12 @@
 
    - `:local` -- answered by this machine, never proxied;
    - `:hub`   -- proxied to the hub whole;
-   - `:split` -- dispatched per call. `/ui` is the only one: by command name,
-     see `machine-local-commands`.
+   - `:split` -- dispatched per call, by command name. **Nothing is `:split`
+     today:** `/ui` was, until Obsidian support was removed and
+     `machine-local-commands` became empty. The value stays because the
+     dispatch-by-name mechanism stays (see `machine-local-commands`), and
+     `placement-sweep-test` re-derives `/ui`'s entry from whether that set has
+     members, so the two cannot disagree.
 
    Keys are the route paths exactly as they appear in `server.clj`, so
    `api.placement-sweep-test` can check that none has gone stale.
@@ -153,7 +146,7 @@
    - `/test/reset` is `:hub` -- it truncates tables. It is e2e-only, and e2e
      runs both halves on one machine anyway, but classifying it by what it does
      rather than by where it is used keeps the table honest."
-  {"/ui"                 :split
+  {"/ui"                 :hub
    "/api"                :hub
    "/open/:file-id"      :local
    "/img-by-id/:item-id" :local

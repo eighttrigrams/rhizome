@@ -130,15 +130,27 @@
              "A new route needs a half: :local (this machine answers it), "
              ":hub (proxied whole) or :split (dispatched per call)."))))
 
-(deftest only-ui-is-split-test
-  (testing "/ui is the only surface dispatched per call"
-    (is (= #{"/ui"} (set (keep (fn [[path half]] (when (= :split half) path))
-                               placement/route-placement)))
-        (str "/api answering as one surface on the hub is a finding, not an "
-             "accident -- see the comment in placement. If a second surface "
-             "becomes split, that comment needs revisiting."))
-    (is (= #{:local :hub :split} (set (vals placement/route-placement)))
-        "sanity: all three halves are in use; an unused one means a stale table")))
+(deftest the-ui-entry-follows-the-machine-local-set-test
+  (testing "/ui is :split exactly when there is something machine-local to split off"
+    ;; These two statements are the same statement, made in two places, so they
+    ;; are derived from each other here rather than both maintained. Obsidian's
+    ;; removal emptied machine-local-commands and so /ui became :hub; if
+    ;; something machine-local is ever added back, this reddens until the route
+    ;; table agrees again.
+    (is (= (if (seq placement/machine-local-commands) :split :hub)
+           (get placement/route-placement "/ui"))
+        (str "machine-local-commands has "
+             (count placement/machine-local-commands)
+             " members, so /ui should be "
+             (if (seq placement/machine-local-commands) ":split" ":hub")
+             " -- it says " (get placement/route-placement "/ui"))))
+  (testing "/api is not split, and that is a finding rather than an accident"
+    ;; See the comment in placement: image bytes live in synced folders, so the
+    ;; hub can answer all of /api. If this ever becomes :split, that comment is
+    ;; what needs revisiting.
+    (is (= :hub (get placement/route-placement "/api"))))
+  (testing "every half named in the table is one of the three that exist"
+    (is (empty? (remove #{:local :hub :split} (vals placement/route-placement))))))
 
 ;; --- 3. the byte paths that middleware hides ---------------------------------
 

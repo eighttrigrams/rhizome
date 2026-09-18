@@ -25,8 +25,6 @@
                     (.focus el))
     :annotation-edit (when-let [el (.getElementById js/document "modal-component")]
                        (.focus el))
-    :external-edit (when-let [el (.getElementById js/document "modal-component")]
-                     (.focus el))
     nil))
 
 (defn- handle-mask-keydown
@@ -34,7 +32,7 @@
   (.stopPropagation e)
   (let [modal-type (:modal @*state)]
     (when (= "Escape" (.-code e))
-      (if (#{:description :external-edit} modal-type)
+      (if (= :description modal-type)
         (focus-modal-content modal-type)
         (do (.preventDefault e)
             (modal-actions/cancel-modal! *state))))))

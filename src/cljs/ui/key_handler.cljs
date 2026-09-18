@@ -61,12 +61,10 @@
                        (not shift-pressed?)
                        selected-item)
                     (actions/start-linking-context *state)
-                  (and selected-item (= "KeyD" code) alt-pressed?) (actions/edit-item-in-obsidian!
-                                                                     *state)
-                  (and selected-item (= "KeyD" code) (not alt-pressed?)) (swap! *state
-                                                                           #(assoc %
-                                                                              :modal :description
-                                                                              :item-view? true))
+                  (and selected-item (= "KeyD" code)) (swap! *state
+                                                         #(assoc %
+                                                            :modal :description
+                                                            :item-view? true))
                   (and selected-item (= "KeyS" code)) (actions/cycle-search-mode! *state)
                   (and selected-item (not item-view?) (= "KeyF" code)) (actions/enter-item-view!
                                                                          *state)

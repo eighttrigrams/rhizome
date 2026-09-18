@@ -1,14 +1,11 @@
 (ns ui.modals
   (:require [reagent.core :as r]
-            [cljs.core.async :refer [go]]
-            [cljs.core.async.interop :refer-macros [<p!]]
             [ui.codemirror :as codemirror]
             [ui.modals.key-handler :as key-handler]
             [ui.modals.item-edit :as item-edit]
             [ui.modals.link-context-item :as link-context-item]
             [ui.modals.annotation-edit :as annotation-edit]
-            [ui.modals.actions :as actions]
-            api))
+            [ui.modals.actions :as actions]))
 
 (def *original-description (r/atom nil))
 
@@ -63,17 +60,6 @@
       (swap! *state assoc :show-confirm-discard true)
       (actions/cancel-modal! *state))))
 
-(defn- handle-external-edit-escape
-  [*state]
-  (if (:show-confirm-discard @*state)
-    nil
-    (go (let [result (<p! (api/get-obsidian-file-content @*state))
-              external-content (:obsidian-file-content result)
-              saved-description (or (:description (:selected-item @*state)) "")]
-          (if (= external-content saved-description)
-            (actions/discard-obsidian-and-close! *state)
-            (swap! *state assoc :show-confirm-discard true))))))
-
 (defn- handle-keys
   [*state item]
   (case (:modal @*state)
@@ -93,9 +79,6 @@
                                                     #(annotation-edit/get-values
                                                        (:annotation-edit-item @*state)
                                                        (:annotation-edit-context @*state)))
-    :external-edit (key-handler/handle-external-edit-keys *state
-                                                          #(do {:id (:id item)})
-                                                          #(handle-external-edit-escape *state))
     #()))
 
 (defn- save-notice
@@ -126,11 +109,4 @@
          :annotation-edit [:div#modal-component
                            [annotation-edit/component *state (:annotation-edit-item @*state)
                             (:annotation-edit-context @*state) (save-notice @*state)]]
-         :external-edit
-           [:<>
-            [:div#modal-component {:tabIndex 0 :autoFocus true} [:h3 "Editing in Obsidian"]
-             [:p (str "Editing \"" (:title (:selected-item @*state)) "\" in Obsidian")]
-             [:p "Press ESC to discard changes, or Alt+9 to sync changes back"]]
-            (when (:show-confirm-discard @*state)
-              [confirm-discard-dialog *state #(actions/discard-obsidian-and-close! *state)])]
          nil)])))

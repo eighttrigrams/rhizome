@@ -394,8 +394,3 @@
                             :annotation-edit-item item
                             :annotation-edit-context (filed-under % item)))))
 
-(defn edit-item-in-obsidian!
-  [*state]
-  (let [selected-item (:selected-item @*state)]
-    (when selected-item
-      (fetch-and-reset-with-method! *state @*state api/edit-item-in-obsidian selected-item))))

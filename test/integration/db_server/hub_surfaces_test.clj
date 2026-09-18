@@ -18,7 +18,8 @@
             [clj-http.client :as http]
             [clojure.test :refer [deftest is testing]]
             [cognitect.transit :as transit]
-            [db-server])
+            [db-server]
+            [placement :as placement])
   (:import [java.io ByteArrayOutputStream]))
 
 (defn- temp-db-path []
@@ -69,16 +70,24 @@
                    "reading a different database. Body was: " (pr-str body))))))))
 
 (deftest the-hub-refuses-machine-local-commands-test
-  (with-hub
-    (fn [server]
-      (testing "a command that works on the human's own disk is refused, not run"
-        (let [{:keys [thrown return]} (ui! server "edit-item-in-obsidian" [{} {:id 1}])]
-          (is (nil? return))
-          (is (some? thrown) "an Obsidian command must not be answered here")
-          (is (re-find #"machine-local" (str thrown))
-              (str "the refusal should say why. Got: " (pr-str thrown)))))
-      (testing "and a hub command on the same surface still goes through"
-        (is (nil? (:thrown (ui! server "list-resources" [{}]))))))))
+  ;; `placement/machine-local-commands` is **empty** since Obsidian support was
+  ;; removed (see placement), so there is no real command to send here. The
+  ;; guard is what is under test, not the classification, so the classification
+  ;; is stubbed: any command named machine-local must be refused by the hub
+  ;; rather than answered. Without this the mechanism would sit untested until
+  ;; the next machine-local command is added -- which is exactly when it needs
+  ;; to already work.
+  (with-redefs [placement/machine-local-commands #{"fetch-item-description"}]
+    (with-hub
+      (fn [server]
+        (testing "a command that works on the human's own disk is refused, not run"
+          (let [{:keys [thrown return]} (ui! server "fetch-item-description" [{} {:id 1}])]
+            (is (nil? return))
+            (is (some? thrown) "a machine-local command must not be answered here")
+            (is (re-find #"machine-local" (str thrown))
+                (str "the refusal should say why. Got: " (pr-str thrown)))))
+        (testing "and a hub command on the same surface still goes through"
+          (is (nil? (:thrown (ui! server "list-resources" [{}])))))))))
 
 (deftest the-db-server-describe-still-wins-test
   (with-hub

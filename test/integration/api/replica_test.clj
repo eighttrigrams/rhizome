@@ -46,8 +46,6 @@
                                              :global-annotation "nope"}]
                     [:store-current-view {:selected-item ctx} ctx]
                     [:cycle-search-mode {:selected-item ctx}]
-                    [:edit-item-in-obsidian {} item]
-                    [:sync-obsidian-changes {} item]
                     [:add-atom-poll-feed {} "https://example.com/feed.xml"]
                     [:add-youtube-poll-channel {} "https://www.youtube.com/@example" nil]]]
         (is (refused? (as-replica (apply call! call))) (str (first call))))

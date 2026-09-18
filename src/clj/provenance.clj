@@ -44,6 +44,14 @@
   in rhizome needs to have an opinion about it."
   #{"app" "obsidian"})
 
+;; `"obsidian"` names a feature that no longer exists: the editor round trip was
+;; removed on 2026-09-18 with the hub/server split (see `opener`). The marker
+;; stays in the set above, and must, because the *rows* outlive the feature --
+;; every description the owner ever synced back from his editor carries it.
+;; Dropping it would flip each of those lines from 1.00, sacred, to 0.00, free
+;; for an agent to rewrite, and the agent would be told so in the legend below.
+;; A removed writer can keep a permanent claim on this vocabulary.
+
 (def legend
   "What a caution number means, in words, for whoever reads one.
 
@@ -57,8 +65,8 @@
   an agent holding this string is not in a position to translate someone else's."
   (str "caution runs from 1.00 to 0.00 over the lines of the text it is served with. "
        "1.00 is a stretch written wholly by the owner's own hand — saved from the "
-       "web UI (source \"app\") or synced back from his editor (source "
-       "\"obsidian\") — and is not yours to rewrite. "
+       "web UI (source \"app\"), or synced back from his own editor (source "
+       "\"obsidian\") while rhizome still did that — and is not yours to rewrite. "
        "0.00 is a stretch written wholly through the REST API (source \"api\") or "
        "by a scraper (source \"scraper\") — free to edit. "
        "In between, both have worked on the stretch and the number is the share of "

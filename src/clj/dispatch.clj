@@ -12,9 +12,8 @@
               store-current-view load-stored-context remove-stored-context update-item unlink-item
               unlink-selected-item-from-container delete-item upgrade-item-to-context
               link-selected-context-to-context select-last-context fetch-context deselect-context
-              fetch-aggregated-contexts delete-context fetch-item-description edit-item-in-obsidian
-              fetch-item-provenance
-              sync-obsidian-changes discard-obsidian-changes get-obsidian-file-content update-annotations
+              fetch-aggregated-contexts delete-context fetch-item-description
+              fetch-item-provenance update-annotations
               fetch-relation-description fetch-relation-history fetch-relation-provenance
               vector-search-related-items vector-threshold-search-related-items]]
             [poll :refer
@@ -53,10 +52,6 @@
              delete-context
              fetch-item-description
              fetch-item-provenance
-             edit-item-in-obsidian
-             sync-obsidian-changes
-             discard-obsidian-changes
-             get-obsidian-file-content
              update-annotations
              fetch-relation-description
              fetch-relation-history
@@ -84,10 +79,10 @@
    - `fetch-context` is a read that touches the row's ordering timestamps; on a
      replica the touch is skipped (see repository/fetch-context) so that opening
      a context keeps working.
-   - `discard-obsidian-changes` only deletes a temp file. `edit-item-in-obsidian`
-     is deliberately NOT here although it writes no db row either: it is the
-     entry point of a write flow, and refusing it up front beats stranding the
-     human's edit in a temp file that sync-obsidian-changes then refuses."
+
+   (A third entry used to be here: `discard-obsidian-changes`, which only
+   deleted a temp file. Obsidian support was removed on 2026-09-18 -- see
+   `opener`.)"
   #{"list-resources"
     "fetch-aggregated-contexts"
     "fetch-context"
@@ -98,8 +93,6 @@
     "fetch-relation-description"
     "fetch-relation-history"
     "fetch-relation-provenance"
-    "get-obsidian-file-content"
-    "discard-obsidian-changes"
     "vector-search-related-items"
     "vector-threshold-search-related-items"
     "list-youtube-poll-channels"

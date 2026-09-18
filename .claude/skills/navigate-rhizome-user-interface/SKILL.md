@@ -138,7 +138,6 @@ Where `12345` is the ID of the imported image item. The image will be displayed 
 - `Alt+U` - Upgrade item to context
 - `Alt+T` - Unlink selected item from container
 - `Alt+B` - Select last context
-- `Alt+D` - Edit item in Obsidian
 - `s` - Cycle search mode
 - `f` - Enter/exit item view
 

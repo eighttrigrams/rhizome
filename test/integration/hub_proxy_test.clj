@@ -17,6 +17,7 @@
             [cognitect.transit :as transit]
             [config :as config]
             [db-server]
+            [placement :as placement]
             [server]))
 
 (defn- temp-db-path []
@@ -103,16 +104,19 @@
             (is (re-find #"ViaTheServer" (:body resp)))))))))
 
 (deftest machine-local-commands-are-not-forwarded-test
-  (with-pair
-    (fn [_hub app]
-      (testing "an Obsidian command is answered here, where the file is"
-        ;; The hub refuses machine-local commands (see
-        ;; db-server.hub-surfaces-test), so a refusal coming back is the tell
-        ;; that this one was forwarded when it should not have been.
-        (let [{:keys [thrown]} (POST-ui* app "get-obsidian-file-content" [{}])]
-          (is (not (re-find #"machine-local" (str thrown)))
-              (str "this command was forwarded to the hub, which refused it: "
-                   thrown)))))))
+  ;; The classification is empty since Obsidian support was removed, so as in
+  ;; db-server.hub-surfaces-test the classification is stubbed and the routing
+  ;; is what is tested. Both halves read the same var, and in this test both
+  ;; halves are in this JVM -- so the hub would refuse the command if the server
+  ;; forwarded it, and that refusal coming back is the tell.
+  (with-redefs [placement/machine-local-commands #{"list-resources"}]
+    (with-pair
+      (fn [_hub app]
+        (testing "a machine-local command is answered here, where the files are"
+          (let [{:keys [thrown]} (POST-ui* app "list-resources" [{}])]
+            (is (not (re-find #"machine-local" (str thrown)))
+                (str "this command was forwarded to the hub, which refused it: "
+                     thrown))))))))
 
 (deftest unclassified-commands-are-refused-not-guessed-test
   (with-pair

@@ -298,8 +298,9 @@ Selecting a child does not re-root the view on it — that is still to come.
 ## Line provenance
 
 Descriptions are written from more than one direction: typed into the app,
-synced back from Obsidian, pulled in by a scraper, and — increasingly —
-rewritten by agents over the REST API. Every version already records which of
+pulled in by a scraper, and — increasingly — rewritten by agents over the REST
+API. Older versions also carry `obsidian`, from a round trip through the owner's
+own editor that rhizome no longer does. Every version already records which of
 those it came from, and the version bar over a description has always shown it.
 That answers a question about a *version*, and it is not the question that
 matters when something is about to be edited.
@@ -323,8 +324,9 @@ about the writing it covers.
 
 The number at the head of each range is a **caution**, 1.00 down to 0.00:
 
-- **1.00** — written wholly by hand, from the web UI (`app`) or synced back from
-  the editor (`obsidian`). Not an agent's to rewrite.
+- **1.00** — written wholly by hand, from the web UI (`app`), or — in older
+  text — synced back from the owner's own editor (`obsidian`). Not an agent's to
+  rewrite.
 - **0.00** — written wholly through the REST API (`api`) or by a scraper
   (`scraper`). Free to edit.
 - **In between** — both have worked on that stretch, and the number is the share
