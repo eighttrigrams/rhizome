@@ -19,6 +19,7 @@
             opener
             dispatch
             rest-api
+            [ui-api :as ui-api]
             [cambium.core :as log]
             [ring.middleware.resource :refer [wrap-resource]]
             [ring.middleware.multipart-params :refer [wrap-multipart-params]]
@@ -31,23 +32,20 @@
 (defn- open [{{:keys [file-id]} :route-params}] (opener/open file-id) {:status 200})
 
 (defn- api
+  "The browser gate in front of `/ui`. The handler itself now lives in `ui-api`,
+   because the hub answers the same commands off its own DataSource and one
+   definition beats two that agree to match (arch rework 2, step 2). What stays
+   here is the part that is about *this* surface: only the local browser may
+   POST to it outside dev mode."
   []
-  (fn [req]
-    (if (and (not (:dev? config/config))
-             (or (not (= (:private-addr config/config) (:remote-addr req)))
-                 (not (= (:private-user-agent config/config)
-                         (get-in req [:headers "user-agent"])))))
-      (do (log/warn (pr-str req)) {:status 403})
-      ((context ""
-                []
-                (-> #(response/response (log/with-logging-context
-                                          {:context :request}
-                                          (dispatch/handler (-> %
-                                                                (assoc-in [:body :server-args :db]
-                                                                          (:db config/config))))))
-                    json/wrap-json-response
-                    (json/wrap-json-body {:keywords? true})))
-        req))))
+  (let [h (ui-api/handler #(:db config/config))]
+    (fn [req]
+      (if (and (not (:dev? config/config))
+               (or (not (= (:private-addr config/config) (:remote-addr req)))
+                   (not (= (:private-user-agent config/config)
+                           (get-in req [:headers "user-agent"])))))
+        (do (log/warn (pr-str req)) {:status 403})
+        (h req)))))
 
 (defn upload-handler
   "POST /upload — store a dropped preview image. A write, so a read-only replica

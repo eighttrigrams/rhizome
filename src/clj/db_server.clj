@@ -33,8 +33,12 @@
             [datastore.schema :as schema]
             [db :as db]
             [next.jdbc :as jdbc]
+            [placement :as placement]
+            [rest-api :as rest-api]
             [ring.adapter.jetty :as jetty]
-            [role :as role])
+            [ring.middleware.params :refer [wrap-params]]
+            [role :as role]
+            [ui-api :as ui-api])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
            [java.sql Connection SQLException]
            [java.util.concurrent Executors TimeUnit]
@@ -466,7 +470,23 @@
         (POST "/tx/commit" req (tx-commit server req))
         (POST "/tx/rollback" req (tx-rollback server req))))
     (GET "/health" [] (health server))
+    ;; Before the item surfaces below, deliberately: this one answers the
+    ;; statement protocol's own description, and prober and the start scripts
+    ;; read it. `rest-api` also serves GET /api/describe, so the two collide and
+    ;; the first one registered wins. Keeping the existing answer here means no
+    ;; script changes in an additive step; it also means the hub's
+    ;; /api/describe is the wrong one of the two for now. That is temporary and
+    ;; it retires with the statement protocol at step 4, when this describe has
+    ;; nothing left to describe. `db-server-describe-still-wins-test` pins it so
+    ;; the swap is a decision rather than a surprise.
     (GET "/api/describe" [] (describe))
+    ;; The item surfaces (arch rework 2, step 2). Same definitions `server`
+    ;; mounts, over this process's own local DataSource instead of a remote
+    ;; handle -- which is the whole point: here a dispatch call that costs nine
+    ;; statements costs nine *local* statements.
+    (ui-api/ui-routes (constantly (:ds server))
+                      {:refuse-command? placement/machine-local-command?})
+    (wrap-params (rest-api/rest-routes (constantly (:ds server))))
     (fn [req] (json-response 404 {:error (str "db-server: no such route: " (:uri req))}))))
 
 ;; -- process ---------------------------------------------------------------
