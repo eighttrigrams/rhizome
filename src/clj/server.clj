@@ -272,7 +272,13 @@
   every tick."
   []
   (and (not (:e2e? config/config))
-       (not (replica/read-only?))))
+       (not (replica/read-only?))
+       ;; And not when there is a hub: it runs them, over the database it owns
+       ;; (`db-server/poll-scheduling-enabled?`). Two machines each running a
+       ;; `server` would otherwise read every feed twice and race to insert the
+       ;; same items. This is the half of the pair that says "not me"; they are
+       ;; pinned against each other in poller-placement-test.
+       (nil? (hub-proxy/hub-url))))
 
 (defn- start-pollers!
   []

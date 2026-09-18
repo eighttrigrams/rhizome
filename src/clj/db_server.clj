@@ -34,6 +34,7 @@
             [db :as db]
             [next.jdbc :as jdbc]
             [placement :as placement]
+            [poll :as poll]
             [rest-api :as rest-api]
             [ring.adapter.jetty :as jetty]
             [ring.middleware.params :refer [wrap-params]]
@@ -702,6 +703,33 @@
       :vec-path   (:vec-path section)
       :read-only? (role/read-only-replica? c (role/primary-marker-present?))})))
 
+(defn poll-scheduling-enabled?
+  "Whether this process should run the feed pollers.
+
+   The pollers moved here from `server` (arch rework 2, step 3) for one reason:
+   they must run **exactly once**, and there is exactly one hub. A poller on
+   every machine's `server` would read the same feeds two or three times and
+   race to insert the same items; a poller on the hub runs where the writes
+   land and where the machine is always on.
+
+   `server` asks the complementary question -- it schedules only when there is
+   no hub to do it (`server/poll-scheduling-enabled?`), which is the
+   single-process case. The two are pinned against each other in
+   `poller-placement-test`: never both, because that is duplicate polling, and
+   never neither in the world where feeds are supposed to be read.
+
+   Two worlds are refused here, and both were `server`'s rules before:
+
+   - **read-only** -- a replica hub does not own the file, so a poller could
+     only fail on every tick. It must not exist rather than fail quietly.
+   - **e2e** -- detected the same way `check-e2e-db-path!` does it, off
+     `-Drhizome.e2e=1`. An e2e run gets a fixed database and asserts about its
+     contents; a scheduler reaching youtube 30 seconds in would make the suite
+     flaky for a reason nobody would find quickly."
+  [server]
+  (and (not (:read-only? server))
+       (not= "1" (System/getProperty "rhizome.e2e"))))
+
 (defn -main
   "Start the db-server from the config.edn in the directory it was launched in,
    and stay up.
@@ -720,7 +748,13 @@
   [& _args]
   (let [server (start! (config-opts))]
     (.addShutdownHook (Runtime/getRuntime)
-                      (Thread. ^Runnable (fn [] (stop! server))))
+                      (Thread. ^Runnable (fn [] (poll/stop-scheduler!) (stop! server))))
+    ;; In `-main` and not in `start!`, deliberately: the test suites boot many
+    ;; of these inside one JVM, and a `start!` that reached youtube would make
+    ;; every one of them a network call. `-main` is the process; `start!` is the
+    ;; server.
+    (when (poll-scheduling-enabled? server)
+      (poll/start-scheduler! (:ds server)))
     (log/info {:url (:url server)}
               (str "db-server: listening on " (:url server) " -- that is the url the "
                    "app-server derives, and nothing off this machine can reach it."))
