@@ -74,6 +74,55 @@
               (str "the statement protocol's describe leaked through the proxy. "
                    "Got: " (pr-str (map :name (:endpoints body))))))))))
 
+(defn- POST-ui*
+  "POST a /ui envelope to a ring app, and answer the parsed envelope."
+  [app fn-name args]
+  (let [os (java.io.ByteArrayOutputStream. 512)
+        _  (transit/write (transit/writer os :json) args)
+        body (cheshire.core/generate-string {:fn fn-name :args (.toString os "UTF-8")})
+        resp (app {:request-method :post
+                   :uri            "/ui"
+                   :headers        {"content-type" "application/json"
+                                    "accept"       "application/json"}
+                   :body           (java.io.ByteArrayInputStream. (.getBytes body "UTF-8"))})
+        b    (:body resp)]
+    (assoc (json/parse-string (if (bytes? b) (String. ^bytes b "UTF-8") (str b)) true)
+      :status (:status resp))))
+
+(deftest hub-commands-are-forwarded-test
+  (with-pair
+    (fn [hub app]
+      (testing "a /ui write sent to this machine lands in the hub's database"
+        (let [{:keys [thrown]} (POST-ui* app "insert-context" [nil {:title "ViaTheServer"}])]
+          (is (nil? thrown) (str "the forwarded call failed: " thrown)))
+        (let [[_ body] (GET* app "/api/contexts")]
+          (is (some #(= "ViaTheServer" (:title %)) body)
+              "the context is not in the hub's database, so it was not forwarded"))
+        (testing "and it really is the hub's db, not this process's"
+          (let [resp (http/get (str (:url hub) "/api/contexts") {:as :string})]
+            (is (re-find #"ViaTheServer" (:body resp)))))))))
+
+(deftest machine-local-commands-are-not-forwarded-test
+  (with-pair
+    (fn [_hub app]
+      (testing "an Obsidian command is answered here, where the file is"
+        ;; The hub refuses machine-local commands (see
+        ;; db-server.hub-surfaces-test), so a refusal coming back is the tell
+        ;; that this one was forwarded when it should not have been.
+        (let [{:keys [thrown]} (POST-ui* app "get-obsidian-file-content" [{}])]
+          (is (not (re-find #"machine-local" (str thrown)))
+              (str "this command was forwarded to the hub, which refused it: "
+                   thrown)))))))
+
+(deftest unclassified-commands-are-refused-not-guessed-test
+  (with-pair
+    (fn [_hub app]
+      (testing "a command nobody has placed is refused rather than sent somewhere"
+        (let [{:keys [thrown return]} (POST-ui* app "not-a-placed-command" [{}])]
+          (is (nil? return))
+          (is (re-find #"has not been placed" (str thrown))
+              (str "expected a placement refusal, got: " (pr-str thrown))))))))
+
 (deftest a-hub-that-is-not-there-answers-502-test
   (testing "a tunnel that is down is an answer, not a stack trace"
     (with-redefs [config/config (assoc config/config

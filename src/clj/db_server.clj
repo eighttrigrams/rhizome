@@ -485,7 +485,11 @@
     ;; handle -- which is the whole point: here a dispatch call that costs nine
     ;; statements costs nine *local* statements.
     (ui-api/ui-routes (constantly (:ds server))
-                      {:refuse-command? placement/machine-local-command?})
+                      {:intercept (fn [fn-name _req]
+                                    (when (placement/machine-local-command? fn-name)
+                                      (ui-api/refusal fn-name "machine-local-refusal"
+                                                      (str "it is a machine-local command and has "
+                                                           "to run where the files are"))))})
     (wrap-params (rest-api/rest-routes (constantly (:ds server))))
     (fn [req] (json-response 404 {:error (str "db-server: no such route: " (:uri req))}))))
 

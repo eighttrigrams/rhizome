@@ -26,33 +26,40 @@
    spells out: this is built once and answers many requests, while the tests
    rebind `config/config` per test. Read it at call time or read the wrong one.
 
-   `:refuse-command?` is an optional predicate on the command name, checked
-   after the envelope is parsed and before the dispatcher sees it. The hub
-   passes `placement/machine-local-command?` through it: a command that does
-   its work on the human's own disk must not be answered by the machine that
-   merely holds the database, because there the file work would silently
-   succeed against the *wrong disk*. Refusing is the only outcome that can be
-   noticed. It answers in the dispatcher's own envelope, as `:thrown`, so
-   whoever misrouted the call gets it as an error rather than as data."
+   `:intercept` is an optional `(fn [fn-name req])` consulted once the envelope
+   is parsed and before the dispatcher sees it. Answer a ring response to take
+   the call over; answer nil to let it through. Both halves of the split use
+   it, for opposite purposes and from the same classification:
+
+   - the **hub** intercepts machine-local commands and refuses them. It must
+     refuse rather than let them through, because they would otherwise
+     *succeed*: the file work would run against the wrong machine's disk with
+     nothing to show for it and nothing to report.
+   - the **`server`** intercepts everything that is not machine-local and
+     forwards it, keeping only the commands that need this disk.
+
+   One hook, because there is one classification. A second mechanism here
+   would be a second place for the two halves to disagree."
   ([db-fn] (handler db-fn nil))
-  ([db-fn {:keys [refuse-command?]}]
+  ([db-fn {:keys [intercept]}]
    (-> (fn [req]
          (let [fn-name (get-in req [:body :fn])]
-           (if (and refuse-command? (refuse-command? fn-name))
-             (do (log/warn {:event "machine-local-refusal" :uri "/ui" :fn fn-name}
-                           (str "refused /ui command " fn-name
-                                ": it belongs on the machine with the browser"))
-                 (response/response
-                   {:return nil
-                    :thrown (str "this server does not answer " fn-name
-                                 ": it is a machine-local command and has to run "
-                                 "where the files are")}))
-             (response/response
-               (log/with-logging-context
-                 {:context :request}
-                 (dispatch/handler (assoc-in req [:body :server-args :db] (db-fn))))))))
+           (or (when intercept (intercept fn-name req))
+               (response/response
+                 (log/with-logging-context
+                   {:context :request}
+                   (dispatch/handler (assoc-in req [:body :server-args :db] (db-fn))))))))
        json/wrap-json-response
        (json/wrap-json-body {:keywords? true}))))
+
+(defn refusal
+  "A refusal in the dispatcher's own envelope, so that whoever misrouted the
+   call reads it as an error rather than as data."
+  [fn-name event reason]
+  (log/warn {:event event :uri "/ui" :fn fn-name}
+            (str "refused /ui command " fn-name ": " reason))
+  (response/response {:return nil
+                      :thrown (str "this server does not answer " fn-name ": " reason)}))
 
 (defn ui-routes
   "`/ui` mounted as a route. The 0-arity reads the global handle, as `server`

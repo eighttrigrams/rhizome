@@ -21,6 +21,8 @@
             rest-api
             [ui-api :as ui-api]
             [hub-proxy :as hub-proxy]
+            [placement :as placement]
+            [cheshire.core :as cheshire]
             [cambium.core :as log]
             [ring.middleware.resource :refer [wrap-resource]]
             [ring.middleware.multipart-params :refer [wrap-multipart-params]]
@@ -32,6 +34,51 @@
 
 (defn- open [{{:keys [file-id]} :route-params}] (opener/open file-id) {:status 200})
 
+(defn- ui-intercept
+  "Where a `/ui` command runs, decided per call from `placement`.
+
+   The whole thing is conditional on there being a hub to talk to. Without one
+   this process holds the database itself -- test mode, e2e, a single-machine
+   dev session with no db-server -- and every command is answered here exactly
+   as it always was. That is what keeps this change from having two meanings.
+
+   With a hub:
+
+   - a **machine-local** command is answered here: it works on this disk, and
+     this is the machine the human is sitting at;
+   - anything else is **forwarded whole** to the hub, which answers it off the
+     database directly. This is the round trip the rework exists for: one hop
+     for the call instead of nine for its statements;
+   - an **unclassified** command is refused. It cannot be forwarded, because
+     nobody has said whether it touches this disk, and guessing is how a file
+     operation ends up running on the wrong machine in silence. The sweep test
+     makes this unreachable in a release; it is here for the release where it
+     is not.
+
+   The envelope is rebuilt rather than replayed: the JSON body was already
+   consumed to read `:fn`, and `{:fn :args}` is the whole of it."
+  [fn-name req]
+  (when-let [url (hub-proxy/hub-url)]
+    (cond
+      (placement/machine-local-command? fn-name) nil
+
+      (placement/classified? fn-name)
+      (hub-proxy/forward url
+                         (assoc req
+                           :headers {"content-type" "application/json"
+                                     "accept"       "application/json"}
+                           :body (java.io.ByteArrayInputStream.
+                                   (.getBytes ^String (cheshire/generate-string
+                                                        {:fn   fn-name
+                                                         :args (get-in req [:body :args])})
+                                              "UTF-8"))))
+
+      :else
+      (ui-api/refusal fn-name "unclassified-command"
+                      (str "it has not been placed on either side of the hub/server "
+                           "split -- see the placement namespace, and the sweep test "
+                           "that should have caught this before it shipped")))))
+
 (defn- api
   "The browser gate in front of `/ui`. The handler itself now lives in `ui-api`,
    because the hub answers the same commands off its own DataSource and one
@@ -39,7 +86,7 @@
    here is the part that is about *this* surface: only the local browser may
    POST to it outside dev mode."
   []
-  (let [h (ui-api/handler #(:db config/config))]
+  (let [h (ui-api/handler #(:db config/config) {:intercept ui-intercept})]
     (fn [req]
       (if (and (not (:dev? config/config))
                (or (not (= (:private-addr config/config) (:remote-addr req)))
