@@ -23,9 +23,11 @@
    disk splits it correctly:
 
    1. **synced-folder access** -- `:preview-images`, `:folders`, the iCloud
-      directories. Every machine has these already (that is what made
-      read-only replicas possible at all), so the sync distributes the result
-      and *any* machine may do the work. Placement is then free, and the hub
+      directories. Every machine has these already, through the iCloud sync
+      that predates all of this work (`specs/architecture.md`, the app-server
+      -> file folders edge), so the sync distributes the result and *any*
+      machine may do the work. Note that this is about *files*; the db is in
+      one place and stays there. Placement is then free, and the hub
       wins by default: it is where the accompanying db write happens, so doing
       it there keeps one user action to one round trip.
    2. **this-machine access** -- the OS `open` call, the Obsidian temp file, an
