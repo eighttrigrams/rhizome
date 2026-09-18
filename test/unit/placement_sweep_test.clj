@@ -78,6 +78,10 @@
 
 (def ^:private route-verbs #{"GET" "POST" "PUT" "DELETE" "PATCH" "HEAD" "ANY"})
 
+(def ^:private api-mounts
+  "Function names whose call mounts `/api`. See `mounted-routes`."
+  #{"rest-routes" "rest-surface"})
+
 (defn- mounted-routes
   "The route paths mounted at the top level of `server.clj`'s `routes`.
 
@@ -87,9 +91,13 @@
    their own. `root?` marks the enclosing `(context \"/\" [] ...)`, which is
    descended into rather than collected.
 
-   `(rest-api/rest-routes)` is a call, not a literal, so it is translated to the
-   `/api` it mounts -- the one hand-written rule here, and it fails loudly if
-   that function is ever renamed, because then no `/api` shows up at all."
+   `/api` is mounted by a *call*, not by a path literal, so the call is
+   translated to the path it mounts -- the one hand-written rule here. Two names
+   qualify, because step 3 put a chooser in front of the route table:
+   `rest-surface` (server's own, which forwards to the hub or answers locally)
+   and `rest-routes` (the table itself, still mounted directly by the hub). The
+   rule fails loudly if either is renamed, because then no `/api` shows up at
+   all and the sanity assertion below goes red."
   [form root?]
   (cond
     (and (seq? form) (symbol? (first form)))
@@ -99,7 +107,7 @@
                               (mapcat #(mounted-routes % false) (drop 3 form))
                               [(second form)])
         (route-verbs h)     (when (string? (second form)) [(second form)])
-        (= h "rest-routes") ["/api"]
+        (api-mounts h)      ["/api"]
         :else               (mapcat #(mounted-routes % false) form)))
     (coll? form) (mapcat #(mounted-routes % false) form)
     :else nil))
@@ -113,7 +121,10 @@
 (deftest the-route-table-matches-the-mounted-routes-test
   (testing "placement/route-placement covers server.clj's routes exactly"
     (is (contains? server-routes "/api")
-        "sanity: rest-api/rest-routes was recognised")
+        (str "sanity: nothing in server.clj's routes was recognised as mounting "
+             "/api. If the function that does was renamed, api-mounts needs the "
+             "new name -- silently losing /api here would make the rest of this "
+             "test pass for the wrong reason."))
     (is (= server-routes (set (keys placement/route-placement)))
         (str "server.clj's routes and placement/route-placement have drifted. "
              "A new route needs a half: :local (this machine answers it), "

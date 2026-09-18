@@ -20,6 +20,7 @@
             dispatch
             rest-api
             [ui-api :as ui-api]
+            [hub-proxy :as hub-proxy]
             [cambium.core :as log]
             [ring.middleware.resource :refer [wrap-resource]]
             [ring.middleware.multipart-params :refer [wrap-multipart-params]]
@@ -135,13 +136,34 @@
       {:status 200 :body "ok"})
     {:status 403 :body "not in dev mode"}))
 
+(defn- rest-surface
+  "`/api`, answered by the hub when there is one and by this process when there
+   is not (see `hub-proxy`).
+
+   `/api/describe` is the exception, and a temporary one. The hub currently
+   answers that path with the *statement protocol's* description, because
+   db-server registered it first and prober and the start scripts read it (see
+   db-server/app). Forwarding it would hand agents the wrong document, so it is
+   answered here until step 4 retires the protocol and the path changes hands.
+   `the-describe-is-not-forwarded-test` is what makes that a decision rather
+   than a leftover."
+  []
+  (let [local (rest-api/rest-routes)]
+    (fn [req]
+      (let [uri (:uri req)]
+        (if-let [url (and (str/starts-with? uri "/api")
+                          (not= "/api/describe" uri)
+                          (hub-proxy/hub-url))]
+          (hub-proxy/forward url req)
+          (local req))))))
+
 (defn- routes
   []
   (context
     "/"
     []
     (context "/ui" [] (POST "/" [] (api)))
-    (rest-api/rest-routes)
+    (rest-surface)
     (POST "/test/reset" [] reset-handler)
     (GET "/open/:file-id" [] open)
     (GET "/img-by-id/:item-id" [] img-by-id-handler)
