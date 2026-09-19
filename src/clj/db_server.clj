@@ -1,37 +1,43 @@
 (ns db-server
-  "The inner server: the one process that opens rhizome's SQLite file.
+  "**The hub**: the one process that opens rhizome's SQLite file, and the only
+   one that knows what the rows mean.
 
-   It speaks statements and knows nothing else. There is no endpoint here that
-   mentions an item, a context or a relation, and there is not going to be one
-   -- everything that knows what the rows *mean* is on the other side of this
-   wire, in the app-server. What this owns is the file, the sqlite-vec
-   extension, the schema, and the connections a transaction is held on.
+   It owns the file, the sqlite-vec extension, the schema, the embedder and the
+   pollers, and it serves the two surfaces the application is made of -- `/ui`
+   by command name and `/api` by path -- off a local DataSource. One instance,
+   on one machine; every machine's `server` forwards to it.
 
-   The protocol it answers is the one `db`'s remote handles speak, and the two
-   share their definition rather than agreeing to match: the option whitelist
-   arriving over the wire is resolved by `db/jdbc-opts`, the same function the
-   local branch of the facade calls. One list, read by both ends.
+   ## It used to be the opposite of that
 
-   Bodies are transit, except `/health` and `/api/describe`, which answer JSON
-   -- those two are read by start scripts and by prober, and neither should
-   have to speak the statement protocol to ask whether the database is up.
+   Until step 4 of the architecture rework this namespace spoke **statements**
+   and nothing else: `/execute`, `/execute-one`, `/tx/begin|commit|rollback`,
+   transit bodies, a token per held transaction and a sweeper for the abandoned
+   ones. Its own docstring promised there would never be an endpoint here that
+   mentioned an item.
 
-   Boot with `start!` and an opts map shaped like the `:db-server` config
-   section; `stop!` takes what it returns. **`start!` itself still reads no
-   configuration** -- that is what lets a test boot as many of these as it
-   likes on ephemeral ports -- so the file is read by `config-opts` and the
-   `-main` below it, and nowhere else."
+   That promise is the thing the rework reversed, and for a measured reason: a
+   dispatch call is 5 to 11 statements (`repository/fetch-context` is 9,
+   `insert-item` is 11 inside one transaction), so a statement-level seam costs
+   nine round trips for one navigation and holds SQLite's write lock across
+   eleven. A call-level seam costs one. See
+   `handoffs/RHIZOME_ARCH_REWORK_2.md`; the protocol is in the history.
+
+   ## Boot
+
+   `start!` with an opts map shaped like the `:db-server` config section, and
+   `stop!` with what it returns. **`start!` reads no configuration** -- that is
+   what lets a test boot as many of these as it likes on ephemeral ports -- so
+   the file is read by `config-opts`, `seed-opts` and `-main`, and nowhere
+   else."
   (:require log-init ;; first: sets LOGS_DIR before any logging ns initialises logback
             [aero.core :as aero]
             [cambium.core :as log]
             [cheshire.core :as json]
             [clojure.java.io :as io]
             [clojure.string :as str]
-            [cognitect.transit :as transit]
             [compojure.core :refer [GET POST routes]]
             [datastore.connection :as connection]
             [datastore.schema :as schema]
-            [db :as db]
             [dev-seed :as dev-seed]
             [repository.insertion.file :as file]
             [next.jdbc :as jdbc]
@@ -44,11 +50,7 @@
             [role :as role]
             [upload :as upload]
             [ui-api :as ui-api])
-  (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
-           [java.sql Connection SQLException]
-           [java.util.concurrent Executors TimeUnit]
-           [javax.sql DataSource]
-           [org.eclipse.jetty.server ServerConnector]))
+  (:import [org.eclipse.jetty.server ServerConnector]))
 
 (def ^:private loopback
   "The only address this ever binds. Not an option: the routes below run
@@ -58,312 +60,13 @@
    than this one."
   "127.0.0.1")
 
-(def default-tx-idle-ms
-  "How long a transaction may go untouched before it is rolled back and its
-   connection freed. A held transaction holds SQLite's write lock, so an
-   abandoned one -- a client that crashed between `/tx/begin` and `/tx/commit`
-   -- would otherwise lock the database against every writer until this process
-   restarts."
-  60000)
-
-;; -- wire ------------------------------------------------------------------
-
-(def ^:private transit-type "application/transit+json")
-
-(defn- transit-body
-  "The transit map in a request. An absent or unreadable body is a refusal
-   rather than an empty map: every route here takes arguments."
-  [req]
-  (try (transit/read (transit/reader (:body req) :json))
-       (catch Throwable t
-         (throw (ex-info (str "db-server: could not read the transit request body: "
-                              (.getMessage t))
-                         {:type :db-server/bad-request})))))
-
-(defn- transit-response
-  [status body]
-  {:status  status
-   :headers {"Content-Type" transit-type}
-   :body    (let [os (ByteArrayOutputStream. 1024)]
-              (transit/write (transit/writer os :json) body)
-              (ByteArrayInputStream. (.toByteArray os)))})
-
 (defn- json-response
   [status body]
   {:status  status
    :headers {"Content-Type" "application/json; charset=utf-8"}
    :body    (json/generate-string body)})
 
-;; -- transactions ----------------------------------------------------------
-;;
-;; One held Connection per token. SQLite's concurrency is inherited rather than
-;; reimplemented: the datasource begins IMMEDIATE, so a write transaction takes
-;; the write lock as it opens, and a second one waits out the driver's 3s
-;; busy_timeout and then fails with SQLITE_BUSY. There is deliberately no queue
-;; in front of that -- one writer at a time is the database's own law, and a
-;; queue here would only be a second, disagreeing opinion about it.
-
-(defn- new-token [] (str (java.util.UUID/randomUUID)))
-
-(defn- begin-transaction!
-  [{:keys [^DataSource ds transactions]}]
-  (let [token (new-token)
-        conn  (.getConnection ds)]
-    (try
-      (.setAutoCommit ^Connection conn false)
-      (swap! transactions assoc token {:conn       conn
-                                       :touched-ms (System/currentTimeMillis)
-                                       :in-flight  0})
-      token
-      (catch Throwable t
-        ;; Nothing was registered, and after a BEGIN that failed there is no
-        ;; transaction on this connection to roll back -- SQLite says so in as
-        ;; many words if you try. Close it and let the failure out.
-        (try (.close ^Connection conn) (catch Throwable _))
-        (throw t)))))
-
-(defn- finish!
-  "Commit or roll back `conn` and close it, whatever happens.
-
-   A commit the database refuses is rolled back before the connection goes, and
-   the commit's own exception is what comes out -- next.jdbc does the same
-   locally, and the point of this seam is that the two are indistinguishable."
-  [^Connection conn commit?]
-  (try
-    (if commit?
-      (try (.commit conn)
-           (catch Throwable t
-             (try (.rollback conn) (catch Throwable _))
-             (throw t)))
-      (.rollback conn))
-    (finally (try (.close conn) (catch Throwable _)))))
-
-(defn- close-transaction!
-  "Commit or roll back the transaction `token` names and free its connection.
-   Answers `:closed`, `:busy` -- a statement is running on it -- or `:unknown`.
-
-   Taking the entry out and deciding whether it may be taken are one `swap!`,
-   which buys two distinct things. No two callers can both close the same
-   connection: exactly one of them finds the entry in `before` and the others
-   get `:unknown`. And nothing closes a connection with a statement still on
-   it: `:in-flight` is read inside the swap, so a statement that arrives while
-   this is deciding either raises the count first -- and this answers `:busy` --
-   or arrives to find the token gone.
-
-   `force?` skips the in-flight check, for `stop!`: at shutdown a held
-   connection has to go whatever it is doing, because the alternative is
-   leaking it with the write lock in its hand.
-
-   That the token is freed even when the commit throws is deliberate: `finish!`
-   has rolled back and closed by then, so there is nothing left to do a second
-   time."
-  ([server token commit?] (close-transaction! server token commit? false))
-  ([{:keys [transactions]} token commit? force?]
-   (let [[before after] (swap-vals! transactions
-                                    (fn [m]
-                                      (let [entry (get m token)]
-                                        (if (and entry
-                                                 (or force? (zero? (:in-flight entry))))
-                                          (dissoc m token)
-                                          m))))]
-     (cond
-       (not (contains? before token)) :unknown
-       (contains? after token)        :busy
-       :else (do (finish! (:conn (get before token)) commit?) :closed)))))
-
-(defn- acquire!
-  "The connection `token` names, with its idle clock reset and its in-flight
-   count raised. Nil when the token names nothing.
-
-   Raising the count is what keeps the sweeper off a transaction that is in the
-   middle of a statement. Resetting the clock on the way in is not enough on its
-   own: a statement can outlive the idle window all by itself, and the sweeper
-   would then close the connection out from under it -- which surfaces as
-   `stmt pointer is closed`, an error about nothing the caller did."
-  [{:keys [transactions]} token]
-  (let [m (swap! transactions
-                 (fn [m]
-                   (if (contains? m token)
-                     (-> m
-                         (assoc-in [token :touched-ms] (System/currentTimeMillis))
-                         (update-in [token :in-flight] inc))
-                     m)))]
-    (:conn (get m token))))
-
-(defn- release!
-  "Give the transaction back after a statement, its idle clock starting from
-   now -- from when the statement ENDED, which is when it actually went quiet."
-  [{:keys [transactions]} token]
-  (swap! transactions
-         (fn [m]
-           (if (contains? m token)
-             (-> m
-                 (update-in [token :in-flight] dec)
-                 (assoc-in [token :touched-ms] (System/currentTimeMillis)))
-             m)))
-  nil)
-
-(defn sweep-idle-transactions!
-  "Roll back and free every transaction that has gone quiet for longer than the
-   idle timeout, and answer how many there were.
-
-   A transaction with a statement in flight is never taken, however long it has
-   been running: the selection and the removal are one `swap!`, so a statement
-   that arrives while the sweep is deciding either raises the count before the
-   swap lands -- and the transaction is left alone -- or arrives after it and
-   finds the token gone, which is a clean refusal rather than a closed
-   connection under a running query.
-
-   What this cannot protect is a transaction whose CLIENT has gone quiet: a body
-   that spends longer than the window between statements is indistinguishable
-   from one that died, and is rolled back. That is the timeout doing its job, and
-   the app is told the truth about it -- see `db/transact`'s remote half.
-
-   Run on a timer by `start!`; public so an operator at a REPL can free a stuck
-   transaction without waiting the window out. The tests do not call it -- what
-   they watch is the timer."
-  [{:keys [transactions tx-idle-ms]}]
-  (let [cutoff  (- (System/currentTimeMillis) tx-idle-ms)
-        idle?   (fn [[_ {:keys [touched-ms in-flight]}]]
-                  (and (zero? in-flight) (< touched-ms cutoff)))
-        [before after] (swap-vals! transactions #(into {} (remove idle?) %))
-        taken   (apply dissoc before (keys after))]
-    (doseq [[token {:keys [conn]}] taken]
-      (log/warn {:tx token :idle-ms tx-idle-ms}
-                "db-server: rolling back a transaction nobody came back for")
-      (try (finish! conn false)
-           (catch Throwable t
-             (log/error t "db-server: could not roll back an idle transaction"))))
-    (count taken)))
-
-(defn- close-or-refuse!
-  "Close the transaction, or say why not."
-  [server token commit?]
-  (case (close-transaction! server token commit?)
-    :closed  true
-    :busy    (throw (ex-info (str "db-server: transaction " token
-                                  " has a statement running on it -- let it finish first")
-                             {:db-server/status 409 :type :db-server/transaction-busy}))
-    :unknown (throw (ex-info (str "db-server: no such transaction: " token
-                                  " -- it was committed, rolled back, or rolled back for being idle")
-                             {:db-server/status 410 :type :db-server/unknown-transaction}))))
-
-(defn- unknown-transaction!
-  [token]
-  (throw (ex-info (str "db-server: no such transaction: " token
-                       " -- it was committed, rolled back, or rolled back for being idle")
-                  {:db-server/status 410 :type :db-server/unknown-transaction})))
-
 ;; -- routes ----------------------------------------------------------------
-;;
-;; Every route is a public var carrying a docstring that leads with its method
-;; and path, and marked ^:endpoint -- that is what `describe` reads. The marker
-;; is positive here where rest-api's is negative (^:no-describe), because most
-;; of what this namespace makes public is machinery rather than surface.
-
-(defn- check-stmt!
-  [stmt]
-  (when-not (and (sequential? stmt) (string? (first stmt)))
-    (throw (ex-info (str "db-server: :stmt must be [sql & params] with the sql a string, got "
-                         (pr-str stmt))
-                    {:type :db-server/bad-request})))
-  (vec stmt))
-
-(defn- run
-  [target one? statement options]
-  (if one?
-    (jdbc/execute-one! target statement options)
-    (jdbc/execute! target statement options)))
-
-(defn- run-statement
-  "Run one statement, on a transaction's held connection when a token names one
-   and on a connection of its own otherwise.
-
-   The token is acquired and released around the statement rather than merely
-   touched before it, so the sweeper cannot close the connection while the
-   statement is still on it."
-  [server one? req]
-  (let [{:keys [stmt opts tx]} (transit-body req)
-        statement (check-stmt! stmt)
-        options   (db/jdbc-opts (or opts {}))]
-    (transit-response 200
-      {:result (if tx
-                 (if-let [conn (acquire! server tx)]
-                   (try (run conn one? statement options)
-                        (finally (release! server tx)))
-                   (unknown-transaction! tx))
-                 (run (:ds server) one? statement options))})))
-
-(defn ^:endpoint execute
-  "POST /execute — run a statement and answer every row it returns.
-
-  Body `{:stmt [sql & params] :opts {…} :tx \"token\"?}`, answer
-  `{:result [row …]}`. The result is wrapped so that a statement returning
-  nothing is distinguishable from a response that carried nothing.
-
-  `:opts` takes `:builder` and `:return-keys`, and refuses anything else rather
-  than ignoring it -- an option this seam cannot carry has to be a refusal here,
-  or it would be a statement quietly running differently than the caller asked.
-
-  With `:tx`, the statement runs on the connection that token is holding;
-  without it, on a connection of its own."
-  [server req]
-  (run-statement server false req))
-
-(defn ^:endpoint execute-one
-  "POST /execute-one — run a statement and answer its first row.
-
-  Body and options exactly as POST /execute; the answer is `{:result row}`,
-  where `row` is nil when the statement matched nothing and next.jdbc's
-  `{:next.jdbc/update-count n}` when it was a write."
-  [server req]
-  (run-statement server true req))
-
-(defn ^:endpoint tx-begin
-  "POST /tx/begin — open a transaction and answer `{:tx \"token\"}`.
-
-  The token names a connection held open for you. Pass it as `:tx` on the
-  statements that belong to the transaction, and finish with POST /tx/commit or
-  POST /tx/rollback. A transaction left untouched for 60 seconds is rolled back
-  and its token freed.
-
-  Body `{}`. A body carrying a `:tx` is refused: a handle that is already a
-  transaction may not be made one again, which is the same rule the app-side
-  facade enforces on itself before it ever gets here."
-  [server req]
-  (let [{:keys [tx]} (transit-body req)]
-    (when tx
-      (throw (ex-info (str "db-server: /tx/begin takes no transaction -- "
-                           "a handle that is already a transaction may not be made one again")
-                      {:db-server/status 409 :type :db-server/nested-transaction})))
-    (transit-response 200 {:tx (begin-transaction! server)})))
-
-(defn ^:endpoint tx-commit
-  "POST /tx/commit — commit the transaction a token names and free it.
-
-  Body `{:tx \"token\"}`, answer `{:ok true}`. A token that names no open
-  transaction answers 410, which is also what a transaction that was swept for
-  idleness answers: in both cases nothing of it survives."
-  [server req]
-  (let [{:keys [tx]} (transit-body req)]
-    (when-not tx
-      (throw (ex-info "db-server: /tx/commit needs a :tx token"
-                      {:type :db-server/bad-request})))
-    (close-or-refuse! server tx true)
-    (transit-response 200 {:ok true})))
-
-(defn ^:endpoint tx-rollback
-  "POST /tx/rollback — roll the transaction a token names back and free it.
-
-  Body `{:tx \"token\"}`, answer `{:ok true}`. 410 for a token that names no
-  open transaction, as POST /tx/commit."
-  [server req]
-  (let [{:keys [tx]} (transit-body req)]
-    (when-not tx
-      (throw (ex-info "db-server: /tx/rollback needs a :tx token"
-                      {:type :db-server/bad-request})))
-    (close-or-refuse! server tx false)
-    (transit-response 200 {:ok true})))
 
 (defn- reach-the-database!
   "Run the smallest possible statement, to find out whether the database is
@@ -374,7 +77,7 @@
   [{:keys [ds]}]
   (jdbc/execute-one! ds ["SELECT 1"]))
 
-(defn ^:endpoint health
+(defn health
   "GET /health — `{:ok true :read-only? b :vec-available? b}`, as JSON.
 
   What a start script waits on and what a prober reads, so it answers plain
@@ -400,69 +103,6 @@
                           :error          (str (.getMessage t))
                           :read-only?     (boolean (:read-only? server))
                           :vec-available? connection/vec-available?}))))
-
-(def ^:private skill-resource "rhizome-db/SKILL.md")
-
-(def ^:private skill-md
-  (delay (when-let [r (io/resource skill-resource)] (str/trim (slurp r)))))
-
-(defn ^:endpoint describe
-  "GET /api/describe — what this server is and every route it answers, as JSON.
-
-  `{:endpoints [{:name :doc} …] :skill \"…\"}`, the shape rhizome's own
-  /api/describe answers and the one the other plurama apps answer, so anything
-  that reads one of them can read this. `:endpoints` is built from the routes
-  themselves rather than maintained beside them; `:skill` is
-  resources/rhizome-db/SKILL.md, which teaches the protocol.
-
-  This route lists itself, which rhizome's does not. A seven-route protocol
-  that a prober discovers in one call is better served by a complete list than
-  by the convention of leaving the describing route out of it."
-  []
-  (json-response 200
-    {:endpoints (->> (ns-publics 'db-server)
-                     (keep (fn [[sym v]]
-                             (when (and (:endpoint (meta v)) (:doc (meta v)))
-                               {:name (str sym) :doc (:doc (meta v))})))
-                     (sort-by :name)
-                     vec)
-     :skill     @skill-md}))
-
-(defn- wrap-refusals
-  "Turn what a route throws into the answer the client can read.
-
-   A statement the *database* refused is marked `:sql?` and keeps its message,
-   because the facade rethrows those as `SQLException` -- the type a local
-   handle raises for the same statement. The protocol's own refusals carry the
-   status they chose in their ex-data, defaulting to 400."
-  [handler]
-  (fn [req]
-    (try
-      (handler req)
-      (catch SQLException e
-        (log/warn {:uri (:uri req)} (str "db-server: the database refused a statement: "
-                                         (.getMessage e)))
-        ;; The state and the vendor code travel with the message so the facade
-        ;; can rebuild a SQLException that answers `.getSQLState` and
-        ;; `.getErrorCode` the way the local one would. A caller that reads
-        ;; those is reading the database's own words, and losing them here
-        ;; would be a difference between the two handles. The driver's class
-        ;; name does NOT travel: the facade cannot construct it, nothing reads
-        ;; it, and a field on a wire that nobody reads is a field that will
-        ;; quietly stop being true.
-        (transit-response 500 {:error      (.getMessage e)
-                               :type       :db-server/sql-error
-                               :sql?       true
-                               :sql-state  (.getSQLState e)
-                               :error-code (.getErrorCode e)}))
-      (catch clojure.lang.ExceptionInfo e
-        (let [data (ex-data e)]
-          (transit-response (or (:db-server/status data) 400)
-                            {:error (.getMessage e)
-                             :type  (or (:type data) :db-server/bad-request)})))
-      (catch Throwable t
-        (log/error t "db-server: unhandled failure")
-        (transit-response 500 {:error (str (.getMessage t)) :type :db-server/error})))))
 
 (def ^:private reset-tables
   "Every table `/test/reset` empties. Relations first, so a foreign key can
@@ -519,30 +159,17 @@
 (defn- app
   [server]
   (routes
-    (wrap-refusals
-      (routes
-        (POST "/execute" req (execute server req))
-        (POST "/execute-one" req (execute-one server req))
-        (POST "/tx/begin" req (tx-begin server req))
-        (POST "/tx/commit" req (tx-commit server req))
-        (POST "/tx/rollback" req (tx-rollback server req))))
     (GET "/health" [] (health server))
     (POST "/test/reset" [] (reset-database! server))
     (wrap-multipart-params (POST "/upload" req (upload! server req)))
-    ;; Before the item surfaces below, deliberately: this one answers the
-    ;; statement protocol's own description, and prober and the start scripts
-    ;; read it. `rest-api` also serves GET /api/describe, so the two collide and
-    ;; the first one registered wins. Keeping the existing answer here means no
-    ;; script changes in an additive step; it also means the hub's
-    ;; /api/describe is the wrong one of the two for now. That is temporary and
-    ;; it retires with the statement protocol at step 4, when this describe has
-    ;; nothing left to describe. `db-server-describe-still-wins-test` pins it so
-    ;; the swap is a decision rather than a surprise.
-    (GET "/api/describe" [] (describe))
-    ;; The item surfaces (arch rework 2, step 2). Same definitions `server`
-    ;; mounts, over this process's own local DataSource instead of a remote
-    ;; handle -- which is the whole point: here a dispatch call that costs nine
-    ;; statements costs nine *local* statements.
+    ;; `/api/describe` is rhizome's own now. The statement protocol had a
+    ;; describe of its own and, being registered first, answered that path --
+    ;; documented as temporary when it was written, and this is the step it was
+    ;; waiting for. What prober and any agent read there is the item API.
+    ;;
+    ;; The item surfaces. Same definitions `server` mounts, over this process's
+    ;; own local DataSource -- which is the whole point: here a dispatch call
+    ;; that costs nine statements costs nine *local* statements.
     (ui-api/ui-routes (constantly (:ds server))
                       {:intercept (fn [fn-name _req]
                                     (when (placement/machine-local-command? fn-name)
@@ -574,35 +201,28 @@
                     {:vec-path vec-path :loaded connection/vec-extension-path}))))
 
 (defn start!
-  "Open the database and start answering the protocol on `:port`. Returns a
-   server map; hand it back to `stop!`.
+  "Open the database and start serving on `:port`. Returns a server map; hand it
+   back to `stop!`.
 
-   `:port`, `:db-path` and `:vec-path` are the plan's `:db-server` config
-   section, so that step 4 can plug that section in whole. The rest are
-   operational and not part of it:
+   - `:port`         the port to bind; 0 takes an ephemeral one, and the port
+                     actually bound comes back as `:port` on the server map.
+   - `:db-path`      the SQLite file. Required.
+   - `:vec-path`     optional, and only checked -- see `check-vec-path!`.
+   - `:read-only?`   open the database read-only. Schema application is skipped.
+                     Nothing in production sets it since the replica machinery
+                     retired -- the `primary.nosync` marker elects the hub now
+                     rather than demoting it (see `-main`) -- but it is kept as
+                     an option because the suites use it to exercise a database
+                     that refuses writes at the driver.
+   - `:allow-reset?` answer POST /test/reset rather than 403 it.
 
-   - `:port`        the port to bind; 0 takes an ephemeral one, and the port
-                    actually bound comes back as `:port` on the server map.
-   - `:db-path`     the SQLite file. Required.
-   - `:vec-path`    optional, and only checked -- see `check-vec-path!`.
-   - `:read-only?`  open the database read-only, the replica's structural write
-                    ban. Schema application is skipped, since a replica's schema
-                    arrives with the file it was synced from. Step 4 decides
-                    this from the `primary.nosync` marker; here it is explicit.
-   - `:tx-idle-ms`  how long an abandoned transaction is left before it is
-                    rolled back. Defaults to a minute, and is swept for at
-                    quarter-window intervals, so the real window is one to
-                    one-and-a-quarter of it.
-
-   There is no `:host`, and passing one is refused rather than ignored -- the
-   rule the option whitelist and `check-vec-path!` are both keeping. This
-   endpoint runs arbitrary SQL and has no authentication of any kind, and the
-   plan says loopback always for this phase; an option would be a way to hand
-   the database to the network by passing one argument, and silently dropping
-   it would be a caller who thinks he has bound elsewhere and has not. Binding
-   beyond the machine comes with the auth that has to arrive alongside it, and
-   neither is in this step."
-  [{:keys [port db-path vec-path read-only? allow-reset? tx-idle-ms] :as opts}]
+   There is no `:host`, and passing one is refused rather than ignored. This
+   process binds loopback and the tunnel terminates on the far machine's
+   loopback, which is what lets the item surfaces here need no authentication of
+   their own; an option would be a way to publish them to the network by passing
+   one argument, and silently dropping it would be a caller who thinks he has
+   bound elsewhere and has not."
+  [{:keys [port db-path vec-path read-only? allow-reset?] :as opts}]
   (when (contains? opts :host)
     (throw (ex-info (str "db-server: :host is not an option -- this binds " loopback
                          " and nothing else. These routes run arbitrary SQL with no "
@@ -617,9 +237,7 @@
   (let [ds     (connection/make-datasource {:dbname db-path :read-only? (boolean read-only?)})
         server {:ds           ds
                 :read-only?   (boolean read-only?)
-                :allow-reset? (boolean allow-reset?)
-                :transactions (atom {})
-                :tx-idle-ms   (or tx-idle-ms default-tx-idle-ms)}]
+                :allow-reset? (boolean allow-reset?)}]
     ;; Before anything else, and before the port is open: prove the database is
     ;; actually there. Applying the schema would prove it for a writable one,
     ;; but a read-only server skips that and would otherwise come up green
@@ -632,45 +250,27 @@
     (if read-only?
       (log/info "db-server: read-only, so the schema is left as it arrived")
       (schema/apply-schema! ds))
-    (let [jetty   (jetty/run-jetty (app server) {:port port :host loopback :join? false})
-          bound   (.getLocalPort ^ServerConnector (first (.getConnectors jetty)))
-          sweeper (doto (Executors/newSingleThreadScheduledExecutor)
-                    (.scheduleWithFixedDelay
-                      ^Runnable (fn []
-                                  (try (sweep-idle-transactions! server)
-                                       (catch Throwable t
-                                         (log/error t "db-server: idle sweep failed"))))
-                      ;; Same first delay as period: a server told to time
-                      ;; transactions out quickly should sweep quickly too,
-                      ;; which is what lets a test watch it happen.
-                      (max 250 (quot (:tx-idle-ms server) 4))
-                      (max 250 (quot (:tx-idle-ms server) 4))
-                      TimeUnit/MILLISECONDS))]
+    (let [jetty (jetty/run-jetty (app server) {:port port :host loopback :join? false})
+          bound (.getLocalPort ^ServerConnector (first (.getConnectors jetty)))]
       (log/info {:port bound :db-path db-path :read-only? (boolean read-only?)}
                 "db-server: up")
       (assoc server
-        :jetty   jetty
-        :sweeper sweeper
-        :port    bound
-        :url     (str "http://" loopback ":" bound)))))
+        :jetty jetty
+        :port  bound
+        :url   (str "http://" loopback ":" bound)))))
 
 (defn stop!
-  "Stop a server `start!` returned. Every transaction still open is rolled
-   back, not left to the sweeper: the process is going away and a held
-   connection would take the write lock with it.
+  "Stop a server `start!` returned.
 
-   Jetty goes first, and the order is the whole point: while it is still
-   answering, a request can open a transaction after the loop has passed, and
-   that connection would then be leaked with the write lock in its hand. In a
-   process that is exiting anyway that is invisible; in the test harness of step
-   3, where a db-server is started and stopped inside the JVM the next test runs
-   in, it is a locked database."
-  [{:keys [jetty sweeper transactions] :as server}]
+   It used to roll back every transaction still open, and to stop jetty first so
+   that no request could open one after the loop had passed -- a connection
+   leaked with SQLite's write lock in its hand, invisible in a process that is
+   exiting and a locked database in a test JVM that goes on running. That whole
+   concern went with the statement protocol: transactions are no longer held
+   across requests, because a request is now a call about items and a
+   transaction lives and dies inside one."
+  [{:keys [jetty]}]
   (when jetty (.stop jetty))
-  (when sweeper (.shutdownNow sweeper))
-  (doseq [token (keys @transactions)]
-    (try (close-transaction! server token false true)
-         (catch Throwable t (log/error t "db-server: could not roll back on shutdown"))))
   nil)
 
 ;; -- boot from config.edn ---------------------------------------------------
@@ -760,10 +360,47 @@
      {:port         (or (:port section) default-port)
       :db-path      (:db-path section)
       :vec-path     (:vec-path section)
-      :read-only?   (role/read-only-replica? c (role/primary-marker-present?))
       ;; The same gate `server` applied to /test/reset, read from the same flag:
       ;; dev answers it, production refuses it.
       :allow-reset? (boolean (:dev? c))})))
+
+(defn check-elected!
+  "Refuse to boot a hub on a machine that was not elected to run one.
+
+   `primary.nosync` used to mean *may this instance write* -- present, and the
+   database opened writable; absent, and it opened read-only, which is what made
+   a synced copy a safe read-only replica. There are no replicas any more (one
+   hub, one mode), so the marker was free, and it was given the job the
+   deployment actually has: **which machine runs the hub.** It elects now
+   instead of demoting.
+
+   The cost of getting this wrong is worse than it sounds, and worse than it was.
+   The database is `rhizome.db.nosync`, and `.nosync` is precisely the suffix
+   that keeps iCloud from syncing it. So two hubs are not two writers racing over
+   one file -- they are **two separate databases diverging in silence**, found
+   whenever the owner next notices something missing. A refusal to boot is cheap
+   against that.
+
+   Dev is exempt, as it is everywhere else this marker is read: no checkout has
+   one (`primary.nosync` is gitignored), so requiring it would mean no developer
+   could ever start a hub.
+
+   This catches a hub that *starts* unelected. It does nothing about a hub that
+   is already running on a machine being demoted -- see the README's run
+   section: demoting a machine means stopping its hub, not just removing the
+   marker."
+  ([] (check-elected! config-path))
+  ([path]
+   (let [c (aero/read-config path)]
+     (when-not (or (:dev? c) (role/primary-marker-present?))
+       (throw (ex-info (str "db-server: refusing to start. This machine has no "
+                            role/primary-marker " beside its config.edn, so it was not "
+                            "elected to hold the database. Exactly one machine runs the "
+                            "hub; the others run a server that forwards to it. If this "
+                            "machine is meant to take over, stop the hub on the old one "
+                            "FIRST, move the database file across, then `touch "
+                            role/primary-marker "` here.")
+                       {:config-path path :marker role/primary-marker}))))))
 
 (defn seed-opts
   "What `dev-seed/maybe-seed!` needs, from the same config.edn.
@@ -830,6 +467,7 @@
    of its own: the test harness boots servers inside a JVM that goes on running,
    and hangs its own."
   [& _args]
+  (check-elected!)
   (let [server (start! (config-opts))
         ds     (:ds server)]
     (.addShutdownHook (Runtime/getRuntime)

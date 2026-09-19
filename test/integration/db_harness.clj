@@ -1,28 +1,34 @@
 (ns db-harness
-  "The db-server the integration suites run against, and the remote handle onto
-   it. Started once for the whole run, on an ephemeral port, and stopped when
-   the JVM goes.
+  "The handle the integration suites hand to the application.
 
-   **Two names onto one database.** The database is the same shared-cache
-   in-memory SQLite the suite has always used -- `config/config`'s `:db` -- and
-   after this there are two ways to reach it:
+   ## What this was, and what is left of it
 
-   - `config/config`'s DataSource, which is what every test's own setup
-     statements and assertions keep using, verbatim. `reset-db` included.
-   - `remote` here, which is what the harness hands to the app. Statements sent
-     through it leave this process over HTTP and come back.
+   It used to boot a whole db-server for the run, on an ephemeral port against
+   the suite's own in-memory database, and hand the app a **remote** handle onto
+   it. Two names onto one database: the tests kept using `config/config`'s
+   DataSource for their own setup and assertions, while everything the app did
+   went out over HTTP and came back. That arrangement existed so the suites
+   could go end to end across the statement protocol without a line of any test
+   body changing -- 88 statements across 19 files that would otherwise have had
+   to be rewritten.
 
-   That is the whole of the arrangement, and it is what lets the existing tests
-   go end to end without a line of any test body changing. The alternative --
-   one handle, remote, for everything -- would have meant rewriting 88
-   statements across 19 files, which is the requirement this exists to keep.
+   The statement protocol retired in step 4 of the architecture rework: the hub
+   answers calls about items, not statements, and the only process that runs a
+   statement is the one holding the file. So there is nothing for a remote
+   handle to be, and the two names collapse back into one.
 
-   The dbname is read off the datasource rather than written down again, so the
-   two names cannot drift onto two databases: whatever `config` decided, this
-   opens the same one."
+   `app-config` stays, and is still a **function** rather than a def, for the
+   reason it became one in step 3: a config read when a namespace loads is a
+   convention, and one read when the handler is called is a guard. The four REST
+   suites build their config through it, which is the arrangement that stopped
+   seven `{:db …}` literals from drifting apart, and that is worth keeping
+   whatever the handle turns out to be.
+
+   The live hub/server pair is tested where it belongs now: `hub-proxy-test`
+   stands both processes up for real, against two different databases, which is
+   a sharper instrument than one database wearing two names ever was."
   (:require [clojure.string :as str]
-            [config :as config]
-            [db-server])
+            [config :as config])
   (:import [org.sqlite SQLiteDataSource]))
 
 (defn dbname-of
@@ -39,51 +45,11 @@
                 (.unwrap ds SQLiteDataSource))]
     (str/replace-first (.getUrl ^SQLiteDataSource inner) #"^jdbc:sqlite:" "")))
 
-(defonce server
-  (let [s (db-server/start! {:port 0 :db-path (dbname-of (:db config/config))})]
-    ;; The suite has no global fixture to hang a teardown on, and the runner
-    ;; exits the JVM when it is done, so this is where the server is stopped.
-    ;; `stop!` closes jetty before it rolls back what is still open, which is
-    ;; the ordering that matters when the database outlives the server -- an
-    ;; in-memory one does, for as long as the anchor connection holds it.
-    (.addShutdownHook (Runtime/getRuntime)
-                      (Thread. ^Runnable (fn [] (db-server/stop! s))))
-    s))
-
-(def remote
-  "The handle the app is given. Not the one the tests use on themselves."
-  {:db-server/url (:url server)})
-
 (defn app-config
   "The `config/config` the REST handlers are given while they are under test.
 
-   Every suite that stands a handler up builds its config from here -- four
-   places, one request helper per REST suite, where there used to be seven
-   `{:db …}` literals. (Two spots in `mutations_test` still build config inline
-   in a test body; they call only `GET /api/describe`, which reaches no
-   database, and the reasoning for leaving them is in the step-3 handoff.)
-
-   Seven literals were seven places a switch could be reverted without anything
-   noticing, which is exactly what had happened: the REST half was quietly
-   running local while `api.harness-wiring-test`, which only ever looked at the
-   /ui half, went on passing.
-
-   Consolidating them was not enough on its own, and it is worth being exact
-   about why. As a `def` this was `{:db remote}` evaluated when the namespace
-   loaded, and the wiring test asserted about the definition. Reverting all
-   seven literals therefore *still* left the suite green -- one place to look
-   at, and nothing that failed if a suite looked elsewhere. A convention, not
-   a guard.
-
-   So it is a function, and it reads `remote` when it is **called**. That is
-   what lets `api.harness-wiring-test` point the REST half at a dead port and
-   watch each of the four helpers fail to reach a database -- the same redef
-   that has always covered the /ui half now covers this one too, and a helper
-   that had gone back to the local DataSource answers 200 instead, which is
-   the failure.
-
-   The one-argument arity carries whatever else a suite's handlers need in
-   their config: `:folders` for the image routes, the role flags for the
-   replica ones. A caller adds to the config rather than restating the handle."
+   The one-argument arity carries whatever else a suite's handlers need in their
+   config: `:folders` for the image routes, the role flags for the replica ones.
+   A caller adds to the config rather than restating the handle."
   ([] (app-config nil))
-  ([m] (merge {:db remote} m)))
+  ([m] (merge {:db (:db config/config)} m)))

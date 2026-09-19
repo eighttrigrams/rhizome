@@ -65,19 +65,20 @@
           (is (some #(= "OnTheHub" (:title %)) body)
               (str "the answer did not come from the hub. Got: " (pr-str body))))))))
 
-(deftest the-describe-is-not-forwarded-test
+(deftest the-whole-api-forwards-describe-included-test
   (with-pair
     (fn [_hub app]
-      (testing "/api/describe is answered here, not by the hub"
-        ;; The hub still answers that path with the statement protocol's
-        ;; description (db-server registered it first, and prober reads it).
-        ;; Forwarding it would hand agents the wrong document. When step 4
-        ;; retires the protocol this test is what says the exception can go.
+      (testing "/api/describe goes to the hub like every other /api path"
+        ;; It was the one excluded path, because the hub answered it with the
+        ;; statement protocol's own description. The protocol is gone and the
+        ;; path changed hands, so the exception went with it -- and an agent
+        ;; reading describe through this machine is told about the API this
+        ;; machine serves.
         (let [[status body] (GET* app "/api/describe")]
           (is (= 200 status))
           (is (not-any? #(= "execute" (:name %)) (:endpoints body))
-              (str "the statement protocol's describe leaked through the proxy. "
-                   "Got: " (pr-str (map :name (:endpoints body))))))))))
+              (str "the statement protocol's describe is still somewhere. Got: "
+                   (pr-str (map :name (:endpoints body))))))))))
 
 (defn- POST-ui*
   "POST a /ui envelope to a ring app, and answer the parsed envelope."

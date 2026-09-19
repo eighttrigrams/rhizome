@@ -63,10 +63,15 @@
    values; the return value is the dispatched fn's return as plain data.
    Throws ex-info when the server reports `:thrown`.
 
-   What the app is handed is a **remote** handle: everything a dispatched
-   function does to the database leaves this process over HTTP and is executed
-   by a db-server, against the same in-memory database the calling test reads
-   and writes directly. See `db-harness` -- two names, one database, and no
-   test body the wiser."
+   The handle is the suite's own database. It used to be a *remote* one --
+   everything a dispatched function did left this process over HTTP and was run
+   by a db-server against the same in-memory database the test read directly --
+   which is how these suites covered the statement protocol without a line of
+   any test body changing. The protocol retired in step 4; see `db-harness`.
+
+   What that arrangement was proving is now proved better, and elsewhere:
+   `hub-proxy-test` stands a real hub and a real `server` up against two
+   *different* databases, so an answer from the wrong one is visible rather than
+   indistinguishable."
   [fn-name & args]
-  (apply call-on! db-harness/remote fn-name args))
+  (apply call-on! (:db (db-harness/app-config)) fn-name args))

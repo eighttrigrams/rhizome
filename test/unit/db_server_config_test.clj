@@ -23,6 +23,11 @@
 (defn- opts-for [content]
   (db-server/config-opts (.getPath (config-file content))))
 
+(defn- with-config
+  "Call `f` with the path of a config.edn holding `content`."
+  [content f]
+  (f (.getPath (config-file content))))
+
 (deftest reads-the-section-and-nothing-else-of-its-own-test
   (testing "the shared file: the app's keys are there and none of them arrives"
     (let [opts (opts-for (str "{:port 3140 :dev? true"
@@ -31,7 +36,7 @@
                               " :db-server {:port 3141 :db-path \"./rhizome.db\""
                               "             :vec-path \"./.sqlite-vec/vec0\"}}"))]
       (is (= {:port 3141 :db-path "./rhizome.db" :vec-path "./.sqlite-vec/vec0"
-              :read-only? false :allow-reset? true}
+              :allow-reset? true}
              opts)
           "the app's :port is 3140 and the db-server's is 3141: it took its own")))
   (testing "the standalone file: same reader, nothing else required"
@@ -41,23 +46,44 @@
     ;; is about which keys are read.
     (with-redefs [role/primary-marker-present? (constantly false)]
       (is (= {:port 3008 :db-path "/db/rhizome.db.nosync" :vec-path nil
-              :read-only? true :allow-reset? false}
+              :allow-reset? false}
              (opts-for "{:db-server {:port 3008 :db-path \"/db/rhizome.db.nosync\"}}"))
-          (str "no :dev? in the file means prod, and prod with no marker is "
-               "read-only -- and refuses /test/reset, which is the same flag")))))
+          (str "no :dev? in the file means prod, and a prod hub refuses "
+               "/test/reset. There is no :read-only? here at all any more: the "
+               "marker elects the hub, it does not demote it")))))
 
-(deftest the-role-comes-from-the-marker-and-the-mode-test
-  ;; The same rule the app-server reaches, from the same directory -- `role` owns
-  ;; it precisely so the two cannot drift.
-  (testing "prod without the marker is read-only: the structural ban"
+(deftest the-marker-elects-the-hub-rather-than-demoting-it-test
+  ;; The marker's meaning changed in step 4 and this is where it is pinned.
+  ;; Before: present meant "may write", absent meant a read-only replica. Now
+  ;; there are no replicas -- one hub, one mode -- so it answers a different
+  ;; question: WHICH MACHINE runs the hub. A hub that boots is writable; one
+  ;; that was not elected does not boot.
+  ;;
+  ;; Getting this wrong is worse than two writers on one file. The database is
+  ;; `rhizome.db.nosync`, and `.nosync` is exactly the suffix that keeps iCloud
+  ;; from syncing it -- so two hubs are two DATABASES diverging in silence.
+  (testing "no config-opts key carries a role any more"
     (with-redefs [role/primary-marker-present? (constantly false)]
-      (is (true? (:read-only? (opts-for "{:db-server {:db-path \"./x.db\"}}"))))))
-  (testing "prod with the marker is the primary"
+      (is (not (contains? (opts-for "{:db-server {:db-path \"./x.db\"}}") :read-only?)))))
+  (testing "prod without the marker refuses to boot, and says what to do"
+    (with-redefs [role/primary-marker-present? (constantly false)]
+      (let [t (try (with-config "{:db-server {:db-path \"./x.db\"}}"
+                     #(db-server/check-elected! %))
+                   nil
+                   (catch Throwable t t))]
+        (is (some? t))
+        (is (re-find #"was not elected" (.getMessage t)))
+        (is (re-find #"stop the hub on the old one" (.getMessage t))
+            "the remedy names the order, because doing it the other way round
+             leaves two hubs running"))))
+  (testing "prod with the marker boots"
     (with-redefs [role/primary-marker-present? (constantly true)]
-      (is (false? (:read-only? (opts-for "{:db-server {:db-path \"./x.db\"}}"))))))
+      (is (nil? (with-config "{:db-server {:db-path \"./x.db\"}}"
+                  #(db-server/check-elected! %))))))
   (testing "dev needs no marker, which is why :dev? is read at all"
     (with-redefs [role/primary-marker-present? (constantly false)]
-      (is (false? (:read-only? (opts-for "{:dev? true :db-server {:db-path \"./x.db\"}}")))))))
+      (is (nil? (with-config "{:dev? true :db-server {:db-path \"./x.db\"}}"
+                  #(db-server/check-elected! %)))))))
 
 (deftest the-port-defaults-to-the-one-the-scripts-fall-back-to-test
   (is (= 3141 (:port (opts-for "{:db-server {:db-path \"./x.db\"}}"))))

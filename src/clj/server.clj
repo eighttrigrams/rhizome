@@ -259,22 +259,19 @@
   "`/api`, answered by the hub when there is one and by this process when there
    is not (see `hub-proxy`).
 
-   `/api/describe` is the exception, and a temporary one. The hub currently
-   answers that path with the *statement protocol's* description, because
-   db-server registered it first and prober and the start scripts read it (see
-   db-server/app). Forwarding it would hand agents the wrong document, so it is
-   answered here until step 4 retires the protocol and the path changes hands.
-   `the-describe-is-not-forwarded-test` is what makes that a decision rather
-   than a leftover."
+   `/api/describe` used to be excluded, because the hub answered that path with
+   the *statement protocol's* description and forwarding it would have handed
+   agents the wrong document. The protocol retired in step 4 and the path
+   changed hands with it, so the whole surface forwards -- which is what makes
+   `/api/describe` through this machine describe the API this machine actually
+   serves."
   []
   (let [local (rest-api/rest-routes)]
     (fn [req]
-      (let [uri (:uri req)]
-        (if-let [url (and (str/starts-with? uri "/api")
-                          (not= "/api/describe" uri)
-                          (hub-proxy/hub-url))]
-          (hub-proxy/forward url req)
-          (local req))))))
+      (if-let [url (and (str/starts-with? (:uri req) "/api")
+                        (hub-proxy/hub-url))]
+        (hub-proxy/forward url req)
+        (local req)))))
 
 (defn- routes
   []

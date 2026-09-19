@@ -3,7 +3,7 @@
    feeding it, so both halves are testable without a prod-mode process."
   (:require [clojure.test :refer [deftest is testing]]
             [config :as config]
-            [db :as db])
+)
   (:import [java.io File]))
 
 (deftest read-only-replica-decision-test
@@ -37,21 +37,23 @@
 ;; same `config/config`.
 
 (deftest test-mode-keeps-a-local-datasource-test
-  ;; The subtle one in the whole step. Everywhere else the app's `:db` is a
-  ;; remote handle and this process holds no datasource at all -- but the test
-  ;; database is a shared-cache in-memory SQLite, which lives inside ONE JVM.
-  ;; No separate process could open it, so there is no db-server for this handle
-  ;; to point at; the one the integration suites run against is booted inside
-  ;; this JVM by `db-harness`. And 88 statements across 19 test files use
-  ;; `(:db config/config)` directly, which is the two-names-onto-one-database
-  ;; decision from step 3.
+  ;; The subtle one in the whole step, and it survived the retirement of the
+  ;; statement protocol unchanged. Everywhere else the `server` holds NO handle
+  ;; at all -- since step 4 `:db` is nil outside test mode, because that process
+  ;; reaches no database -- but the test database is a shared-cache in-memory
+  ;; SQLite, which lives inside ONE JVM. No separate process could open it, and
+  ;; 88 statements across 19 test files use `(:db config/config)` directly.
   (testing "this JVM is in test mode"
     (is (true? (:test? config/config))))
-  (testing "and its :db is the DataSource, not a db-server url"
-    (is (instance? javax.sql.DataSource (:db config/config)))
-    (is (not (db/remote? (:db config/config))))))
+  (testing "and its :db is a real DataSource"
+    (is (instance? javax.sql.DataSource (:db config/config))))
+  (testing "and it has no hub to forward to, which is what makes it answer itself"
+    (is (nil? (:hub-url config/config)))))
 
 (deftest db-url-derivation-test
+  ;; Still `db-url`, still derived from the `:db-server` section, but what it
+  ;; feeds changed: it is `:hub-url` now -- where the hub is -- rather than the
+  ;; url inside a remote db handle. The rename of the section itself is step 5.
   (testing "derived from the :db-server section both processes read"
     (is (= "http://127.0.0.1:3141"
            (#'config/db-url {:db-server {:port 3141}}))))

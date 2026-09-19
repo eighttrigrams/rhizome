@@ -93,26 +93,26 @@
         (testing "and a hub command on the same surface still goes through"
           (is (nil? (:thrown (ui! server "list-resources" [{}])))))))))
 
-(deftest the-db-server-describe-still-wins-test
+(deftest the-describe-is-rhizomes-own-now-test
   (with-hub
     (fn [server]
-      (testing "GET /api/describe is still the statement protocol's own"
-        ;; Both surfaces claim this path and the first registered wins (see the
-        ;; comment in db-server/app). Pinning it means the swap at step 4 --
-        ;; when the statement protocol retires and rhizome's describe should
-        ;; take the path over -- is a decision someone makes, not a surprise
-        ;; someone discovers.
+      (testing "GET /api/describe answers the item API"
+        ;; The statement protocol had a describe of its own and, being
+        ;; registered first, answered this path. It was documented as temporary
+        ;; the day it was written and pinned by a test, so that the handover
+        ;; would be a decision rather than a surprise. This is the other side of
+        ;; that test: the protocol is gone, and what prober and any agent read
+        ;; here is rhizome's REST surface.
         (let [[status body] (api-get server "/api/describe")]
           (is (= 200 status))
-          ;; Both describes answer {:endpoints … :skill …} -- that shape is the
-          ;; plurama convention and db-server was built to match it, so the
-          ;; keys cannot tell them apart. The contents can: the db-server lists
-          ;; its own vars by name, rhizome lists REST paths.
-          (is (some #(= "execute" (:name %)) (:endpoints body))
-              (str "/api/describe should still be the statement protocol's. If "
-                   "this fails, rhizome's REST describe has taken the path over "
-                   "-- which is step 4's job, and this test goes with it. Got: "
-                   (pr-str (map :name (:endpoints body))))))))))
+          (is (some? (:endpoints body)))
+          (is (not-any? #(= "execute" (:name %)) (:endpoints body))
+              (str "the statement protocol's describe is still answering. Got: "
+                   (pr-str (map :name (:endpoints body)))))
+          ;; rhizome's describe names each endpoint by var and leads its doc
+          ;; with the method and path, so the item routes are visible there.
+          (is (some #(re-find #"/api/items" (str (:doc %))) (:endpoints body))
+              "and the item routes are what it names"))))))
 
 (defn- post-plain [server path]
   (let [resp (http/post (str (:url server) path) {:as :string :throw-exceptions false})]
