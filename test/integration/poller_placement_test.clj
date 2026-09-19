@@ -45,27 +45,29 @@
           (System/setProperty "rhizome.e2e" prop)
           (System/clearProperty "rhizome.e2e"))))))
 
-;; The worlds, by name. `:db` is what decides whether a hub exists at all:
-;; a remote handle means there is one, a local DataSource means this process is
-;; holding the file itself.
-(def ^:private remote-handle {:db-server/url "http://127.0.0.1:3008"})
+;; The worlds, by name. `:hub-url` is what decides whether a hub exists at all:
+;; set means there is one, absent means this process is holding the file itself.
+(def ^:private a-hub
+  "A `:hub-url`. Its presence is the whole of \"there is a hub\" (see
+   `hub-proxy/hub-url`); nothing here connects to it."
+  "http://127.0.0.1:3008")
 
 (def ^:private worlds
   {"prod, a writable hub"
-   {:config-overrides {:db remote-handle :e2e? false :read-only-replica? false}
+   {:config-overrides {:hub-url a-hub :e2e? false :read-only-replica? false}
     :hub              {:read-only? false}}
 
    "one process, no hub"
-   {:config-overrides {:db (:db config/config) :e2e? false :read-only-replica? false}
+   {:config-overrides {:hub-url nil :e2e? false :read-only-replica? false}
     :hub              nil}
 
    "e2e"
-   {:config-overrides {:db remote-handle :e2e? true :read-only-replica? false}
+   {:config-overrides {:hub-url a-hub :e2e? true :read-only-replica? false}
     :hub              {:read-only? false}
     :e2e?             true}
 
    "a read-only hub"
-   {:config-overrides {:db remote-handle :e2e? false :read-only-replica? false}
+   {:config-overrides {:hub-url a-hub :e2e? false :read-only-replica? false}
     :hub              {:read-only? true}}})
 
 (deftest never-two-schedulers-test

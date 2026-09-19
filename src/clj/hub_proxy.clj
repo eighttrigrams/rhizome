@@ -8,24 +8,24 @@
 
    ## When it proxies, and when it does not
 
-   Off `db/remote?`, asked of the process's own handle at call time. That is
-   not a convenience: it is the same question, asked once, in the one place the
-   answer already lives.
+   Off `:hub-url`, read at call time. One key, one fact — where the hub is — and
+   its absence is the whole of “there is no hub”:
 
-   - a handle like `{:db-server/url \"http://127.0.0.1:3008\"}` means there is a
-     hub over there and this process should be asking it;
-   - a local DataSource means this process *is* the one holding the file — which
-     is what the test and e2e modes hand it, both of which run one process with
-     no hub to talk to. They keep answering `/api` themselves, exactly as
-     before.
+   - set, and this process forwards the item surfaces there;
+   - absent, and this process holds the database itself, which is what test mode
+     is: one JVM, an in-memory database no other process could open, answering
+     `/api` and `/ui` here exactly as before.
 
-   So no mode flag is introduced, and no configuration decides this twice."
+   It used to ask `db/remote?` about this process's own db handle, which worked
+   while that handle was the only thing that knew. It retired with the facade's
+   remote half (step 4): the `server` reaches no database at all now, so `:db`
+   is nil outside test mode and the hub's address is a key of its own. No mode
+   flag is introduced, and no configuration decides this twice."
   (:require [cheshire.core :as json]
             [clj-http.client :as http]
             [clj-http.conn-mgr :as conn-mgr]
             [clojure.string :as str]
-            [config :as config]
-            [db :as db]))
+            [config :as config]))
 
 (def ^:private conn-manager
   "Its own pool, deliberately not `db`'s: that one is sized for statement
@@ -35,8 +35,7 @@
 (defn hub-url
   "The hub's base URL, or nil when this process holds the database itself."
   []
-  (let [handle (:db config/config)]
-    (when (db/remote? handle) (:db-server/url handle))))
+  (:hub-url config/config))
 
 (defn health
   "The hub's `/health`, parsed, or a throw naming the url that did not answer.

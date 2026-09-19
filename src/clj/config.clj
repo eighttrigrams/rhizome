@@ -207,10 +207,18 @@
    two-names-onto-one-database decision from step 3, and 88 statements across 19
    files rest on `(:db config/config)` still being a DataSource here.
 
-   Everywhere else -- dev, e2e, prod -- it is a remote handle, and this process
-   holds no datasource at all."
+   **Everywhere else -- dev, e2e, prod -- it is nil**, and that is deliberate.
+   Since step 4 this process does not reach the database at all: the hub answers
+   `/ui` and `/api`, and what is left here is the frontend, this machine's files
+   and the forwarding. There is no handle to give, and `nil` is the honest value
+   for that. A leftover call site that still expects one fails at once and says
+   which line it was on -- where a remote handle would have gone on quietly
+   speaking SQL over a wire that is being retired.
+
+   The hub's address is `:hub-url`, a separate key, because it is a separate
+   fact: where the hub is, not what this process may query."
   [c replica?]
-  (if (:test? c)
+  (when (:test? c)
     ;; A replica's structural write ban -- the datasource opened in SQLite's
     ;; read-only mode, so that even a code path which forgot to check cannot
     ;; write -- is the db-server's to make now, and it makes it from the same
@@ -218,8 +226,7 @@
     ;; forces :dev?; it is passed anyway so that this handle is built from the
     ;; decision rather than from an assumption about it. The graceful refusals
     ;; in front of it (see the `replica` ns) are still this process's.
-    (connection/make-datasource {:dbname test-dbname :read-only? replica?})
-    {:db-server/url (db-url c)}))
+    (connection/make-datasource {:dbname test-dbname :read-only? replica?})))
 
 (defn ds []
   (let [c (aero/read-config config-path)
@@ -234,6 +241,10 @@
         replica? (read-only-replica? c (primary-marker-present?))]
     (-> c
         (assoc :read-only-replica? replica?)
-        (assoc :db (db-handle c replica?)))))
+        (assoc :db (db-handle c replica?))
+        ;; Where the hub is. Nil in test mode, which is the one arrangement
+        ;; with no hub to talk to -- `hub-proxy` reads exactly this to decide
+        ;; whether to forward, so "no hub" and "answer it here" are one fact.
+        (assoc :hub-url (when-not (:test? c) (db-url c))))))
 
 (def config (ds))

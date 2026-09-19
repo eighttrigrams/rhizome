@@ -431,8 +431,8 @@
   So the verdicts are compared, and any disagreement is a refusal -- in both
   directions. A db-server that is writable under an app that refuses every write
   is the milder half, but it is the same confusion and the same fix."
-  [handle]
-  (let [db-read-only?  (db/remote-read-only? handle)
+  [url health]
+  (let [db-read-only?  (boolean (:read-only? health))
         app-read-only? (replica/read-only?)]
     (when-not (= db-read-only? app-read-only?)
       (let [msg (str "Refusing to start: this app-server and its db-server disagree about "
@@ -441,7 +441,7 @@
                      "  db-server:  " (if db-read-only? "read-only" "writable")
                      " -- it read its own config.edn and looked for "
                      config/primary-marker " in the directory IT was started in ("
-                     (:db-server/url handle) ")\n"
+                     url ")\n"
                      (if (:dev? config/config)
                        ;; The flagship case, and the one where naming the remedy
                        ;; is worth more than restating the rule: a db-server
@@ -458,19 +458,20 @@
                             "or give the db-server a config.edn that says what this one "
                             "says.")))]
         (log/error msg)
-        (throw (ex-info msg {:db-server/url        (:db-server/url handle)
+        (throw (ex-info msg {:db-server/url        url
                              :db-server/read-only? db-read-only?
                              :app/read-only?       app-read-only?}))))
-    (log/info {:db-server (:db-server/url handle) :read-only? db-read-only?}
-              (str "app-server: database reached over " (:db-server/url handle)
+    (log/info {:db-server url :read-only? db-read-only?}
+              (str "app-server: database reached over " url
                    ", and both processes call this instance "
                    (if db-read-only? "a read-only replica" "a primary")))))
 
 (defn- check-db-server!
   "One `/health` call, before anything else needs the hub, so that a hub that is
   not there says so in one line instead of surfacing as a connection refused in
-  the middle of the first request. Then `check-db-server-role!`, which is the
-  other half and the less obvious one.
+  the middle of the first request. Its answer is then handed to
+  `check-db-server-role!`, which is the other half and the less obvious one --
+  one call answering both questions, since `/health` reports the role too.
 
   It used to be `SELECT 1` over the statement protocol. `/health` says the same
   thing -- something is listening and it has a database open -- without this
@@ -481,17 +482,16 @@
   at all. This is the message for when that did not happen -- an app-server
   started by hand, or pointed at the wrong port."
   []
-  (let [handle (:db config/config)]
-    (when (db/remote? handle)
-      (try (hub-proxy/health (:db-server/url handle))
-           (catch Throwable t
-             (let [msg (str "Refusing to start: no db-server answering at "
-                            (:db-server/url handle) " (" (.getMessage t) "). "
-                            "Start it first -- 'make start' does, and 'make start-db' "
-                            "runs it alone.")]
-               (log/error t msg)
-               (throw (ex-info msg {:db-server/url (:db-server/url handle)} t)))))
-      (check-db-server-role! handle))))
+  (when-let [url (hub-proxy/hub-url)]
+    (let [health (try (hub-proxy/health url)
+                      (catch Throwable t
+                        (let [msg (str "Refusing to start: no db-server answering at "
+                                       url " (" (.getMessage t) "). "
+                                       "Start it first -- 'make start' does, and "
+                                       "'make start-db' runs it alone.")]
+                          (log/error t msg)
+                          (throw (ex-info msg {:db-server/url url} t)))))]
+      (check-db-server-role! url health))))
 
 (defn start-http-server!
   []

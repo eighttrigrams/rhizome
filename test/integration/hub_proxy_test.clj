@@ -32,9 +32,10 @@
   [f]
   (let [hub (db-server/start! {:port 0 :db-path (temp-db-path)})]
     (try
-      (with-redefs [config/config (assoc config/config
-                                    :db {:db-server/url (:url hub)}
-                                    :dev? true)]
+      ;; `:hub-url` is what makes this process a forwarding `server`; `:db` stays
+      ;; as test mode set it, which is a DIFFERENT database from the hub's file
+      ;; and is exactly what makes the assertions here mean something.
+      (with-redefs [config/config (assoc config/config :hub-url (:url hub) :dev? true)]
         (f hub (server/app)))
       (finally (db-server/stop! hub)))))
 
@@ -244,7 +245,7 @@
   (testing "a tunnel that is down is an answer, not a stack trace"
     (with-redefs [config/config (assoc config/config
                                   ;; a port nothing is listening on
-                                  :db {:db-server/url "http://127.0.0.1:1"}
+                                  :hub-url "http://127.0.0.1:1"
                                   :dev? true)]
       (let [[status body] (GET* (server/app) "/api/contexts")]
         (is (= 502 status))

@@ -92,7 +92,10 @@
 ;; failure arrives later as a bare SQLITE_READONLY. So the verdicts are compared
 ;; at startup instead.
 
-(def ^:private remote {:db-server/url "http://127.0.0.1:65535"})
+(def ^:private hub-url
+  "A url nothing is listening on. Every use of it here is redefined away -- what
+   the tests need is a `:hub-url` that is set, not one that answers."
+  "http://127.0.0.1:65535")
 
 (defn- role-check-with
   "Run the startup role check. `app` is what THIS process's world says --
@@ -107,12 +110,16 @@
   [app db-read-only?]
   (let [{:keys [dev? marker?]} app
         app-replica? (role/read-only-replica? {:dev? dev?} (boolean marker?))]
-    (with-redefs [config/config                  {:db remote
+    (with-redefs [config/config                  {:hub-url hub-url
                                                   :read-only-replica? app-replica?
                                                   :dev? dev?}
-                  config/primary-marker-present? (constantly (boolean marker?))
-                  db/remote-read-only?           (constantly db-read-only?)]
-      (try (#'server/check-db-server-role! remote) nil (catch Throwable t t)))))
+                  config/primary-marker-present? (constantly (boolean marker?))]
+      ;; The db-server's verdict arrives in its /health answer now, which is the
+      ;; same call the reachability check already makes -- one question, one
+      ;; round trip, instead of a statement and then a health read.
+      (try (#'server/check-db-server-role! hub-url {:ok true :read-only? db-read-only?})
+           nil
+           (catch Throwable t t)))))
 
 ;; The three worlds, named once. `dev` is the flagship repro: a dev app-server
 ;; in front of a db-server that read a config.edn of its own.
@@ -172,10 +179,12 @@
   ;; suite green. e2e does not catch it either -- there the two agree, and
   ;; agreement is silent whether or not anything asked.
   (testing "the role check is reached: a disagreement refuses through the front door"
-    (let [t (with-redefs [config/config        {:db remote :dev? true :read-only-replica? false}
+    (let [t (with-redefs [config/config        {:hub-url hub-url :dev? true :read-only-replica? false}
                           config/primary-marker-present? (constantly false)
-                          hub-proxy/health     (constantly {:ok true})
-                          db/remote-read-only? (constantly true)]
+                          ;; The role now rides in on the same /health answer,
+                          ;; so the disagreement is expressed by what /health
+                          ;; says rather than by a second call.
+                          hub-proxy/health     (constantly {:ok true :read-only? true})]
               (try (#'server/check-db-server!) nil (catch Throwable t t)))]
       (is (some? t)
           "if this passes, `check-db-server!` is no longer calling the role check")
@@ -185,16 +194,15 @@
     ;; protocol (step 4): the same question -- something is listening and it has
     ;; a database open -- without this process having to speak SQL to ask it.
     (let [asked (atom [])]
-      (with-redefs [config/config        {:db remote :dev? true :read-only-replica? false}
+      (with-redefs [config/config        {:hub-url hub-url :dev? true :read-only-replica? false}
                     config/primary-marker-present? (constantly false)
-                    hub-proxy/health     (fn [url] (swap! asked conj url) {:ok true})
-                    db/remote-read-only? (constantly false)]
+                    hub-proxy/health     (fn [url] (swap! asked conj url)
+                                           {:ok true :read-only? false})]
         (#'server/check-db-server!))
-      (is (= [(:db-server/url remote)] @asked))))
-  (testing "a local handle is asked nothing at all -- which is what test mode rests on"
+      (is (= [hub-url] @asked))))
+  (testing "no :hub-url means nothing is asked at all -- which is what test mode rests on"
     (let [asked (atom [])]
-      (with-redefs [config/config        {:db ::a-datasource :read-only-replica? false}
-                    hub-proxy/health     (fn [& _] (swap! asked conj :health) nil)
-                    db/remote-read-only? (fn [& _] (swap! asked conj :role) nil)]
+      (with-redefs [config/config        {:hub-url nil :read-only-replica? false}
+                    hub-proxy/health     (fn [& _] (swap! asked conj :health) nil)]
         (#'server/check-db-server!))
       (is (empty? @asked)))))
