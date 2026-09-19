@@ -1,7 +1,7 @@
 #!/bin/bash
-# Decide whether to run :vector tests based on the same signal the db-server
-# uses: presence of :db-server :vec-path resolved against config.edn AND the
-# dylib actually on disk. Drop :vec-path from the :db-server block to skip
+# Decide whether to run :vector tests based on the same signal the hub
+# uses: presence of :hub :vec-path resolved against config.edn AND the
+# dylib actually on disk. Drop :vec-path from the :hub block to skip
 # vector tests.
 #
 # The key sat under :semsearch until the app/db split -- loading the extension
@@ -21,8 +21,13 @@ case "$(uname -s)" in
   *)      EXT=so    ;;
 esac
 
-# Pull :db-server :vec-path out of config.edn with a small bb/clj-free
+# Pull :hub :vec-path out of config.edn with a small bb/clj-free
 # parse. Multi-line: the block spans lines, so flatten first.
+# Both spellings are matched, for the reason detect-ports.sh gives at
+# config_edn_without_hub_section: config.edn is gitignored, so a checkout from
+# before the :db-server -> :hub rename still has the old name. Matching only
+# the new one would silently stop running the ^:vector tests -- the exact
+# failure the comment below says this grep exists to avoid.
 # Mirrors aero #or [#env VEC_PATH "default"]: $VEC_PATH wins, otherwise the
 # first quoted string after :vec-path is the default. The `grep -oE '"[^"]*"'
 # | head -1` form handles both `:vec-path "..."` and the #or form.
@@ -30,7 +35,7 @@ VEC_PATH_ENV="${VEC_PATH:-}"
 VEC_PATH=""
 if [ -f "$CONFIG" ]; then
   VEC_PATH=$(tr '\n' ' ' < "$CONFIG" \
-    | grep -oE ':db-server[[:space:]]*\{[^}]*\}' \
+    | grep -oE ':(hub|db-server)[[:space:]]*\{[^}]*\}' \
     | grep -oE ':vec-path[^}]*' \
     | grep -oE '"[^"]*"' \
     | head -1 \
@@ -43,7 +48,7 @@ if [ -n "$VEC_PATH" ] && [ -f "${VEC_PATH}.${EXT}" ]; then
     && echo "tests passed (including :vector tests; sqlite-vec found at ${VEC_PATH}.${EXT})"
 else
   if [ -z "$VEC_PATH" ]; then
-    echo ":db-server :vec-path not set in config.edn; excluding ^:vector tests"
+    echo ":hub :vec-path not set in config.edn; excluding ^:vector tests"
   else
     echo "sqlite-vec not at ${VEC_PATH}.${EXT}; excluding ^:vector tests"
   fi

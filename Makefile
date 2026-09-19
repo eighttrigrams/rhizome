@@ -7,11 +7,14 @@
 # and the generated docker overlay so both sides agree.
 PORT        ?= $(shell ./scripts/detect-ports.sh PORT)
 SHADOW_PORT ?= $(shell ./scripts/detect-ports.sh SHADOW_PORT)
-# The db-server's port, same `?=` rule: an exported DB_PORT wins, otherwise it
-# comes out of config.edn's :db-server section (final fallback 3141, which is
-# db-server/default-port). Deliberately absent from COMPOSE_ENV below -- the
-# seam is internal, the db-server binds loopback inside the container, and its
-# port is not published to the host.
+# The hub's port, same `?=` rule: an exported DB_PORT wins, otherwise it
+# comes out of config.edn's :hub section (final fallback 3141, which is
+# et.rz.hub.main/default-port). The variable keeps its DB_PORT name: it is the
+# one a developer exports by hand, and renaming env vars alongside the config
+# section would have meant two coordinated edits at cutover instead of one.
+# Deliberately absent from COMPOSE_ENV below -- the seam is internal, the hub
+# binds loopback inside the container, and its port is not published to the
+# host.
 DB_PORT     ?= $(shell ./scripts/detect-ports.sh DB_PORT)
 # DEPLOY_TARGET has no default and is deliberately NOT read from the
 # environment: `deploy` requires it to be passed on the command line
@@ -24,7 +27,7 @@ $(error DEPLOY_TARGET is required and must be passed on the command line: make d
 endif
 endif
 
-.PHONY: start start-db stop test e2e deploy install-sqlite-vec box backfill-embeddings clean
+.PHONY: start start-hub stop test e2e deploy install-sqlite-vec box backfill-embeddings clean
 
 onboard:
 	./scripts/onboard.sh
@@ -105,12 +108,18 @@ backfill-embeddings:
 start:
 	@./scripts/start.sh
 
-# The db-server on its own, in the foreground, so Ctrl-C stops it. `make start`
+# The hub on its own, in the foreground, so Ctrl-C stops it. `make start`
 # afterwards finds it answering /health and connects to that one instead of
 # starting a second -- two processes on one SQLite file is what the split
 # exists to prevent. The port check refuses when a dev session already holds
-# the lock, which is the case where a db-server is already running for you.
-start-db:
+# the lock, which is the case where a hub is already running for you.
+#
+# Renamed from `start-db` at step 5 of the architecture rework, with the rest
+# of the db-server -> hub naming. Dev only: it does NOT check for
+# primary.nosync, because that marker elects the hub in production and no
+# checkout has one (it is gitignored), so gating this on it would mean no
+# developer could start a hub at all.
+start-hub:
 	@./scripts/detect-ports.sh check DB_PORT || exit 0; \
 	DB_PORT=$(DB_PORT) clj -M:dev -m et.rz.hub.main
 

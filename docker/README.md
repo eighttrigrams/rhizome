@@ -34,8 +34,9 @@ there instead of pulling ~640 MB again. `make box` creates it first
 compose's auto-creation.
 
 Vector-dependent tests are tagged `^:vector`. `make test` looks at
-`:db-server :vec-path` in `config.edn` and adds `--exclude :vector` if
+`:hub :vec-path` in `config.edn` and adds `--exclude :vector` if
 the dylib it points at isn't on disk. To force-skip even when vec is
-installed, remove `:vec-path` from the `:db-server` block in `config.edn`.
-(The key sat under `:semsearch` before the app-server / db-server split;
+installed, remove `:vec-path` from the `:hub` block in `config.edn`.
+(The key sat under `:semsearch` before the app-server / db-server split, and
+the section was called `:db-server` until the hub rename;
 `:semsearch` keeps `:ollama-url` and `:ollama-model`, the app-side embedder's.)

@@ -1,10 +1,10 @@
 #!/bin/bash
-# Bring up the dev stack in the foreground: the db-server goes up first (in the
+# Bring up the dev stack in the foreground: the hub goes up first (in the
 # background, like shadow-cljs), shadow-cljs watch is backgrounded (its stdout
 # still streams to this TTY) and the app JVM runs as the foreground process so
 # Ctrl-C tears it down cleanly. Mirrors tracker's start.sh.
 #
-# The db-server is first because it owns the SQLite file and applies the
+# The hub is first because it owns the SQLite file and applies the
 # schema, and because the app-server holds no datasource at all any more: it
 # refuses to boot with nothing answering at its :db-url rather than coming up
 # and failing at its first statement.
@@ -60,7 +60,7 @@ cleanup_lock() {
     [ "$listening" = "0" ] && break
     sleep 0.5
   done
-  # .db-server.pid is deliberately NOT removed here. The db-server outlives
+  # .db-server.pid is deliberately NOT removed here. The hub outlives
   # this session the way shadow-cljs does -- the next `make start` connects to
   # it instead of paying for a boot -- and `make stop` is what takes it down.
   [ "$listening" = "0" ] && rm -f .dev-server.lock .shadow-cljs.pid
@@ -69,13 +69,13 @@ cleanup_lock() {
 # from the foreground `clj` below and fall through to EXIT naturally.
 trap cleanup_lock EXIT
 
-# --- the db-server ----------------------------------------------------------
+# --- the hub ----------------------------------------------------------
 # Wait on /health, not on the port: a bound port says jetty is listening, and
 # /health says the database behind it answered a statement. Starting the app in
 # front of a server that cannot reach its file is the case the health check
 # exists for.
 #
-# An already-healthy one is CONNECTED TO rather than replaced. `make start-db`
+# An already-healthy one is CONNECTED TO rather than replaced. `make start-hub`
 # in another terminal is a supported way to run it, and two processes on one
 # SQLite file is the thing this whole split exists to prevent -- so a second is
 # never started. Anything else holding the port is refused instead of guessed
@@ -83,13 +83,13 @@ trap cleanup_lock EXIT
 db_healthy() { curl -sf -m 2 "http://127.0.0.1:$DB_PORT/health" >/dev/null 2>&1; }
 
 if db_healthy; then
-  echo "db-server already answering on :$DB_PORT -- connecting to that one."
+  echo "hub already answering on :$DB_PORT -- connecting to that one."
 elif lsof -nP -iTCP:"$DB_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
   echo "Refusing: :$DB_PORT is held by something that does not answer /health." >&2
-  echo "That is either not a db-server or a broken one. Free the port and retry." >&2
+  echo "That is either not a hub or a broken one. Free the port and retry." >&2
   exit 1
 else
-  echo "Starting db-server on :$DB_PORT..."
+  echo "Starting hub on :$DB_PORT..."
   clj -M:dev -m et.rz.hub.main &
   # Structured like .dev-server.lock, and for its reason: this file lives in
   # the repo, which is bind-mounted, so a pid written inside a container is
@@ -110,21 +110,21 @@ else
     sleep 0.5
   done
   if ! db_healthy; then
-    echo "db-server did not answer /health on :$DB_PORT within 30s -- see its output above." >&2
+    echo "hub did not answer /health on :$DB_PORT within 30s -- see its output above." >&2
     db_pids=$(lsof -nP -iTCP:"$DB_PORT" -sTCP:LISTEN -t 2>/dev/null | tr '\n' ' ' || true)
     # shellcheck disable=SC2086
     [ -n "$db_pids" ] && kill $db_pids 2>/dev/null || true
     rm -f .db-server.pid
     exit 1
   fi
-  echo "db-server up on :$DB_PORT."
+  echo "hub up on :$DB_PORT."
 fi
 
 echo "Starting shadow-cljs watch on :$SHADOW_PORT..."
 npx shadow-cljs watch app &
 echo $! > .shadow-cljs.pid
 
-echo "Starting app server on :$PORT (db-server: http://127.0.0.1:$DB_PORT)..."
+echo "Starting app server on :$PORT (hub: http://127.0.0.1:$DB_PORT)..."
 # Don't `exec` -- that replaces the bash process so the EXIT trap never
 # fires. Run as a foreground subprocess instead; bash regains control on
 # JVM exit and the trap runs.

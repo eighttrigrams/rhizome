@@ -4,7 +4,7 @@
 #     Print the resolved port value, checking in order:
 #       1. for PORT: the :port fallback in config.edn
 #          for SHADOW_PORT: the :default in shadow-cljs.edn's :http :port
-#          for DB_PORT: the :port inside config.edn's :db-server section
+#          for DB_PORT: the :port inside config.edn's :hub section
 #       2. hardcoded final fallback (3140 / 9804 / 3141)
 #
 #     Note: this script does NOT read .envrc. Env-var overrides are the
@@ -25,15 +25,23 @@ set -e
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-# config.edn flattened to one line with the :db-server block cut out. That
+# config.edn flattened to one line with the :hub block cut out. That
 # block carries a :port of its own -- the inner server's -- and it is NOT the
 # app's. The two differ by which map they sit in and by nothing else, so
 # anything resolving the app port by pattern has to remove it rather than rely
 # on which comes first in the file. test/e2e/port.ts does the same, for the
 # same reason.
-config_edn_without_db_server() {
+# Both spellings are matched, here and in resolve_hub_port_from_config_edn
+# below. config.edn is gitignored and generated, so a checkout that predates
+# the :db-server -> :hub rename still has the old name in a file `git pull`
+# cannot update. Matching only the new one would make this script fall back to
+# its default port and then wait for /health at a port nothing is bound to --
+# a confusing failure for what is really one word out of date. Matching both
+# means the failure that arrives is the hub's own named refusal, which says
+# which word to change. Drop the alternation once no old config.edn is left.
+config_edn_without_hub_section() {
   tr '\n' ' ' < "$ROOT/config.edn" \
-    | sed -E 's/:db-server[[:space:]]*\{[^}]*\}//'
+    | sed -E 's/:(hub|db-server)[[:space:]]*\{[^}]*\}//'
 }
 
 resolve_from_config_edn() {
@@ -42,21 +50,23 @@ resolve_from_config_edn() {
   # `#or [#env PORT 3140]`; both end with the integer we want. `-o` now,
   # because the source above is one flattened line: the match has to be cut
   # out before the digits are read off it.
-  config_edn_without_db_server \
+  config_edn_without_hub_section \
     | grep -oE '(^|[[:space:]{]):port[^:}]*' \
     | head -1 \
     | grep -oE '[0-9]+' \
     | tail -1
 }
 
-# The db-server's port, out of its own section: same two shapes, a literal
+# The hub's port, out of its own section: same two shapes, a literal
 # `:port 3141` or aero's `#long #or [#env DB_PORT 3141]`. The section holds no
 # nested maps, so `\{[^}]*\}` isolates it -- the same form run-tests.sh uses on
-# it to find :vec-path.
-resolve_db_port_from_config_edn() {
+# it to find :vec-path. (DB_PORT keeps its name: it is the variable the
+# developer exports, and renaming env vars in the same change as the config
+# section would mean two coordinated edits at cutover instead of one.)
+resolve_hub_port_from_config_edn() {
   [ -f "$ROOT/config.edn" ] || return 1
   tr '\n' ' ' < "$ROOT/config.edn" \
-    | grep -oE ':db-server[[:space:]]*\{[^}]*\}' \
+    | grep -oE ':(hub|db-server)[[:space:]]*\{[^}]*\}' \
     | grep -oE ':port[^:}]*' \
     | head -1 \
     | grep -oE '[0-9]+' \
@@ -81,12 +91,12 @@ resolve_port() {
       ;;
     DB_PORT)
       # 3141 is `et.rz.hub.main/default-port` in src/clj/et/rz/hub/main.clj. A config.edn
-      # whose :db-server section names no port and this script have to land on
+      # whose :hub section names no port and this script have to land on
       # the same number, or `make start` waits for /health at a port nothing is
       # bound to. The pipeline yields an empty string rather than a non-zero
       # status when the section is absent, so the fallback is tested for, not
       # chained onto `||`.
-      val=$(resolve_db_port_from_config_edn || true)
+      val=$(resolve_hub_port_from_config_edn || true)
       [ -n "$val" ] || val=3141
       ;;
     *)
