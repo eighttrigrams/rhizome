@@ -78,7 +78,7 @@ trap 'rm -f .dev-server.lock' EXIT INT TERM
 # created and populated by this line and not by the JVM playwright spawns.
 export DB_PATH="./test/rhizome-e2e.db"
 echo "Starting db-server for e2e on :$DB_PORT (db: $DB_PATH)..."
-clj -M:e2e -m db-server &
+clj -M:e2e -m et.rz.hub.main &
 # By port, not by $!: `clj` is a bash wrapper that forks the JVM as a child, so
 # $! is the wrapper and it is gone before this trap ever runs. Whatever holds
 # DB_PORT is this run's -- the check above refused to start if anything already

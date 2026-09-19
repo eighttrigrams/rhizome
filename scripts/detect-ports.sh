@@ -80,7 +80,7 @@ resolve_port() {
       val=$(resolve_from_shadow_cljs) || val=9804
       ;;
     DB_PORT)
-      # 3141 is `db-server/default-port` in src/clj/db_server.clj. A config.edn
+      # 3141 is `et.rz.hub.main/default-port` in src/clj/et/rz/hub/main.clj. A config.edn
       # whose :db-server section names no port and this script have to land on
       # the same number, or `make start` waits for /health at a port nothing is
       # bound to. The pipeline yields an empty string rather than a non-zero

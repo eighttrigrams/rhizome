@@ -90,7 +90,7 @@ elif lsof -nP -iTCP:"$DB_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
   exit 1
 else
   echo "Starting db-server on :$DB_PORT..."
-  clj -M:dev -m db-server &
+  clj -M:dev -m et.rz.hub.main &
   # Structured like .dev-server.lock, and for its reason: this file lives in
   # the repo, which is bind-mounted, so a pid written inside a container is
   # visible on the host where it means a different process entirely. stop.sh
@@ -128,4 +128,4 @@ echo "Starting app server on :$PORT (db-server: http://127.0.0.1:$DB_PORT)..."
 # Don't `exec` -- that replaces the bash process so the EXIT trap never
 # fires. Run as a foreground subprocess instead; bash regains control on
 # JVM exit and the trap runs.
-clj -M:dev -m server || true
+clj -M:dev -m et.rz.server.main || true

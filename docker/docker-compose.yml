@@ -24,7 +24,7 @@ x-common-env: &common-env
   # :vec-path #or [#env VEC_PATH "./.sqlite-vec/vec0"], and the Dockerfile
   # sets VEC_PATH=/usr/local/lib/sqlite-vec/vec0 so the in-container path
   # wins automatically. Nothing to wire here.
-  # The server binds 0.0.0.0 automatically when :dev? true (see server.clj),
+  # The server binds 0.0.0.0 automatically when :dev? true (see et/rz/server/main.clj),
   # so no RHIZOME_BIND_ALL is needed in the container either.
   PORT: "${PORT}"
   SHADOW_PORT: "${SHADOW_PORT}"

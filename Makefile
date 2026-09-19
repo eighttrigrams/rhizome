@@ -112,7 +112,7 @@ start:
 # the lock, which is the case where a db-server is already running for you.
 start-db:
 	@./scripts/detect-ports.sh check DB_PORT || exit 0; \
-	DB_PORT=$(DB_PORT) clj -M:dev -m db-server
+	DB_PORT=$(DB_PORT) clj -M:dev -m et.rz.hub.main
 
 stop:
 	@./scripts/stop.sh
