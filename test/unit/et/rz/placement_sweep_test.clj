@@ -7,7 +7,7 @@
       so a `/ui` command added to `dispatch.clj` cannot default into a half in
       silence. That is the whole point of classifying both halves explicitly
       instead of deriving the hub side (see `placement/hub-commands`);
-   2. that its route table names **the routes `server.clj` actually mounts** --
+   2. that its route table names **the routes `et/rz/server/main.clj` actually mounts** --
       so a route added, renamed or dropped there cannot leave the table stale.
 
    Both are checked by reading the source forms of those two namespaces off the
@@ -83,7 +83,7 @@
   #{"rest-routes" "rest-surface"})
 
 (defn- mounted-routes
-  "The route paths mounted at the top level of `server.clj`'s `routes`.
+  "The route paths mounted at the top level of `et/rz/server/main.clj`'s `routes`.
 
    Walks the form, collecting the path literal of every compojure verb and of
    every *nested* `context` -- without descending into a nested context, since
@@ -113,20 +113,20 @@
     :else nil))
 
 (def ^:private server-routes
-  (let [form (find-form "server.clj" #(and (#{'defn 'defn-} (first %))
+  (let [form (find-form "et/rz/server/main.clj" #(and (#{'defn 'defn-} (first %))
                                            (= 'routes (second %))))]
-    (assert form "no (defn- routes ...) form in server.clj")
+    (assert form "no (defn- routes ...) form in et/rz/server/main.clj")
     (set (mounted-routes (first (drop 3 form)) true))))
 
 (deftest the-route-table-matches-the-mounted-routes-test
-  (testing "placement/route-placement covers server.clj's routes exactly"
+  (testing "placement/route-placement covers et/rz/server/main.clj's routes exactly"
     (is (contains? server-routes "/api")
-        (str "sanity: nothing in server.clj's routes was recognised as mounting "
+        (str "sanity: nothing in et/rz/server/main.clj's routes was recognised as mounting "
              "/api. If the function that does was renamed, api-mounts needs the "
              "new name -- silently losing /api here would make the rest of this "
              "test pass for the wrong reason."))
     (is (= server-routes (set (keys placement/route-placement)))
-        (str "server.clj's routes and placement/route-placement have drifted. "
+        (str "et/rz/server/main.clj's routes and placement/route-placement have drifted. "
              "A new route needs a half: :local (this machine answers it), "
              ":hub (proxied whole) or :split (dispatched per call)."))))
 
@@ -156,7 +156,7 @@
 
 (deftest the-image-middleware-is-still-there-test
   (testing "/imgs/* is middleware, not a route, so the table cannot see it"
-    (let [app-form (find-form "server.clj" #(and (#{'defn 'defn-} (first %))
+    (let [app-form (find-form "et/rz/server/main.clj" #(and (#{'defn 'defn-} (first %))
                                                  (= 'app (second %))))
           syms     (set (map str (filter symbol? (tree-seq coll? seq app-form))))]
       (is (contains? syms "wrap-imgs")
