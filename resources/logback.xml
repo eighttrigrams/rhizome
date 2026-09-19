@@ -31,7 +31,7 @@
       <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level %logger{36} - %msg - MDC{ %mdc }%n</pattern>
     </encoder>
   </appender>
-  <logger name="rest-api" level="info">
+  <logger name="et.rz.hub.rest-api" level="info">
     <appender-ref ref="REST-API" />
   </logger>
   <root level="info">
