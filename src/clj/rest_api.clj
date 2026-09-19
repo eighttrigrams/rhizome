@@ -23,8 +23,7 @@
   ([] (rest-routes #(:db config/config)))
   ([db-fn]
   (mw/wrap-logging
-   (mw/wrap-refuse-writes
-    (mw/wrap-require-reason
+   (mw/wrap-require-reason
      (context "/api" []
            (GET "/describe" [] (queries/describe))
            (GET "/status" [] (queries/status))
@@ -71,4 +70,4 @@
                 (mutations/deletion-preview-related-items (db-fn) id))
            (POST "/items/:id/related/delete" [id]
                  (mutations/delete-related-items (db-fn) id))
-           (PUT "/relations" req (mutations/upsert-relation (db-fn) req))))))))
+           (PUT "/relations" req (mutations/upsert-relation (db-fn) req)))))))

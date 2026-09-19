@@ -7,7 +7,6 @@
             [et.vp.ds :as datastore]
             [et.vp.ds.search :as search]
             [provenance :as provenance]
-            [replica :as replica]
             [semsearch.query :as semsearch]
             [rest-api.util :refer [json-response item->api parse-int-opt parse-ids-csv]]))
 
@@ -495,19 +494,23 @@
       (json-response 500 {:error (.getMessage e)}))))
 
 (defn status
-  "GET /api/status — this instance's role: {\"read-only-replica\": true|false}.
-  True when it booted as a read-only replica (prod mode, no primary.nosync
-  marker in its start directory): every mutating request is refused with 403 and
-  its db is open read-only. False when writes are possible at all (recording
-  mode still gates them). Decided once at startup, so it cannot change while the
-  process runs."
+  "GET /api/status — {\"read-only-replica\": false}, always.
+
+  It used to be a real question. An instance that booted without its
+  primary.nosync marker in prod mode was a read-only replica: it opened its
+  database read-only and refused every mutating request with 403. Step 4 of the
+  architecture rework retired replicas -- one hub, one mode, and the marker
+  elects which machine runs the hub rather than demoting the ones that do not.
+
+  The field is kept and kept false so that a caller written against the old
+  answer goes on working, rather than reading nil from a missing key and having
+  to guess what that meant. Removing it is an API change and belongs in one."
   []
-  (json-response {:read-only-replica (replica/read-only?)}))
+  (json-response {:read-only-replica false}))
 
 (def ^:private global-conventions
   ["Every mutation (POST/PUT/PATCH/DELETE) MUST include a non-blank \"reason\" field in its JSON body explaining why the change is being made. Requests without one are rejected with 400. The reason is recorded in server logs and is not repeated in individual endpoint docstrings."
    "Mutations are gated by recording mode: while OFF they are logged as intent and dropped (a stub response is returned). Toggle with POST /api/recording-mode/toggle, or in-app with Option+Shift+W."
-   "A read-only replica refuses writes: an instance that booted without its primary.nosync marker (prod mode) answers every mutating request -- recording-mode toggle and embeddings backfill included -- with 403 {\"read-only-replica\": true} and writes nothing; reads are unaffected. GET /api/status reports the role, and the role is fixed for the lifetime of the process."
    "A relation may additionally be a part-of edge (PUT /relations with \"is-part-of\": the target item is the whole, the source item one of its parts), ordered among its siblings by \"part-of-sort-idx\". That is a plain integer, ascending, and any integer is accepted. -1 is the one reserved value: it is the default, it means the part has no place yet, and it sorts AFTER every sibling that carries an index rather than ahead of 0. Every other negative is an ordinary index and does sort ahead of 0, so -2 puts a part in front of everything -- that is a way of saying \"first\" without renumbering the siblings, not a mistake. The index belongs to the edge and not to the item, so a part that sits under several wholes can take a different position under each; it is independent of every other sort index in the system."
    "The part-of edges form a directed acyclic graph, not a tree: a node may be part of several wholes, and nothing should assume a unique parent or a unique path to a root. A cycle is not allowed. Any write that would close one is refused with 409 and the response names the path that would close it, both in \"error\" and as ids in \"part-of-cycle\". Plain relations are not constrained this way."
    "The part-of layer is readable, and should be read before it is written to: part_of=true on GET /items/:id/related lists the parts of that whole in sibling order, each carrying its own \"part-of-sort-idx\", so a caller can see whether something is already filed and which index is free. From the other end, every item carries a \"part-of\" map of {whole-id: index} for the wholes it is a part of, alongside \"contexts\"."

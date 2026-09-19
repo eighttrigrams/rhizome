@@ -1,21 +1,14 @@
 (ns config-test
-  "The primary/replica role decision. Pure function plus the filesystem lookup
-   feeding it, so both halves are testable without a prod-mode process."
-  (:require [clojure.test :refer [deftest is testing]]
-            [config :as config]
-)
-  (:import [java.io File]))
+  "The marker lookup, and what the app-server is handed as `:db`.
 
-(deftest read-only-replica-decision-test
-  (testing "prod mode without the marker is the only read-only-replica case"
-    (is (true? (config/read-only-replica? {:dev? false} false))
-        "prod + no marker -> read-only replica")
-    (is (false? (config/read-only-replica? {:dev? false} true))
-        "prod + marker -> primary, writes enabled")
-    (is (false? (config/read-only-replica? {:dev? true} false))
-        "dev needs no marker")
-    (is (false? (config/read-only-replica? {:dev? true} true))
-        "dev is unaffected by a marker being there")))
+   The rule that read the marker -- prod mode without it meant a read-only
+   replica -- retired in step 4 of the architecture rework, along with replicas
+   themselves. The marker did not: it elects which machine runs the hub now, and
+   `db-server-config-test` is where that meaning is pinned. What is left here is
+   the filesystem lookup, which is unchanged."
+  (:require [clojure.test :refer [deftest is testing]]
+            [config :as config])
+  (:import [java.io File]))
 
 (deftest primary-marker-present-test
   (testing "the marker is a plain file lookup in the start directory"
@@ -25,11 +18,9 @@
         (finally (.delete f)))
       (is (false? (config/primary-marker-present? (.getPath f)))))))
 
-(deftest this-process-booted-as-primary-test
-  (testing "the test config (dev mode, no marker) carries the decision as :read-only-replica?"
-    (is (false? (:read-only-replica? config/config))))
-  (testing "the marker name is the one the owner's sync excludes"
-    (is (= "primary.nosync" config/primary-marker))))
+(deftest the-marker-name-is-the-one-the-sync-excludes-test
+  (is (= "primary.nosync" config/primary-marker)
+      "the .nosync suffix is what keeps it off every other machine"))
 
 ;; --- what the app-server is handed as `:db`, since the split ----------------
 ;; The role tests above are the human's and untouched; these are step 4's, and

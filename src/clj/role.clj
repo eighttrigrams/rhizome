@@ -1,61 +1,48 @@
 (ns role
-  "Primary or read-only replica, decided from the directory a process was
-   started in.
+  "Which machine runs the hub, decided from the directory a process was started
+   in.
 
-   **Two processes ask this now, and they have to reach the same verdict.**
-   The app-server's graceful refusals sit in front of every write; the
-   db-server opens the database read-only, which is what makes the ban
-   structural. Both read the same marker in the same directory, independently
-   -- so the marker's name and the rule that reads it live here, once, rather
-   than in each of them.
+   The owner syncs the rhizome directory between machines, and the sync excludes
+   files ending in `.nosync`. A marker named `primary.nosync` next to config.edn
+   therefore exists on **exactly one machine**, and that machine is the one that
+   holds the database.
 
-   It is deliberately tiny and requires nothing but `clojure.java.io`. That is
-   what lets the db-server use it: `config` cannot be required from there,
-   because loading `config` builds the *app's* configuration -- folders,
-   logging and all -- out of a file that, in the separate-files arrangement,
-   holds nothing but the `:db-server` section.
+   ## The marker elects; it used to demote
 
-   `config` re-exports all three names, so `config/primary-marker` and
-   `config/read-only-replica?` go on meaning what they always did."
+   Until step 4 of the architecture rework this answered a different question:
+   *may this instance write*. Present, and the database opened writable; absent,
+   and prod mode meant a read-only replica -- a synced copy that refused every
+   write, in front and at the driver both. That is why the app-server and the
+   db-server each read it independently, and why they had to be checked against
+   each other at boot.
+
+   There are no replicas now: one hub, and a `server` on every machine that
+   forwards to it. So the marker was free, and it answers the question the
+   deployment actually has -- **which machine runs the hub**. It is read in one
+   place, `db-server/check-elected!`, which refuses to boot a hub on a machine
+   that has no marker.
+
+   It stays deliberately tiny and requires nothing but `clojure.java.io`. That
+   is what lets the db-server use it: `config` cannot be required from there,
+   because loading `config` builds the *app's* configuration -- folders, logging
+   and all -- out of a file that, in the separate-files arrangement, holds
+   nothing but the `:db-server` section.
+
+   `config` re-exports both names."
   (:require [clojure.java.io :as io]))
 
-;; --- primary vs replica -----------------------------------------------------
-;; The owner syncs the rhizome directory between machines, and the sync
-;; excludes files ending in `.nosync`. A marker named `primary.nosync` in the
-;; directory the app starts from (sibling to config.edn) therefore exists on
-;; exactly one machine -- the primary. Every other, synced copy is a replica
-;; and must never write to the db.
 (def primary-marker
-  "File name of the primary marker, looked up in the start directory."
+  "File name of the marker, looked up in the start directory."
   "primary.nosync")
 
 (defn primary-marker-present?
-  "Is the primary marker in the directory the app was started from? The path is
-   relative (like config-path), so it resolves against the process's working
-   directory."
+  "Is the marker in the directory the process was started from? The path is
+   relative (like config-path), so it resolves against the working directory.
+
+   Read once, at boot, and then held: a sync that adds or drops the marker
+   underneath a running process does not change what that process is. Moving
+   the hub to another machine means stopping the hub on the old one, moving the
+   database file, placing the marker on the new one and starting it there --
+   see the README's run section."
   ([] (primary-marker-present? (str "./" primary-marker)))
   ([path] (.exists (io/file path))))
-
-(defn read-only-replica?
-  "Must this instance run as a read-only replica? True in prod mode when the
-   primary marker is absent.
-
-   Evaluated exactly ONCE per process -- in `config/ds`, which `config` calls at
-   namespace load, and in `db-server`'s `-main` -- and then held for the process
-   lifetime: an instance's role does not flip mid-run. Nothing re-reads the
-   filesystem afterwards, so a sync that adds or drops the marker underneath a
-   running app cannot silently change what that process may do. Promoting a
-   replica to primary means placing `primary.nosync` next to config.edn and
-   RESTARTING BOTH PROCESSES; a primary likewise stays one until it is
-   restarted without the marker.
-
-   Dev mode (including :test? / :e2e?, which force :dev? true) is never a
-   replica: no marker needed, no guards, no banner.
-
-   `c` is the config map. The app hands over its own, fully resolved; the
-   db-server hands over what it read from `config.edn`, where `:dev?` is the
-   only key outside its own section it reads at all -- because the rule needs
-   it, and because a mode both processes are in is not either one's private
-   configuration."
-  [c marker-present?]
-  (and (not (:dev? c)) (not marker-present?)))

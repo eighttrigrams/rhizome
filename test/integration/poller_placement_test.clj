@@ -54,20 +54,20 @@
 
 (def ^:private worlds
   {"prod, a writable hub"
-   {:config-overrides {:hub-url a-hub :e2e? false :read-only-replica? false}
+   {:config-overrides {:hub-url a-hub :e2e? false}
     :hub              {:read-only? false}}
 
    "one process, no hub"
-   {:config-overrides {:hub-url nil :e2e? false :read-only-replica? false}
+   {:config-overrides {:hub-url nil :e2e? false}
     :hub              nil}
 
    "e2e"
-   {:config-overrides {:hub-url a-hub :e2e? true :read-only-replica? false}
+   {:config-overrides {:hub-url a-hub :e2e? true}
     :hub              {:read-only? false}
     :e2e?             true}
 
    "a read-only hub"
-   {:config-overrides {:hub-url a-hub :e2e? false :read-only-replica? false}
+   {:config-overrides {:hub-url a-hub :e2e? false}
     :hub              {:read-only? true}}})
 
 (deftest never-two-schedulers-test

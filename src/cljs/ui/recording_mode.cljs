@@ -6,14 +6,8 @@
     (-> resp
         (.json)
         (.then (fn [^js data]
-                 (let [{:keys [recording read-only-replica error]}
-                         (js->clj data :keywordize-keys true)]
-                   ;; Toggling the gate is itself a write, so a read-only replica
-                   ;; refuses it -- report that instead of leaving the keypress
-                   ;; looking like a no-op.
-                   (if read-only-replica
-                     (js/window.alert error)
-                     (swap! *state assoc :recording-mode? (boolean recording)))))))))
+                 (let [{:keys [recording]} (js->clj data :keywordize-keys true)]
+                   (swap! *state assoc :recording-mode? (boolean recording))))))))
 
 (defn toggle!
   [*state]

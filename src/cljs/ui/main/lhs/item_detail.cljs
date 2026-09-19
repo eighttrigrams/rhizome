@@ -7,7 +7,6 @@
             [ui.main.diff :as diff]
             [ui.markdown :as markdown]
             [ui.qr-overlay :as qr-overlay]
-            [ui.replica :as replica]
             [ui.youtube :as youtube]
             [reagent.core :as r]))
 
@@ -146,15 +145,8 @@
                     :img (custom-image-component *state))}]]])
 
 (defn- upload-error-handler
-  "A read-only replica refuses /upload, and there a refusal is normal operation
-   rather than an anomaly: reporting it only to the console would leave the drop
-   looking like it worked. Alerting is how a refused write is already reported in
-   this UI (see ui.recording-mode, ui.replica); other failures keep going to the
-   console alone, as before."
   [error]
-  (println "Error:" error)
-  (when-let [msg (replica/refused-write-message (:response error))]
-    (js/window.alert msg)))
+  (println "Error:" error))
 
 (defn send-file-to-backend
   [file id mode]

@@ -27,10 +27,8 @@
 
 (defn- app-for
   "The /ui app, serving `db` as the dispatcher's server-args. Parameterised
-   because a read-only replica's datasource is a different one (see
-   api.replica-query-sweep-test) -- and because `call-on!` exists for callers
-   that have a handle of their own, which the facade carries whichever kind it
-   is."
+   because `call-on!` exists for callers that have a handle of their own -- a
+   datasource a test built for itself, most often a read-only one."
   [db]
   (-> (fn [req]
         (response/response

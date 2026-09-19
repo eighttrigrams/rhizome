@@ -6,7 +6,6 @@
             [ui.modals :as modals]
             [ui.modals.actions :as modal-actions]
             [ui.recording-mode :as recording-mode]
-            [ui.replica :as replica]
             [ui.danger-mode :as danger-mode]
             [ui.hierarchy-mode :as hierarchy-mode]
             [ui.main.rhs.modifiers :as modifiers]))
@@ -58,10 +57,6 @@
     (r/create-class
       {:component-did-mount (fn []
                               (re-focus)
-                              ;; Learn once whether this instance is a read-only
-                              ;; replica, so the banner can stand for as long as
-                              ;; the process runs.
-                              (replica/load!)
                               ;; A blocking native dialog (window.confirm on
                               ;; delete/unlink) swallows the Alt keyup, which
                               ;; used to leave *alt-pressed? stuck true. Resetting
@@ -74,7 +69,6 @@
                  ;; hangs the strip's height off it and takes the same height
                  ;; off everything that is sized against the viewport.
                  {:class (when (:hierarchy-mode? @*state) "hierarchy-mode")}
-                 [replica/banner]
                  [recording-mode/indicator *state]
                  [danger-mode/indicator *state]
                  [danger-mode/confirm-modal *state]

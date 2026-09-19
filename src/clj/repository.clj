@@ -6,7 +6,6 @@
             [et.vp.ds.part-of :as part-of]
             [cambium.core :as log]
             [provenance :as provenance]
-            [replica :as replica]
             [repository.insertion :as insertion]
             [repository.deletion :as deletion]
             [semsearch.query :as semsearch]))
@@ -155,13 +154,13 @@
                      "\""))
       (log/info (str "Fetched " (count descriptions) " description versions"))
       ;; Selecting something is a read for the user, but it touches the row's
-      ;; ordering timestamps. On a read-only replica that touch is skipped so
-      ;; navigation keeps working -- it is the one write on a query path, which
-      ;; is why fetch-context is classified as a query in dispatch.
-      (when-not (replica/read-only?)
-        (if fetch-as-item?
-          (datastore/reprioritize-item db arg)
-          (datastore/reprioritize-context db arg)))
+      ;; ordering timestamps. It used to be skipped on a read-only replica, so
+      ;; that opening a context kept working where every write failed at the
+      ;; driver; there are no replicas since step 4, and the hub that answers
+      ;; this always may write.
+      (if fetch-as-item?
+        (datastore/reprioritize-item db arg)
+        (datastore/reprioritize-context db arg))
       (merge opts
              (items-under db selected-item old-state)
              {:selected-item selected-item

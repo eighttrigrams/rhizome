@@ -1,9 +1,6 @@
 (ns dispatch
   (:require [net.eighttrigrams.defn-over-http.core :refer [defdispatch]]
             [cambium.core :as log]
-            [cognitect.transit :as transit]
-            [config :as config]
-            [replica :as replica]
             [repository :refer
              [list-resources insert-item insert-context change-secondary-contexts-selection
               change-secondary-contexts-unassigned-selected change-secondary-contexts-inverted
@@ -66,94 +63,15 @@
              add-atom-poll-feed
              delete-atom-poll-feed)
 
-;; --- read-only replica guard ------------------------------------------------
+;; The `/ui` entry point. `handler*` is what `defdispatch` built above; this
+;; name is what `server` and the hub mount.
+;;
+;; It used to be wrapped: a read-only replica refused every write command here,
+;; in band, because the SPA carries queries and mutations through one POST and
+;; could not be refused by HTTP method without breaking reading. There are no
+;; replicas since step 4 of the architecture rework -- one hub, one mode -- so
+;; the classification, the refusal envelope and the per-command guard went with
+;; them. What routes a command now is `placement`, and it asks a different
+;; question: which machine, not whether.
 
-(def ^:private read-only-commands
-  "The commands above that cannot write the db. Everything else counts as a
-   write, so a command added to the dispatch list without being classified here
-   is refused on a replica rather than let through -- the guard fails closed.
-
-   Three entries need a word:
-   - `list-resources` is both: a search on its own, but one of its :cmd branches
-     saves a description (see writing-list-resources-cmds).
-   - `fetch-context` is a read that touches the row's ordering timestamps; on a
-     replica the touch is skipped (see repository/fetch-context) so that opening
-     a context keeps working.
-
-   (A third entry used to be here: `discard-obsidian-changes`, which only
-   deleted a temp file. Obsidian support was removed on 2026-09-18 -- see
-   `opener`.)"
-  #{"list-resources"
-    "fetch-aggregated-contexts"
-    "fetch-context"
-    "deselect-context"
-    "select-last-context"
-    "fetch-item-description"
-    "fetch-item-provenance"
-    "fetch-relation-description"
-    "fetch-relation-history"
-    "fetch-relation-provenance"
-    "vector-search-related-items"
-    "vector-threshold-search-related-items"
-    "list-youtube-poll-channels"
-    "list-atom-poll-feeds"})
-
-(def ^:private writing-list-resources-cmds
-  "The :cmd values that make a list-resources call a write."
-  #{:update-context-description})
-
-(defn- read-args
-  "Decode the transit-encoded args. Only list-resources needs this to be
-   classified; nil (unparseable args) makes the classification fall back to
-   treating the call as a write."
-  [args]
-  (try (-> (java.io.ByteArrayInputStream. (.getBytes ^String args "UTF-8"))
-           (transit/reader :json)
-           transit/read)
-       (catch Exception _ nil)))
-
-(defn- write-command?
-  [fn-name args]
-  (cond
-    (not (contains? read-only-commands fn-name)) true
-    (= "list-resources" fn-name) (let [decoded (read-args args)]
-                                   (or (nil? decoded)
-                                       (boolean (some-> decoded
-                                                        first
-                                                        :cmd
-                                                        writing-list-resources-cmds))))
-    :else false))
-
-(defn- refusal
-  "A refusal in the envelope the SPA already reads, carrying :read-only-refused
-   for the UI to surface (see ui.replica). Answering in-band keeps the response
-   a normal one: the list the user is looking at stays on screen.
-
-   It clears :cmd and :arg exactly as a successful call does (see
-   repository/list-resources, which merges {:cmd nil :arg nil} over every
-   result). The SPA merges the response over the state it sent and reset!s its
-   atom from that, so without the clear a refused description save would leave
-   :cmd :update-context-description latched in state -- and every later feed or
-   search request would re-send that write cmd and be refused in turn."
-  []
-  (let [os (java.io.ByteArrayOutputStream. 512)]
-    (transit/write (transit/writer os :json)
-                   {:read-only-refused replica/message :cmd nil :arg nil})
-    {:return (.toString os "UTF-8") :thrown nil}))
-
-(defn handler
-  "The /ui entry point. The SPA carries queries AND mutations through this one
-   POST, so a read-only replica cannot refuse by HTTP method without breaking
-   reading: it refuses per command instead, here at the dispatch level. Query
-   commands pass through untouched -- see read-only-commands for the
-   classification, and `replica` for the rest of the guards."
-  [{{fn-name :fn args :args} :body :as req}]
-  (if (and (replica/read-only?) (write-command? fn-name args))
-    ;; INFO, not WARN like the /api refusal: on a replica plain browsing keys are
-    ;; write commands (s -> cycle-search-mode, the secondary-context badges ->
-    ;; change-secondary-contexts-*), so a refusal here is ordinary operation
-    ;; rather than the anomaly an /api write attempt is.
-    (do (log/info {:event "replica-refusal" :uri "/ui" :fn fn-name}
-                  (str "read-only replica: refused /ui command " fn-name))
-        (refusal))
-    (handler* req)))
+(def handler handler*)

@@ -12,7 +12,6 @@
             [db :as db]
             [repository :as r]
             [poll :as poll]
-            [replica :as replica]
             [et.vp.ds :as datastore]
             opener
             dispatch
@@ -95,30 +94,25 @@
         (h req)))))
 
 (defn upload-handler
-  "POST /upload — store a dropped preview image. A write, so a read-only replica
-  refuses it gracefully instead of letting the read-only datasource throw.
+  "POST /upload — store a dropped preview image.
 
   This is the **local** branch, used when this process holds the database
   itself. With a hub, `upload-surface` forwards the whole multipart request
   there instead: see its docstring for why the bytes travel rather than the
   file staying here."
   [request]
-  (if (replica/read-only?)
-    (do (log/warn {:event "replica-refusal" :uri "/upload"}
-                  "read-only replica: refused /upload")
-        (replica/refusal-response))
-    (let [uploaded-file (get (-> request
-                                 :multipart-params)
-                             "file")
-          id (get (-> request
-                      :multipart-params)
-                  "id")
-          alternative-behaviour? (get (-> request
-                                          :multipart-params)
-                                      "alternative-behaviour")]
-      (upload/upload-preview-file (:db config/config) uploaded-file id alternative-behaviour?)
-      ;; Process the uploaded file here. For example, save it to a directory.
-      (response/response "File uploaded successfully!"))))
+  (let [uploaded-file (get (-> request
+                               :multipart-params)
+                           "file")
+        id (get (-> request
+                    :multipart-params)
+                "id")
+        alternative-behaviour? (get (-> request
+                                        :multipart-params)
+                                    "alternative-behaviour")]
+    (upload/upload-preview-file (:db config/config) uploaded-file id alternative-behaviour?)
+    ;; Process the uploaded file here. For example, save it to a directory.
+    (response/response "File uploaded successfully!")))
 
 (defn- upload-surface
   "POST /upload, forwarded whole to the hub when there is one.
@@ -317,31 +311,13 @@
             (log/error msg)
             (throw (ex-info msg {:folder dir}))))))))
 
-(defn- log-instance-role!
-  "One unmissable startup line naming the role this process booted with, and why.
-  Prod only -- dev mode has no primary/replica distinction (see
-  config/read-only-replica?)."
-  []
-  (when-not (:dev? config/config)
-    (let [dir (System/getProperty "user.dir")]
-      (if (replica/read-only?)
-        (log/warn {:instance-role "read-only-replica"}
-                  (str "INSTANCE ROLE: READ-ONLY REPLICA -- prod mode and no "
-                       config/primary-marker " in " dir
-                       ": db opened read-only, every write refused, pollers not scheduled"))
-        (log/info {:instance-role "primary"}
-                  (str "INSTANCE ROLE: PRIMARY -- " config/primary-marker
-                       " present in " dir ": writes enabled"))))))
-
 (defn poll-scheduling-enabled?
   "The youtube/atom pollers write (imported items plus the seen tables), so they
-  are only scheduled where writing is possible: never under e2e, and never on a
-  read-only replica -- there the job must not exist at all rather than fail on
-  every tick."
+  are only scheduled where writing is possible: never under e2e, and never when
+  there is a hub to do it."
   []
   (and (not (:e2e? config/config))
-       (not (replica/read-only?))
-       ;; And not when there is a hub: it runs them, over the database it owns
+       ;; Not when there is a hub: it runs them, over the database it owns
        ;; (`db-server/poll-scheduling-enabled?`). Two machines each running a
        ;; `server` would otherwise read every feed twice and race to insert the
        ;; same items. This is the half of the pair that says "not me"; they are
@@ -354,141 +330,50 @@
     (poll/start-scheduler! (:db config/config))))
 
 (defn- prepare-for-writing!
-  "The startup steps that only make sense where this instance may write, skipped
-  wholesale on a read-only replica:
-  - the seed write. A replica's db is owned by the primary and arrives through
-    the sync already seeded; its datasource would refuse the write anyway.
-  - `ensure-convert!` gates startup on ImageMagick, which only preview
-    downscaling needs. A replica can never convert anything -- /upload is
-    refused and the pollers are not scheduled -- so gating it there would refuse
-    to boot over a capability it cannot use.
+  "What is left of the startup steps that were about being able to write.
 
-  **Neither the schema nor the seed is applied here any more.** The hub owns
-  the file: it applies the schema as it opens it, and since step 4 it seeds it
-  too, from its own `-main`. What is left here is the one thing that is about
-  *this machine* rather than about the database -- ImageMagick, which only
-  preview downscaling needs and which has to exist where the downscaling
-  happens."
+  The schema and the seed are the hub's -- it owns the file, applies the schema
+  as it opens it, and seeds it from its own `-main`. What is left here is the
+  one thing about *this machine* rather than about the database: ImageMagick,
+  which preview downscaling needs and which has to exist where the downscaling
+  happens.
+
+  So it runs only when this process will do that downscaling itself. With a hub,
+  /upload is forwarded and `convert` is needed there instead -- the hub gates on
+  it in its own -main. Complementary, the way the poller predicates are."
   []
-  (when (and (not (replica/read-only?))
-             ;; Only when this process will do the downscaling itself. With a
-             ;; hub, /upload is forwarded and ImageMagick is needed there, not
-             ;; here -- the hub gates on it in its own -main. Complementary, the
-             ;; way the poller predicates are.
-             (nil? (hub-proxy/hub-url)))
+  (when (nil? (hub-proxy/hub-url))
     (upload/ensure-convert!)))
-
-(defn- app-role-reason
-  "What this process concluded about its own role, and *why*, in the words the
-   reader needs to check it.
-
-   Three cases, not two. An app-server is a primary either because it is in dev
-   mode -- which is never a replica, marker or no marker -- or because it is in
-   prod mode WITH the marker; only prod-without-marker is the replica. Saying
-   \"prod mode and <marker> in <dir>\" for every primary was false in exactly the
-   scenario the refusal below exists for: a dev app-server in front of a
-   standalone db-server, where it denied the mode the reader is in and sent them
-   hunting a marker file that is not there.
-
-   `log-instance-role!` above has always had this right, and says why in one
-   line: dev mode has no primary/replica distinction."
-  []
-  (let [dir (System/getProperty "user.dir")]
-    (cond
-      (:dev? config/config)
-      (str "primary -- dev mode (:dev? true in " dir "/config.edn), which is never a "
-           "replica: no marker is consulted and none would change it")
-
-      (config/primary-marker-present?)
-      (str "primary -- prod mode and " config/primary-marker " in " dir)
-
-      :else
-      (str "read-only replica -- prod mode and no " config/primary-marker " in " dir))))
-
-(defn- check-db-server-role!
-  "**The two processes decide primary-vs-replica independently, so the startup
-  check is where they are made to agree.**
-
-  Same rule, `role`'s, and the same marker file -- but each reads it in ITS OWN
-  working directory, and only the marker is shared by construction. `:dev?` is
-  per-file, so a db-server started against a config.edn of its own (the
-  standalone `{:db-server {…}}` arrangement the plan allows, and the one the
-  later remote-machine step is built on) reads no `:dev?`, calls itself prod,
-  finds no marker beside itself, and opens the database READ-ONLY -- while this
-  process, reading the dev config.edn it was started with, believes it is a
-  primary and may write.
-
-  Nothing about that is visible until the first write: `SELECT 1` succeeds
-  perfectly well against a read-only database, `/api/status` reports
-  `read-only-replica: false`, and the failure arrives much later as a bare
-  SQLITE_READONLY with nothing to connect it to a marker file in another
-  directory. Which is precisely the drift `role` exists to prevent, and the
-  reason a shared *rule* is not the same thing as a shared *verdict*.
-
-  So the verdicts are compared, and any disagreement is a refusal -- in both
-  directions. A db-server that is writable under an app that refuses every write
-  is the milder half, but it is the same confusion and the same fix."
-  [url health]
-  (let [db-read-only?  (boolean (:read-only? health))
-        app-read-only? (replica/read-only?)]
-    (when-not (= db-read-only? app-read-only?)
-      (let [msg (str "Refusing to start: this app-server and its db-server disagree about "
-                     "whether this instance may write.\n"
-                     "  app-server: " (app-role-reason) "\n"
-                     "  db-server:  " (if db-read-only? "read-only" "writable")
-                     " -- it read its own config.edn and looked for "
-                     config/primary-marker " in the directory IT was started in ("
-                     url ")\n"
-                     (if (:dev? config/config)
-                       ;; The flagship case, and the one where naming the remedy
-                       ;; is worth more than restating the rule: a db-server
-                       ;; handed a config.edn of its own sees no `:dev?` in it,
-                       ;; concludes prod, finds no marker beside itself, and opens
-                       ;; the database read-only.
-                       (str "A db-server reading a config.edn of its own sees no :dev? in it, "
-                            "so it concludes prod, looks for " config/primary-marker
-                            " beside itself, does not find one, and opens the database "
-                            "read-only. Add :dev? true to that file, or start both processes "
-                            "from this directory so they read this config.edn.")
-                       (str "Both decide this from the same rule and the same marker file, but "
-                            "each in its own working directory. Start them from the same one, "
-                            "or give the db-server a config.edn that says what this one "
-                            "says.")))]
-        (log/error msg)
-        (throw (ex-info msg {:db-server/url        url
-                             :db-server/read-only? db-read-only?
-                             :app/read-only?       app-read-only?}))))
-    (log/info {:db-server url :read-only? db-read-only?}
-              (str "app-server: database reached over " url
-                   ", and both processes call this instance "
-                   (if db-read-only? "a read-only replica" "a primary")))))
 
 (defn- check-db-server!
   "One `/health` call, before anything else needs the hub, so that a hub that is
   not there says so in one line instead of surfacing as a connection refused in
-  the middle of the first request. Its answer is then handed to
-  `check-db-server-role!`, which is the other half and the less obvious one --
-  one call answering both questions, since `/health` reports the role too.
+  the middle of the first request.
 
   It used to be `SELECT 1` over the statement protocol. `/health` says the same
   thing -- something is listening and it has a database open -- without this
-  process needing to speak SQL to ask, which is step 4's whole direction.
+  process needing to speak SQL to ask.
 
-  It is not a health check with a retry loop: waiting for the db-server is
-  `scripts/start.sh`'s job, which polls `/health` before it starts this process
-  at all. This is the message for when that did not happen -- an app-server
-  started by hand, or pointed at the wrong port."
+  Its answer used to be handed to a role check as well: the two processes
+  compared their verdicts about whether this instance might write, because they
+  read the same marker in two different working directories and could disagree.
+  There is nothing to disagree about now -- a hub that boots is writable, and a
+  machine that was not elected does not boot one (`db-server/check-elected!`).
+
+  It is not a health check with a retry loop: waiting for the hub is the start
+  procedure's job, which polls `/health` before it starts this process at all.
+  This is the message for when that did not happen -- a server started by hand,
+  or pointed at the wrong port."
   []
   (when-let [url (hub-proxy/hub-url)]
-    (let [health (try (hub-proxy/health url)
-                      (catch Throwable t
-                        (let [msg (str "Refusing to start: no db-server answering at "
-                                       url " (" (.getMessage t) "). "
-                                       "Start it first -- 'make start' does, and "
-                                       "'make start-db' runs it alone.")]
-                          (log/error t msg)
-                          (throw (ex-info msg {:db-server/url url} t)))))]
-      (check-db-server-role! url health))))
+    (try (hub-proxy/health url)
+         (catch Throwable t
+           (let [msg (str "Refusing to start: no db-server answering at "
+                          url " (" (.getMessage t) "). "
+                          "Start it first -- 'make start' does, and "
+                          "'make start-db' runs it alone.")]
+             (log/error t msg)
+             (throw (ex-info msg {:db-server/url url} t)))))))
 
 (defn start-http-server!
   []
@@ -496,7 +381,6 @@
              (or (nil? (:private-addr config/config))
                  (not (string? (:private-addr config/config)))))
     (throw (Exception. "config invalid")))
-  (log-instance-role!)
   (check-db-server!)
   (prepare-for-writing!)
   ;; The file-type context gate moved to the hub with the seed it depends on

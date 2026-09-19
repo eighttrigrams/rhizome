@@ -1,7 +1,6 @@
 (ns ui.main.config
   (:require [clojure.string :as str]
             [reagent.core :as r]
-            [ui.replica :as replica]
             api))
 
 (defn- parse-min
@@ -15,13 +14,10 @@
   [*state p]
   (-> p
       (.then (fn [res]
-               ;; The poll lists are read here but written through the same
-               ;; commands, so a replica's refusal arrives on this path too.
-               (let [res (replica/refusal-notice! res)]
-                 (swap! *state (fn [state]
-                                 (merge state
-                                        (select-keys res
-                                                     [:youtube-poll-channels :atom-poll-feeds])))))))))
+               (swap! *state (fn [state]
+                               (merge state
+                                      (select-keys res
+                                                   [:youtube-poll-channels :atom-poll-feeds]))))))))
 
 (defn- load!
   [*state]

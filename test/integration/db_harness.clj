@@ -49,7 +49,7 @@
   "The `config/config` the REST handlers are given while they are under test.
 
    The one-argument arity carries whatever else a suite's handlers need in their
-   config: `:folders` for the image routes, the role flags for the replica ones.
-   A caller adds to the config rather than restating the handle."
+   config: `:folders` for the image routes, say. A caller adds to the config
+   rather than restating the handle."
   ([] (app-config nil))
   ([m] (merge {:db (:db config/config)} m)))

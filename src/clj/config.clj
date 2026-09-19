@@ -127,18 +127,17 @@
     (configure-logging! dir)
     (assoc-in c [:folders :logs] dir)))
 
-;; --- primary vs replica -----------------------------------------------------
-;; The marker, and the rule that reads it, moved to `role` when the db-server
-;; became a process of its own: it decides the same thing about the same
-;; directory and cannot require this namespace (loading `config` builds the
-;; app's whole configuration, folders and all, out of a file the db-server may
-;; not even share). One rule, two readers -- see `role`.
+;; --- which machine holds the database ---------------------------------------
+;; The marker lives in `role`, which the db-server can require and this
+;; namespace cannot be required from (loading `config` builds the app's whole
+;; configuration, folders and all, out of a file the db-server may not even
+;; share). Since step 4 it elects the hub rather than demoting replicas --
+;; see `role`, and `db-server/check-elected!`, which is the one reader.
 ;;
-;; The three names stay here, because `server`, `replica` and config_test have
-;; always called them this and none of them cares where the rule lives.
+;; Re-exported here because config_test and the scripts have always called
+;; them this.
 (def primary-marker role/primary-marker)
 (def primary-marker-present? role/primary-marker-present?)
-(def read-only-replica? role/read-only-replica?)
 
 ;; --- the database, which is not in this process any more --------------------
 ;; Two keys moved into the `:db-server` section when the db-server became its
@@ -217,16 +216,9 @@
 
    The hub's address is `:hub-url`, a separate key, because it is a separate
    fact: where the hub is, not what this process may query."
-  [c replica?]
+  [c]
   (when (:test? c)
-    ;; A replica's structural write ban -- the datasource opened in SQLite's
-    ;; read-only mode, so that even a code path which forgot to check cannot
-    ;; write -- is the db-server's to make now, and it makes it from the same
-    ;; marker (see `role`). Here `replica?` is always false, because :test?
-    ;; forces :dev?; it is passed anyway so that this handle is built from the
-    ;; decision rather than from an assumption about it. The graceful refusals
-    ;; in front of it (see the `replica` ns) are still this process's.
-    (connection/make-datasource {:dbname test-dbname :read-only? replica?})))
+    (connection/make-datasource {:dbname test-dbname :read-only? false})))
 
 (defn ds []
   (let [c (aero/read-config config-path)
@@ -237,11 +229,9 @@
         c (check-moved-keys c)
         c (apply-dev-folders c)
         c (check-folders c)
-        c (apply-logs-dir c)
-        replica? (read-only-replica? c (primary-marker-present?))]
+        c (apply-logs-dir c)]
     (-> c
-        (assoc :read-only-replica? replica?)
-        (assoc :db (db-handle c replica?))
+        (assoc :db (db-handle c))
         ;; Where the hub is. Nil in test mode, which is the one arrangement
         ;; with no hub to talk to -- `hub-proxy` reads exactly this to decide
         ;; whether to forward, so "no hub" and "answer it here" are one fact.

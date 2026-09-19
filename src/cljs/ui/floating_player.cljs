@@ -95,9 +95,8 @@
    an edge that moved while it sat there, and nothing has to listen for it.
 
    The top offsets carry --top-strip-height the way every other floating marker
-   in this app does (see ui.replica/banner): hierarchy mode takes a row off the
-   top of the viewport, and 0px the rest of the time leaves this plain
-   corner-padding."
+   in this app does: hierarchy mode takes a row off the top of the viewport, and
+   0px the rest of the time leaves this plain corner-padding."
   [corner]
   (let [pad (str corner-padding "px")
         from-bottom (str "calc(100vh - " (+ frame-height handle-height corner-padding) "px)")
