@@ -1,4 +1,4 @@
-(ns log-init
+(ns et.rz.log-init
   ;; logback.xml's rolling appenders read ${LOGS_DIR:-logs}, but only at the
   ;; moment logback first initialises -- which opens BOTH file appenders and so
   ;; creates the directory immediately. config's apply-logs-dir set the property

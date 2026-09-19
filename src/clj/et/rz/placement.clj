@@ -1,4 +1,4 @@
-(ns placement
+(ns et.rz.placement
   "**Machine placement**: which of the two halves a call belongs to.
 
    Nothing here runs yet -- this namespace is data plus one predicate, read by

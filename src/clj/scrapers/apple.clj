@@ -1,5 +1,5 @@
 (ns scrapers.apple
-  (:require utils
+  (:require et.rz.utils
             [hickory.core :as html]
             [clj-http.client :as http]
             scrapers.common))

@@ -1,7 +1,7 @@
 (ns upload
   (:require [clojure.java.io :as io]
             [cambium.core :as log]
-            [config :as config]
+            [et.rz.config :as config]
             [et.vp.ds :as datastore]
             [clojure.java.shell :refer [sh]]))
 

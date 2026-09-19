@@ -3,8 +3,8 @@
             [et.vp.ds :as datastore]
             [cambium.core :as log]
             [repository.insertion.common :as common]
-            utils
-            [utils.url :as url]
+            et.rz.utils
+            [et.rz.utils.url :as url]
             [scrapers.substack :as substack]
             upload))
 

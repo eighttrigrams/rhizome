@@ -4,7 +4,7 @@
             [clojure.set :as set]
             [et.vp.ds :as datastore]
             [et.vp.ds.search :as search]
-            [utils :refer [condx]]
+            [et.rz.utils :refer [condx]]
             [repository.insertion.common :as common]
             [repository.homefolder :as home]))
 

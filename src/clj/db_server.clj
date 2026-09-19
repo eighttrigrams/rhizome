@@ -29,7 +29,7 @@
    what lets a test boot as many of these as it likes on ephemeral ports -- so
    the file is read by `config-opts`, `seed-opts` and `-main`, and nowhere
    else."
-  (:require log-init ;; first: sets LOGS_DIR before any logging ns initialises logback
+  (:require et.rz.log-init ;; first: sets LOGS_DIR before any logging ns initialises logback
             [aero.core :as aero]
             [cambium.core :as log]
             [cheshire.core :as json]
@@ -41,13 +41,13 @@
             [dev-seed :as dev-seed]
             [repository.insertion.file :as file]
             [next.jdbc :as jdbc]
-            [placement :as placement]
+            [et.rz.placement :as placement]
             [poll :as poll]
             [rest-api :as rest-api]
             [ring.adapter.jetty :as jetty]
             [ring.middleware.multipart-params :refer [wrap-multipart-params]]
             [ring.middleware.params :refer [wrap-params]]
-            [role :as role]
+            [et.rz.role :as role]
             [upload :as upload]
             [ui-api :as ui-api])
   (:import [org.eclipse.jetty.server ServerConnector]))

@@ -7,7 +7,7 @@
    `db-server-config-test` is where that meaning is pinned. What is left here is
    the filesystem lookup, which is unchanged."
   (:require [clojure.test :refer [deftest is testing]]
-            [config :as config])
+            [et.rz.config :as config])
   (:import [java.io File]))
 
 (deftest primary-marker-present-test

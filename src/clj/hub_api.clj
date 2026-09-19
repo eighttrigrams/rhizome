@@ -24,7 +24,7 @@
    rather than two that have to agree."
   (:require [cheshire.core :as json]
             [clj-http.client :as http]
-            [config :as config]
+            [et.rz.config :as config]
             [hub-proxy :as hub-proxy]
             [rest-api :as rest-api]))
 

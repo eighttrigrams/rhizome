@@ -16,11 +16,11 @@
             [clojure.java.io :as io]
             [clojure.test :refer [deftest is testing]]
             [cognitect.transit :as transit]
-            [config :as config]
+            [et.rz.config :as config]
             [db-server]
             [next.jdbc :as jdbc]
             [next.jdbc.result-set]
-            [placement :as placement]
+            [et.rz.placement :as placement]
             [server]))
 
 (defn- temp-db-path []

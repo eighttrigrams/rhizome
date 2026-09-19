@@ -3,8 +3,8 @@
             [et.vp.ds :as datastore]
             [cambium.core :as log]
             [repository.insertion.common :as common]
-            utils
-            [utils.url :as url]
+            et.rz.utils
+            [et.rz.utils.url :as url]
             upload))
 
 (defn match? [title] (re-matches #"https://github.com\/.*" title))

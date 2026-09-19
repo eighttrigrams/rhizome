@@ -1,5 +1,5 @@
 (ns scrapers.substack-note
-  (:require utils
+  (:require et.rz.utils
             [clojure.string :as str]
             [hickory.select :as select]
             [hickory.core :as html]

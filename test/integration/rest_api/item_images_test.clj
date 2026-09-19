@@ -13,7 +13,7 @@
             [cheshire.core :as json]
             [ring.mock.request :as mock]
             [ring.middleware.params :refer [wrap-params]]
-            [config :as config]
+            [et.rz.config :as config]
             [rest-api :as rest-api]
             [et.vp.ds :as ds]
             [et.vp.ds.search-test :refer [reset-db with-time db]])

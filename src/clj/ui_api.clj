@@ -13,7 +13,7 @@
    somebody else's machine."
   (:require [compojure.core :refer [context POST]]
             [cambium.core :as log]
-            [config :as config]
+            [et.rz.config :as config]
             [dispatch :as dispatch]
             [ring.middleware.json :as json]
             [ring.util.response :as response]))

@@ -1,7 +1,7 @@
 (ns et.vp.ds.search-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [config :as config]
+   [et.rz.config :as config]
    [et.vp.ds :as ds]
    [et.vp.ds.search :as search]
    [et.vp.ds.helpers :as helpers]

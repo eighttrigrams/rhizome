@@ -6,7 +6,7 @@
             [next.jdbc :as jdbc]
             [ring.mock.request :as mock]
             [ring.middleware.params :refer [wrap-params]]
-            [config :as config]
+            [et.rz.config :as config]
             [rest-api :as rest-api]
             [rest-api.queries :as queries]
             [et.vp.ds.search :as search]

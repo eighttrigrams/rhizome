@@ -28,7 +28,7 @@
    stands both processes up for real, against two different databases, which is
    a sharper instrument than one database wearing two names ever was."
   (:require [clojure.string :as str]
-            [config :as config])
+            [et.rz.config :as config])
   (:import [org.sqlite SQLiteDataSource]))
 
 (defn dbname-of

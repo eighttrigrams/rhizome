@@ -4,7 +4,7 @@
             [et.vp.ds :as datastore]
             [repository.insertion.common :as common]
             scrapers.substack-note
-            utils
+            et.rz.utils
             upload))
 
 (defn- get-author-id

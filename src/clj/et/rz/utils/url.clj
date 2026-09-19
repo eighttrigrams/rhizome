@@ -1,4 +1,4 @@
-(ns utils.url
+(ns et.rz.utils.url
   (:require [clojure.string :as str]
             [ring.util.codec :refer [url-encode form-decode]]
             [clojure.java.io :as io]))

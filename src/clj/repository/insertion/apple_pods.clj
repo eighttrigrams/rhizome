@@ -2,7 +2,7 @@
   (:require [clojure.string :as str]
             [et.vp.ds :as datastore]
             [repository.insertion.common :as common]
-            utils
+            et.rz.utils
             scrapers.apple))
 
 (defn match?

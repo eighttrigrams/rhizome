@@ -1,4 +1,4 @@
-(ns role
+(ns et.rz.role
   "Which machine runs the hub, decided from the directory a process was started
    in.
 

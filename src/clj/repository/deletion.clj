@@ -4,7 +4,7 @@
             [honey.sql :as sql]
             [cheshire.core :as json]
             [cambium.core :as log]
-            [config :as config]
+            [et.rz.config :as config]
             [datastore.dialect :as dialect]
             [repository.homefolder :as home]
             [et.vp.ds :as datastore]

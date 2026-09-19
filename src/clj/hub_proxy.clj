@@ -25,7 +25,7 @@
             [clj-http.client :as http]
             [clj-http.conn-mgr :as conn-mgr]
             [clojure.string :as str]
-            [config :as config]))
+            [et.rz.config :as config]))
 
 (def ^:private conn-manager
   "Its own pool, deliberately not `db`'s: that one is sized for statement

@@ -2,7 +2,7 @@
   (:require [cambium.core :as log]
             [clojure.string :as str]
             [clojure.java.io :as io]
-            [config :as config]))
+            [et.rz.config :as config]))
 
 (defn- folder
   "Absolute path of the configured media folder `k` (e.g. :imports, :images)."

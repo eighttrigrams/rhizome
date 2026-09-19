@@ -4,7 +4,7 @@
    Tagged ^:vector -- without the extension there is nothing to fail to load."
   (:require [clojure.test :refer [deftest is]]
             [next.jdbc :as jdbc]
-            [config :as config]
+            [et.rz.config :as config]
             [datastore.schema :as schema]))
 
 (def ^:private thread-count 16)

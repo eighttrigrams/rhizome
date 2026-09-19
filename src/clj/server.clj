@@ -1,5 +1,5 @@
 (ns server
-  (:require log-init ;; first: sets LOGS_DIR before any logging ns initialises logback
+  (:require et.rz.log-init ;; first: sets LOGS_DIR before any logging ns initialises logback
             [ring.adapter.jetty :as j]
             upload
             [clojure.string :as str]
@@ -8,7 +8,7 @@
             [ring.util.response :as response]
             [ring.middleware.json :as json]
             [env :refer [wrap-env-defaults]]
-            [config :as config]
+            [et.rz.config :as config]
             [db :as db]
             [repository :as r]
             [poll :as poll]
@@ -19,7 +19,7 @@
             [ui-api :as ui-api]
             [hub-api :as hub-api]
             [hub-proxy :as hub-proxy]
-            [placement :as placement]
+            [et.rz.placement :as placement]
             [cheshire.core :as cheshire]
             [cambium.core :as log]
             [ring.middleware.resource :refer [wrap-resource]]

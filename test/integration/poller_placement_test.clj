@@ -18,7 +18,7 @@
      would simply go quiet, and quietly, which is the worst way for this to
      break."
   (:require [clojure.test :refer [deftest is testing]]
-            [config :as config]
+            [et.rz.config :as config]
             [db-server]
             [server]))
 

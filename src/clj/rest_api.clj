@@ -1,7 +1,7 @@
 (ns rest-api
   (:require [clojure.string :as str]
             [compojure.core :refer [context GET POST PUT]]
-            [config :as config]
+            [et.rz.config :as config]
             [rest-api.middleware :as mw]
             [rest-api.mutations :as mutations]
             [rest-api.queries :as queries]))

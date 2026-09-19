@@ -1,8 +1,8 @@
-(ns config
+(ns et.rz.config
   (:require [aero.core :as aero]
             [clojure.java.io :as io]
             [datastore.connection :as connection]
-            [role :as role])
+            [et.rz.role :as role])
   (:import [ch.qos.logback.classic LoggerContext]
            [ch.qos.logback.classic.joran JoranConfigurator]
            [org.slf4j LoggerFactory]))

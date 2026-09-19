@@ -22,7 +22,7 @@
   (:require [clojure.test :refer [deftest is testing]]
             [clojure.java.io :as io]
             [clojure.set :as set]
-            [placement :as placement]))
+            [et.rz.placement :as placement]))
 
 ;; --- reading source off the classpath ---------------------------------------
 

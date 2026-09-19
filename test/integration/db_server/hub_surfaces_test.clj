@@ -19,7 +19,7 @@
             [clojure.test :refer [deftest is testing]]
             [cognitect.transit :as transit]
             [db-server]
-            [placement :as placement])
+            [et.rz.placement :as placement])
   (:import [java.io ByteArrayOutputStream]))
 
 (defn- temp-db-path []

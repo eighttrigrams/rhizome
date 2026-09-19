@@ -9,7 +9,7 @@
    verdict about the same directory."
   (:require [clojure.test :refer [deftest is testing]]
             [db-server]
-            [role :as role])
+            [et.rz.role :as role])
   (:import [java.io File]))
 
 (defn- config-file

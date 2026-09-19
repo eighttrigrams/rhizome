@@ -2,7 +2,7 @@
   (:require [et.vp.ds :as datastore]
             [cambium.core :as log]
             [repository.insertion.common :as common]
-            [utils.url :as url]
+            [et.rz.utils.url :as url]
             [scrapers.substack :as substack]
             upload))
 
