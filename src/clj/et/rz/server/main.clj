@@ -372,7 +372,14 @@
   \"the hub is not up\". And the refusal costs nothing where it happens under a
   supervisor: a LaunchAgent with KeepAlive turns it into a wait loop that
   succeeds as soon as the tunnel comes back. See the README's \"Reaching the hub
-  from another machine\"."
+  from another machine\".
+
+  That last part is why `hub-proxy/health` has a ceiling of its own, shorter
+  than the one a forwarded request gets. A wait loop needs this process to
+  *exit*, and a half-dead tunnel accepts connections and answers nothing -- so
+  without a socket timeout this call would not return, launchd would have
+  nothing to restart, and the machine would sit there starting forever. The
+  wait loop is a property of `health-request-defaults`, not of the refusal."
   []
   (when-let [url (hub-proxy/hub-url)]
     (try (hub-proxy/health url)

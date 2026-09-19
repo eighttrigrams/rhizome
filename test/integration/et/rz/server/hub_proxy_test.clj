@@ -21,6 +21,8 @@
             [next.jdbc :as jdbc]
             [next.jdbc.result-set]
             [et.rz.placement :as placement]
+            [et.rz.server.hub-api :as hub-api]
+            [et.rz.server.hub-proxy :as hub-proxy]
             [et.rz.server.main :as server]))
 
 (defn- temp-db-path []
@@ -251,3 +253,122 @@
       (let [[status body] (GET* (server/app) "/api/contexts")]
         (is (= 502 status))
         (is (re-find #"could not be reached" (str (:error body))))))))
+
+;; ---------------------------------------------------------------------------
+;; A tunnel that is down, in both of its shapes
+;;
+;; The test above (`a-hub-that-is-not-there-answers-502-test`) points at a
+;; closed port, and a closed port is the easy half: the kernel answers
+;; connection-refused and clj-http fails in a millisecond whether or not
+;; anything has set a timeout. It is also the only half that happens over
+;; loopback, which is why it was the only half under test.
+;;
+;; The other half is what a half-dead `ssh -L` looks like from the client, and
+;; it is the shape the whole rework exists to run over: the socket **accepts**
+;; and then nothing ever comes back. No connection timeout can see that. Until
+;; a socket timeout was added, every call on this wire waited forever -- a
+;; browser navigation holding its jetty thread, `/img-by-id` holding one per
+;; picture on the page, and `check-hub!` never returning, so a `server` under a
+;; LaunchAgent never exited and the KeepAlive "wait loop" the README promises
+;; never turned over.
+
+(defn- black-hole!
+  "A listening socket that accepts connections and never writes a byte.
+   Accepted sockets are held open on purpose: closing them would make this a
+   slow way of testing connection-refused."
+  []
+  (let [ss   (java.net.ServerSocket. 0 16 (java.net.InetAddress/getByName "127.0.0.1"))
+        held (atom [])
+        t    (doto (Thread. (fn [] (try (loop [] (swap! held conj (.accept ss)) (recur))
+                                        (catch Throwable _ nil))))
+               (.setDaemon true)
+               (.start))]
+    {:url   (str "http://127.0.0.1:" (.getLocalPort ss))
+     :close #(do (.interrupt t)
+                 (doseq [s @held] (try (.close ^java.net.Socket s) (catch Throwable _ nil)))
+                 (.close ss))}))
+
+(defn- within
+  "Run `f` on another thread and answer `[:done v]` if it finished inside
+   `ms`, or `:still-hanging` if it did not. The distinction is the assertion in
+   every test below, in one direction or the other."
+  [ms f]
+  (let [fut (future (try [:done (f)] (catch Throwable t [:threw (.getMessage t)])))
+        r   (deref fut ms :still-hanging)]
+    (future-cancel fut)
+    r))
+
+(def ^:private brief
+  "The production ceilings are 60s (`forward`), 10s (`hub-api`) and 5s
+   (`health`); a test that waited them out would be a minute of nothing. What
+   has to be proved is that a ceiling is passed through to the http client at
+   all -- the bug was that none was -- so the tests redefine the numbers down
+   and assert against the real sockets."
+  500)
+
+(deftest a-hub-that-accepts-and-never-answers-is-bounded-test
+  (let [{:keys [url close]} (black-hole!)]
+    (try
+      (with-redefs [hub-proxy/request-defaults
+                    (assoc hub-proxy/request-defaults :socket-timeout brief)
+                    hub-proxy/health-request-defaults
+                    (assoc hub-proxy/health-request-defaults :socket-timeout brief)]
+        (testing "forward gives up and answers 502, rather than holding the thread"
+          (is (= [:done 502]
+                 (within (* 10 brief)
+                         #(:status (hub-proxy/forward
+                                     url {:request-method :get :uri "/api/contexts"
+                                          :headers {} :body nil}))))
+              "forward hung against a socket that accepts and never answers"))
+        (testing "health throws, which is what makes check-hub! refuse to start"
+          (let [r (within (* 10 brief) #(hub-proxy/health url))]
+            (is (= :threw (first r))
+                (str "health did not fail against a black hole, so a `server` "
+                     "under a LaunchAgent would never exit and never retry. Got: "
+                     (pr-str r))))))
+      (finally (close)))))
+
+(deftest the-image-question-gives-up-rather-than-holding-a-thread-test
+  ;; hub-api's docstring promises `[502 nil]` so that "the tunnel is down reads
+  ;; as a missing image rather than a 500". Against a black hole it promised
+  ;; that and hung instead -- one jetty thread per image on the page.
+  (let [{:keys [url close]} (black-hole!)]
+    (try
+      (with-redefs [config/config (assoc config/config :hub-url url :dev? true)
+                    et.rz.server.hub-api/request-defaults
+                    (assoc hub-proxy/request-defaults :socket-timeout brief)]
+        (let [r (within (* 10 brief) #(hub-api/item-images "1"))]
+          (is (= [:done nil] r)
+              (str "item-images hung against a black hole. Got: " (pr-str r)))))
+      (finally (close)))))
+
+(deftest the-backfill-path-keeps-its-licence-to-be-slow-test
+  ;; The exemption is as deliberate as the ceiling. `POST /api/backfill/
+  ;; embeddings` embeds every unembedded item one ollama call at a time and
+  ;; answers when it is done; on the live database that is minutes of silence,
+  ;; and a socket timeout would turn the documented behaviour of the endpoint
+  ;; into a 502. So this asserts the opposite of the test above: on this one
+  ;; path, silence is not a failure.
+  (let [{:keys [url close]} (black-hole!)]
+    (try
+      (with-redefs [hub-proxy/request-defaults
+                    (assoc hub-proxy/request-defaults :socket-timeout brief)]
+        (is (= :still-hanging
+               (within (* 6 brief)
+                       #(:status (hub-proxy/forward
+                                   url {:request-method :post
+                                        :uri "/api/backfill/embeddings"
+                                        :headers {} :body nil}))))
+            "the backfill path was cut off by the socket timeout it is exempt from")
+        (testing "and a hub that is not listening at all still fails at once there"
+          ;; The exemption lifts the ceiling on silence, not the one on
+          ;; reaching the hub -- otherwise it would be a hole rather than an
+          ;; exception.
+          (is (= [:done 502]
+                 (within (* 6 brief)
+                         #(:status (hub-proxy/forward
+                                     "http://127.0.0.1:1"
+                                     {:request-method :post
+                                      :uri "/api/backfill/embeddings"
+                                      :headers {} :body nil})))))))
+      (finally (close)))))

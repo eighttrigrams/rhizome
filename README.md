@@ -365,7 +365,7 @@ Host mini-tunnel
 
 ```bash
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/net.eighttrigrams.rhizome-tunnel.plist
-curl -sf http://127.0.0.1:3008/health    # proves the far end, not just the socket
+curl -sf --max-time 5 http://127.0.0.1:3008/health   # proves the far end, not just the socket
 ```
 
 Four of those settings are the entire design, and each covers a failure that is
@@ -378,9 +378,14 @@ invisible without it:
   ssh exits and launchd retries.
 - **`ServerAliveInterval` / `ServerAliveCountMax`.** Lid closed, network changed:
   the connection is dead and neither end has noticed. The tunnel becomes a black
-  hole that *accepts* connections and never answers, so a health check **hangs**
-  rather than failing. These make ssh notice and exit. This is the one failure a
-  health check cannot catch for you.
+  hole that *accepts* connections and never answers. These make ssh notice and
+  exit, so launchd can put a working tunnel back.
+  Without them nothing on this machine ever repairs it: rhizome's own calls to
+  the hub now give up rather than hang (see `hub-proxy/request-defaults` — sixty
+  seconds for a forwarded request, five for `/health`), so the `server` stays
+  answering and says so, but *every* navigation spends its sixty seconds first.
+  A bounded failure repeated forever is still an unusable machine. ssh exiting
+  is what ends it.
 - **`ControlPath none`.** A long-lived forward must not ride a shared
   `ControlMaster`; an interactive session's master timing out or being closed
   would take the forward with it. Give the tunnel its own alias.
@@ -396,6 +401,12 @@ A `server` that came up anyway would serve a frontend where every navigation
 502s, which reads as "rhizome is broken" rather than "the tunnel is down". Under
 a LaunchAgent with `KeepAlive` the refusal is simply a wait loop: it retries
 every ten seconds and succeeds once the tunnel is up.
+
+That is a wait loop only because the check can *finish*. Against a black-hole
+tunnel a `/health` call with no ceiling never returns, the process never exits,
+and `KeepAlive` has nothing to restart — the machine sits there starting
+forever. `hub-proxy/health-request-defaults` gives it five seconds, which is
+what turns the refusal into the retry this paragraph claims it is.
 
 ## Part-of relations and hierarchy mode
 

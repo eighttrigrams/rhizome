@@ -33,16 +33,41 @@
    and only ever reached when there is no hub -- see the namespace docstring."
   (delay (et.rz.hub.rest-api/rest-routes #(:db config/config))))
 
+(def ^:private request-defaults
+  "`hub-proxy`'s, with a tighter ceiling on silence.
+
+   Ten seconds instead of sixty, because what this namespace asks for is one
+   indexed row -- which file does this item name -- and nothing on the other
+   side of these two calls scrapes, embeds or sweeps. The generous bound
+   `hub-proxy/forward` carries is headroom for hub-side work that genuinely
+   takes that long; there is none here to leave room for.
+
+   And the cost of being generous is paid per image. `/img-by-id` is one call
+   per picture on the page, each holding the jetty thread that is serving it,
+   so a page of twenty against a tunnel that accepts and never answers is the
+   thread pool. That is the failure this number is chosen against."
+  (assoc hub-proxy/request-defaults :socket-timeout 10000))
+
 (defn- get-json
   "GET an `/api` path and answer `[status parsed-body]`.
 
    A hub that cannot be reached is `[502 nil]` rather than a throw: every caller
    here is a route serving a browser, and 'the tunnel is down' has to read as a
-   missing image rather than a 500 with a stack trace."
+   missing image rather than a 500 with a stack trace.
+
+   That promise needs `request-defaults` above to keep it. It was made without
+   them and was false in the case it was written for: a *closed* port answers
+   connection-refused and comes back 502 at once, but a half-dead tunnel accepts
+   and stays silent, and this call had nothing to give up on. It hung, one
+   jetty thread per image, which is not a missing image -- it is a page that
+   never finishes loading and a `server` that stops answering for anything
+   else, including the local files it alone can serve."
   [path]
   (try
     (if-let [url (hub-proxy/hub-url)]
-      (let [resp (http/get (str url path) {:as :string :throw-exceptions false})]
+      (let [resp (http/get (str url path)
+                           (merge request-defaults
+                                  {:as :string :throw-exceptions false}))]
         [(:status resp) (json/parse-string (:body resp) true)])
       (let [resp (@local-routes {:request-method :get :uri path :headers {}})
             body (:body resp)]
