@@ -173,6 +173,73 @@
               (is (= 404 (:status (app {:request-method :get :uri (str "/img-by-id/" id)
                                         :headers {} :body nil})))))))))))
 
+(defn- multipart-body
+  "A real multipart/form-data body, built by hand.
+
+   By hand because the point is to send the bytes through `server`'s route into
+   the hub's own `wrap-multipart-params` -- a mock that hands over a parsed
+   `:multipart-params` map would skip the only part of this that could be
+   wrong."
+  [boundary fields]
+  (let [sb (StringBuilder.)]
+    (doseq [{:keys [name filename content]} fields]
+      (.append sb (str "--" boundary "\r\n"))
+      (.append sb (str "Content-Disposition: form-data; name=\"" name "\""
+                       (when filename (str "; filename=\"" filename "\"")) "\r\n"))
+      (when filename (.append sb "Content-Type: image/png\r\n"))
+      (.append sb "\r\n")
+      (.append sb content)
+      (.append sb "\r\n"))
+    (.append sb (str "--" boundary "--\r\n"))
+    (.getBytes (.toString sb) "UTF-8")))
+
+(deftest an-upload-lands-on-the-hub-test
+  ;; The write direction, and the opposite arrangement to /img-by-id: here the
+  ;; bytes travel. An upload writes a file AND the item's resource-links, and
+  ;; the two have to agree -- so both happen on the machine that owns the
+  ;; database.
+  ;;
+  ;; The discriminator is the database again: the item exists only in the hub's
+  ;; file, so a resource-link appearing on it can only have been written there.
+  (with-pair
+    (fn [hub app]
+      (jdbc/execute-one!
+        (:ds hub)
+        ["INSERT INTO items (title, short_title, data, is_context, inserted_at, updated_at, updated_at_ctx)
+          VALUES ('Needs a preview', '', '{}', 0, datetime('now'), datetime('now'), datetime('now'))"])
+      (let [id   (:id (jdbc/execute-one!
+                        (:ds hub)
+                        ["SELECT id FROM items WHERE title = 'Needs a preview'"]
+                        {:builder-fn next.jdbc.result-set/as-unqualified-lower-maps}))
+            bnd  "----rhizometest"
+            body (multipart-body bnd [{:name "file" :filename "p.png" :content "pretend-png"}
+                                      {:name "id" :content (str id)}
+                                      ;; "true" means: do not downscale, so the
+                                      ;; test does not depend on ImageMagick
+                                      ;; being on the box.
+                                      {:name "alternative-behaviour" :content "true"}])
+            ;; The local upload handler is made to throw for the duration. It
+            ;; is not enough to look at the database: until the statement
+            ;; protocol is gone, a locally-handled upload would ALSO write to
+            ;; the hub's file, over the wire, and the row would look identical.
+            ;; So the routing is asserted where it actually differs -- the local
+            ;; handler is not reached at all.
+            resp (with-redefs [server/upload-handler
+                               (fn [_] (throw (ex-info "the upload was handled locally" {})))]
+                   (app {:request-method :post
+                         :uri            "/upload"
+                         :headers        {"content-type" (str "multipart/form-data; boundary=" bnd)
+                                          "content-length" (str (count body))}
+                         :content-type   (str "multipart/form-data; boundary=" bnd)
+                         :body           (java.io.ByteArrayInputStream. body)}))]
+        (is (= 200 (:status resp)) (str "the upload did not go through: " (pr-str resp)))
+        (let [row (jdbc/execute-one! (:ds hub)
+                                     ["SELECT data FROM items WHERE id = ?" id]
+                                     {:builder-fn next.jdbc.result-set/as-unqualified-lower-maps})]
+          (is (re-find #"preview-image" (str (:data row)))
+              (str "the hub's row was not updated, so the upload was handled on "
+                   "the wrong machine: " (pr-str (:data row)))))))))
+
 (deftest a-hub-that-is-not-there-answers-502-test
   (testing "a tunnel that is down is an answer, not a stack trace"
     (with-redefs [config/config (assoc config/config

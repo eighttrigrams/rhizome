@@ -96,7 +96,12 @@
 
 (defn upload-handler
   "POST /upload — store a dropped preview image. A write, so a read-only replica
-  refuses it gracefully instead of letting the read-only datasource throw."
+  refuses it gracefully instead of letting the read-only datasource throw.
+
+  This is the **local** branch, used when this process holds the database
+  itself. With a hub, `upload-surface` forwards the whole multipart request
+  there instead: see its docstring for why the bytes travel rather than the
+  file staying here."
   [request]
   (if (replica/read-only?)
     (do (log/warn {:event "replica-refusal" :uri "/upload"}
@@ -114,6 +119,38 @@
       (upload/upload-preview-file (:db config/config) uploaded-file id alternative-behaviour?)
       ;; Process the uploaded file here. For example, save it to a directory.
       (response/response "File uploaded successfully!"))))
+
+(defn- upload-surface
+  "POST /upload, forwarded whole to the hub when there is one.
+
+  **The bytes travel and the file does not stay here**, which is the opposite
+  of what `/img-by-id` does, and deliberately. An upload is a write: it puts a
+  preview file on disk *and* writes the item's resource-links, and those two
+  have to agree. Sending the bytes to the machine that owns the database is the
+  only arrangement where they land together -- the alternative needs a new
+  `/api` route, the reason-required write gate in front of it, and a window
+  where one half is written and the other is not. Uploads are rare, human, and
+  not on a read path, so one round trip with a file in it is a fair price for a
+  seam that does not exist.
+
+  **A known property, not a free win:** the machine that performed the upload
+  sees the resource-link before the synced folder delivers it the file. The
+  data goes through the tunnel and the file comes back through iCloud, so on a
+  remote machine the preview appears late by however long the sync takes. On
+  the hub itself that window is zero, which is today's only case.
+
+  Multipart is parsed here rather than around the whole app, which is what
+  makes the forward possible at all: `wrap-multipart-params` consumes the body,
+  so a global one would leave nothing to forward."
+  []
+  ;; Through the var, not the value: the middleware is built once and the
+  ;; handler is looked up per request, which is what lets a test redefine it to
+  ;; prove it was never reached.
+  (let [local (wrap-multipart-params #'upload-handler)]
+    (fn [req]
+      (if-let [url (hub-proxy/hub-url)]
+        (hub-proxy/forward url req)
+        (local req)))))
 
 ;; The directories configured under :folders are served beneath the /imgs URL
 ;; prefix by wrap-imgs (used in both dev and prod): :images backs /imgs/*
@@ -249,7 +286,7 @@
     (POST "/test/reset" [] reset-handler)
     (GET "/open/:file-id" [] open)
     (GET "/img-by-id/:item-id" [] img-by-id-handler)
-    (POST "/upload" req (upload-handler req))
+    (POST "/upload" [] (upload-surface))
     (GET "/" [] (response/resource-response "public/index.html"))
     (fn [req] (log/warn (str "File not found:" (:uri req))) {:status 404 :body "Not Found"})))
 
@@ -259,8 +296,7 @@
       wrap-env-defaults
       (wrap-resource "public")
       (wrap-imgs images-folder preview-images-folder)
-      wrap-params
-      wrap-multipart-params))
+      wrap-params))
 
 (defn check-folders-exist!
   "Startup filesystem gate, run once logging is configured (config load itself
@@ -337,7 +373,12 @@
   preview downscaling needs and which has to exist where the downscaling
   happens."
   []
-  (when-not (replica/read-only?)
+  (when (and (not (replica/read-only?))
+             ;; Only when this process will do the downscaling itself. With a
+             ;; hub, /upload is forwarded and ImageMagick is needed there, not
+             ;; here -- the hub gates on it in its own -main. Complementary, the
+             ;; way the poller predicates are.
+             (nil? (hub-proxy/hub-url)))
     (upload/ensure-convert!)))
 
 (defn- app-role-reason

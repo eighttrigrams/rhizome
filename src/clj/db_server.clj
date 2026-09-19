@@ -39,8 +39,10 @@
             [poll :as poll]
             [rest-api :as rest-api]
             [ring.adapter.jetty :as jetty]
+            [ring.middleware.multipart-params :refer [wrap-multipart-params]]
             [ring.middleware.params :refer [wrap-params]]
             [role :as role]
+            [upload :as upload]
             [ui-api :as ui-api])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
            [java.sql Connection SQLException]
@@ -488,6 +490,32 @@
         {:status 200 :headers {"Content-Type" "text/plain"} :body "ok"})
     {:status 403 :headers {"Content-Type" "text/plain"} :body "not in dev mode"}))
 
+(defn- upload!
+  "POST /upload -- a dropped preview image, stored beside the row it belongs to.
+
+   It moved here from `server` (arch rework 2, step 4) because an upload is two
+   writes that have to agree: a file in the `:preview-images` folder and the
+   item's resource-links in the database. Doing both on the machine that owns
+   the database is the only arrangement where they land together.
+
+   That means the bytes cross the wire, which is the opposite of what
+   `/img-by-id` does -- see `server/upload-surface` for why that is the right
+   way round for a write, and for the known property it leaves behind (the
+   uploading machine sees the link before iCloud delivers it the file).
+
+   A read-only hub refuses rather than letting its datasource throw."
+  [{:keys [ds read-only?]} request]
+  (if read-only?
+    (do (log/warn {:event "replica-refusal" :uri "/upload"}
+                  "read-only: refused /upload")
+        (json-response 403 {:read-only-replica true}))
+    (let [params (:multipart-params request)]
+      (upload/upload-preview-file ds
+                                  (get params "file")
+                                  (get params "id")
+                                  (get params "alternative-behaviour"))
+      {:status 200 :headers {"Content-Type" "text/plain"} :body "File uploaded successfully!"})))
+
 (defn- app
   [server]
   (routes
@@ -500,6 +528,7 @@
         (POST "/tx/rollback" req (tx-rollback server req))))
     (GET "/health" [] (health server))
     (POST "/test/reset" [] (reset-database! server))
+    (wrap-multipart-params (POST "/upload" req (upload! server req)))
     ;; Before the item surfaces below, deliberately: this one answers the
     ;; statement protocol's own description, and prober and the start scripts
     ;; read it. `rest-api` also serves GET /api/describe, so the two collide and
@@ -810,6 +839,11 @@
     ;; the suites boot many servers inside one JVM, and `start!` is the server
     ;; while `-main` is the process. A read-only hub writes nothing, as before.
     (when-not (:read-only? server)
+      ;; ImageMagick, gated here because this is where preview downscaling
+      ;; happens now (see `upload!`). `server` keeps the same gate for the
+      ;; single-process case, and the two are complementary the way the poller
+      ;; predicates are.
+      (upload/ensure-convert!)
       (let [{:keys [dev? e2e? skip-seed?] :as seed} (seed-opts)]
         (dev-seed/maybe-seed! (assoc seed :db ds))
         ;; A missing file-type context silently drops files of that type on
