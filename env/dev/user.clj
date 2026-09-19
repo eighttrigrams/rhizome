@@ -1,6 +1,6 @@
 (ns user
-  (:require server
-            [config :as config]))
+  (:require [et.rz.server.main :as server]
+            [et.rz.config :as config]))
 
 (def db (:db (config/ds)))
 

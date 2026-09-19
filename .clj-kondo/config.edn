@@ -8,7 +8,7 @@
             ;; so kondo should flag at edit time the [sym handle opts] form
             ;; that with-transaction refuses at macroexpansion. Should: none of
             ;; this has been run -- clj-kondo is not installed in the box.
-            db/with-transaction clojure.core/with-open}
- :linters {:unresolved-symbol {:exclude [(server http-server)]}
-           :unused-private-var {:exclude [server/http-server]}}
+            et.rz.hub.db/with-transaction clojure.core/with-open}
+ :linters {:unresolved-symbol {:exclude [(et.rz.server.main http-server)]}
+           :unused-private-var {:exclude [et.rz.server.main/http-server]}}
  :hooks {:analyze-call {cambium.core/deflevel hooks.cambium/deflevel}}}

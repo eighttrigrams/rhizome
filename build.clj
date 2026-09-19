@@ -14,13 +14,13 @@
   (clean nil)
   (b/copy-dir {:src-dirs ["src/clj" "src/cljc" "resources"]
                :target-dir class-dir})
-  ;; Both mains, one jar. The db-server is a second process out of the same
-  ;; artifact -- `java -cp server.jar clojure.main -m db-server` -- so deploy
-  ;; does not change shape when the database moves behind it.
+  ;; Both mains, one jar. The hub is a second process out of the same
+  ;; artifact -- `java -cp server.jar clojure.main -m et.rz.hub.main` -- so
+  ;; deploy does not change shape when the database moves behind it.
   (b/compile-clj {:basis @basis
-                  :ns-compile '[server db-server]
+                  :ns-compile '[et.rz.server.main et.rz.hub.main]
                   :class-dir class-dir})
   (b/uber {:class-dir class-dir
            :uber-file uber-file
            :basis @basis
-           :main 'server}))
+           :main 'et.rz.server.main}))

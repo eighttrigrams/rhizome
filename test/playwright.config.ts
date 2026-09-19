@@ -23,7 +23,7 @@ const port = resolveE2EPort();
 // non-tty context, `clj` (the bash wrapper) reads from its stdin and gets
 // SIGTTIN if it's still attached to a controlling terminal -- the JVM never
 // starts and the webServer times out.
-const command = `clj -M:e2e -m server < /dev/null`;
+const command = `clj -M:e2e -m et.rz.server.main < /dev/null`;
 
 const baseURL = `http://localhost:${port}`;
 
