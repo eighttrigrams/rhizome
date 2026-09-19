@@ -18,6 +18,7 @@
             dispatch
             rest-api
             [ui-api :as ui-api]
+            [hub-api :as hub-api]
             [hub-proxy :as hub-proxy]
             [placement :as placement]
             [cheshire.core :as cheshire]
@@ -145,26 +146,56 @@
 
         :else (handler req)))))
 
+(defn- serve-image-named
+  "Serve `filename` out of this machine's images folder, or 404.
+
+   The canonical path is checked to fall under the folder because the name comes
+   from the database and is free-form text -- whatever the file was called on
+   import. The old version of this handler read straight at the filesystem
+   without that check, and `rest-api.queries/image-file` said so in its
+   docstring in as many words: 'not a model to copy'. It is copied now."
+  [filename]
+  (let [root (io/file images-folder)
+        f    (io/file root filename)]
+    (if (and (str/starts-with? (.getCanonicalPath f) (.getCanonicalPath root))
+             (.isFile f))
+      (response/file-response (str f))
+      {:status 404 :body "Image file not found"})))
+
 (defn- img-by-id-handler
+  "GET /img-by-id/:item-id -- the item's image, off this machine's disk.
+
+   The row lives on the hub and the file lives here, so this asks the hub which
+   file and then serves it itself (see `hub-api`): the question crosses the
+   tunnel, the bytes do not.
+
+   The manifest is asked first, and both of its lists are read. An entry under
+   `:missing` means the *hub* could not resolve the file -- on a machine whose
+   sync has delivered it that is not the same answer, and the filename is all
+   this needs from either list.
+
+   The second branch is for older rows that declare no image at all but whose
+   title *is* an image filename. It costs a second call, so it is only made when
+   the manifest came back with nothing."
   [{{:keys [item-id]} :route-params}]
-  (try (let [item (datastore/get-item (:db config/config) {:id item-id})
-             data (:data item)
-             title (:title item)
-             resource-links (:resource-links data)]
-         (cond (:image resource-links)
-                 (let [file (io/file images-folder (:image resource-links))]
-                   (if (.exists file)
-                     (response/file-response (str file))
-                     {:status 404 :body "Image file not found"}))
-               (and title (re-matches #".*\.(png|jpg|jpeg|PNG|JPG|JPEG)$" title))
-                 (let [file (io/file images-folder title)]
-                   (if (.exists file)
-                     (response/file-response (str file))
-                     {:status 404 :body "Image file not found"}))
-               :else {:status 404 :body "Item has no image"}))
-       (catch Exception e
-         (log/error e "Error serving image by ID")
-         {:status 500 :body "Internal server error"})))
+  (try
+    (let [manifest (hub-api/item-images item-id)
+          declared (->> (concat (:images manifest) (:missing manifest))
+                        (filter #(= "image" (:kind %)))
+                        first)]
+      (cond
+        declared (serve-image-named (:filename declared))
+
+        (nil? manifest) {:status 404 :body "Item not found"}
+
+        :else
+        (let [title (:title (hub-api/item item-id))]
+          (if (and title (re-matches #".*\.(png|jpg|jpeg|PNG|JPG|JPEG)$" title))
+            (serve-image-named title)
+            {:status 404 :body "Item has no image"}))))
+    (catch Exception e
+      (log/error e "Error serving image by ID")
+      {:status 500 :body "Internal server error"})))
 
 (defn- reset-handler
   "POST /test/reset. Forwarded to the hub when there is one -- it owns the file,

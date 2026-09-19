@@ -13,10 +13,13 @@
    only have come from the hub."
   (:require [cheshire.core :as json]
             [clj-http.client :as http]
+            [clojure.java.io :as io]
             [clojure.test :refer [deftest is testing]]
             [cognitect.transit :as transit]
             [config :as config]
             [db-server]
+            [next.jdbc :as jdbc]
+            [next.jdbc.result-set]
             [placement :as placement]
             [server]))
 
@@ -126,6 +129,49 @@
           (is (nil? return))
           (is (re-find #"has not been placed" (str thrown))
               (str "expected a placement refusal, got: " (pr-str thrown))))))))
+
+(deftest the-image-question-crosses-and-the-bytes-do-not-test
+  ;; /img-by-id is the first route where the outer *calls* the inner rather than
+  ;; forwarding to it. The row that says which file lives on the hub; the file
+  ;; lives on this machine, in a folder iCloud has already delivered. So the
+  ;; question crosses the tunnel and the bytes never do.
+  ;;
+  ;; The proof of that here is blunt: the file is written into a directory the
+  ;; hub knows nothing about, and the hub's own copy of it does not exist. If
+  ;; the handler were serving from the hub, there would be nothing to serve.
+  (let [dir      (doto (java.io.File. (str (System/getProperty "java.io.tmpdir")
+                                           "/rhizome-img-test-" (System/nanoTime)))
+                   (.mkdirs) (.deleteOnExit))
+        filename "a-picture.png"
+        bytes'   (.getBytes "not really a png, but bytes are bytes" "UTF-8")]
+    (io/copy bytes' (io/file dir filename))
+    (with-pair
+      (fn [hub app]
+        (jdbc/execute-one!
+          (:ds hub)
+          ["INSERT INTO items (title, short_title, data, is_context, inserted_at, updated_at, updated_at_ctx)
+            VALUES ('An image', '', ?, 0, datetime('now'), datetime('now'), datetime('now'))"
+           (json/generate-string {:resource-links {:image filename}})])
+        (let [id (:id (jdbc/execute-one! (:ds hub)
+                                         ["SELECT id FROM items WHERE title = 'An image'"]
+                                         {:builder-fn next.jdbc.result-set/as-unqualified-lower-maps}))]
+          (with-redefs [server/images-folder (.getAbsolutePath dir)]
+            (testing "the file is served off this machine's disk"
+              (let [resp (app {:request-method :get :uri (str "/img-by-id/" id)
+                               :headers {} :body nil})]
+                (is (= 200 (:status resp))
+                    (str "the handler did not find the image the hub named: " (pr-str resp)))
+                (is (= (String. bytes' "UTF-8") (slurp (:body resp))))))
+            (testing "a name that would escape the images folder is refused"
+              ;; The old handler read straight at the filesystem with no such
+              ;; check -- rest-api.queries/image-file called it out by name as
+              ;; 'not a model to copy'. This is the check arriving.
+              (jdbc/execute-one!
+                (:ds hub)
+                ["UPDATE items SET data = ? WHERE id = ?"
+                 (json/generate-string {:resource-links {:image "../../../etc/passwd"}}) id])
+              (is (= 404 (:status (app {:request-method :get :uri (str "/img-by-id/" id)
+                                        :headers {} :body nil})))))))))))
 
 (deftest a-hub-that-is-not-there-answers-502-test
   (testing "a tunnel that is down is an answer, not a stack trace"
