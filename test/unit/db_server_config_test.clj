@@ -31,7 +31,7 @@
                               " :db-server {:port 3141 :db-path \"./rhizome.db\""
                               "             :vec-path \"./.sqlite-vec/vec0\"}}"))]
       (is (= {:port 3141 :db-path "./rhizome.db" :vec-path "./.sqlite-vec/vec0"
-              :read-only? false}
+              :read-only? false :allow-reset? true}
              opts)
           "the app's :port is 3140 and the db-server's is 3141: it took its own")))
   (testing "the standalone file: same reader, nothing else required"
@@ -40,9 +40,11 @@
     ;; drops ./primary.nosync in to exercise prod behaviour reddens a test that
     ;; is about which keys are read.
     (with-redefs [role/primary-marker-present? (constantly false)]
-      (is (= {:port 3008 :db-path "/db/rhizome.db.nosync" :vec-path nil :read-only? true}
+      (is (= {:port 3008 :db-path "/db/rhizome.db.nosync" :vec-path nil
+              :read-only? true :allow-reset? false}
              (opts-for "{:db-server {:port 3008 :db-path \"/db/rhizome.db.nosync\"}}"))
-          "no :dev? in the file means prod, and prod with no marker is read-only"))))
+          (str "no :dev? in the file means prod, and prod with no marker is "
+               "read-only -- and refuses /test/reset, which is the same flag")))))
 
 (deftest the-role-comes-from-the-marker-and-the-mode-test
   ;; The same rule the app-server reaches, from the same directory -- `role` owns

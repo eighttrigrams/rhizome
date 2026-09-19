@@ -26,9 +26,13 @@
   (.getAbsolutePath (doto (java.io.File/createTempFile "rhizome-hub-test" ".db")
                       (.deleteOnExit))))
 
-(defn- with-hub [f]
-  (let [server (db-server/start! {:port 0 :db-path (temp-db-path)})]
-    (try (f server) (finally (db-server/stop! server)))))
+(defn- with-hub
+  ([f] (with-hub {} f))
+  ([opts f]
+   (let [server (db-server/start! (merge {:port 0 :db-path (temp-db-path)
+                                          :allow-reset? true}
+                                         opts))]
+     (try (f server) (finally (db-server/stop! server))))))
 
 (defn- transit-args
   "The `/ui` envelope carries its args as a transit string."
@@ -109,3 +113,31 @@
                    "this fails, rhizome's REST describe has taken the path over "
                    "-- which is step 4's job, and this test goes with it. Got: "
                    (pr-str (map :name (:endpoints body))))))))))
+
+(defn- post-plain [server path]
+  (let [resp (http/post (str (:url server) path) {:as :string :throw-exceptions false})]
+    [(:status resp) (:body resp)]))
+
+(deftest the-hub-empties-its-own-database-test
+  (with-hub
+    (fn [server]
+      (testing "/test/reset deletes the rows this server holds"
+        (is (nil? (:thrown (ui! server "insert-context" [nil {:title "Doomed"}]))))
+        (is (= [200 "ok"] (post-plain server "/test/reset")))
+        (let [[status body] (api-get server "/api/contexts")]
+          (is (= 200 status))
+          (is (empty? body)
+              (str "the reset did not empty this server's database: " (pr-str body))))))))
+
+(deftest a-production-hub-refuses-to-empty-itself-test
+  ;; :allow-reset? comes from the config's top-level :dev?, so this is the world
+  ;; of the mini: no :dev? in config.edn, and a route that deletes every row
+  ;; must answer 403 rather than run. It was `server`'s gate before the reset
+  ;; moved here, and it moved with it.
+  (with-hub {:allow-reset? false}
+    (fn [server]
+      (is (nil? (:thrown (ui! server "insert-context" [nil {:title "Survivor"}]))))
+      (is (= 403 (first (post-plain server "/test/reset"))))
+      (let [[_ body] (api-get server "/api/contexts")]
+        (is (some #(= "Survivor" (:title %)) body)
+            "the row was deleted by a hub that should have refused")))))

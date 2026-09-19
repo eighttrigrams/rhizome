@@ -460,6 +460,32 @@
         (log/error t "db-server: unhandled failure")
         (transit-response 500 {:error (str (.getMessage t)) :type :db-server/error})))))
 
+(def ^:private reset-tables
+  "Every table `/test/reset` empties. Relations first, so a foreign key can
+   never hold a delete up."
+  ["relations" "items" "history" "relation_history"
+   "youtube_poll_channels" "youtube_poll_seen"
+   "atom_poll_feeds" "atom_poll_seen"])
+
+(defn- reset!
+  "POST /test/reset -- empty the database. The e2e suite's globalSetup calls it,
+   and it is the reason `check-e2e-db-path!` exists.
+
+   It moved here from `server` (arch rework 2, step 4) because it is eight
+   DELETEs and nothing else: the last caller of the statement protocol with no
+   business speaking SQL over a wire. The hub owns the file, so the hub empties
+   it.
+
+   `:allow-reset?` comes from the config's top-level `:dev?`, so a production
+   hub answers 403 exactly as `server` did. An explicit option rather than a
+   config read, because `start!` reads no configuration -- see its docstring."
+  [{:keys [ds allow-reset?]}]
+  (if allow-reset?
+    (do (doseq [t reset-tables]
+          (jdbc/execute-one! ds [(str "DELETE FROM " t)]))
+        {:status 200 :headers {"Content-Type" "text/plain"} :body "ok"})
+    {:status 403 :headers {"Content-Type" "text/plain"} :body "not in dev mode"}))
+
 (defn- app
   [server]
   (routes
@@ -471,6 +497,7 @@
         (POST "/tx/commit" req (tx-commit server req))
         (POST "/tx/rollback" req (tx-rollback server req))))
     (GET "/health" [] (health server))
+    (POST "/test/reset" [] (reset! server))
     ;; Before the item surfaces below, deliberately: this one answers the
     ;; statement protocol's own description, and prober and the start scripts
     ;; read it. `rest-api` also serves GET /api/describe, so the two collide and
@@ -544,7 +571,7 @@
    it would be a caller who thinks he has bound elsewhere and has not. Binding
    beyond the machine comes with the auth that has to arrive alongside it, and
    neither is in this step."
-  [{:keys [port db-path vec-path read-only? tx-idle-ms] :as opts}]
+  [{:keys [port db-path vec-path read-only? allow-reset? tx-idle-ms] :as opts}]
   (when (contains? opts :host)
     (throw (ex-info (str "db-server: :host is not an option -- this binds " loopback
                          " and nothing else. These routes run arbitrary SQL with no "
@@ -559,6 +586,7 @@
   (let [ds     (connection/make-datasource {:dbname db-path :read-only? (boolean read-only?)})
         server {:ds           ds
                 :read-only?   (boolean read-only?)
+                :allow-reset? (boolean allow-reset?)
                 :transactions (atom {})
                 :tx-idle-ms   (or tx-idle-ms default-tx-idle-ms)}]
     ;; Before anything else, and before the port is open: prove the database is
@@ -698,10 +726,13 @@
                             "whole block.")
                        {:config-path path})))
      (check-e2e-db-path! (:db-path section))
-     {:port       (or (:port section) default-port)
-      :db-path    (:db-path section)
-      :vec-path   (:vec-path section)
-      :read-only? (role/read-only-replica? c (role/primary-marker-present?))})))
+     {:port         (or (:port section) default-port)
+      :db-path      (:db-path section)
+      :vec-path     (:vec-path section)
+      :read-only?   (role/read-only-replica? c (role/primary-marker-present?))
+      ;; The same gate `server` applied to /test/reset, read from the same flag:
+      ;; dev answers it, production refuses it.
+      :allow-reset? (boolean (:dev? c))})))
 
 (defn poll-scheduling-enabled?
   "Whether this process should run the feed pollers.

@@ -169,19 +169,25 @@
          {:status 500 :body "Internal server error"})))
 
 (defn- reset-handler
-  [_req]
-  (if (true? (:dev? config/config))
-    (let [db (:db config/config)]
-      (db/execute-one! db ["DELETE FROM relations"])
-      (db/execute-one! db ["DELETE FROM items"])
-      (db/execute-one! db ["DELETE FROM history"])
-      (db/execute-one! db ["DELETE FROM relation_history"])
-      (db/execute-one! db ["DELETE FROM youtube_poll_channels"])
-      (db/execute-one! db ["DELETE FROM youtube_poll_seen"])
-      (db/execute-one! db ["DELETE FROM atom_poll_feeds"])
-      (db/execute-one! db ["DELETE FROM atom_poll_seen"])
-      {:status 200 :body "ok"})
-    {:status 403 :body "not in dev mode"}))
+  "POST /test/reset. Forwarded to the hub when there is one -- it owns the file,
+   and emptying it is eight DELETEs that have no business crossing a wire as
+   SQL (arch rework 2, step 4). The local branch below is what a single-process
+   run still does, and it goes when the statement protocol does."
+  [req]
+  (if-let [url (hub-proxy/hub-url)]
+    (hub-proxy/forward url req)
+    (if (true? (:dev? config/config))
+      (let [db (:db config/config)]
+        (db/execute-one! db ["DELETE FROM relations"])
+        (db/execute-one! db ["DELETE FROM items"])
+        (db/execute-one! db ["DELETE FROM history"])
+        (db/execute-one! db ["DELETE FROM relation_history"])
+        (db/execute-one! db ["DELETE FROM youtube_poll_channels"])
+        (db/execute-one! db ["DELETE FROM youtube_poll_seen"])
+        (db/execute-one! db ["DELETE FROM atom_poll_feeds"])
+        (db/execute-one! db ["DELETE FROM atom_poll_seen"])
+        {:status 200 :body "ok"})
+      {:status 403 :body "not in dev mode"})))
 
 (defn- rest-surface
   "`/api`, answered by the hub when there is one and by this process when there
