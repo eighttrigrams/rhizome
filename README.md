@@ -150,27 +150,61 @@ Both work on the host system and in the Docker containers.
 
 ## Package, deploy and run
 
+**Two processes out of one jar**, both started from the deploy directory: the
+**hub** on `:3008`, which opens the database, and the **`server`** on `:3007`,
+which serves the frontend and this machine's files. The deploy directory is
+inside iCloud Drive, so the jar and the config travel to every machine.
+
+**The order is not optional.** The `server` asks the hub for `/health` at
+startup and refuses to boot if nothing answers, so wait on it between the two.
+And **the working directory must be the deploy directory**: the hub slurps
+`schema-sqlite.sql` by a relative path, and both processes look for
+`config.edn` and `primary.nosync` in the directory they were launched from.
+
 Define these functions
 
 ```bash
 rhizome-start() {
+    local dir="$HOME/Library/Mobile Documents/com~apple~CloudDocs/Rhizome"
     if lsof -nP -iTCP:3007 -sTCP:LISTEN >/dev/null 2>&1; then
       echo ":3007 already in use — run rhizome-stop first"
       return 1
     fi
-    (cd ~/Applications/rhizome && java -cp server.jar clojure.main -m server &)
+    # The hub, but only on the machine elected to run one. Everywhere else
+    # :3008 is the tunnel and there is nothing to start here.
+    if [ -e "$dir/primary.nosync" ] && \
+       ! curl -sf -m 2 http://127.0.0.1:3008/health >/dev/null 2>&1; then
+      (cd "$dir" && java -cp server.jar clojure.main -m et.rz.hub.main &)
+      local i=0
+      until curl -sf -m 2 http://127.0.0.1:3008/health >/dev/null 2>&1; do
+        i=$((i+1)); [ $i -gt 30 ] && { echo "hub did not answer :3008/health"; return 1; }
+        sleep 1
+      done
+    fi
+    curl -sf -m 2 http://127.0.0.1:3008/health >/dev/null 2>&1 || {
+      echo "nothing answers :3008 — no primary.nosync here, and no tunnel to the hub"
+      return 1
+    }
+    (cd "$dir" && java -cp server.jar clojure.main -m et.rz.server.main &)
     ~/Applications/Tracker-darwin-arm64/Tracker.app/Contents/MacOS/Tracker 2>/dev/null
 }
 rhizome-stop() {
+    local dir="$HOME/Library/Mobile Documents/com~apple~CloudDocs/Rhizome"
     local pids=$(lsof -nP -iTCP:3007 -sTCP:LISTEN -t)
     [ -n "$pids" ] && kill $pids || echo "nothing on :3007"
+    # Only where a hub actually runs. On any other machine :3008 is the ssh
+    # tunnel, which belongs to launchd rather than to this function.
+    if [ -e "$dir/primary.nosync" ]; then
+      pids=$(lsof -nP -iTCP:3008 -sTCP:LISTEN -t)
+      [ -n "$pids" ] && kill $pids || echo "nothing on :3008"
+    fi
 }
 ```
 
 and then use
 
 ```bash
-make deploy DEPLOY_TARGET=~/Applications/rhizome
+make deploy DEPLOY_TARGET=~/Library/Mobile\ Documents/com~apple~CloudDocs/Rhizome
 rhizome-start
 rhizome-stop
 ```
@@ -178,42 +212,173 @@ rhizome-stop
 `DEPLOY_TARGET` is required and must be passed on the command line — there is
 no default and it is deliberately not read from the environment.
 
+What lives in that directory, and which of it travels:
+
+| | |
+| --- | --- |
+| `server.jar` | both `-m` entry points; synced, so every machine gets the same build |
+| `config.edn` | synced, and **the same file is correct on every machine** — see below |
+| `rhizome.db.nosync` | the database. `.nosync` is what excludes it from iCloud, so **it does not travel**, which is the whole reason there is one hub |
+| `primary.nosync` | also not synced, which is what lets it mean something different per machine: *this machine runs the hub* |
+| `schema-sqlite.sql` | read by the hub, by relative path, hence the `cd` |
+
 Comments
 - We use nativefier to serve the app via electron
 - A first time run will seed some necessary contexts
 
-## Primary and replica
+## One hub, and which machine runs it
 
-The rhizome directory is synced between machines, and only one copy may write to
-the db. Files ending in `.nosync` are excluded from that sync, so a marker named
-`primary.nosync` — in the directory the app starts from, next to `config.edn` —
-exists on exactly one machine: the **primary**.
+**Exactly one machine holds the database.** That machine runs a **hub**
+(`:3008`); every machine, that one included, runs a **`server`** (`:3007`) that
+serves its own frontend and its own files and forwards everything about items to
+the hub. There is one database, in one place, and no replicas.
 
-An instance that starts in prod mode (`:dev?` false) *without* that marker is a
-**read-only replica**:
+The rhizome directory is synced between machines, but files ending in `.nosync`
+are excluded from that sync — and the database is `rhizome.db.nosync`. **So the
+database does not travel.** The files do: images and previews reach every
+machine, which is what lets each `server` serve `/imgs/*` off its own disk.
 
-- its sqlite db is opened read-only, so no code path can write to it — forgotten
-  ones included;
-- writes are refused gracefully in front of that: `/api` mutations
-  (recording-mode toggle and embeddings backfill included) and `/upload` answer
-  `403 {"read-only-replica": true}`; `/ui` carries queries and mutations through
-  one POST, so it refuses per command and in band — a normal `200` whose transit
-  body is `{:read-only-refused "…" :cmd nil :arg nil}`, leaving the list on
-  screen (the cleared `:cmd`/`:arg` keep the refused command from staying latched
-  in the SPA state it is merged into) — and queries pass;
-- the youtube/atom pollers are not scheduled at all;
-- the UI carries a standing red badge, and `GET /api/status` reports the role.
-
-Startup logs the role it booted with as one line (`INSTANCE ROLE: PRIMARY` /
-`INSTANCE ROLE: READ-ONLY REPLICA`, with the reason). The role is decided once
-and held for the life of the process, so promoting a replica means placing the
-marker and restarting:
+A marker named `primary.nosync` — in the directory the app starts from, next to
+`config.edn` — **elects** the machine that runs the hub. It is excluded from the
+sync too, which is what lets it say something different on each machine. It no
+longer demotes anything: there is no read-only mode and no replica any more, and
+a machine without the marker simply does not start a hub.
 
 ```bash
-touch primary.nosync   # next to config.edn, then restart the app
+touch primary.nosync   # next to config.edn, then start the hub
 ```
 
-Dev mode is unaffected — no marker needed, no guards, no badge.
+A hub started in prod mode without the marker **refuses to boot** and says so.
+That refusal is worth more than it sounds. Two writers on one file would at
+least be one file; two hubs are **two separate databases diverging in silence**,
+because the db is precisely the thing the sync does not carry. You would find out
+whenever you next noticed something missing.
+
+### Moving the hub to another machine
+
+The check above catches a hub that *starts* unelected. **It cannot catch one
+that is already running** — nothing re-reads the marker while a process is up.
+So, in this order:
+
+1. **Stop the hub on the old machine.** Removing the marker is not enough, and
+   this is the step that actually matters.
+2. Copy `rhizome.db.nosync` across by hand. It is not synced, so nothing else
+   will move it, and it is around 172 MB.
+3. `rm primary.nosync` on the old machine, `touch primary.nosync` on the new one.
+4. Start the hub there, then the `server`s.
+
+**Hub down means that machine is down**, not degraded. A `server` that cannot
+reach its hub answers 502, and refuses to boot at all if the hub is already
+unreachable. Offline reading was something the old read-only replicas could do;
+it was not something in use, and it was given up on purpose.
+
+Dev mode is unaffected — no marker needed, and no checkout has one
+(`primary.nosync` is gitignored).
+
+## Reaching the hub from another machine
+
+The hub binds `127.0.0.1` and nothing else. Passing it a host is refused rather
+than ignored, because one argument would otherwise publish an unauthenticated
+item API to the network. So a machine that is not the hub's reaches it through
+an **ssh tunnel**, and the tunnel — not an application check — is the security
+boundary:
+
+```bash
+ssh -N -L 3008:127.0.0.1:3008 mini
+```
+
+The far end of that forward is the mini's *own* loopback, opened by its sshd. So
+the hub stays exactly as reachable as it was, and ssh supplies the one control
+that matters over a network: *who* may speak.
+
+**The nice consequence: the tunnel puts the hub on `127.0.0.1:3008` on the
+remote machine too, so the same `config.edn` is correct everywhere.** One jar,
+one config, and `primary.nosync` is the only difference between two machines.
+
+**One port, and only one.** It is tempting to forward `:11434` as well so the
+remote machine can reach Ollama — don't. The embedder runs in the hub precisely
+so that a query crosses the wire as a *string* instead of as a 1024-float vector
+that then has to cross back as a SQL parameter. A second forward would restore
+the arrangement this replaced.
+
+### Keeping it up
+
+On the remote machine, and only there. `ssh` under a LaunchAgent; no `autossh`
+and nothing else to install.
+
+`~/.ssh/config`:
+
+```
+Host mini-tunnel
+  HostName Mac-mini.local      # Bonjour name, not an IP: DHCP moves
+  User <you>
+  IdentityFile ~/.ssh/id_ed25519_rhizome
+  IdentitiesOnly yes
+  ControlPath none
+  ExitOnForwardFailure yes
+  ServerAliveInterval 15
+  ServerAliveCountMax 3
+```
+
+`~/Library/LaunchAgents/net.eighttrigrams.rhizome-tunnel.plist`:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>            <string>net.eighttrigrams.rhizome-tunnel</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/ssh</string>
+    <string>-N</string>
+    <string>-T</string>
+    <string>-L</string>
+    <string>3008:127.0.0.1:3008</string>
+    <string>mini-tunnel</string>
+  </array>
+  <key>RunAtLoad</key>        <true/>
+  <key>KeepAlive</key>        <true/>
+  <key>ThrottleInterval</key> <integer>10</integer>
+  <key>StandardErrorPath</key><string>/tmp/rhizome-tunnel.log</string>
+</dict>
+</plist>
+```
+
+```bash
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/net.eighttrigrams.rhizome-tunnel.plist
+curl -sf http://127.0.0.1:3008/health    # proves the far end, not just the socket
+```
+
+Four of those settings are the entire design, and each covers a failure that is
+invisible without it:
+
+- **`ExitOnForwardFailure yes`.** Without it, when something already holds local
+  `:3008`, ssh connects fine, logs one line about not being able to listen, and
+  **stays up forwarding nothing**. launchd sees a healthy process and the
+  `server` health-checks against whatever the stale tunnel points at. With it,
+  ssh exits and launchd retries.
+- **`ServerAliveInterval` / `ServerAliveCountMax`.** Lid closed, network changed:
+  the connection is dead and neither end has noticed. The tunnel becomes a black
+  hole that *accepts* connections and never answers, so a health check **hangs**
+  rather than failing. These make ssh notice and exit. This is the one failure a
+  health check cannot catch for you.
+- **`ControlPath none`.** A long-lived forward must not ride a shared
+  `ControlMaster`; an interactive session's master timing out or being closed
+  would take the forward with it. Give the tunnel its own alias.
+- **`KeepAlive`**, which is the whole reason `autossh` is not here. `autossh`'s
+  recommended mode is `-M 0`, which turns off its own monitoring and delegates
+  liveness to the two `ServerAlive*` options above — leaving it with nothing to
+  do but restart the process, which is what launchd is for. If plain ssh turns
+  out to miss half-dead connections in practice, `autossh -M 0` in the
+  `ProgramArguments` above is the known remedy and is a one-line change.
+
+**The `server` refuses to boot when the tunnel is down, and that is deliberate.**
+A `server` that came up anyway would serve a frontend where every navigation
+502s, which reads as "rhizome is broken" rather than "the tunnel is down". Under
+a LaunchAgent with `KeepAlive` the refusal is simply a wait loop: it retries
+every ten seconds and succeeds once the tunnel is up.
 
 ## Part-of relations and hierarchy mode
 
