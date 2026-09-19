@@ -20,7 +20,8 @@
      before.
 
    So no mode flag is introduced, and no configuration decides this twice."
-  (:require [clj-http.client :as http]
+  (:require [cheshire.core :as json]
+            [clj-http.client :as http]
             [clj-http.conn-mgr :as conn-mgr]
             [clojure.string :as str]
             [config :as config]
@@ -36,6 +37,21 @@
   []
   (let [handle (:db config/config)]
     (when (db/remote? handle) (:db-server/url handle))))
+
+(defn health
+  "The hub's `/health`, parsed, or a throw naming the url that did not answer.
+
+   Plain JSON on a plain GET, which is what makes this the right thing for a
+   startup check: it is the one route a start script or a prober can read
+   without speaking any protocol at all."
+  [url]
+  (let [resp (http/get (str url "/health")
+                       {:as :string :throw-exceptions false
+                        :connection-manager @conn-manager})]
+    (when-not (= 200 (:status resp))
+      (throw (ex-info (str "hub: /health answered " (:status resp) " at " url)
+                      {:hub-url url :status (:status resp)})))
+    (json/parse-string (:body resp) true)))
 
 (def ^:private forwarded-request-headers
   "Only what the far end reads. Not `host` (it names this machine), not

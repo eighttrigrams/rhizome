@@ -9,10 +9,8 @@
             [ring.middleware.json :as json]
             [env :refer [wrap-env-defaults]]
             [config :as config]
-            [dev-seed :as dev-seed]
             [db :as db]
             [repository :as r]
-            [repository.insertion.file :as file]
             [poll :as poll]
             [replica :as replica]
             [et.vp.ds :as datastore]
@@ -301,18 +299,15 @@
     refused and the pollers are not scheduled -- so gating it there would refuse
     to boot over a capability it cannot use.
 
-  **The schema is not applied here any more.** The db-server owns the file and
-  applies it as it opens it, before this process is started at all -- and on a
-  replica it skips it there for the same reason it was skipped here. The seed
-  stays: it is a write of *items*, which is app-side business, and it travels
-  over the wire like every other statement."
+  **Neither the schema nor the seed is applied here any more.** The hub owns
+  the file: it applies the schema as it opens it, and since step 4 it seeds it
+  too, from its own `-main`. What is left here is the one thing that is about
+  *this machine* rather than about the database -- ImageMagick, which only
+  preview downscaling needs and which has to exist where the downscaling
+  happens."
   []
   (when-not (replica/read-only?)
-    (upload/ensure-convert!)
-    (dev-seed/maybe-seed! {:db         (:db config/config)
-                           :dev?       (:dev? config/config)
-                           :e2e?       (:e2e? config/config)
-                           :skip-seed? (:skip-seed? config/config)})))
+    (upload/ensure-convert!)))
 
 (defn- app-role-reason
   "What this process concluded about its own role, and *why*, in the words the
@@ -400,10 +395,14 @@
                    (if db-read-only? "a read-only replica" "a primary")))))
 
 (defn- check-db-server!
-  "One statement, before anything else needs one, so that a db-server that is
+  "One `/health` call, before anything else needs the hub, so that a hub that is
   not there says so in one line instead of surfacing as a connection refused in
-  the middle of seeding. Then `check-db-server-role!`, which is the other half
-  and the less obvious one.
+  the middle of the first request. Then `check-db-server-role!`, which is the
+  other half and the less obvious one.
+
+  It used to be `SELECT 1` over the statement protocol. `/health` says the same
+  thing -- something is listening and it has a database open -- without this
+  process needing to speak SQL to ask, which is step 4's whole direction.
 
   It is not a health check with a retry loop: waiting for the db-server is
   `scripts/start.sh`'s job, which polls `/health` before it starts this process
@@ -412,7 +411,7 @@
   []
   (let [handle (:db config/config)]
     (when (db/remote? handle)
-      (try (db/execute-one! handle ["SELECT 1"])
+      (try (hub-proxy/health (:db-server/url handle))
            (catch Throwable t
              (let [msg (str "Refusing to start: no db-server answering at "
                             (:db-server/url handle) " (" (.getMessage t) "). "
@@ -431,14 +430,11 @@
   (log-instance-role!)
   (check-db-server!)
   (prepare-for-writing!)
-  ;; A missing file-type context silently drops files of that type on import,
-  ;; so refuse to come up unless every named id is present. The only exemption
-  ;; is a completely empty db: e2e runs against one by design, and a fresh
-  ;; prod/dev db was just seeded above (so it won't read as empty here unless
-  ;; seeding was deliberately skipped).
-  (when-not (or (:e2e? config/config)
-                (dev-seed/items-empty? (:db config/config)))
-    (file/ensure-contexts! (:db config/config)))
+  ;; The file-type context gate moved to the hub with the seed it depends on
+  ;; (db-server/-main): both are questions about the contents of the database,
+  ;; and the process that owns the file is the one that can answer them without
+  ;; a wire.
+  ;;
   ;; Filesystem gate: warn on any missing folder, refuse to start without
   ;; :preview-images. Skipped under e2e -- it runs in CI where the gitignored
   ;; ./files/* dev folders don't exist (same exemption ensure-contexts! uses).

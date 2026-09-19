@@ -32,6 +32,8 @@
             [datastore.connection :as connection]
             [datastore.schema :as schema]
             [db :as db]
+            [dev-seed :as dev-seed]
+            [repository.insertion.file :as file]
             [next.jdbc :as jdbc]
             [placement :as placement]
             [poll :as poll]
@@ -467,7 +469,7 @@
    "youtube_poll_channels" "youtube_poll_seen"
    "atom_poll_feeds" "atom_poll_seen"])
 
-(defn- reset!
+(defn- reset-database!
   "POST /test/reset -- empty the database. The e2e suite's globalSetup calls it,
    and it is the reason `check-e2e-db-path!` exists.
 
@@ -497,7 +499,7 @@
         (POST "/tx/commit" req (tx-commit server req))
         (POST "/tx/rollback" req (tx-rollback server req))))
     (GET "/health" [] (health server))
-    (POST "/test/reset" [] (reset! server))
+    (POST "/test/reset" [] (reset-database! server))
     ;; Before the item surfaces below, deliberately: this one answers the
     ;; statement protocol's own description, and prober and the start scripts
     ;; read it. `rest-api` also serves GET /api/describe, so the two collide and
@@ -734,6 +736,28 @@
       ;; dev answers it, production refuses it.
       :allow-reset? (boolean (:dev? c))})))
 
+(defn seed-opts
+  "What `dev-seed/maybe-seed!` needs, from the same config.edn.
+
+   Seeding moved here from `server` (arch rework 2, step 4) for the reason the
+   pollers did: it is a write of items into the database, and the process that
+   owns the database is the one that should make it. It was the largest block of
+   SQL still crossing the wire.
+
+   It re-reads the file rather than riding along on `config-opts`, which returns
+   exactly what `start!` takes and is asserted as such. Two reads of a small
+   file at boot is a cheaper price than a map that is two things at once.
+
+   `:e2e?` is read off the sysprop, not the file: nothing writes `:e2e? true`
+   into a config.edn -- `config.clj` forces it from `-Drhizome.e2e=1`, and
+   `check-e2e-db-path!` already reads it the same way."
+  ([] (seed-opts config-path))
+  ([path]
+   (let [c (aero/read-config path)]
+     {:dev?       (boolean (:dev? c))
+      :e2e?       (= "1" (System/getProperty "rhizome.e2e"))
+      :skip-seed? (boolean (:skip-seed? c))})))
+
 (defn poll-scheduling-enabled?
   "Whether this process should run the feed pollers.
 
@@ -777,15 +801,27 @@
    of its own: the test harness boots servers inside a JVM that goes on running,
    and hangs its own."
   [& _args]
-  (let [server (start! (config-opts))]
+  (let [server (start! (config-opts))
+        ds     (:ds server)]
     (.addShutdownHook (Runtime/getRuntime)
                       (Thread. ^Runnable (fn [] (poll/stop-scheduler!) (stop! server))))
-    ;; In `-main` and not in `start!`, deliberately: the test suites boot many
-    ;; of these inside one JVM, and a `start!` that reached youtube would make
-    ;; every one of them a network call. `-main` is the process; `start!` is the
-    ;; server.
+    ;; Seeding and the file-context gate, both moved from `server` (step 4).
+    ;; They run here rather than in `start!` for the same reason the pollers do:
+    ;; the suites boot many servers inside one JVM, and `start!` is the server
+    ;; while `-main` is the process. A read-only hub writes nothing, as before.
+    (when-not (:read-only? server)
+      (let [{:keys [dev? e2e? skip-seed?] :as seed} (seed-opts)]
+        (dev-seed/maybe-seed! (assoc seed :db ds))
+        ;; A missing file-type context silently drops files of that type on
+        ;; import, so refuse to come up without every named id. Exempt on an
+        ;; empty database: e2e runs against one by design, and a fresh db was
+        ;; just seeded above unless seeding was deliberately skipped.
+        (when-not (or e2e? (dev-seed/items-empty? ds))
+          (file/ensure-contexts! ds))
+        (when (and dev? skip-seed?)
+          (log/info "db-server: :skip-seed? is set, so nothing was seeded"))))
     (when (poll-scheduling-enabled? server)
-      (poll/start-scheduler! (:ds server)))
+      (poll/start-scheduler! ds))
     (log/info {:url (:url server)}
               (str "db-server: listening on " (:url server) " -- that is the url the "
                    "app-server derives, and nothing off this machine can reach it."))

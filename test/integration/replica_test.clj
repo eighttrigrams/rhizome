@@ -6,7 +6,7 @@
             [datastore.schema :as schema]
             [db :as db]
             [role :as role]
-            [dev-seed :as dev-seed]
+            [hub-proxy :as hub-proxy]
             [poll :as poll]
             [server :as server]
             [upload :as upload]))
@@ -42,22 +42,22 @@
 (deftest write-side-startup-skipped-on-a-replica-test
   (let [called (atom [])
         record! (fn [k] (fn [& _] (swap! called conj k) nil))]
-    (testing "a replica runs neither of them -- not the seed, and not the
-              ImageMagick gate, which would refuse it a boot over preview
-              downscaling it can never do"
+    ;; Since step 4 the seed is the hub's (db-server/-main), so what is left
+    ;; here is the ImageMagick gate alone -- the one startup step that is about
+    ;; this machine rather than about the database.
+    (testing "a replica runs it not at all: the gate would refuse it a boot over
+              preview downscaling it can never do"
       (with-redefs [config/config replica-config
                     upload/ensure-convert! (record! :ensure-convert)
-                    schema/apply-schema! (record! :apply-schema)
-                    dev-seed/maybe-seed! (record! :maybe-seed)]
+                    schema/apply-schema! (record! :apply-schema)]
         (#'server/prepare-for-writing!)
         (is (empty? @called))))
-    (testing "a primary runs both"
+    (testing "a primary runs it"
       (with-redefs [config/config (assoc primary-config :db ::db)
                     upload/ensure-convert! (record! :ensure-convert)
-                    schema/apply-schema! (record! :apply-schema)
-                    dev-seed/maybe-seed! (record! :maybe-seed)]
+                    schema/apply-schema! (record! :apply-schema)]
         (#'server/prepare-for-writing!)
-        (is (= [:ensure-convert :maybe-seed] @called))))))
+        (is (= [:ensure-convert] @called))))))
 
 (deftest the-app-server-does-not-apply-the-schema-test
   ;; Since step 4 the db-server owns the file and applies the schema as it opens
@@ -67,8 +67,7 @@
   (let [called (atom [])]
     (with-redefs [config/config (assoc primary-config :db ::db)
                   upload/ensure-convert! (constantly nil)
-                  schema/apply-schema! (fn [& _] (swap! called conj :apply-schema) nil)
-                  dev-seed/maybe-seed! (constantly nil)]
+                  schema/apply-schema! (fn [& _] (swap! called conj :apply-schema) nil)]
       (#'server/prepare-for-writing!)
       (is (empty? @called)
           "a primary app-server applying the schema would be a second opinion about
@@ -175,24 +174,27 @@
   (testing "the role check is reached: a disagreement refuses through the front door"
     (let [t (with-redefs [config/config        {:db remote :dev? true :read-only-replica? false}
                           config/primary-marker-present? (constantly false)
-                          db/execute-one!      (constantly nil)
+                          hub-proxy/health     (constantly {:ok true})
                           db/remote-read-only? (constantly true)]
               (try (#'server/check-db-server!) nil (catch Throwable t t)))]
       (is (some? t)
           "if this passes, `check-db-server!` is no longer calling the role check")
       (is (re-find #"disagree about whether this instance may write" (.getMessage t)))))
-  (testing "and so is the reachability check, with the statement it claims to run"
+  (testing "and so is the reachability check, at the url it claims to ask"
+    ;; It asks /health now rather than running SELECT 1 over the statement
+    ;; protocol (step 4): the same question -- something is listening and it has
+    ;; a database open -- without this process having to speak SQL to ask it.
     (let [asked (atom [])]
       (with-redefs [config/config        {:db remote :dev? true :read-only-replica? false}
                     config/primary-marker-present? (constantly false)
-                    db/execute-one!      (fn [_ stmt] (swap! asked conj stmt) nil)
+                    hub-proxy/health     (fn [url] (swap! asked conj url) {:ok true})
                     db/remote-read-only? (constantly false)]
         (#'server/check-db-server!))
-      (is (= [["SELECT 1"]] @asked))))
+      (is (= [(:db-server/url remote)] @asked))))
   (testing "a local handle is asked nothing at all -- which is what test mode rests on"
     (let [asked (atom [])]
       (with-redefs [config/config        {:db ::a-datasource :read-only-replica? false}
-                    db/execute-one!      (fn [& _] (swap! asked conj :statement) nil)
-                    db/remote-read-only? (fn [& _] (swap! asked conj :health) nil)]
+                    hub-proxy/health     (fn [& _] (swap! asked conj :health) nil)
+                    db/remote-read-only? (fn [& _] (swap! asked conj :role) nil)]
         (#'server/check-db-server!))
       (is (empty? @asked)))))
