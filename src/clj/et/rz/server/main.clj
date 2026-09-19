@@ -37,7 +37,7 @@
 
    The whole thing is conditional on there being a hub to talk to. Without one
    this process holds the database itself -- test mode, e2e, a single-machine
-   dev session with no db-server -- and every command is answered here exactly
+   dev session with no hub -- and every command is answered here exactly
    as it always was. That is what keeps this change from having two meanings.
 
    With a hub:
@@ -318,7 +318,7 @@
   []
   (and (not (:e2e? config/config))
        ;; Not when there is a hub: it runs them, over the database it owns
-       ;; (`db-server/poll-scheduling-enabled?`). Two machines each running a
+       ;; (`et.rz.hub.main/poll-scheduling-enabled?`). Two machines each running a
        ;; `server` would otherwise read every feed twice and race to insert the
        ;; same items. This is the half of the pair that says "not me"; they are
        ;; pinned against each other in poller-placement-test.
@@ -345,7 +345,7 @@
   (when (nil? (hub-proxy/hub-url))
     (upload/ensure-convert!)))
 
-(defn- check-db-server!
+(defn- check-hub!
   "One `/health` call, before anything else needs the hub, so that a hub that is
   not there says so in one line instead of surfacing as a connection refused in
   the middle of the first request.
@@ -358,22 +358,33 @@
   compared their verdicts about whether this instance might write, because they
   read the same marker in two different working directories and could disagree.
   There is nothing to disagree about now -- a hub that boots is writable, and a
-  machine that was not elected does not boot one (`db-server/check-elected!`).
+  machine that was not elected does not boot one (`et.rz.hub.main/check-elected!`).
 
   It is not a health check with a retry loop: waiting for the hub is the start
   procedure's job, which polls `/health` before it starts this process at all.
   This is the message for when that did not happen -- a server started by hand,
-  or pointed at the wrong port."
+  a server pointed at the wrong port, or, on a machine that is not the hub's, a
+  tunnel that is down.
+
+  **Refusing is deliberate, and it is not the harsh option.** This process can
+  run without a hub only in the sense that it can answer the frontend; every
+  navigation in it would 502, which reads as \"rhizome is broken\" rather than
+  \"the hub is not up\". And the refusal costs nothing where it happens under a
+  supervisor: a LaunchAgent with KeepAlive turns it into a wait loop that
+  succeeds as soon as the tunnel comes back. See the README's \"Reaching the hub
+  from another machine\"."
   []
   (when-let [url (hub-proxy/hub-url)]
     (try (hub-proxy/health url)
          (catch Throwable t
-           (let [msg (str "Refusing to start: no db-server answering at "
+           (let [msg (str "Refusing to start: no hub answering at "
                           url " (" (.getMessage t) "). "
-                          "Start it first -- 'make start' does, and "
-                          "'make start-db' runs it alone.")]
+                          "On the hub's own machine, start it first -- 'make start' "
+                          "does, and 'make start-hub' runs it alone. On any other "
+                          "machine this address is the near end of an ssh tunnel, so "
+                          "what is down is the tunnel, not the hub.")]
              (log/error t msg)
-             (throw (ex-info msg {:db-server/url url} t)))))))
+             (throw (ex-info msg {:hub/url url} t)))))))
 
 (defn start-http-server!
   []
@@ -381,10 +392,10 @@
              (or (nil? (:private-addr config/config))
                  (not (string? (:private-addr config/config)))))
     (throw (Exception. "config invalid")))
-  (check-db-server!)
+  (check-hub!)
   (prepare-for-writing!)
   ;; The file-type context gate moved to the hub with the seed it depends on
-  ;; (db-server/-main): both are questions about the contents of the database,
+  ;; (et.rz.hub.main/-main): both are questions about the contents of the database,
   ;; and the process that owns the file is the one that can answer them without
   ;; a wire.
   ;;

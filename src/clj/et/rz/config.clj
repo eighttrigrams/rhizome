@@ -34,10 +34,10 @@
 ;; SQLite's shared-cache URI form rather than the bare ":memory:".
 ;;
 ;; **The only db path this process still knows.** The dev and e2e paths that
-;; used to sit beside it are the db-server's business since the split -- they
-;; are `:db-server :db-path` in config.edn, written by onboard.sh as
+;; used to sit beside it are the hub's business since the split -- they
+;; are `:hub :db-path` in config.edn, written by onboard.sh as
 ;; `#or [#env DB_PATH "./rhizome.db"]`, which is how `scripts/e2e.sh` points
-;; its own db-server at ./test/rhizome-e2e.db without a second config file.
+;; its own hub at ./test/rhizome-e2e.db without a second config file.
 ;; This one cannot follow them there, and that is not an oversight: a
 ;; shared-cache in-memory SQLite lives inside one JVM, so no separate process
 ;; could open it. See the `:db` handle in `ds` below.
@@ -128,11 +128,11 @@
     (assoc-in c [:folders :logs] dir)))
 
 ;; --- which machine holds the database ---------------------------------------
-;; The marker lives in `role`, which the db-server can require and this
+;; The marker lives in `role`, which the hub can require and this
 ;; namespace cannot be required from (loading `config` builds the app's whole
-;; configuration, folders and all, out of a file the db-server may not even
+;; configuration, folders and all, out of a file the hub may not even
 ;; share). Since step 4 it elects the hub rather than demoting replicas --
-;; see `role`, and `db-server/check-elected!`, which is the one reader.
+;; see `role`, and `et.rz.hub.main/check-elected!`, which is the one reader.
 ;;
 ;; Re-exported here because config_test and the scripts have always called
 ;; them this.
@@ -140,57 +140,82 @@
 (def primary-marker-present? role/primary-marker-present?)
 
 ;; --- the database, which is not in this process any more --------------------
-;; Two keys moved into the `:db-server` section when the db-server became its
-;; own process, and both would fail *silently* if a config.edn from before the
-;; split were simply read: a top-level `:db-path` would be ignored by an app
-;; that no longer opens a file at all, and a `:semsearch :vec-path` would leave
-;; `et.rz.hub.sqlite.connection` with no extension path -- semantic search quietly off
-;; and the ^:vector tests quietly skipped. So they are refused, by name, with
-;; the move spelled out.
+;; Three shapes of an older config.edn are refused here, by name, and none of
+;; them is refused for tidiness: each would fail *silently* if simply read.
+;;
+;; A top-level `:db-path` would be ignored by an app that no longer opens a
+;; file at all. A `:semsearch :vec-path` would leave
+;; `et.rz.hub.sqlite.connection` with no extension path -- semantic search
+;; quietly off and the ^:vector tests quietly skipped. And a `:db-server`
+;; section is the section itself under its old name: the hub reads `:hub`, so
+;; the whole block -- port, db path, vec path -- would be invisible, and the
+;; hub would fall back to its default port while this process derived a hub
+;; address from nothing.
+;;
+;; The `:db-server` refusal is the one that matters operationally. It is what
+;; makes the cutover step -- rename the section in the deployed config.edn --
+;; impossible to skip quietly: the process stops and names the one word to
+;; change, instead of coming up green against a config section nobody is
+;; reading.
 (defn- check-moved-keys [c]
   (when (:db-path c)
-    (throw (ex-info (str "config invalid: :db-path moved into the :db-server section. "
-                         "The app-server holds no database; the db-server opens the file. "
-                         "Write :db-server {:db-path \"…\"} instead.")
+    (throw (ex-info (str "config invalid: :db-path moved into the :hub section. "
+                         "The server holds no database; the hub opens the file. "
+                         "Write :hub {:db-path \"…\"} instead.")
                     {:config c})))
   (when (get-in c [:semsearch :vec-path])
     (throw (ex-info (str "config invalid: :vec-path moved from :semsearch into the "
-                         ":db-server section. Loading the sqlite-vec extension is the "
-                         "db-server's business now; :semsearch keeps :ollama-url and "
-                         ":ollama-model, which are the app-side embedder's.")
+                         ":hub section. Loading the sqlite-vec extension is the "
+                         "hub's business now; :semsearch keeps :ollama-url and "
+                         ":ollama-model, which are the embedder's -- and the embedder "
+                         "runs in the hub.")
+                    {:config c})))
+  (when (contains? c :db-server)
+    (throw (ex-info (str "config invalid: the :db-server section is now :hub. Rename it "
+                         "-- the contents are unchanged. Nothing reads :db-server any "
+                         "more, so leaving it would mean the hub's port, :db-path and "
+                         ":vec-path were all silently ignored. (`make onboard` writes "
+                         "the new name; a deployed config.edn has to be edited by hand, "
+                         "and that is exactly the step this refusal exists to catch.)")
                     {:config c})))
   c)
 
-(defn- db-url
-  "Where this app-server's db-server is. `:db-url` wins when it is set -- that
-   is the separate-files arrangement, and the hook the later remote-machine
-   step needs -- otherwise it is derived from the `:db-server :port` in the
-   file both processes share.
+(defn- hub-url
+  "Where this machine's `server` finds the hub. `:hub-url` wins when it is set
+   -- that is the separate-files arrangement -- otherwise it is derived from
+   the `:hub :port` in the file both processes share.
+
+   **The derived answer is usually the right one even from another machine**,
+   and that is the point of the tunnel: `ssh -N -L 3008:127.0.0.1:3008 mini`
+   puts the hub on this machine's loopback at the same port, so the same
+   config.edn is correct on the hub's machine and on every other. `:hub-url` is
+   for the case where it is not -- a local port already taken, so the forward
+   had to land somewhere else.
 
    Neither present is a refusal rather than a default. A guessed port would
-   come up green and fail on the first statement with a connection refused,
+   come up green and fail on the first request with a connection refused,
    which is the confusing version of exactly this message."
   [c]
-  (or (:db-url c)
-      (when-let [port (get-in c [:db-server :port])]
+  (or (:hub-url c)
+      (when-let [port (get-in c [:hub :port])]
         (str "http://127.0.0.1:" port))
-      (throw (ex-info (if (contains? c :db-server)
+      (throw (ex-info (if (contains? c :hub)
                         ;; There IS a section; it just does not name a port. Saying
-                        ;; "no :db-server section" here was simply false, and a false
+                        ;; "no :hub section" here was simply false, and a false
                         ;; message costs more than a missing one -- it sends the reader
                         ;; to look for something that is in front of them.
-                        (str "config invalid: the :db-server section has no :port, so there "
-                             "is nothing to derive this app-server's db handle from. Add "
+                        (str "config invalid: the :hub section has no :port, so there "
+                             "is nothing to derive this server's hub address from. Add "
                              ":port to it (that is what `make onboard` writes), or set a "
-                             "top-level :db-url. Note that the db-server defaults its own "
+                             "top-level :hub-url. Note that the hub defaults its own "
                              "port when the section omits one -- this process does not "
                              "guess at it, because a guess that happened to be wrong would "
-                             "come up green and fail on the first statement.")
-                        (str "config invalid: no :db-server section and no :db-url. "
-                             "The app-server reaches its database over HTTP, so it needs "
-                             "either :db-server {:port …} to derive http://127.0.0.1:<port> "
-                             "from, or an explicit :db-url. `make onboard` writes the "
-                             "section; a config.edn from before the split has to gain it."))
+                             "come up green and fail on the first request.")
+                        (str "config invalid: no :hub section and no :hub-url. "
+                             "This server reaches the hub over HTTP, so it needs "
+                             "either :hub {:port …} to derive http://127.0.0.1:<port> "
+                             "from, or an explicit :hub-url. `make onboard` writes the "
+                             "section."))
                       {:config c}))))
 
 (defn- db-handle
@@ -199,7 +224,7 @@
    **Test mode is the one arrangement that keeps a local DataSource, and it is
    not a shortcut.** The test database is a shared-cache in-memory SQLite, which
    lives inside one JVM: no separate process could open it, so there is no
-   db-server for this handle to point at. The one the integration suites run
+   hub for this handle to point at. The one the integration suites run
    against is booted *in* the test JVM by `db-harness`, on an ephemeral port,
    against this very datasource's file name -- and every test's own setup
    statements and assertions go on using this handle directly. That is the
@@ -235,6 +260,6 @@
         ;; Where the hub is. Nil in test mode, which is the one arrangement
         ;; with no hub to talk to -- `hub-proxy` reads exactly this to decide
         ;; whether to forward, so "no hub" and "answer it here" are one fact.
-        (assoc :hub-url (when-not (:test? c) (db-url c))))))
+        (assoc :hub-url (when-not (:test? c) (hub-url c))))))
 
 (def config (ds))

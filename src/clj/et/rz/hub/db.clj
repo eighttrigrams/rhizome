@@ -9,7 +9,7 @@
 
    Until step 4 of the architecture rework a handle was one of *two* things, and
    every function dispatched on which: a local DataSource, or
-   `{:db-server/url \"…\"}` -- transit over HTTP to a `db-server` that held the
+   `{:db-server/url \"…\"}` -- transit over HTTP to a db-server that held the
    database at the other end and ran statements sent to it as SQL. The whole
    point was that no caller above this namespace knew which it had.
 

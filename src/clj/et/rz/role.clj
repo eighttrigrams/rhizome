@@ -13,20 +13,20 @@
    *may this instance write*. Present, and the database opened writable; absent,
    and prod mode meant a read-only replica -- a synced copy that refused every
    write, in front and at the driver both. That is why the app-server and the
-   db-server each read it independently, and why they had to be checked against
+   hub each read it independently, and why they had to be checked against
    each other at boot.
 
    There are no replicas now: one hub, and a `server` on every machine that
    forwards to it. So the marker was free, and it answers the question the
    deployment actually has -- **which machine runs the hub**. It is read in one
-   place, `db-server/check-elected!`, which refuses to boot a hub on a machine
+   place, `et.rz.hub.main/check-elected!`, which refuses to boot a hub on a machine
    that has no marker.
 
    It stays deliberately tiny and requires nothing but `clojure.java.io`. That
-   is what lets the db-server use it: `config` cannot be required from there,
+   is what lets the hub use it: `config` cannot be required from there,
    because loading `config` builds the *app's* configuration -- folders, logging
    and all -- out of a file that, in the separate-files arrangement, holds
-   nothing but the `:db-server` section.
+   nothing but the `:hub` section.
 
    `config` re-exports both names."
   (:require [clojure.java.io :as io]))

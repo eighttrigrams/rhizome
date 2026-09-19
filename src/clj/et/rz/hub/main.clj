@@ -24,7 +24,7 @@
 
    ## Boot
 
-   `start!` with an opts map shaped like the `:db-server` config section, and
+   `start!` with an opts map shaped like the `:hub` config section, and
    `stop!` with what it returns. **`start!` reads no configuration** -- that is
    what lets a test boot as many of these as it likes on ephemeral ports -- so
    the file is read by `config-opts`, `seed-opts` and `-main`, and nowhere
@@ -53,11 +53,16 @@
   (:import [org.eclipse.jetty.server ServerConnector]))
 
 (def ^:private loopback
-  "The only address this ever binds. Not an option: the routes below run
-   arbitrary SQL with no authentication of any kind, so a `:host` argument
-   would be a one-word way to publish the database to the network. The plan
-   puts LAN exposure and the auth that has to come with it in a later step
-   than this one."
+  "The only address this ever binds. Not an option: the routes below reach the
+   database with no authentication of any kind, so a `:host` argument would be
+   a one-word way to publish it to the network.
+
+   **And it stays that way.** Step 5 settled how another machine reaches this
+   process, and the answer is not a bind address: it is an ssh tunnel
+   (`ssh -N -L 3008:127.0.0.1:3008 mini`), whose far end is this machine's own
+   loopback opened by sshd. So the remote case needs nothing from here, ssh
+   supplies the authentication, and there is no later step in which this
+   becomes an option."
   "127.0.0.1")
 
 (defn- json-response
@@ -72,7 +77,7 @@
   "Run the smallest possible statement, to find out whether the database is
    actually there. Building a datasource proves nothing: SQLite opens lazily,
    and a read-only datasource in particular never creates or touches the file,
-   so a db-server pointed at a path that does not exist comes up perfectly and
+   so a hub pointed at a path that does not exist comes up perfectly and
    fails on its first real statement."
   [{:keys [ds]}]
   (jdbc/execute-one! ds ["SELECT 1"]))
@@ -98,7 +103,7 @@
                         :read-only?     (boolean (:read-only? server))
                         :vec-available? connection/vec-available?})
     (catch Throwable t
-      (log/error t "db-server: /health could not reach the database")
+      (log/error t "hub: /health could not reach the database")
       (json-response 503 {:ok             false
                           :error          (str (.getMessage t))
                           :read-only?     (boolean (:read-only? server))
@@ -177,7 +182,7 @@
                                                       (str "it is a machine-local command and has "
                                                            "to run where the files are"))))})
     (wrap-params (et.rz.hub.rest-api/rest-routes (constantly (:ds server))))
-    (fn [req] (json-response 404 {:error (str "db-server: no such route: " (:uri req))}))))
+    (fn [req] (json-response 404 {:error (str "hub: no such route: " (:uri req))}))))
 
 ;; -- process ---------------------------------------------------------------
 
@@ -185,7 +190,7 @@
   "Refuse to boot on a `:vec-path` this process cannot honour.
 
    `et.rz.hub.sqlite.connection` resolves the extension path once, at load, out of
-   `:db-server :vec-path` in config.edn -- the same key `config-opts` reads
+   `:hub :vec-path` in config.edn -- the same key `config-opts` reads
    below, so a server booted from the file agrees with it by construction and
    this check has nothing to say. What it is for is a caller that passes a
    *different* path explicitly: the extension is loaded on every connection
@@ -194,8 +199,8 @@
    whole seam is arranged to prevent, so it is refused instead."
   [vec-path]
   (when (and vec-path (not= vec-path connection/vec-extension-path))
-    (throw (ex-info (str "db-server: :vec-path " (pr-str vec-path) " but et.rz.hub.sqlite.connection "
-                         "loaded " (pr-str connection/vec-extension-path) " from :db-server "
+    (throw (ex-info (str "hub: :vec-path " (pr-str vec-path) " but et.rz.hub.sqlite.connection "
+                         "loaded " (pr-str connection/vec-extension-path) " from :hub "
                          ":vec-path in config.edn. The extension path is resolved once, at "
                          "load; a different one here could not take effect.")
                     {:vec-path vec-path :loaded connection/vec-extension-path}))))
@@ -224,15 +229,15 @@
    bound elsewhere and has not."
   [{:keys [port db-path vec-path read-only? allow-reset?] :as opts}]
   (when (contains? opts :host)
-    (throw (ex-info (str "db-server: :host is not an option -- this binds " loopback
+    (throw (ex-info (str "hub: :host is not an option -- this binds " loopback
                          " and nothing else. These routes run arbitrary SQL with no "
                          "authentication, so exposing them beyond the machine is a step "
                          "that has to arrive with the auth for it.")
                     {:host (:host opts)})))
   (when (str/blank? (str db-path))
-    (throw (ex-info "db-server: :db-path is required" {})))
+    (throw (ex-info "hub: :db-path is required" {})))
   (when (nil? port)
-    (throw (ex-info "db-server: :port is required (0 for an ephemeral one)" {})))
+    (throw (ex-info "hub: :port is required (0 for an ephemeral one)" {})))
   (check-vec-path! vec-path)
   (let [ds     (connection/make-datasource {:dbname db-path :read-only? (boolean read-only?)})
         server {:ds           ds
@@ -244,16 +249,16 @@
     ;; against a path that does not exist.
     (try (reach-the-database! server)
          (catch Throwable t
-           (throw (ex-info (str "db-server: cannot reach the database at " (pr-str db-path)
+           (throw (ex-info (str "hub: cannot reach the database at " (pr-str db-path)
                                 ": " (.getMessage t))
                            {:db-path db-path :read-only? (boolean read-only?)} t))))
     (if read-only?
-      (log/info "db-server: read-only, so the schema is left as it arrived")
+      (log/info "hub: read-only, so the schema is left as it arrived")
       (schema/apply-schema! ds))
     (let [jetty (jetty/run-jetty (app server) {:port port :host loopback :join? false})
           bound (.getLocalPort ^ServerConnector (first (.getConnectors jetty)))]
       (log/info {:port bound :db-path db-path :read-only? (boolean read-only?)}
-                "db-server: up")
+                "hub: up")
       (assoc server
         :jetty jetty
         :port  bound
@@ -278,20 +283,20 @@
 (def ^:private config-path "./config.edn")
 
 (def default-port
-  "The port when the `:db-server` section names none. onboard.sh writes
+  "The port when the `:hub` section names none. onboard.sh writes
    `#long #or [#env DB_PORT 3141]`, so this is only reached by a hand-written
    section; `scripts/detect-ports.sh` falls back to the same number, and it is
    the same number on purpose."
   3141)
 
 (def e2e-db-path
-  "The only database a db-server started under the `:e2e` alias may open.
+  "The only database a hub started under the `:e2e` alias may open.
 
    Before the split, `-Drhizome.e2e=1` picked the file: `config.clj` hardcoded
    it, so an e2e JVM physically could not reach the developer's database. Since
-   the split the file is the db-server's `:db-path`, which `scripts/e2e.sh`
+   the split the file is the hub's `:db-path`, which `scripts/e2e.sh`
    points here by exporting `DB_PATH` -- and an export is a thing that can be
-   forgotten. A db-server hand-started with `-M:e2e` and no `DB_PATH` would open
+   forgotten. A hub hand-started with `-M:e2e` and no `DB_PATH` would open
    `./rhizome.db`, and e2e's `globalSetup` POSTs `/test/reset`, which deletes
    every row it can see. So the old guarantee is kept, by refusal rather than by
    hardcoding."
@@ -308,23 +313,23 @@
              (= "1" (System/getProperty "rhizome.e2e")))
     (let [canon #(.getCanonicalPath (io/file %))]
       (when-not (= (canon db-path) (canon e2e-db-path))
-        (throw (ex-info (str "db-server: refusing to open " (pr-str db-path)
+        (throw (ex-info (str "hub: refusing to open " (pr-str db-path)
                              " under -Drhizome.e2e=1. An e2e run may only touch "
                              (pr-str e2e-db-path) ", because its globalSetup POSTs "
                              "/test/reset and that deletes every row in whatever "
                              "database is behind it. Export DB_PATH=" e2e-db-path
-                             " (scripts/e2e.sh does), or start this db-server "
+                             " (scripts/e2e.sh does), or start this hub "
                              "without the :e2e alias.")
                         {:db-path db-path :e2e-db-path e2e-db-path}))))))
 
 (defn config-opts
-  "The `:db-server` section of a `config.edn`, as `start!` takes it.
+  "The `:hub` section of a `config.edn`, as `start!` takes it.
 
    **It reads that one key, and one flag outside it.** The key is this
-   server's entire configuration -- `:port`, `:db-path`, `:vec-path` -- which
+   process's entire configuration -- `:port`, `:db-path`, `:vec-path` -- which
    is what makes the two arrangements one file format: the shared config.edn
-   the app-server also reads, or a standalone one holding nothing but
-   `{:db-server {…}}`. Neither needs a reader of its own.
+   the `server` also reads, or a standalone one holding nothing but
+   `{:hub {…}}`. Neither needs a reader of its own.
 
    The flag is the top-level `:dev?`, and it is read because the primary /
    replica rule is `(and (not dev?) (not marker))` and **both processes have to
@@ -333,26 +338,39 @@
    why it is not in the section; a standalone file that says nothing is prod,
    which is the right default for a file written for a deployment.
 
-   The two keys that moved into the section are refused by name where they used
-   to live. Ignoring them would be silent: an old top-level `:db-path` would
-   leave this server pointed at nothing, and an old `:semsearch :vec-path` would
-   turn the vec extension off everywhere without a word."
+   Three shapes of an older config.edn are refused by name, because ignoring
+   any of them would be silent: an old top-level `:db-path` would leave this
+   process pointed at nothing, an old `:semsearch :vec-path` would turn the vec
+   extension off everywhere without a word, and an old `:db-server` section is
+   this very section under the name it had until step 5 -- so port, db path and
+   vec path would *all* be invisible and this process would come up on its
+   default port against a database nobody named. That last one is the cutover
+   step (rename the section in the deployed config.edn) made impossible to skip
+   quietly. `et.rz.config/check-moved-keys` refuses the same three, for the
+   `server`."
   ([] (config-opts config-path))
   ([path]
    (let [c       (aero/read-config path)
-         section (:db-server c)]
+         section (:hub c)]
      (when (:db-path c)
-       (throw (ex-info (str "db-server: :db-path moved into the :db-server section. "
-                            "Write :db-server {:db-path \"…\"} in " path ".")
+       (throw (ex-info (str "hub: :db-path moved into the :hub section. "
+                            "Write :hub {:db-path \"…\"} in " path ".")
                        {:config-path path})))
      (when (get-in c [:semsearch :vec-path])
-       (throw (ex-info (str "db-server: :vec-path moved from :semsearch into the :db-server "
+       (throw (ex-info (str "hub: :vec-path moved from :semsearch into the :hub "
                             "section -- loading the extension is this process's business now. "
                             ":semsearch keeps :ollama-url and :ollama-model, which are the "
-                            "app-side embedder's.")
+                            "embedder's, and the embedder runs here.")
+                       {:config-path path})))
+     (when (contains? c :db-server)
+       (throw (ex-info (str "hub: the :db-server section is now :hub. Rename it in " path
+                            " -- the contents are unchanged. Nothing reads :db-server any "
+                            "more, so leaving it would mean this process's :port, :db-path "
+                            "and :vec-path were all silently ignored and it came up on its "
+                            "default port against a database nobody named.")
                        {:config-path path})))
      (when-not (map? section)
-       (throw (ex-info (str "db-server: no :db-server section in " path
+       (throw (ex-info (str "hub: no :hub section in " path
                             ". It needs at least a :db-path; `make onboard` writes the "
                             "whole block.")
                        {:config-path path})))
@@ -393,7 +411,7 @@
   ([path]
    (let [c (aero/read-config path)]
      (when-not (or (:dev? c) (role/primary-marker-present?))
-       (throw (ex-info (str "db-server: refusing to start. This machine has no "
+       (throw (ex-info (str "hub: refusing to start. This machine has no "
                             role/primary-marker " beside its config.edn, so it was not "
                             "elected to hold the database. Exactly one machine runs the "
                             "hub; the others run a server that forwards to it. If this "
@@ -452,7 +470,7 @@
        (not= "1" (System/getProperty "rhizome.e2e"))))
 
 (defn -main
-  "Start the db-server from the config.edn in the directory it was launched in,
+  "Start the hub from the config.edn in the directory it was launched in,
    and stay up.
 
    There is nothing to join and no daemon flag anywhere. Jetty's thread pool is
@@ -491,10 +509,10 @@
         (when-not (or e2e? (dev-seed/items-empty? ds))
           (file/ensure-contexts! ds))
         (when (and dev? skip-seed?)
-          (log/info "db-server: :skip-seed? is set, so nothing was seeded"))))
+          (log/info "hub: :skip-seed? is set, so nothing was seeded"))))
     (when (poll-scheduling-enabled? server)
       (poll/start-scheduler! ds))
     (log/info {:url (:url server)}
-              (str "db-server: listening on " (:url server) " -- that is the url the "
+              (str "hub: listening on " (:url server) " -- that is the url the "
                    "app-server derives, and nothing off this machine can reach it."))
     nil))

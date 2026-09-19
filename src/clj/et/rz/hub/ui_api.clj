@@ -8,7 +8,7 @@
    What is NOT here is the browser gate. `server` wraps this in the
    `:private-addr` / `:private-user-agent` check, because that guards the
    surface a browser can reach. The hub binds loopback and refuses anything
-   else (`db-server/loopback`), so the gate would have nothing to add there --
+   else (`et.rz.hub.main/loopback`), so the gate would have nothing to add there --
    and putting it here would make the hub read config keys that describe
    somebody else's machine."
   (:require [compojure.core :refer [context POST]]

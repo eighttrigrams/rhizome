@@ -2,7 +2,7 @@
   "The hub answers `/ui` and `/api` off its own database (arch rework 2,
    step 2).
 
-   Until now the db-server spoke statements and nothing else -- `db_server`'s
+   Until now the hub spoke statements and nothing else -- its
    own docstring said there would never be an endpoint here that mentioned an
    item. That is the sentence this step reverses, so it deserves a test that
    reverses it visibly: a context created through this server's `/ui` and read
@@ -18,7 +18,7 @@
             [clj-http.client :as http]
             [clojure.test :refer [deftest is testing]]
             [cognitect.transit :as transit]
-            [et.rz.hub.main :as db-server]
+            [et.rz.hub.main :as hub-main]
             [et.rz.placement :as placement])
   (:import [java.io ByteArrayOutputStream]))
 
@@ -29,10 +29,10 @@
 (defn- with-hub
   ([f] (with-hub {} f))
   ([opts f]
-   (let [server (db-server/start! (merge {:port 0 :db-path (temp-db-path)
+   (let [server (hub-main/start! (merge {:port 0 :db-path (temp-db-path)
                                           :allow-reset? true}
                                          opts))]
-     (try (f server) (finally (db-server/stop! server))))))
+     (try (f server) (finally (hub-main/stop! server))))))
 
 (defn- transit-args
   "The `/ui` envelope carries its args as a transit string."

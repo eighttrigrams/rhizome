@@ -8,7 +8,7 @@
 
 (defn- read-config* []
   ;; Peek at config.edn directly so we don't pull in the `config` ns
-  ;; (which depends on this one). The `:db-server` block is the single
+  ;; (which depends on this one). The `:hub` block is the single
   ;; source of truth: when present, it carries the vec-extension path; when
   ;; absent, the sqlite-vec extension stays off.
   ;;
@@ -16,14 +16,14 @@
   ;; the extension is the *database's* business and `:semsearch` is the app-side
   ;; embedder's -- ollama's url and model stay there. A config.edn still
   ;; carrying the old key is refused by name, loudly, in `config` and in
-  ;; `db-server`'s `-main`; the peek here stays deliberately silent about a
+  ;; the hub's `-main`; the peek here stays deliberately silent about a
   ;; missing or unreadable file, because unit tests and tools load this
   ;; namespace with no config.edn at all.
   (try (aero/read-config "./config.edn")
        (catch Exception _ nil)))
 
 (def vec-extension-path
-  (some-> (read-config*) :db-server :vec-path))
+  (some-> (read-config*) :hub :vec-path))
 
 (defn- vec-extension-file ^File []
   (when vec-extension-path
@@ -34,9 +34,9 @@
       (File. (str vec-extension-path ext)))))
 
 (def vec-available?
-  "True iff `:db-server :vec-path` is in config AND the configured
+  "True iff `:hub :vec-path` is in config AND the configured
    vec-extension dylib actually exists on disk. Omit it (or point it at a
-   missing file) and both the db-server and the test runner treat the vec
+   missing file) and both the hub and the test runner treat the vec
    extension as absent."
   (boolean (some-> (vec-extension-file) .exists)))
 
@@ -80,7 +80,7 @@
 (defn make-datasource
   "Wrap a SQLite db spec as a DataSource that loads the sqlite-vec
    extension on every connection (when present). The extension path is
-   read from `:db-server :vec-path` in config.edn; if it is absent or the
+   read from `:hub :vec-path` in config.edn; if it is absent or the
    dylib is missing, the datasource still works but vector-search features
    (items_vec / vec_distance_*) are unavailable.
 

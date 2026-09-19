@@ -222,6 +222,23 @@ What lives in that directory, and which of it travels:
 | `primary.nosync` | also not synced, which is what lets it mean something different per machine: *this machine runs the hub* |
 | `schema-sqlite.sql` | read by the hub, by relative path, hence the `cd` |
 
+### The config.edn already deployed needs one word changed
+
+The section that configures the hub was called `:db-server` until the hub
+rename. The deployed `config.edn` on the mini still says that, and **it is not
+something `make deploy` updates** — the file is not in the jar and is not in
+git. So, once, before starting a phase-2 jar:
+
+```clojure
+:hub {:port 3008 :db-path "./rhizome.db.nosync" :vec-path "./.sqlite-vec/vec0"}
+```
+
+— the same contents under the new name. Both processes **refuse to start** on
+a config.edn that still says `:db-server`, rather than ignoring the section, so
+this cannot be skipped silently: the alternative would be a hub coming up on
+its default port against a database nobody named, and since the db does not
+sync, quietly creating a second one.
+
 Comments
 - We use nativefier to serve the app via electron
 - A first time run will seed some necessary contexts
@@ -610,9 +627,12 @@ the text a delete carried off is still there to read.
 | `:port` | HTTP port. Numeric, accepts `#env`/`#or` readers. |
 | `:dev?` | Dev mode: REST API always open, `/test/reset` enabled, dev resource pipeline, hardcodes all `:folders` paths (under `./files/`) and the sqlite db path. Also auto-seeds the dev db on first start (canonical contexts + demo articles) when items are empty — set `:skip-seed? true` to opt out. |
 | `:skip-seed?` | Skip the first-start auto-seed in dev mode. Useful when you want an empty dev db, or when you're restoring contexts/items from elsewhere. Ignored outside `:dev? true`. |
-| `:db-path` | Sqlite file path (string). Required in prod. Must not be set when `:dev? true`. |
+| `:hub` | The hub's whole configuration, and the only key it reads as such: `:port` (its own, 3141 in dev / 3008 in prod — not the `server`'s), `:db-path` (the SQLite file, required), `:vec-path` (the sqlite-vec extension, no `.dylib`/`.so` suffix; absent turns semantic search off and skips the `:vector` test selector). The same block serves a config.edn shared with the `server` and a standalone one holding nothing else. **Called `:db-server` before the hub rename; both processes refuse the old name rather than ignoring it**, because a section nothing reads would take port, db path and vec path out of sight together. |
+| `:hub-url` | Optional override for where the `server` finds the hub; otherwise derived as `http://127.0.0.1:<:hub :port>`. Usually unnecessary even from another machine — the ssh tunnel puts the hub on that address there too. Set it when the local end of the forward had to land on a different port. |
+| `:db-path` (top level) | **Refused.** It moved into `:hub`. A `server` opens no file, so a top-level one would be silently ignored. |
 | `:folders` | Map of the media directories. Every key is **required in prod** — the app refuses to start if any is unset or its directory does not exist — and **must not be set when `:dev? true`** (all hardcoded under `./files/`). There is no shared root; each is an independent absolute path, so no symlinks are needed. Keys: `:imports` — the drop folder the import flow scans (dev: `./files/Downloads/Tracked/`); `:audio`, `:video`, `:docs`, `:images` — import destinations files are moved into, classified by suffix (dev: `Music/`, `Movies/`, `Documents/`, `Pictures/` under `…/Tracked/`); `:images` also backs `/imgs/*` and `/img-by-id`; `:preview-images` — previews written by the upload drag-and-drop fields, served at `/imgs/Preview/*` with downscaled variants under its `Lowres/` subfolder at `/imgs/Preview/Lowres/*` (dev: `./files/Pictures/Tracked/Preview/`). |
-| `:semsearch` `:vec-path`, `:ollama-url`, `:ollama-model` | Single switch for semantic search. Present → app loads the sqlite-vec extension from `:vec-path` (no `.dylib`/`.so` suffix) and embeds against the Ollama endpoint. Absent → vec extension is not loaded, embedder is inert, and the `:vector` test selector is skipped. |
+| `:semsearch` `:ollama-url`, `:ollama-model` | The embedder, which runs **in the hub** — one model on one machine, so a remote query crosses the wire as a string rather than as a vector. Absent → the embedder is inert. |
+| `:semsearch` `:vec-path` | **Refused.** It moved into `:hub`: loading the extension is the database's business, and a `:vec-path` left here would turn semantic search off everywhere without a word. |
 | `:substack` `:external-substacks` | List of external Substack hostnames (regex-matched on titles). |
 | `:private-addr`, `:private-user-agent` | Prod-only allowlist: `/ui` is reachable only from this remote-addr + user-agent. Not used when `:dev? true`. |
 

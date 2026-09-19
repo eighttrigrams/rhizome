@@ -17,7 +17,7 @@
             [clojure.test :refer [deftest is testing]]
             [cognitect.transit :as transit]
             [et.rz.config :as config]
-            [et.rz.hub.main :as db-server]
+            [et.rz.hub.main :as hub-main]
             [next.jdbc :as jdbc]
             [next.jdbc.result-set]
             [et.rz.placement :as placement]
@@ -30,14 +30,14 @@
 (defn- with-pair
   "A live hub, and `server`'s app pointed at it by a remote handle."
   [f]
-  (let [hub (db-server/start! {:port 0 :db-path (temp-db-path)})]
+  (let [hub (hub-main/start! {:port 0 :db-path (temp-db-path)})]
     (try
       ;; `:hub-url` is what makes this process a forwarding `server`; `:db` stays
       ;; as test mode set it, which is a DIFFERENT database from the hub's file
       ;; and is exactly what makes the assertions here mean something.
       (with-redefs [config/config (assoc config/config :hub-url (:url hub) :dev? true)]
         (f hub (server/app)))
-      (finally (db-server/stop! hub)))))
+      (finally (hub-main/stop! hub)))))
 
 (defn- GET* [app uri]
   (let [resp (app {:request-method :get :uri uri :headers {} :body nil})]

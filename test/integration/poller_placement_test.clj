@@ -19,7 +19,7 @@
      break."
   (:require [clojure.test :refer [deftest is testing]]
             [et.rz.config :as config]
-            [et.rz.hub.main :as db-server]
+            [et.rz.hub.main :as hub-main]
             [et.rz.server.main :as server]))
 
 (def ^:private server-polls? #'server/poll-scheduling-enabled?)
@@ -27,7 +27,7 @@
 (defn- verdicts
   "What each half answers in one named world: `[server? hub?]`.
 
-   `hub` is the server map `db-server/start!` returns, of which only
+   `hub` is the server map `hub-main/start!` returns, of which only
    `:read-only?` is consulted -- so it is given as a map rather than booted,
    because booting one to ask it a question about scheduling would be a network
    call and a file."
@@ -39,7 +39,7 @@
         (System/clearProperty "rhizome.e2e"))
       (with-redefs [config/config (merge config/config config-overrides)]
         [(boolean (server-polls?))
-         (boolean (and hub (db-server/poll-scheduling-enabled? hub)))])
+         (boolean (and hub (hub-main/poll-scheduling-enabled? hub)))])
       (finally
         (if prop
           (System/setProperty "rhizome.e2e" prop)
