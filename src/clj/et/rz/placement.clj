@@ -19,7 +19,7 @@
 
    That was the first cut and it is wrong, because it puts `insert-item` on the
    local side -- the scrapers write preview images (see
-   `repository.insertion.*` -> `upload/upload-preview-file`). Sorting by *whose*
+   `et.rz.hub.repository.insertion.*` -> `upload/upload-preview-file`). Sorting by *whose*
    disk splits it correctly:
 
    1. **synced-folder access** -- `:preview-images`, `:folders`, the iCloud
@@ -47,7 +47,7 @@
    `get-obsidian-file-content`), and Obsidian support was removed on 2026-09-18
    -- see `opener`, and the cookbook recipe it points at. So every `/ui` command
    is the hub's, and `route-placement` says `/ui` is `:hub` rather than
-   `:split`. `placement-sweep-test` ties those two statements together, so they
+   `:split`. `et.rz.placement-sweep-test` ties those two statements together, so they
    cannot come apart.
 
    **The set stays, and so does the mechanism.** What is left is not a leftover
@@ -129,7 +129,7 @@
      today:** `/ui` was, until Obsidian support was removed and
      `machine-local-commands` became empty. The value stays because the
      dispatch-by-name mechanism stays (see `machine-local-commands`), and
-     `placement-sweep-test` re-derives `/ui`'s entry from whether that set has
+     `et.rz.placement-sweep-test` re-derives `/ui`'s entry from whether that set has
      members, so the two cannot disagree.
 
    Keys are the route paths exactly as they appear in `server.clj`, so

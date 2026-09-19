@@ -17,7 +17,7 @@
             [clojure.test :refer [deftest is testing]]
             [cognitect.transit :as transit]
             [et.rz.config :as config]
-            [db-server]
+            [et.rz.hub.main :as db-server]
             [next.jdbc :as jdbc]
             [next.jdbc.result-set]
             [et.rz.placement :as placement]
@@ -110,7 +110,7 @@
 
 (deftest machine-local-commands-are-not-forwarded-test
   ;; The classification is empty since Obsidian support was removed, so as in
-  ;; db-server.hub-surfaces-test the classification is stubbed and the routing
+  ;; et.rz.hub.main.hub-surfaces-test the classification is stubbed and the routing
   ;; is what is tested. Both halves read the same var, and in this test both
   ;; halves are in this JVM -- so the hub would refuse the command if the server
   ;; forwarded it, and that refusal coming back is the tell.
@@ -166,7 +166,7 @@
                 (is (= (String. bytes' "UTF-8") (slurp (:body resp))))))
             (testing "a name that would escape the images folder is refused"
               ;; The old handler read straight at the filesystem with no such
-              ;; check -- rest-api.queries/image-file called it out by name as
+              ;; check -- et.rz.hub.rest-api.queries/image-file called it out by name as
               ;; 'not a model to copy'. This is the check arriving.
               (jdbc/execute-one!
                 (:ds hub)

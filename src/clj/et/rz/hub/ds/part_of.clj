@@ -11,7 +11,7 @@
    about the database rather than about one client. Plain relations are not
    constrained -- they may go on forming cycles exactly as they always have."
   (:require [clojure.string :as str]
-            [db :as db]))
+            [et.rz.hub.db :as db]))
 
 (defn- edges
   "The part-of edge set as {whole-id #{part-id …}}, leaving out every edge into

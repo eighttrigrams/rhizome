@@ -15,7 +15,7 @@
             [et.rz.hub.ds.relations :as relations]
             [et.rz.hub.ds.search-test :refer [db]]
             [next.jdbc :as jdbc]
-            [provenance :as provenance]))
+            [et.rz.hub.provenance :as provenance]))
 
 (defmacro ^:private with-fresh-history
   "`with-fresh-db`, and the relation history cleared as well.

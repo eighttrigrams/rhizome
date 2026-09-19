@@ -18,7 +18,7 @@
 
    With a hub, these are HTTP calls. Without one -- test mode, e2e, a dev
    session with no db-server -- the *same request map* is handed to
-   `rest-api/rest-routes` in this process, over the local handle. Not a second
+   `et.rz.hub.rest-api/rest-routes` in this process, over the local handle. Not a second
    implementation reading the database directly: the same routes, the same
    response shape, the same JSON, so there is one answer to be wrong about
    rather than two that have to agree."
@@ -26,12 +26,12 @@
             [clj-http.client :as http]
             [et.rz.config :as config]
             [hub-proxy :as hub-proxy]
-            [rest-api :as rest-api]))
+            [et.rz.hub.rest-api :as et.rz.hub.rest-api]))
 
 (def ^:private local-routes
   "The same routes the hub mounts, over this process's own handle. Built once,
    and only ever reached when there is no hub -- see the namespace docstring."
-  (delay (rest-api/rest-routes #(:db config/config))))
+  (delay (et.rz.hub.rest-api/rest-routes #(:db config/config))))
 
 (defn- get-json
   "GET an `/api` path and answer `[status parsed-body]`.

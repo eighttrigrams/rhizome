@@ -14,7 +14,7 @@
    there before touching that set."
   (:require [clojure.java.shell :as sh]
             [clojure.java.io :as io]
-            [repository.homefolder :as home]))
+            [et.rz.hub.repository.homefolder :as home]))
 
 (defn open
   [file-id]

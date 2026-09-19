@@ -1,5 +1,5 @@
 (ns et.rz.hub.ds.relations
-  (:require [db :as db]
+  (:require [et.rz.hub.db :as db]
             [honey.sql :as sql]
             [cambium.core :as log]
             [cheshire.core :as json]
@@ -269,7 +269,7 @@
 
 (defn tombstone-relations-touching!
   "Tombstone every edge with one end in `ids`, in either direction, for a bulk
-   delete about to remove those rows (repository.deletion/execute!).
+   delete about to remove those rows (et.rz.hub.repository.deletion/execute!).
 
    Both directions, unlike the single-item path: a bulk delete can take a
    container and the things in it in one gesture, so an edge can lose the end it

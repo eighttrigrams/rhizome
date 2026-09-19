@@ -1,5 +1,5 @@
 (ns et.rz.hub.ds
-  (:require [db :as db]
+  (:require [et.rz.hub.db :as db]
             [honey.sql :as sql]
             [cheshire.core :as json]
             [cambium.core :as log]
@@ -120,7 +120,7 @@
 
    Inbound edges only, because inbound is what the delete below deletes. A bulk
    delete clears both directions and tombstones them on its own way past --
-   repository.deletion/execute!."
+   et.rz.hub.repository.deletion/execute!."
   [db {:keys [id]}]
   (when-let [row (db/execute-one! db
                                   (sql/format {:select [:title :description

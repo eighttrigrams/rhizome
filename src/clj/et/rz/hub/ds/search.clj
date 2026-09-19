@@ -1,6 +1,6 @@
 (ns et.rz.hub.ds.search
   (:require [cambium.core :as log]
-            [db :as db]
+            [et.rz.hub.db :as db]
             [honey.sql :as sql]
             [et.rz.hub.ds.search.core :as core]
             [et.rz.hub.ds.helpers :refer [un-namespace-keys post-process-base] :as helpers]))

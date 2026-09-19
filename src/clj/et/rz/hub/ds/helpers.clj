@@ -1,6 +1,6 @@
 (ns et.rz.hub.ds.helpers
   (:require [cheshire.core :as json]
-            [db :as db]
+            [et.rz.hub.db :as db]
             [tick.core :as t]
             [et.rz.hub.sqlite.dialect :as dialect]))
 

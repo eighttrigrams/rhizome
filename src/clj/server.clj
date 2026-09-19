@@ -1,7 +1,7 @@
 (ns server
   (:require et.rz.log-init ;; first: sets LOGS_DIR before any logging ns initialises logback
             [ring.adapter.jetty :as j]
-            upload
+            [et.rz.hub.upload :as upload]
             [clojure.string :as str]
             [compojure.core :refer [context GET POST PUT]]
             [ring.util.codec :as codec]
@@ -9,14 +9,14 @@
             [ring.middleware.json :as json]
             [env :refer [wrap-env-defaults]]
             [et.rz.config :as config]
-            [db :as db]
-            [repository :as r]
-            [poll :as poll]
+            [et.rz.hub.db :as db]
+            [et.rz.hub.repository :as r]
+            [et.rz.hub.poll :as poll]
             [et.rz.hub.ds :as datastore]
             opener
-            dispatch
-            rest-api
-            [ui-api :as ui-api]
+            et.rz.hub.dispatch
+            et.rz.hub.rest-api
+            [et.rz.hub.ui-api :as et.rz.hub.ui-api]
             [hub-api :as hub-api]
             [hub-proxy :as hub-proxy]
             [et.rz.placement :as placement]
@@ -72,19 +72,19 @@
                                               "UTF-8"))))
 
       :else
-      (ui-api/refusal fn-name "unclassified-command"
+      (et.rz.hub.ui-api/refusal fn-name "unclassified-command"
                       (str "it has not been placed on either side of the hub/server "
                            "split -- see the placement namespace, and the sweep test "
                            "that should have caught this before it shipped")))))
 
 (defn- api
-  "The browser gate in front of `/ui`. The handler itself now lives in `ui-api`,
+  "The browser gate in front of `/ui`. The handler itself now lives in `et.rz.hub.ui-api`,
    because the hub answers the same commands off its own DataSource and one
    definition beats two that agree to match (arch rework 2, step 2). What stays
    here is the part that is about *this* surface: only the local browser may
    POST to it outside dev mode."
   []
-  (let [h (ui-api/handler #(:db config/config) {:intercept ui-intercept})]
+  (let [h (et.rz.hub.ui-api/handler #(:db config/config) {:intercept ui-intercept})]
     (fn [req]
       (if (and (not (:dev? config/config))
                (or (not (= (:private-addr config/config) (:remote-addr req)))
@@ -183,7 +183,7 @@
    The canonical path is checked to fall under the folder because the name comes
    from the database and is free-form text -- whatever the file was called on
    import. The old version of this handler read straight at the filesystem
-   without that check, and `rest-api.queries/image-file` said so in its
+   without that check, and `et.rz.hub.rest-api.queries/image-file` said so in its
    docstring in as many words: 'not a model to copy'. It is copied now."
   [filename]
   (let [root (io/file images-folder)
@@ -260,7 +260,7 @@
    `/api/describe` through this machine describe the API this machine actually
    serves."
   []
-  (let [local (rest-api/rest-routes)]
+  (let [local (et.rz.hub.rest-api/rest-routes)]
     (fn [req]
       (if-let [url (and (str/starts-with? (:uri req) "/api")
                         (hub-proxy/hub-url))]

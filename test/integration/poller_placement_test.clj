@@ -19,7 +19,7 @@
      break."
   (:require [clojure.test :refer [deftest is testing]]
             [et.rz.config :as config]
-            [db-server]
+            [et.rz.hub.main :as db-server]
             [server]))
 
 (def ^:private server-polls? #'server/poll-scheduling-enabled?)

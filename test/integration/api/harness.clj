@@ -11,7 +11,7 @@
             [ring.middleware.json :as ring-json]
             [ring.util.response :as response]
             [db-harness]
-            [dispatch :as dispatch]
+            [et.rz.hub.dispatch :as dispatch]
             [et.rz.hub.ds.search-test])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]))
 

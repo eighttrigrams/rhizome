@@ -7,7 +7,7 @@
    so trigger creation comes through as a single statement."
   (:require [clojure.string :as str]
             [et.rz.hub.sqlite.connection :as connection]
-            [db :as db]))
+            [et.rz.hub.db :as db]))
 
 (def ^:private schema-path "schema-sqlite.sql")
 
