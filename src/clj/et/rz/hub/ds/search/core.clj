@@ -1,4 +1,4 @@
-(ns et.vp.ds.search.core
+(ns et.rz.hub.ds.search.core
   (:require [honey.sql :as sql]
             [clojure.string :as str]))
 
@@ -315,7 +315,7 @@
    between polynomial and combinatorial on the same graph.
 
    Termination rests on acyclicity, which every write already enforces (see
-   et.vp.ds.part-of), so there is no depth cap here to make it safe. Nor one to
+   et.rz.hub.ds.part-of), so there is no depth cap here to make it safe. Nor one to
    make it cheap: the dedup above is that argument, and a cap would be a second
    one that has to be right about how deep a rhizome is allowed to be."
   [q selected-item-id]

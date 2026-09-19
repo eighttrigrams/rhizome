@@ -1,5 +1,5 @@
 (ns repository.insertion.simonwillison
-  (:require [et.vp.ds :as datastore]
+  (:require [et.rz.hub.ds :as datastore]
             [cambium.core :as log]
             [repository.insertion.common :as common]
             [scrapers.simonwillison :as scraper]

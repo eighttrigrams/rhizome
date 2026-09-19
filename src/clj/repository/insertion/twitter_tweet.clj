@@ -1,6 +1,6 @@
 (ns repository.insertion.twitter-tweet
   (:require [clojure.string :as str]
-            [et.vp.ds :as datastore]
+            [et.rz.hub.ds :as datastore]
             [repository.insertion.common :as common]
             et.rz.utils))
 

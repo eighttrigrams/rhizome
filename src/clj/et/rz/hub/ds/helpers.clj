@@ -1,8 +1,8 @@
-(ns et.vp.ds.helpers
+(ns et.rz.hub.ds.helpers
   (:require [cheshire.core :as json]
             [db :as db]
             [tick.core :as t]
-            [datastore.dialect :as dialect]))
+            [et.rz.hub.sqlite.dialect :as dialect]))
 
 (defn namespace-keys
   [ns-str m]

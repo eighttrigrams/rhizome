@@ -1,9 +1,9 @@
 (ns repository
   (:require [clojure.string :as str]
-            [et.vp.ds :as datastore]
-            [et.vp.ds.search :as search]
-            [et.vp.ds.relations :as datastore.relations]
-            [et.vp.ds.part-of :as part-of]
+            [et.rz.hub.ds :as datastore]
+            [et.rz.hub.ds.search :as search]
+            [et.rz.hub.ds.relations :as datastore.relations]
+            [et.rz.hub.ds.part-of :as part-of]
             [cambium.core :as log]
             [provenance :as provenance]
             [repository.insertion :as insertion]
@@ -98,7 +98,7 @@
    subgraph.
 
    Scoped to the context it was counted for, the way the level the SPA sends is
-   (see et.vp.ds.search/level-asked-for). Same reason: a response that changes
+   (see et.rz.hub.ds.search/level-asked-for). Same reason: a response that changes
    the selected context without rebuilding the list would otherwise leave the
    strip bounding one context's stepper by another context's depth.
 
@@ -640,7 +640,7 @@
    standing.
 
    The standing is written first because it is the only write here that can be
-   refused: an edge ticked `part of` may close a loop, and et.vp.ds.part-of
+   refused: an edge ticked `part of` may close a loop, and et.rz.hub.ds.part-of
    throws rather than write it. Going first is what makes \"nothing was saved\"
    true of a refusal -- the two annotations below have not been written yet.
 

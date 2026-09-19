@@ -4,16 +4,16 @@
    history.
 
    The datastore mechanism is pinned next door, in
-   et.vp.ds.relation-history-test. What is only here is the shape the client is
+   et.rz.hub.ds.relation-history-test. What is only here is the shape the client is
    answered in -- which version the editor is filled from, which edge an answer is
    about, and the guarantee that a version list, texts and all, never rides in on
    anything else."
   (:require [clojure.test :refer [deftest is]]
             [api.harness :refer [call!]]
             [api.helpers :refer [with-fresh-db]]
-            [et.vp.ds :as ds]
-            [et.vp.ds.relations :as relations]
-            [et.vp.ds.search-test :refer [db]]
+            [et.rz.hub.ds :as ds]
+            [et.rz.hub.ds.relations :as relations]
+            [et.rz.hub.ds.search-test :refer [db]]
             [next.jdbc :as jdbc]
             [provenance :as provenance]))
 

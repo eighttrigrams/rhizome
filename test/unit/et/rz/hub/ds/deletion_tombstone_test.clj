@@ -1,4 +1,4 @@
-(ns et.vp.ds.deletion-tombstone-test
+(ns et.rz.hub.ds.deletion-tombstone-test
   "Deletion as a tombstoning: what a delete writes down before it scraps the row.
 
    A delete used to leave the history it had already accumulated and take the text
@@ -12,14 +12,14 @@
    For a relation it is not: an edge can be unlinked and linked again, the history
    is keyed on the pair, so the mark is where in one list the edge was not there."
   (:require [clojure.test :refer [deftest is]]
-            [et.vp.ds :as ds]
-            [et.vp.ds.relations :as relations]
-            [et.vp.ds.search-test :refer [test-with-reset-db-and-time db]]
+            [et.rz.hub.ds :as ds]
+            [et.rz.hub.ds.relations :as relations]
+            [et.rz.hub.ds.search-test :refer [test-with-reset-db-and-time db]]
             [next.jdbc :as jdbc]))
 
 (defmacro ^:private with-fresh-history
   "`test-with-reset-db-and-time`, and both history tables cleared as well -- see
-   the note on the macro of the same name in et.vp.ds.relation-history-test."
+   the note on the macro of the same name in et.rz.hub.ds.relation-history-test."
   [description & body]
   `(test-with-reset-db-and-time ~description
      (jdbc/execute-one! db ["delete from history"])

@@ -1,6 +1,6 @@
 (ns repository.insertion.substack
   (:require [clojure.string :as str]
-            [et.vp.ds :as datastore]
+            [et.rz.hub.ds :as datastore]
             [cambium.core :as log]
             [repository.insertion.common :as common]
             et.rz.utils

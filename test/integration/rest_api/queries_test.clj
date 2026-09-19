@@ -9,13 +9,13 @@
             [et.rz.config :as config]
             [rest-api :as rest-api]
             [rest-api.queries :as queries]
-            [et.vp.ds.search :as search]
+            [et.rz.hub.ds.search :as search]
             [semsearch.embedder :as embedder]
             [semsearch.backfill :as backfill]
-            [et.vp.ds :as ds]
-            [et.vp.ds.relations :as relations]
+            [et.rz.hub.ds :as ds]
+            [et.rz.hub.ds.relations :as relations]
             [provenance :as provenance]
-            [et.vp.ds.search-test :refer [reset-db with-time db]]))
+            [et.rz.hub.ds.search-test :refer [reset-db with-time db]]))
 
 (def baseline-contexts
   ["Imports"

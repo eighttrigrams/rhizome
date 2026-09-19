@@ -1,4 +1,4 @@
-(ns et.vp.ds.relation-history-test
+(ns et.rz.hub.ds.relation-history-test
   "The versions of the text a relation carries.
 
    The same mechanism an item's description is versioned by -- the row about to be
@@ -18,9 +18,9 @@
      and without the mark it would read as a run of texts that each gave way to
      the next rather than as an edge that was severed and made again."
   (:require [clojure.test :refer [deftest is]]
-            [et.vp.ds :as ds]
-            [et.vp.ds.relations :as relations]
-            [et.vp.ds.search-test :refer [test-with-reset-db-and-time db]]
+            [et.rz.hub.ds :as ds]
+            [et.rz.hub.ds.relations :as relations]
+            [et.rz.hub.ds.search-test :refer [test-with-reset-db-and-time db]]
             [next.jdbc :as jdbc]
             [provenance :as provenance]))
 
@@ -356,7 +356,7 @@
   (with-fresh-history
     "the history is folded oldest-first. Handed over the way it arrives it would
      say the agent wrote his line -- a well-formed answer with the value inverted,
-     which is the failure et.vp.ds's own history has a test for too"
+     which is the failure et.rz.hub.ds's own history has a test for too"
     (let [[book chapter] (book-with-chapter)]
       (write! chapter book "his one\nhis two\nhis three" "app")
       (write! chapter book "their one\ntheir two\ntheir three" "api")

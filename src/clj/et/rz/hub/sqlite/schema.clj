@@ -1,4 +1,4 @@
-(ns datastore.schema
+(ns et.rz.hub.sqlite.schema
   "Loads schema-sqlite.sql into a SQLite database.
 
    The naive split-on-semicolons doesn't work because trigger bodies
@@ -6,7 +6,7 @@
    single-quote string literals, -- line comments and BEGIN/END nesting
    so trigger creation comes through as a single statement."
   (:require [clojure.string :as str]
-            [datastore.connection :as connection]
+            [et.rz.hub.sqlite.connection :as connection]
             [db :as db]))
 
 (def ^:private schema-path "schema-sqlite.sql")

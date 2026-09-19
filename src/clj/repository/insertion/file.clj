@@ -2,8 +2,8 @@
   (:require [cambium.core :as log]
             [clojure.string :as str]
             [clojure.set :as set]
-            [et.vp.ds :as datastore]
-            [et.vp.ds.search :as search]
+            [et.rz.hub.ds :as datastore]
+            [et.rz.hub.ds.search :as search]
             [et.rz.utils :refer [condx]]
             [repository.insertion.common :as common]
             [repository.homefolder :as home]))

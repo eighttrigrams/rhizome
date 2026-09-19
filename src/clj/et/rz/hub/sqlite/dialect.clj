@@ -1,4 +1,4 @@
-(ns datastore.dialect
+(ns et.rz.hub.sqlite.dialect
   "SQLite-specific helpers shared across the data layer.
 
    Used to be a Postgres/SQLite dispatcher; now just a thin SQLite-only

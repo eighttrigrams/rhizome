@@ -1,9 +1,9 @@
-(ns et.vp.ds.search
+(ns et.rz.hub.ds.search
   (:require [cambium.core :as log]
             [db :as db]
             [honey.sql :as sql]
-            [et.vp.ds.search.core :as core]
-            [et.vp.ds.helpers :refer [un-namespace-keys post-process-base] :as helpers]))
+            [et.rz.hub.ds.search.core :as core]
+            [et.rz.hub.ds.helpers :refer [un-namespace-keys post-process-base] :as helpers]))
 
 (defn- post-process
   [result]
@@ -120,7 +120,7 @@
 
 (def max-part-of-level
   "The deepest level one part-of-level query can express -- see
-   et.vp.ds.search.core/max-part-of-level for why there is a ceiling at all.
+   et.rz.hub.ds.search.core/max-part-of-level for why there is a ceiling at all.
 
    Re-exported here because /api refuses a level past it and has to name the same
    number, and the REST layer talks to this namespace rather than reaching into

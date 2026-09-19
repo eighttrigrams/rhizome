@@ -1,12 +1,12 @@
-(ns et.vp.ds.search-test
+(ns et.rz.hub.ds.search-test
   (:require
    [clojure.test :refer [deftest is testing]]
    [et.rz.config :as config]
-   [et.vp.ds :as ds]
-   [et.vp.ds.search :as search]
-   [et.vp.ds.helpers :as helpers]
-   [datastore.schema :as schema]
-   [datastore.connection :as connection]
+   [et.rz.hub.ds :as ds]
+   [et.rz.hub.ds.search :as search]
+   [et.rz.hub.ds.helpers :as helpers]
+   [et.rz.hub.sqlite.schema :as schema]
+   [et.rz.hub.sqlite.connection :as connection]
    [next.jdbc :as jdbc]))
 
 (defonce db (:db config/config))

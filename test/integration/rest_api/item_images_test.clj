@@ -15,8 +15,8 @@
             [ring.middleware.params :refer [wrap-params]]
             [et.rz.config :as config]
             [rest-api :as rest-api]
-            [et.vp.ds :as ds]
-            [et.vp.ds.search-test :refer [reset-db with-time db]])
+            [et.rz.hub.ds :as ds]
+            [et.rz.hub.ds.search-test :refer [reset-db with-time db]])
   (:import [java.nio.file Files]
            [java.nio.file.attribute FileAttribute]
            [java.util Base64]))

@@ -12,7 +12,7 @@
             [db :as db]
             [repository :as r]
             [poll :as poll]
-            [et.vp.ds :as datastore]
+            [et.rz.hub.ds :as datastore]
             opener
             dispatch
             rest-api

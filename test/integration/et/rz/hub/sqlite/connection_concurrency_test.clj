@@ -1,11 +1,11 @@
-(ns datastore.connection-concurrency-test
+(ns et.rz.hub.sqlite.connection-concurrency-test
   "Regression guard: borrowing connections concurrently must not lose the
-   sqlite-vec extension. See datastore.connection/vec-loading-datasource.
+   sqlite-vec extension. See et.rz.hub.sqlite.connection/vec-loading-datasource.
    Tagged ^:vector -- without the extension there is nothing to fail to load."
   (:require [clojure.test :refer [deftest is]]
             [next.jdbc :as jdbc]
             [et.rz.config :as config]
-            [datastore.schema :as schema]))
+            [et.rz.hub.sqlite.schema :as schema]))
 
 (def ^:private thread-count 16)
 (def ^:private borrows-per-thread 40)

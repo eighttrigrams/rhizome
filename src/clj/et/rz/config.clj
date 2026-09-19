@@ -1,7 +1,7 @@
 (ns et.rz.config
   (:require [aero.core :as aero]
             [clojure.java.io :as io]
-            [datastore.connection :as connection]
+            [et.rz.hub.sqlite.connection :as connection]
             [et.rz.role :as role])
   (:import [ch.qos.logback.classic LoggerContext]
            [ch.qos.logback.classic.joran JoranConfigurator]
@@ -144,7 +144,7 @@
 ;; own process, and both would fail *silently* if a config.edn from before the
 ;; split were simply read: a top-level `:db-path` would be ignored by an app
 ;; that no longer opens a file at all, and a `:semsearch :vec-path` would leave
-;; `datastore.connection` with no extension path -- semantic search quietly off
+;; `et.rz.hub.sqlite.connection` with no extension path -- semantic search quietly off
 ;; and the ^:vector tests quietly skipped. So they are refused, by name, with
 ;; the move spelled out.
 (defn- check-moved-keys [c]

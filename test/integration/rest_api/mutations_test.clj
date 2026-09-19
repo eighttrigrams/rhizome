@@ -9,9 +9,9 @@
             [rest-api :as rest-api]
             [rest-api.middleware :as mw]
             [scrapers.website :as website-scraper]
-            [et.vp.ds :as ds]
-            [et.vp.ds.relations :as relations]
-            [et.vp.ds.search-test :refer [reset-db with-time db]]))
+            [et.rz.hub.ds :as ds]
+            [et.rz.hub.ds.relations :as relations]
+            [et.rz.hub.ds.search-test :refer [reset-db with-time db]]))
 
 (defn- with-recording-on
   [f]

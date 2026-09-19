@@ -12,7 +12,7 @@
             [ring.util.response :as response]
             [db-harness]
             [dispatch :as dispatch]
-            [et.vp.ds.search-test])
+            [et.rz.hub.ds.search-test])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]))
 
 (defn- transit-write [v]

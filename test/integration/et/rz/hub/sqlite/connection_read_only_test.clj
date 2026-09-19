@@ -1,10 +1,10 @@
-(ns datastore.connection-read-only-test
+(ns et.rz.hub.sqlite.connection-read-only-test
   "The structural half of read-only replica mode: a datasource built with
    :read-only? true cannot write, whatever the caller does. This is the
    connection layer on its own -- no prod-mode scaffolding involved."
   (:require [clojure.test :refer [deftest is testing]]
             [next.jdbc :as jdbc]
-            [datastore.connection :as connection])
+            [et.rz.hub.sqlite.connection :as connection])
   (:import [java.io File]))
 
 (defn- temp-db-path

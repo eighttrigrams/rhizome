@@ -1,11 +1,11 @@
-(ns et.vp.ds.relations
+(ns et.rz.hub.ds.relations
   (:require [db :as db]
             [honey.sql :as sql]
             [cambium.core :as log]
             [cheshire.core :as json]
-            [datastore.dialect :as dialect]
-            [et.vp.ds.part-of :as part-of]
-            [et.vp.ds.helpers :as helpers]))
+            [et.rz.hub.sqlite.dialect :as dialect]
+            [et.rz.hub.ds.part-of :as part-of]
+            [et.rz.hub.ds.helpers :as helpers]))
 
 (defn- get-title
   [container]
@@ -186,7 +186,7 @@
 (defn- save-relation-revision!
   "Archive the text an edge is carrying, before something replaces it.
 
-   `et.vp.ds/save-revision-to-history!` for a relation, and the same mechanism
+   `et.rz.hub.ds/save-revision-to-history!` for a relation, and the same mechanism
    edge for edge: the text about to be overwritten is copied under the next
    version number, stamped with the source that WROTE it rather than the one
    about to write, and a blank text is not archived at all -- there is nothing in
@@ -246,7 +246,7 @@
 
 (defn tombstone-inbound-relations!
   "Tombstone every edge that points AT `item-id`, for a delete of the item that
-   is about to take those rows with it (et.vp.ds/delete-item).
+   is about to take those rows with it (et.rz.hub.ds/delete-item).
 
    Inbound only, because that is the set that delete deletes. The bulk path
    clears both directions and tombstones them itself, before this ever runs --
@@ -318,7 +318,7 @@
                  "..." containers))
   ;; Every relation row is written here, so this is where acyclicity is kept --
   ;; before the delete, so a refused write leaves the relations exactly as they
-  ;; were rather than half rewritten. It throws; see et.vp.ds.part-of.
+  ;; were rather than half rewritten. It throws; see et.rz.hub.ds.part-of.
   (part-of/check-acyclic! db
                           (:id item)
                           (keep (fn [[container-id {:keys [is-part-of?]}]]
@@ -553,7 +553,7 @@
    states: the check only means anything if nothing can write a part-of edge
    between it and the row it authorises.
 
-   Throws the acyclicity refusal (et.vp.ds.part-of/check-acyclic!) when ticking
+   Throws the acyclicity refusal (et.rz.hub.ds.part-of/check-acyclic!) when ticking
    `part of` here would make a thing part of itself. Returns false, having
    written nothing, when there is no such relation to edit."
   [db item-id container-id {:keys [show-badge? is-part-of? part-of-sort-idx] :as standing}]
@@ -614,7 +614,7 @@
 (defn update-relation-description!
   "Replace the body text of one relation, keeping the text it replaces.
 
-   `et.vp.ds/update-context-description` for a relation, with one deliberate
+   `et.rz.hub.ds/update-context-description` for a relation, with one deliberate
    difference, and it is the reason anything is compared here at all. There a save
    IS an edit: the description modal exists to write a description and nothing
    else, so every save of it earns a version even when the text came back
@@ -659,7 +659,7 @@
 
 (defn get-relation-description-history
   "Every version of one relation's text, newest first, and how many there are --
-   the shape `et.vp.ds/get-description-history` answers with for an item.
+   the shape `et.rz.hub.ds/get-description-history` answers with for an item.
 
    Two differences from that one, both deliberate.
 

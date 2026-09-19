@@ -2,9 +2,9 @@
   (:require [clojure.test :refer [deftest is]]
             [api.harness :refer [call!]]
             [api.helpers :refer [with-fresh-db]]
-            [et.vp.ds :as ds]
-            [et.vp.ds.relations :as relations]
-            [et.vp.ds.search-test :refer [db]]
+            [et.rz.hub.ds :as ds]
+            [et.rz.hub.ds.relations :as relations]
+            [et.rz.hub.ds.search-test :refer [db]]
             [next.jdbc :as jdbc]))
 
 (defn- relations-count [target-id owner-id]
@@ -53,7 +53,7 @@
   (with-fresh-db
     "and writes down what it was on the way out: the description it was carrying and
      the text on the edge that held it, each as one more version, marked as the
-     deletion. The mechanism is pinned in et.vp.ds.deletion-tombstone-test; what is
+     deletion. The mechanism is pinned in et.rz.hub.ds.deletion-tombstone-test; what is
      here is that the command the keyboard reaches it through goes through it too"
     (jdbc/execute-one! db ["delete from history"])
     (jdbc/execute-one! db ["delete from relation_history"])

@@ -2,7 +2,7 @@
   (:require [clojure.java.io :as io]
             [cambium.core :as log]
             [et.rz.config :as config]
-            [et.vp.ds :as datastore]
+            [et.rz.hub.ds :as datastore]
             [clojure.java.shell :refer [sh]]))
 
 ;; Drag-and-drop preview uploads land in the configured preview-images folder

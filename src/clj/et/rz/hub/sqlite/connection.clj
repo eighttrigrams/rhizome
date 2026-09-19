@@ -1,4 +1,4 @@
-(ns datastore.connection
+(ns et.rz.hub.sqlite.connection
   (:require [aero.core :as aero]
             [clojure.string :as str])
   (:import [java.io File]

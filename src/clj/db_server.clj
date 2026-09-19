@@ -36,8 +36,8 @@
             [clojure.java.io :as io]
             [clojure.string :as str]
             [compojure.core :refer [GET POST routes]]
-            [datastore.connection :as connection]
-            [datastore.schema :as schema]
+            [et.rz.hub.sqlite.connection :as connection]
+            [et.rz.hub.sqlite.schema :as schema]
             [dev-seed :as dev-seed]
             [repository.insertion.file :as file]
             [next.jdbc :as jdbc]
@@ -184,7 +184,7 @@
 (defn- check-vec-path!
   "Refuse to boot on a `:vec-path` this process cannot honour.
 
-   `datastore.connection` resolves the extension path once, at load, out of
+   `et.rz.hub.sqlite.connection` resolves the extension path once, at load, out of
    `:db-server :vec-path` in config.edn -- the same key `config-opts` reads
    below, so a server booted from the file agrees with it by construction and
    this check has nothing to say. What it is for is a caller that passes a
@@ -194,7 +194,7 @@
    whole seam is arranged to prevent, so it is refused instead."
   [vec-path]
   (when (and vec-path (not= vec-path connection/vec-extension-path))
-    (throw (ex-info (str "db-server: :vec-path " (pr-str vec-path) " but datastore.connection "
+    (throw (ex-info (str "db-server: :vec-path " (pr-str vec-path) " but et.rz.hub.sqlite.connection "
                          "loaded " (pr-str connection/vec-extension-path) " from :db-server "
                          ":vec-path in config.edn. The extension path is resolved once, at "
                          "load; a different one here could not take effect.")

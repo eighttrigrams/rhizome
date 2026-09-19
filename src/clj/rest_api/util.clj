@@ -1,7 +1,7 @@
 (ns rest-api.util
   (:require [clojure.string :as str]
             [cheshire.core :as json]
-            [et.vp.ds.helpers :as helpers]))
+            [et.rz.hub.ds.helpers :as helpers]))
 
 (defn json-response
   ([body] (json-response 200 body))

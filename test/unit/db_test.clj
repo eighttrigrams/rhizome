@@ -14,11 +14,11 @@
    - the nested-transaction prohibition -- and the evidence that switching it on
      changed nothing about the transaction paths the app actually has today."
   (:require [clojure.test :refer [deftest is testing]]
-            [datastore.connection :as connection]
+            [et.rz.hub.sqlite.connection :as connection]
             [db :as db]
-            [et.vp.ds :as ds]
-            [et.vp.ds.relations :as relations]
-            [et.vp.ds.search-test :as search-test]
+            [et.rz.hub.ds :as ds]
+            [et.rz.hub.ds.relations :as relations]
+            [et.rz.hub.ds.search-test :as search-test]
             [next.jdbc.transaction :as jdbc-tx]
             [repository.deletion :as deletion]))
 

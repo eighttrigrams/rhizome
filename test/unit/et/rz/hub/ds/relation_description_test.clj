@@ -1,4 +1,4 @@
-(ns et.vp.ds.relation-description-test
+(ns et.rz.hub.ds.relation-description-test
   "The body text of a relation, which is the one thing a relation carries that
    does not travel with a list row.
 
@@ -12,9 +12,9 @@
    accident, and nothing may lose it -- least of all the save that rewrites an
    item's relation rows out of a map that has never heard of it."
   (:require [clojure.test :refer [deftest is]]
-            [et.vp.ds :as ds]
-            [et.vp.ds.relations :as relations]
-            [et.vp.ds.search-test :refer [test-with-reset-db-and-time db]]
+            [et.rz.hub.ds :as ds]
+            [et.rz.hub.ds.relations :as relations]
+            [et.rz.hub.ds.search-test :refer [test-with-reset-db-and-time db]]
             [next.jdbc :as jdbc]))
 
 (defn- book-with-chapter

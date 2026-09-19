@@ -4,8 +4,8 @@
             [clojure.java.io :as io]
             [clojure.string :as str]
             [cambium.core :as log]
-            [et.vp.ds :as datastore]
-            [et.vp.ds.search :as search]
+            [et.rz.hub.ds :as datastore]
+            [et.rz.hub.ds.search :as search]
             [provenance :as provenance]
             [semsearch.query :as semsearch]
             [rest-api.util :refer [json-response item->api parse-int-opt parse-ids-csv]]))
@@ -309,7 +309,7 @@
    for an item that *is* an image is `:resource-links` `:image`.
 
    Both preview keys can be present at once. upload/upload-preview-file dissocs
-   the one it is not writing, but et.vp.ds/update-item merges `:data`, so the
+   the one it is not writing, but et.rz.hub.ds/update-item merges `:data`, so the
    dissoc never lands -- there is a comment there admitting it. `:lowres?` is the
    tie-breaker the UI reads to choose between them. On disk both files exist, and
    both are reported."

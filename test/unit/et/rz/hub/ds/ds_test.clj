@@ -1,9 +1,9 @@
-(ns et.vp.ds.ds-test
+(ns et.rz.hub.ds.ds-test
   (:require
    [clojure.test :refer [deftest is]]
-   [et.vp.ds :as ds]
-   [et.vp.ds.relations :as relations]
-   [et.vp.ds.search-test :refer [test-with-reset-db-and-time db]]))
+   [et.rz.hub.ds :as ds]
+   [et.rz.hub.ds.relations :as relations]
+   [et.rz.hub.ds.search-test :refer [test-with-reset-db-and-time db]]))
 
 (deftest new-item-test
   (test-with-reset-db-and-time "creates item with database interaction"

@@ -10,7 +10,7 @@
   (:require [cambium.core :as log]
             [clojure.edn :as edn]
             [db :as db]
-            [et.vp.ds.relations :as relations]
+            [et.rz.hub.ds.relations :as relations]
             [repository.insertion.file :as file]))
 
 (def ^:private contexts

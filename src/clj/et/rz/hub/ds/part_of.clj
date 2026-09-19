@@ -1,4 +1,4 @@
-(ns et.vp.ds.part-of
+(ns et.rz.hub.ds.part-of
   "The part-of edges read as a graph, and the one invariant kept over it.
 
    A part-of edge runs from the whole (the relation's owner) to the part (its

@@ -1,11 +1,11 @@
-(ns et.vp.ds
+(ns et.rz.hub.ds
   (:require [db :as db]
             [honey.sql :as sql]
             [cheshire.core :as json]
             [cambium.core :as log]
-            [et.vp.ds.relations :as datastore.relations]
-            [et.vp.ds.helpers :refer [un-namespace-keys post-process-base] :as helpers]
-            [datastore.dialect :as dialect]))
+            [et.rz.hub.ds.relations :as datastore.relations]
+            [et.rz.hub.ds.helpers :refer [un-namespace-keys post-process-base] :as helpers]
+            [et.rz.hub.sqlite.dialect :as dialect]))
 
 (defn clear-item-embedding!
   "Drop the stored embedding (and any 'skipped' marker) for an item, so the

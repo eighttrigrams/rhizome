@@ -30,7 +30,7 @@
      refused rather than passed along. `:builder-fn` is a *function*; naming it
      instead keeps the call sites declarative and keeps this namespace the one
      place that decides what a call site may ask for."
-  (:require [datastore.connection :as connection]
+  (:require [et.rz.hub.sqlite.connection :as connection]
             [next.jdbc :as jdbc]
             [next.jdbc.result-set :as rs]
             [next.jdbc.transaction :as jdbc-tx]))
@@ -138,7 +138,7 @@
 
    Takes the handle, though it no longer reads it: the question is about the
    database and not about the process asking, and the signature says so. It is
-   the filesystem check `datastore.connection` made at startup.
+   the filesystem check `et.rz.hub.sqlite.connection` made at startup.
 
    It used to be a round trip when the handle was remote -- the dylib was on the
    far side of the wire -- which made this the one question at the seam that

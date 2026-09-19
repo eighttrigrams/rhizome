@@ -11,9 +11,9 @@
             [semsearch.embedder :as embedder]
             [semsearch.query :as query]
             [semsearch.backfill :as backfill]
-            [et.vp.ds :as ds]
-            [et.vp.ds.search :as search]
-            [et.vp.ds.search-test :refer [reset-db with-time db]]))
+            [et.rz.hub.ds :as ds]
+            [et.rz.hub.ds.search :as search]
+            [et.rz.hub.ds.search-test :refer [reset-db with-time db]]))
 
 (defn- vec-2d
   "embedding-dim unit vector with `x` on axis 0 and `y` on axis 1, rest 0.

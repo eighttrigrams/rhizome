@@ -9,8 +9,8 @@
    to edit."
   (:require [clojure.test :refer [deftest is]]
             [dev-seed :as dev-seed]
-            [et.vp.ds :as ds]
-            [et.vp.ds.search-test :refer [db test-with-reset-db-and-time]]
+            [et.rz.hub.ds :as ds]
+            [et.rz.hub.ds.search-test :refer [db test-with-reset-db-and-time]]
             [next.jdbc :as jdbc]))
 
 (defn- articles-id

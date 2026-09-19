@@ -15,8 +15,8 @@
   for the ordering and `source-of` for the empty column."
   (:require [clojure.string :as str]
             [et.uvt.caution :as uvt]
-            [et.vp.ds :as ds]
-            [et.vp.ds.relations :as relations]))
+            [et.rz.hub.ds :as ds]
+            [et.rz.hub.ds.relations :as relations]))
 
 (def ours
   "The source markers that are the owner's own hand.
@@ -77,7 +77,7 @@
 
   A row with no source at all is read as **the owner's**. Those rows predate the
   column — `description_source` and `history.source` are both added by
-  `ensure-column!` in `datastore.schema`, so every description written before
+  `ensure-column!` in `et.rz.hub.sqlite.schema`, so every description written before
   that migration has nothing in it — and the two ways of reading them are not
   equally wrong. Read as an agent's, his oldest hand-written descriptions come
   back at 0.00 and an agent is told in so many words that they are free to
@@ -149,7 +149,7 @@
    The same `of-versions` and therefore the same reversal, the same legend and the
    same reading of an empty source column -- which is what makes the two answers
    comparable. A relation's history is versioned by exactly the mechanism an
-   item's description is (et.vp.ds.relations/get-relation-description-history), so
+   item's description is (et.rz.hub.ds.relations/get-relation-description-history), so
    there is nothing for this namespace to know about edges beyond where to ask.
 
    Cheaper than `of-item` in practice for the same reason it is on a colder path:

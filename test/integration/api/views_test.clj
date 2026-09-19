@@ -2,8 +2,8 @@
   (:require [clojure.test :refer [deftest is]]
             [api.harness :refer [call!]]
             [api.helpers :refer [with-fresh-db]]
-            [et.vp.ds :as ds]
-            [et.vp.ds.search-test :refer [db]]))
+            [et.rz.hub.ds :as ds]
+            [et.rz.hub.ds.search-test :refer [db]]))
 
 (deftest store-current-view-test
   (with-fresh-db "appends a stored entry under :data :views :stored"

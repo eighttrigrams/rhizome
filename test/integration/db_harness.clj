@@ -32,7 +32,7 @@
   (:import [org.sqlite SQLiteDataSource]))
 
 (defn dbname-of
-  "The SQLite dbname behind a datasource. `datastore.connection` may hand back
+  "The SQLite dbname behind a datasource. `et.rz.hub.sqlite.connection` may hand back
    its vec-loading wrapper rather than the SQLiteDataSource itself, and that
    wrapper implements `unwrap` for exactly this kind of question.
 

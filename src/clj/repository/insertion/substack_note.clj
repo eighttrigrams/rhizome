@@ -1,7 +1,7 @@
 (ns repository.insertion.substack-note
   (:require [clojure.string :as str]
             [cambium.core :as log]
-            [et.vp.ds :as datastore]
+            [et.rz.hub.ds :as datastore]
             [repository.insertion.common :as common]
             scrapers.substack-note
             et.rz.utils

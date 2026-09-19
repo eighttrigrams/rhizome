@@ -1,10 +1,10 @@
-(ns et.vp.ds.fetch-aggregated-contexts-test
+(ns et.rz.hub.ds.fetch-aggregated-contexts-test
   (:require
    [clojure.test :refer [deftest is testing]]
    [et.rz.config :as config]
-   [et.vp.ds :as ds]
-   [et.vp.ds.search :as search]
-   [et.vp.ds.helpers :as helpers]
+   [et.rz.hub.ds :as ds]
+   [et.rz.hub.ds.search :as search]
+   [et.rz.hub.ds.helpers :as helpers]
    [next.jdbc :as jdbc]))
 
 (defonce db (:db config/config))

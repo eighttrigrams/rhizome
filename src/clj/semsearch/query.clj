@@ -1,7 +1,7 @@
 (ns semsearch.query
   (:require [clojure.string :as str]
             [semsearch.embedder :as embedder]
-            [et.vp.ds.search :as search]))
+            [et.rz.hub.ds.search :as search]))
 
 (defn search-related-items-vector
   "Vector-ranked retrieval. Reuses search/search-related-items so all the

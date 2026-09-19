@@ -1,7 +1,7 @@
 (ns repository.insertion
   (:require [cambium.core :as log]
-            [et.vp.ds :as datastore]
-            [et.vp.ds.relations :as relations]
+            [et.rz.hub.ds :as datastore]
+            [et.rz.hub.ds.relations :as relations]
             [repository.insertion.substack :as substack]
             [repository.insertion.substack-note :as substack-note]
             [repository.insertion.twitter-tweet :as twitter-tweet]

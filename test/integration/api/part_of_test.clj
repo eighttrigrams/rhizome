@@ -6,10 +6,10 @@
   (:require [clojure.test :refer [deftest is]]
             [api.harness :refer [call!]]
             [api.helpers :refer [with-fresh-db]]
-            [et.vp.ds :as ds]
-            [et.vp.ds.relations :as relations]
-            [et.vp.ds.search :as search]
-            [et.vp.ds.search-test :refer [db]]
+            [et.rz.hub.ds :as ds]
+            [et.rz.hub.ds.relations :as relations]
+            [et.rz.hub.ds.search :as search]
+            [et.rz.hub.ds.search-test :refer [db]]
             [next.jdbc :as jdbc]))
 
 (defn- save-relations!
@@ -302,7 +302,7 @@
      said. It has to come back in band like the refusal does"
     (let [{book :selected-item} (call! :insert-context nil {:title "Book"})
           chapter (ds/new-item db "Chapter" "" #{(:id book)} nil)
-          resp (with-redefs [et.vp.ds.relations/set-the-containers-of-item!
+          resp (with-redefs [et.rz.hub.ds.relations/set-the-containers-of-item!
                                (fn [& _]
                                  (throw (java.sql.SQLException.
                                           "[SQLITE_BUSY] The database file is locked")))]

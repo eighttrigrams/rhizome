@@ -1,12 +1,12 @@
-(ns et.vp.ds.part-of-test
+(ns et.rz.hub.ds.part-of-test
   "A part-of relation is written down twice -- as a row in `relations` and as an
    entry in the `contexts` map inside `items.data` -- and the save paths rebuild
    one out of the other. These tests pin the two to each other."
   (:require [clojure.test :refer [deftest is testing]]
-            [et.vp.ds :as ds]
-            [et.vp.ds.relations :as relations]
-            [et.vp.ds.search :as search]
-            [et.vp.ds.search-test :refer [test-with-reset-db-and-time db]]
+            [et.rz.hub.ds :as ds]
+            [et.rz.hub.ds.relations :as relations]
+            [et.rz.hub.ds.search :as search]
+            [et.rz.hub.ds.search-test :refer [test-with-reset-db-and-time db]]
             [next.jdbc :as jdbc]))
 
 (defn- row
@@ -288,7 +288,7 @@
   "Hierarchy mode, reading level `n` of `whole`. Naming the whole twice -- once
    to read under, once inside the level -- is the contract rather than
    repetition: a level counts for the whole it was counted under and no other.
-   See et.vp.ds.search/level-asked-for."
+   See et.rz.hub.ds.search/level-asked-for."
   [whole n]
   {:hierarchy-mode? true :hierarchy-level {:context (:id whole) :level n}})
 

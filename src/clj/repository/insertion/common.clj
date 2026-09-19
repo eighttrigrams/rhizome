@@ -1,6 +1,6 @@
 (ns repository.insertion.common
-  (:require [et.vp.ds :as datastore]
-            [et.vp.ds.helpers :as helpers]
+  (:require [et.rz.hub.ds :as datastore]
+            [et.rz.hub.ds.helpers :as helpers]
             [db :as db]
             [honey.sql :as sql]))
 

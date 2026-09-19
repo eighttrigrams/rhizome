@@ -11,9 +11,9 @@
   (:require [clojure.test :refer [deftest is]]
             [api.harness :refer [call!]]
             [api.helpers :refer [with-fresh-db]]
-            [et.vp.ds :as ds]
-            [et.vp.ds.relations :as relations]
-            [et.vp.ds.search-test :refer [db]]))
+            [et.rz.hub.ds :as ds]
+            [et.rz.hub.ds.relations :as relations]
+            [et.rz.hub.ds.search-test :refer [db]]))
 
 (def ^:private marker
   "Distinctive enough that finding it anywhere in a response is proof, not

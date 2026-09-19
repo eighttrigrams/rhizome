@@ -1,11 +1,11 @@
-(ns datastore.schema-test
+(ns et.rz.hub.sqlite.schema-test
   "The part-of columns have to arrive on databases that already exist -- the
    human's dev and prod db both predate them -- so apply-schema! must add them
    in place, without touching the rows that are already there, and must stay
    safe to run on every boot."
   (:require [clojure.test :refer [deftest is testing]]
-            [datastore.connection :as connection]
-            [datastore.schema :as schema]
+            [et.rz.hub.sqlite.connection :as connection]
+            [et.rz.hub.sqlite.schema :as schema]
             [next.jdbc :as jdbc]))
 
 (def ^:private pre-migration-relations
