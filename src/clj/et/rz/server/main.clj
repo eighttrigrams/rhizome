@@ -1,4 +1,4 @@
-(ns server
+(ns et.rz.server.main
   (:require et.rz.log-init ;; first: sets LOGS_DIR before any logging ns initialises logback
             [ring.adapter.jetty :as j]
             [et.rz.hub.upload :as upload]
@@ -13,12 +13,12 @@
             [et.rz.hub.repository :as r]
             [et.rz.hub.poll :as poll]
             [et.rz.hub.ds :as datastore]
-            opener
+            [et.rz.server.opener :as opener]
             et.rz.hub.dispatch
             et.rz.hub.rest-api
             [et.rz.hub.ui-api :as et.rz.hub.ui-api]
-            [hub-api :as hub-api]
-            [hub-proxy :as hub-proxy]
+            [et.rz.server.hub-api :as hub-api]
+            [et.rz.server.hub-proxy :as hub-proxy]
             [et.rz.placement :as placement]
             [cheshire.core :as cheshire]
             [cambium.core :as log]

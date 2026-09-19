@@ -1,4 +1,4 @@
-(ns hub-api
+(ns et.rz.server.hub-api
   "Reading the hub's `/api` from the `server`, for the two places where a
    machine-local route needs a fact about an item before it can do its own work.
 
@@ -25,7 +25,7 @@
   (:require [cheshire.core :as json]
             [clj-http.client :as http]
             [et.rz.config :as config]
-            [hub-proxy :as hub-proxy]
+            [et.rz.server.hub-proxy :as hub-proxy]
             [et.rz.hub.rest-api :as et.rz.hub.rest-api]))
 
 (def ^:private local-routes

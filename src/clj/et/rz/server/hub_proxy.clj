@@ -1,4 +1,4 @@
-(ns hub-proxy
+(ns et.rz.server.hub-proxy
   "Forwarding `server`'s item surfaces to the hub (arch rework 2, step 3).
 
    `server` keeps the routes that are about *this machine* — the frontend, the

@@ -1,4 +1,4 @@
-(ns opener
+(ns et.rz.server.opener
   "Handing a file to the OS to open.
 
    Obsidian support lived here too -- a temp file written into the owner's vault,

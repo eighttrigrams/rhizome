@@ -68,7 +68,7 @@
    any test body changing. The protocol retired in step 4; see `db-harness`.
 
    What that arrangement was proving is now proved better, and elsewhere:
-   `hub-proxy-test` stands a real hub and a real `server` up against two
+   `et.rz.server.hub-proxy-test` stands a real hub and a real `server` up against two
    *different* databases, so an answer from the wrong one is visible rather than
    indistinguishable."
   [fn-name & args]

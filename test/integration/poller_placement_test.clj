@@ -20,7 +20,7 @@
   (:require [clojure.test :refer [deftest is testing]]
             [et.rz.config :as config]
             [et.rz.hub.main :as db-server]
-            [server]))
+            [et.rz.server.main :as server]))
 
 (def ^:private server-polls? #'server/poll-scheduling-enabled?)
 

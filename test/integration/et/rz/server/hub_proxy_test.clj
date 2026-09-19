@@ -1,4 +1,4 @@
-(ns hub-proxy-test
+(ns et.rz.server.hub-proxy-test
   "`server` hands the item surfaces to the hub (arch rework 2, step 3).
 
    The test stands the pair up for real: a hub on an ephemeral port with its
@@ -21,7 +21,7 @@
             [next.jdbc :as jdbc]
             [next.jdbc.result-set]
             [et.rz.placement :as placement]
-            [server]))
+            [et.rz.server.main :as server]))
 
 (defn- temp-db-path []
   (.getAbsolutePath (doto (java.io.File/createTempFile "rhizome-proxy-test" ".db")

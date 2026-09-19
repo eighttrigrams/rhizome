@@ -24,7 +24,7 @@
    seven `{:db …}` literals from drifting apart, and that is worth keeping
    whatever the handle turns out to be.
 
-   The live hub/server pair is tested where it belongs now: `hub-proxy-test`
+   The live hub/server pair is tested where it belongs now: `et.rz.server.hub-proxy-test`
    stands both processes up for real, against two different databases, which is
    a sharper instrument than one database wearing two names ever was."
   (:require [clojure.string :as str]

@@ -120,7 +120,7 @@
     "delete-atom-poll-feed"})
 
 (def route-placement
-  "The top-level HTTP routes of `server.clj`, each assigned a half. Three
+  "The top-level HTTP routes of `et/rz/server/main.clj`, each assigned a half. Three
    values, because two do not fit:
 
    - `:local` -- answered by this machine, never proxied;
@@ -132,7 +132,7 @@
      `et.rz.placement-sweep-test` re-derives `/ui`'s entry from whether that set has
      members, so the two cannot disagree.
 
-   Keys are the route paths exactly as they appear in `server.clj`, so
+   Keys are the route paths exactly as they appear in `et/rz/server/main.clj`, so
    `api.placement-sweep-test` can check that none has gone stale.
 
    Two that need a word:
