@@ -398,16 +398,24 @@
 
    ## It is not the only line of defence, on purpose
 
-   `rhizome-start` in the README refuses, on a machine with no marker, when
-   `:3008` is held by a process that is not `ssh`. That catches the same failure
+   **The README requires a start script to refuse**, on a machine with no
+   marker, when `:3008` is held by a process that is not `ssh` -- see *Package,
+   deploy and run*, which states the requirement rather than showing an
+   implementation, because the implementation is each operator's own and lives
+   in his shell rather than in this repository. That catches the same failure
    **one layer earlier and differently**: before any process starts, by asking
    the operating system what is listening rather than asking the thing itself,
    so it needs no running hub and no `/health` at all. This catches it for a
    `server` started **any other way** -- by hand, from a make target, by a
-   supervisor, or on the mini, where `rhizome-start` is not what is running. The
-   two overlap and neither subsumes the other; deleting one because the other
-   exists reopens the half it did not cover. `hub-identity-sweep-test` pins them
-   to each other, the way `poller-placement-test` pins the poller predicates."
+   supervisor, or on the mini, where no such script is what is running. The two
+   overlap and neither subsumes the other; deleting one because the other exists
+   reopens the half it did not cover. `hub-identity-sweep-test` pins them to each
+   other, the way `poller-placement-test` pins the poller predicates.
+
+   **Only this half is testable from here**, since the other is a requirement on
+   a script this repository does not contain: what the sweep test can still hold
+   is that the README goes on asking for it, and that the two go on naming each
+   other."
   [{:keys [elected? mine theirs url]}]
   (cond
     (str/blank? (str mine))

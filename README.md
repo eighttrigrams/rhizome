@@ -161,100 +161,63 @@ And **the working directory must be the deploy directory**: the hub slurps
 `schema-sqlite.sql` by a relative path, and both processes look for
 `config.edn` and `primary.nosync` in the directory they were launched from.
 
-Define these functions
+Run them from the deploy directory:
 
 ```bash
-rhizome-start() {
-    local dir="$HOME/Library/Mobile Documents/com~apple~CloudDocs/Rhizome"
-    if lsof -nP -iTCP:3007 -sTCP:LISTEN >/dev/null 2>&1; then
-      echo ":3007 already in use — run rhizome-stop first"
-      return 1
-    fi
-    # The hub, but only on the machine elected to run one. Everywhere else
-    # :3008 is the tunnel and there is nothing to start here.
-    if [ -e "$dir/primary.nosync" ]; then
-      if ! curl -sf -m 2 http://127.0.0.1:3008/health >/dev/null 2>&1; then
-        (cd "$dir" && java -cp server.jar clojure.main -m et.rz.hub.main &)
-        local i=0
-        until curl -sf -m 2 http://127.0.0.1:3008/health >/dev/null 2>&1; do
-          i=$((i+1)); [ $i -gt 30 ] && { echo "hub did not answer :3008/health"; return 1; }
-          sleep 1
-        done
-      fi
-    else
-      # No marker, so :3008 must be the ssh tunnel and nothing else. A hub left
-      # running from a trip answers /health exactly as well as the tunnel does,
-      # and the server would then read the stale travel database. lsof can tell
-      # them apart; /health, asked from here, cannot.
-      #
-      # Not the only guard, on purpose: et.rz.server.main/hub-identity-problem
-      # refuses the same thing from inside the server, by comparing the hub's
-      # own hostname against this machine's. That one covers a server started
-      # any other way — by hand, by a supervisor, or on the mini. This one
-      # covers it before any process starts, and without needing the thing
-      # being questioned to answer questions about itself. Keep both.
-      local holder=$(lsof -nP -iTCP:3008 -sTCP:LISTEN -F c | sed -n 's/^c//p' | head -1)
-      if [ -n "$holder" ] && [ "$holder" != "ssh" ]; then
-        echo ":3008 is held by '$holder', not the ssh tunnel — a hub left over from a trip?"
-        echo "run rhizome-stop to kill it, then let launchd put the tunnel back"
-        return 1
-      fi
-    fi
-    curl -sf -m 2 http://127.0.0.1:3008/health >/dev/null 2>&1 || {
-      echo "nothing answers :3008 — no primary.nosync here, and no tunnel to the hub"
-      return 1
-    }
-    (cd "$dir" && java -cp server.jar clojure.main -m et.rz.server.main &)
-    # Wait for it the way we waited for the hub. It refuses to boot on a hub
-    # that is missing, or on one that turns out to be this machine's own
-    # leftover — and without this the refusal scrolls past underneath the
-    # window Tracker opens on the next line.
-    local j=0
-    until curl -sf -m 2 http://127.0.0.1:3007/ >/dev/null 2>&1; do
-      j=$((j+1)); [ $j -gt 30 ] && { echo "server did not come up on :3007 — see its output above"; return 1; }
-      sleep 1
-    done
-    ~/Applications/Tracker-darwin-arm64/Tracker.app/Contents/MacOS/Tracker 2>/dev/null
-}
-rhizome-stop() {
-    local pids=$(lsof -nP -iTCP:3007 -sTCP:LISTEN -t)
-    [ -n "$pids" ] && kill $pids || echo "nothing on :3007"
-    # Ungated on purpose, and it used to be gated on primary.nosync. :3008 is
-    # the hub here and the ssh tunnel elsewhere, and the asymmetry decides it:
-    # launchd's KeepAlive puts a killed tunnel back in seconds, while a hub
-    # left running from a trip serves a stale database forever. Worse, the
-    # gate failed exactly where it was needed — remove the marker before
-    # stopping the hub, which is the natural order to do it in, and the one
-    # function that could kill that hub refuses to.
-    local holder=$(lsof -nP -iTCP:3008 -sTCP:LISTEN -F c | sed -n 's/^c//p' | head -1)
-    pids=$(lsof -nP -iTCP:3008 -sTCP:LISTEN -t)
-    if [ -z "$pids" ]; then
-      echo "nothing on :3008"
-    elif kill $pids; then
-      if [ "$holder" = "ssh" ]; then
-        echo "killed the ssh tunnel on :3008 — launchd will put it back"
-      else
-        echo "stopped the hub on :3008 ($holder)"
-      fi
-    else
-      # Nested rather than `kill $pids && [ "$holder" = "ssh" ]`, because that
-      # shape sends a failed kill down the else branch and prints "stopped the
-      # hub" over a hub that is still running — finding 3's own failure in
-      # miniature: a reassuring sentence about a stale database still being
-      # served. A kill does fail: the pid is gone between the lsof and the
-      # kill, or it is not this user's to signal.
-      echo "could not kill everything on :3008 ($holder) — still there; check by hand"
-      return 1
-    fi
-}
+java -cp server.jar clojure.main -m et.rz.hub.main     # only where primary.nosync is
+java -cp server.jar clojure.main -m et.rz.server.main  # on every machine
 ```
+
+Both are worth wrapping in a start/stop pair of shell functions. **The
+implementation is yours** — it depends on your machine and on what you use to
+keep things running — but these are the requirements it has to meet, and each
+one is here because of a failure that actually happened:
+
+**Starting**
+
+1. Refuse when `:3007` is already held, rather than starting a second `server`
+   beside the first.
+2. Start the hub **only where `primary.nosync` is**, and only when nothing
+   answers `:3008/health` yet — then **wait for `/health` to answer** before
+   going on. Everywhere else there is no hub to start: `:3008` is the near end
+   of the tunnel.
+3. Where there is **no** marker, prove `:3008` is the tunnel before trusting it.
+   Ask the operating system *what* holds the port —
+   `lsof -nP -iTCP:3008 -sTCP:LISTEN -F c` — and refuse a holder that is not
+   `ssh`. A hub left running from a trip answers `/health` exactly as well as
+   the tunnel does, so a `server` started against it reads and writes a stale
+   database that looks complete; the port's holder is the only thing that tells
+   them apart from here.
+
+   **Not the only guard, on purpose.**
+   `et.rz.server.main/hub-identity-problem` refuses the same thing from inside
+   the `server`, by comparing the hub's own hostname against this machine's,
+   which covers a `server` started any other way — by hand, from a make target,
+   by a supervisor. This one fires before any process starts, and without having
+   to ask the suspect process about itself. Neither subsumes the other; keep
+   both.
+4. **Wait for `:3007` to answer** before opening anything over the output. The
+   `server` refuses to boot against a missing hub, and against one that turns
+   out to be this machine's own leftover — and a refusal nobody reads is a
+   refusal that reads as "rhizome is broken".
+
+**Stopping**
+
+1. `:3007` first, then `:3008`.
+2. **Kill `:3008` whether or not this machine has the marker.** Gating that on
+   the marker fails exactly where it is needed: remove the marker before
+   stopping the hub — the natural order, and what *Moving the hub* asks for —
+   and the one thing that could kill that hub refuses to. A keepalive puts a
+   killed tunnel back in seconds; an orphan hub serves a stale database forever.
+3. Say **which of the two was killed** — `-F c` again — and report **a kill that
+   failed** as a failure rather than as a stopped hub. Otherwise the reassuring
+   sentence ends up over a hub that is still running, and still answering out of
+   a stale database.
 
 and then use
 
 ```bash
-make deploy DEPLOY_TARGET=~/Library/Mobile\ Documents/com~apple~CloudDocs/Rhizome
-rhizome-start
-rhizome-stop
+make deploy DEPLOY_TARGET=<deploy-dir>
 ```
 
 `DEPLOY_TARGET` is required and must be passed on the command line — there is
