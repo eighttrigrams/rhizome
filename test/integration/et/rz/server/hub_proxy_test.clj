@@ -372,3 +372,68 @@
                                       :uri "/api/backfill/embeddings"
                                       :headers {} :body nil})))))))
       (finally (close)))))
+
+;; ---------------------------------------------------------------------------
+;; Which hub answered
+;;
+;; `hub-identity-test` asks the rule about every world; this asks a real hub the
+;; one question that cannot be faked -- a hub booted in this JVM really is on
+;; this machine, and this checkout really has no `primary.nosync`. That is
+;; finding 3's laptop, exactly, with nothing stubbed but `:dev?`.
+
+(deftest health-says-which-machine-and-which-file-test
+  (let [path (temp-db-path)
+        hub  (hub-main/start! {:port 0 :db-path path})]
+    (try
+      (let [health (hub-proxy/health (:url hub))]
+        (is (= @config/hostname (:hostname health))
+            "the hub did not report the hostname, so nothing can tell two hubs apart")
+        (is (= (.getCanonicalPath (io/file path)) (:db-path health))
+            (str "the db path is not canonical. The configured value is relative "
+                 "(./rhizome.db.nosync) and /health is read from another machine, "
+                 "where a relative path is not an answer. Got: " (:db-path health))))
+      (finally (hub-main/stop! hub)))))
+
+(deftest a-leftover-local-hub-is-refused-test
+  (let [hub (hub-main/start! {:port 0 :db-path (temp-db-path)})]
+    (try
+      (let [health (hub-proxy/health (:url hub))
+            prod   #(assoc config/config :dev? false)]
+        (testing "no marker here, and the hub answering is on this machine"
+          ;; The whole of finding 3. Before this check, `server` booted happily
+          ;; and served the stale travel database.
+          (with-redefs [config/config (prod)
+                        config/primary-marker-present? (constantly false)]
+            (is (thrown-with-msg?
+                  clojure.lang.ExceptionInfo #"running on THIS machine"
+                  (server/check-same-machine! (:url hub) health)))))
+
+        (testing "the same hub, on the machine that is meant to hold it"
+          (with-redefs [config/config (prod)
+                        config/primary-marker-present? (constantly true)]
+            (is (nil? (server/check-same-machine! (:url hub) health)))))
+
+        (testing "the mirror: elected, but :3008 leads to some other machine"
+          (with-redefs [config/config (prod)
+                        config/primary-marker-present? (constantly true)]
+            (is (thrown-with-msg?
+                  clojure.lang.ExceptionInfo #"says it is on"
+                  (server/check-same-machine!
+                    (:url hub) (assoc health :hostname "some-other-machine"))))))
+
+        (testing "a hub older than this check does not quietly pass"
+          (with-redefs [config/config (prod)
+                        config/primary-marker-present? (constantly false)]
+            (is (thrown-with-msg?
+                  clojure.lang.ExceptionInfo #"did not say which machine"
+                  (server/check-same-machine!
+                    (:url hub) (dissoc health :hostname))))))
+
+        (testing "dev is exempt, or `make start` and every e2e run would refuse"
+          ;; The dev stack is a hub and a `server` on one machine with no marker
+          ;; -- the refusing shape exactly. Same exemption as `check-elected!`,
+          ;; and for the same reason: no checkout has a marker.
+          (with-redefs [config/config (assoc config/config :dev? true)
+                        config/primary-marker-present? (constantly false)]
+            (is (nil? (server/check-same-machine! (:url hub) health))))))
+      (finally (hub-main/stop! hub)))))

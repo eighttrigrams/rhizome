@@ -345,6 +345,130 @@
   (when (nil? (hub-proxy/hub-url))
     (upload/ensure-convert!)))
 
+(defn hub-identity-problem
+  "Is the hub that answered `/health` the one this machine should be talking
+   to? nil when it is, or `{:problem kw :message s}` when it is not.
+
+   ## The failure this exists for
+
+   `:hub-url` is `http://127.0.0.1:3008` on **every** machine -- that is the
+   property the ssh tunnel buys, and it is why one config.edn is correct
+   everywhere. The cost of it is that \"the hub\" and \"a hub left running from
+   a trip\" are the same address. Sequence, using only the README's own tooling:
+   the laptop travels as the hub; the owner comes home, removes
+   `primary.nosync`; `rhizome-start` skips starting a hub (no marker), finds
+   `:3008/health` answering (the orphan answers it), and starts a `server` that
+   reads and writes the **stale travel database** -- a complete, plausible
+   rhizome with the mini's recent work missing, and nothing anywhere saying so.
+
+   `check-elected!` cannot see this. It runs when a hub *starts*, and this hub
+   started legitimately, days ago, on the machine that was then the hub.
+
+   ## The rule, which needs no new configuration
+
+   The marker already says which machine is supposed to hold the database, so
+   the expectation is derivable rather than declarable:
+
+   | `primary.nosync` here | the hub answering must be |
+   | --- | --- |
+   | present | **this machine** |
+   | absent  | **not this machine** |
+
+   Both directions are always true in production, because a hub only starts
+   where the marker is (`et.rz.hub.main/check-elected!`). The second row is the
+   sequence above. The first is its mirror -- a `server` on the mini whose
+   `:hub-url` has been pointed somewhere else, or a stale tunnel holding local
+   `:3008` in front of the hub that is right there.
+
+   ## Why the hostname and not the db path
+
+   The obvious field is the wrong one. `:db-path` is `./rhizome.db.nosync` in a
+   config.edn that is identical on every machine, inside a deploy directory
+   that is the same iCloud path on every machine; canonicalised, two machines'
+   answers differ only if their usernames do. It is reported on `/health` to be
+   *read*, and the hostname is what is *compared*. Both sides compute it through
+   one function for that reason -- see `et.rz.role/hostname`.
+
+   ## An unknown hostname is a refusal, not a pass
+
+   nil means *could not tell*. Treating it as a value would make two machines'
+   missing hostnames compare equal, which is precisely the wrong answer, so
+   either side being blank is its own problem with its own message. An old hub
+   that predates this check is the likeliest cause and the message says so.
+
+   ## It is not the only line of defence, on purpose
+
+   `rhizome-start` in the README refuses, on a machine with no marker, when
+   `:3008` is held by a process that is not `ssh`. That catches the same failure
+   **one layer earlier and differently**: before any process starts, by asking
+   the operating system what is listening rather than asking the thing itself,
+   so it needs no running hub and no `/health` at all. This catches it for a
+   `server` started **any other way** -- by hand, from a make target, by a
+   supervisor, or on the mini, where `rhizome-start` is not what is running. The
+   two overlap and neither subsumes the other; deleting one because the other
+   exists reopens the half it did not cover. `hub-identity-sweep-test` pins them
+   to each other, the way `poller-placement-test` pins the poller predicates."
+  [{:keys [elected? mine theirs url]}]
+  (cond
+    (str/blank? (str mine))
+    {:problem :own-hostname-unknown
+     :message (str "this machine could not determine its own hostname, so it cannot tell "
+                   "whether the hub at " url " is running here or at the far end of a "
+                   "tunnel. That distinction is the only thing standing between a "
+                   "stale local hub and the real one, so this refuses rather than "
+                   "guesses.")}
+
+    (str/blank? (str theirs))
+    {:problem :hub-hostname-unknown
+     :message (str "the hub at " url " did not say which machine it is on. Either it is "
+                   "older than this check -- deploy the current jar to it -- or its own "
+                   "hostname could not be determined. Until it says, a hub left running "
+                   "on this machine is indistinguishable from the one through the "
+                   "tunnel, so this refuses rather than guesses.")}
+
+    (and elected? (not= mine theirs))
+    {:problem :elected-but-hub-is-elsewhere
+     :message (str "this machine has " config/primary-marker " beside its config.edn, so "
+                   "it is meant to hold the database -- but the hub answering " url
+                   " says it is on " (pr-str theirs) " and this machine is "
+                   (pr-str mine) ". Something else is holding local :3008 in front of "
+                   "the hub that belongs here, most likely a leftover ssh tunnel. Stop "
+                   "it (rhizome-stop), then start the hub here.")}
+
+    (and (not elected?) (= mine theirs))
+    {:problem :not-elected-but-hub-is-here
+     :message (str "the hub answering " url " is running on THIS machine (" (pr-str mine)
+                   "), and this machine has no " config/primary-marker " -- so it is not "
+                   "the machine that holds the database. This is a hub left running from "
+                   "when this machine was the hub, and it is answering on the address the "
+                   "ssh tunnel should be on. Booting against it would read and write a "
+                   "stale copy of the database, silently. Run rhizome-stop to kill it, "
+                   "and let launchd put the tunnel back.")}
+
+    :else nil))
+
+(defn check-same-machine!
+  "Throw when `/health`'s answer and this machine's marker disagree about which
+   machine the hub is on. See `hub-identity-problem` for the rule and the
+   failure.
+
+   **Dev is exempt, as it is everywhere the marker is read.** No checkout has a
+   marker (`primary.nosync` is gitignored) and `make start` runs a hub and a
+   `server` on one machine, which is the `:not-elected-but-hub-is-here` shape
+   exactly -- so without this exemption the dev stack and the whole e2e suite
+   would refuse to boot. The same exemption is in `check-elected!` for the same
+   reason."
+  [url health]
+  (when-not (:dev? config/config)
+    (when-let [{:keys [message] :as problem}
+               (hub-identity-problem {:elected? (config/primary-marker-present?)
+                                      :mine     @config/hostname
+                                      :theirs   (:hostname health)
+                                      :url      url})]
+      (let [msg (str "Refusing to start: " message)]
+        (log/error (dissoc problem :message) msg)
+        (throw (ex-info msg (assoc problem :hub/url url)))))))
+
 (defn- check-hub!
   "One `/health` call, before anything else needs the hub, so that a hub that is
   not there says so in one line instead of surfacing as a connection refused in
@@ -379,19 +503,27 @@
   *exit*, and a half-dead tunnel accepts connections and answers nothing -- so
   without a socket timeout this call would not return, launchd would have
   nothing to restart, and the machine would sit there starting forever. The
-  wait loop is a property of `health-request-defaults`, not of the refusal."
+  wait loop is a property of `health-request-defaults`, not of the refusal.
+
+  **One call, two questions.** The answer is not thrown away: it goes straight
+  to `check-same-machine!`, which asks whether the hub that answered is the one
+  this machine should be talking to at all. A hub answering `/health` used to
+  be the whole of \"the hub is up\", and on the one machine that has been the
+  hub and is not any more, that was not enough -- see `hub-identity-problem`."
   []
   (when-let [url (hub-proxy/hub-url)]
-    (try (hub-proxy/health url)
-         (catch Throwable t
-           (let [msg (str "Refusing to start: no hub answering at "
-                          url " (" (.getMessage t) "). "
-                          "On the hub's own machine, start it first -- 'make start' "
-                          "does, and 'make start-hub' runs it alone. On any other "
-                          "machine this address is the near end of an ssh tunnel, so "
-                          "what is down is the tunnel, not the hub.")]
-             (log/error t msg)
-             (throw (ex-info msg {:hub/url url} t)))))))
+    (check-same-machine!
+      url
+      (try (hub-proxy/health url)
+           (catch Throwable t
+             (let [msg (str "Refusing to start: no hub answering at "
+                            url " (" (.getMessage t) "). "
+                            "On the hub's own machine, start it first -- 'make start' "
+                            "does, and 'make start-hub' runs it alone. On any other "
+                            "machine this address is the near end of an ssh tunnel, so "
+                            "what is down is the tunnel, not the hub.")]
+               (log/error t msg)
+               (throw (ex-info msg {:hub/url url} t))))))))
 
 (defn start-http-server!
   []

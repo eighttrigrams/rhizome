@@ -82,32 +82,65 @@
   [{:keys [ds]}]
   (jdbc/execute-one! ds ["SELECT 1"]))
 
+(defn- identity-fields
+  "Which machine this hub is on, and which file it has open.
+
+   **`:hostname` is the load-bearing one, and the db path is not.** The obvious
+   choice is the wrong one here: `:db-path` is `./rhizome.db.nosync` in a
+   config.edn that is identical on every machine, resolved inside a deploy
+   directory that is the same iCloud path on every machine. Canonicalised, two
+   machines' answers differ only if their usernames do. So the path is reported
+   for a human and for the prober to *read*, and `hostname` is what anything
+   *compares* -- see `et.rz.server.main/hub-identity-problem`, and do not
+   rebuild that check on this path.
+
+   Why either is here at all: `:hub-url` is `http://127.0.0.1:3008` on every
+   machine -- that is the property the ssh tunnel buys. So \"the hub\" and \"a
+   hub left running from a trip\" are the same address, and until this, `/health`
+   answered them identically. Two hubs on two different databases were
+   byte-for-byte indistinguishable through it.
+
+   Both may be nil, and nil means *could not tell* rather than *no*. A reader
+   that treats a missing hostname as a value would compare it equal to another
+   machine's missing hostname, which is the exact failure this prevents."
+  [server]
+  {:hostname @role/hostname
+   :db-path  (:db-path server)})
+
 (defn health
-  "GET /health — `{:ok true :read-only? b :vec-available? b}`, as JSON.
+  "GET /health — `{:ok true :read-only? b :vec-available? b :hostname s
+  :db-path s}`, as JSON.
 
   What a start script waits on and what a prober reads, so it answers plain
   JSON rather than transit and says everything either of them needs in one
   line. `:read-only?` is whether this process opened the database read-only --
   a replica, where every write fails at the driver. `:vec-available?` is
   whether the sqlite-vec extension loaded, which is what decides whether the
-  items_vec statements can run at all.
+  items_vec statements can run at all. `:hostname` and `:db-path` say *which
+  hub this is* -- see `identity-fields`, which is where the reason lives.
 
   It asks the database rather than reporting this process's own opinion of
   itself. A health check that says `ok` while the first statement will fail with
   SQLITE_CANTOPEN is worse than none, because what waits on it starts the thing
-  in front. 503 and the reason, when the database cannot be reached."
+  in front. 503 and the reason, when the database cannot be reached.
+
+  **The identity is on the 503 too**, because a hub that cannot reach its file
+  is still a hub on a particular machine, and \"which one is answering\" is
+  exactly the question being asked when this goes wrong."
   [server]
   (try
     (reach-the-database! server)
-    (json-response 200 {:ok             true
-                        :read-only?     (boolean (:read-only? server))
-                        :vec-available? connection/vec-available?})
+    (json-response 200 (merge {:ok             true
+                               :read-only?     (boolean (:read-only? server))
+                               :vec-available? connection/vec-available?}
+                              (identity-fields server)))
     (catch Throwable t
       (log/error t "hub: /health could not reach the database")
-      (json-response 503 {:ok             false
-                          :error          (str (.getMessage t))
-                          :read-only?     (boolean (:read-only? server))
-                          :vec-available? connection/vec-available?}))))
+      (json-response 503 (merge {:ok             false
+                                 :error          (str (.getMessage t))
+                                 :read-only?     (boolean (:read-only? server))
+                                 :vec-available? connection/vec-available?}
+                                (identity-fields server))))))
 
 (def ^:private reset-tables
   "Every table `/test/reset` empties. Relations first, so a foreign key can
@@ -242,7 +275,16 @@
   (let [ds     (connection/make-datasource {:dbname db-path :read-only? (boolean read-only?)})
         server {:ds           ds
                 :read-only?   (boolean read-only?)
-                :allow-reset? (boolean allow-reset?)}]
+                :allow-reset? (boolean allow-reset?)
+                ;; Canonical, because the configured value is relative
+                ;; (`./rhizome.db.nosync`) and a relative path is an answer
+                ;; only to someone standing in the same directory. `/health`
+                ;; is read from another machine. Canonicalising also resolves
+                ;; the symlink case, so two paths that name one file read as
+                ;; one file. Best-effort: a path that cannot be canonicalised
+                ;; is reported as given rather than dropped.
+                :db-path      (try (.getCanonicalPath (io/file db-path))
+                                   (catch Throwable _ (str db-path)))}]
     ;; Before anything else, and before the port is open: prove the database is
     ;; actually there. Applying the schema would prove it for a writable one,
     ;; but a read-only server skips that and would otherwise come up green

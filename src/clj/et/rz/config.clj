@@ -139,6 +139,13 @@
 (def primary-marker role/primary-marker)
 (def primary-marker-present? role/primary-marker-present?)
 
+;; And which machine this one is. Same arrangement and same reason: the hub
+;; reports it on /health, the `server` compares it against its own, and a
+;; comparison is only worth anything if both sides computed the value the same
+;; way -- so there is one function and two re-exports of it, not two readings.
+;; A delay: see `role/hostname`.
+(def hostname role/hostname)
+
 ;; --- the database, which is not in this process any more --------------------
 ;; Three shapes of an older config.edn are refused here, by name, and none of
 ;; them is refused for tidiness: each would fail *silently* if simply read.
