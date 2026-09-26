@@ -324,9 +324,15 @@
   [*state]
   (fetch-and-reset-with-method! *state @*state api/cycle-search-mode))
 
-(defn enter-item-view! [*state] (swap! *state assoc :item-view? true))
+;; Both ways across the item-view line drop the hover previews. The item view
+;; outranks them on the lhs, so while it is up they are hidden, not gone, and
+;; hovering goes on setting them underneath it -- a strip passed on the way
+;; after a click included. Stepping out with "f" or Escape then brought the
+;; hidden one to the top, where what was asked for is the selected item's other
+;; view. The next card the pointer actually enters puts a preview back.
+(defn enter-item-view! [*state] (swap! *state #(-> % (dissoc :preview-item :preview-relation) (assoc :item-view? true))))
 
-(defn exit-item-view! [*state] (swap! *state assoc :item-view? false))
+(defn exit-item-view! [*state] (swap! *state #(-> % (dissoc :preview-item :preview-relation) (assoc :item-view? false))))
 
 (defn fetch-item-description!
   [*state item]

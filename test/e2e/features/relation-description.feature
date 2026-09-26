@@ -78,3 +78,23 @@ Feature: The text a relation carries
     Then the lhs should show the relation text "the relation's own text"
     When I hover the body of the card "Chapter two"
     Then the lhs should show no relation text
+
+  Scenario: Selecting a card from its strip leaves no relation behind the item's views
+    Clicking a card makes it the selection, and what the lhs has to offer from
+    then on is views of that item -- the ones "f" flips between. A relation the
+    pointer rested on just before the click is a hover's, not the item's.
+
+    Given "Chapter one" has a part "Section a"
+    And "Chapter one" has a part "Section b"
+    When I open the relation modal on "Chapter one"
+    And I type "the relation's own text" into the relation text
+    And I save the relation modal
+    And I reload the app
+    And I select the context "Book"
+    And I hover the relation strip on "Chapter one"
+    Then the lhs should show the relation text "the relation's own text"
+    When I select the item "Chapter one" on the move
+    And I press the "f" key
+    Then the lhs should show no relation text
+    When I press the "f" key
+    Then the lhs should show no relation text

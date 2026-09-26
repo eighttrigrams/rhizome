@@ -151,13 +151,13 @@
                     (if idx
                       (let [skip-select? (and (deref modifiers/*alt-pressed?)
                                               (not= :items (:active-search @*state)))]
-                        (swap! *state (fn [state] (dissoc state :preview-item)))
+                        (swap! *state (fn [state] (dissoc state :preview-item :preview-relation)))
                         (if skip-select?
                           (do (actions/reprioritize-item *state item) (select-fn idx))
                           (actions/select-item! *state item)))
                       (do (swap! *state (fn [state]
                                           (-> state
-                                              (dissoc :preview-item))))
+                                              (dissoc :preview-item :preview-relation))))
                           (if select-as-context?
                             (actions/select-context! *state item)
                             (actions/select-item! *state item))))))

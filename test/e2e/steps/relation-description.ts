@@ -129,3 +129,40 @@ Then("the lhs should say the relation has no text yet", async ({ page }) => {
   await expect(page.locator("#lhs-component .relation-preview-note"))
     .toContainText("Nothing written on this relation yet");
 });
+
+// A hand does not hold still after a click. The list the selection brings in
+// is rendered under a pointer that goes on moving, and with a strip along the
+// top of every card, a strip is what it most often passes over. Its enter puts
+// a relation up behind the item view, which outranks it and hides it -- until
+// "f" steps out of the item view. So the pointer is run over the first strip
+// of the new list right after the click.
+When("I select the item {string} on the move", async ({ page }, title: string) => {
+  await card(page, title).first().locator("span.title").click();
+  const strip = page.locator("#rhs-component li.item-card .relation-annotation").first();
+  await strip.waitFor({ state: "visible" });
+  const box = await strip.boundingBox();
+  if (box) {
+    for (let dx = 0; dx <= 60; dx += 10) {
+      await page.mouse.move(box.x + 20 + dx, box.y + box.height / 2);
+      await page.waitForTimeout(15);
+    }
+  }
+  await drain(page);
+});
+
+// Anything filed under the item that is about to be selected, so that the list
+// the selection brings in has a card for the moving pointer to land on. Looked
+// up by title alone: the whole here is an item, not necessarily a context.
+When(
+  "{string} has a part {string}",
+  async ({ request }, wholeTitle: string, title: string) => {
+    const found = await request.get(`/api/items?q=${encodeURIComponent(wholeTitle)}`);
+    expect(found.ok(), `searching for "${wholeTitle}" failed`).toBeTruthy();
+    const whole = (await found.json()).find((i: any) => i.title === wholeTitle);
+    expect(whole, `no item titled "${wholeTitle}"`).toBeTruthy();
+    const resp = await request.post("/api/items", {
+      data: { title, "context-ids": [whole.id], reason: "e2e test setup" },
+    });
+    expect(resp.status(), await resp.text()).toBe(201);
+  },
+);
