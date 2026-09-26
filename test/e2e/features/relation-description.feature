@@ -62,3 +62,19 @@ Feature: The text a relation carries
   Scenario: An edge nobody has written on says so rather than showing nothing
     When I hover the relation strip on "Chapter one"
     Then the lhs should say the relation has no text yet
+
+  Scenario: Sweeping from one card's strip onto the next card lets go of the relation
+    A pointer running down a list leaves a strip and arrives on the next card
+    well inside the strip's grace period. The next card's preview is what the
+    pointer is on then, not the edge it passed on the way.
+
+    Given "Book" holds an item "Chapter two" described as "the second chapter"
+    When I open the relation modal on "Chapter one"
+    And I type "the relation's own text" into the relation text
+    And I save the relation modal
+    And I reload the app
+    And I select the context "Book"
+    And I hover the relation strip on "Chapter one"
+    Then the lhs should show the relation text "the relation's own text"
+    When I hover the body of the card "Chapter two"
+    Then the lhs should show no relation text

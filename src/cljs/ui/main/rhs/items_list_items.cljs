@@ -87,11 +87,21 @@
                         (when (= :leave (:mouse @*state)) (swap! *state dissoc :preview-item)))
                       300)))
 
+;; Arriving on a card lets go of any relation preview, before anything else.
+;; The strip's leave only clears it after its 300ms grace, and only if :mouse
+;; still says :leave then -- but :mouse is one flag for cards and strips alike,
+;; so on a sweep down the list the next card's enter set it back to :enter well
+;; inside the grace, the clear was skipped, and the passed edge stayed on the
+;; lhs (which prefers it) over every card after it. The strip being inside the
+;; card, its own enter fires after this one and puts its relation back when it
+;; is the strip that was aimed at. Not behind the :loading guard: letting go is
+;; never wrong, whereas the stale relation was.
 (defn- on-mouse-enter
   [*state item]
-  #(when-not (:loading @*state)
-     (swap! *state assoc :preview-item item :mouse :enter)
-     (actions/fetch-item-description! *state item)))
+  #(do (swap! *state dissoc :preview-relation)
+       (when-not (:loading @*state)
+         (swap! *state assoc :preview-item item :mouse :enter)
+         (actions/fetch-item-description! *state item))))
 
 ;; The strip sits inside the card, and React fires enter handlers from the
 ;; outside in, so the card's has already put the item in the preview slot by the
