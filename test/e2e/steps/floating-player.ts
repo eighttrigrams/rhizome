@@ -211,23 +211,19 @@ Then("there should be exactly one QR overlay", async ({ page }) => {
 
 // Off the composited page, polled, for the same reasons as the corners: the
 // size is calc against the viewport, and growing into it is a transition.
-// "Nearly fills" is said as: centred both ways, the tighter side exactly
-// CORNER_PADDING clear of its edges, and the video still 16:9.
+// "Nearly fills" is said as: CORNER_PADDING clear of every edge of the window.
+// Not 16:9 — the owner wanted the gaps alike on all sides, and YouTube
+// letterboxes inside its own frame.
 Then("the player should nearly fill the window", async ({ page }) => {
-  const fit = async () => page.evaluate((pad) => {
+  const gaps = async () => page.evaluate(() => {
     const r = document.querySelector("#floating-player")!.getBoundingClientRect();
-    const f = document.querySelector("#floating-player-frame")!.getBoundingClientRect();
-    const near = (a: number, b: number) => Math.abs(a - b) <= 2;
-    const centred = near(r.left, window.innerWidth - r.right)
-      && near(r.top, window.innerHeight - r.bottom);
-    const snug = near(Math.min(r.left, r.top), pad);
-    const sixteenNine = Math.abs(f.width / f.height - 16 / 9) < 0.02;
-    return { centred, snug, sixteenNine };
-  }, CORNER_PADDING);
-  await expect.poll(fit, {
-    message: "the player never grew to nearly fill the window",
+    return [r.top, window.innerWidth - r.right, window.innerHeight - r.bottom, r.left]
+      .map(Math.round);
+  });
+  await expect.poll(gaps, {
+    message: "the player never grew to CORNER_PADDING from every edge (top, right, bottom, left)",
     timeout: 5000,
-  }).toEqual({ centred: true, snug: true, sixteenNine: true });
+  }).toEqual([CORNER_PADDING, CORNER_PADDING, CORNER_PADDING, CORNER_PADDING]);
 });
 
 // What is on top at the middle of the code is the question, not z-index

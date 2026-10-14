@@ -107,24 +107,32 @@
      :left (if (#{:top-left :bottom-left} corner) pad from-right)}))
 
 (def ^:private enlarged-width
-  "The widest 16:9 video that fits the window with corner-padding all round
-   and the grip strip still on top: the window's width, unless its height is
-   the tighter of the two. One CSS expression, for the same reason the corners
-   are calc: the browser re-solves it on every resize, and nothing here has to
-   listen."
-  (str "min(calc(100vw - " (* 2 corner-padding) "px), "
-       "calc((100vh - var(--top-strip-height) - " (+ handle-height (* 2 corner-padding)) "px) * 16 / 9))"))
+  "The window less corner-padding on both sides.
 
-(def ^:private enlarged-height (str "calc(" enlarged-width " * 9 / 16)"))
+   Not held to 16:9. Held to it, the video's shape decided the box, and on a
+   window wider than 16:9 that left wide gaps left and right against 20px top
+   and bottom -- a box floating in the middle rather than one filling the
+   window. The owner wanted the gaps alike on every side, so the box takes the
+   window's shape and YouTube letterboxes the video inside its own frame,
+   which it does anyway.
+
+   calc, for the same reason the corners are: the browser re-solves it on
+   every resize, and nothing here has to listen."
+  (str "calc(100vw - " (* 2 corner-padding) "px)"))
+
+(def ^:private enlarged-height
+  "The frame's height: the window less the top strip, the grip strip, and
+   corner-padding above and below."
+  (str "calc(100vh - var(--top-strip-height) - " (+ handle-height (* 2 corner-padding)) "px)"))
 
 (defn- enlarged-position
-  "Centred in what is left of the window under the top strip. Size included,
-   since unlike a corner this box is not the same size as every other."
+  "corner-padding in from the top-left, under the top strip; the size does the
+   rest. Width included, since unlike a corner this box is not the size of
+   every other."
   []
   {:width enlarged-width
-   :left (str "calc((100vw - " enlarged-width ") / 2)")
-   :top (str "calc(var(--top-strip-height) + (100vh - var(--top-strip-height) - "
-             handle-height "px - " enlarged-height ") / 2)")})
+   :left (str corner-padding "px")
+   :top (str "calc(" corner-padding "px + var(--top-strip-height))")})
 
 (defn- quadrant
   "The corner the box belongs in, from where its centre was let go."
