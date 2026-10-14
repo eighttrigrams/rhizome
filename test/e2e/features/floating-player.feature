@@ -135,3 +135,25 @@ Feature: A video that goes on playing
     And I open the QR code
     Then the player should not offer its QR code
     And there should be exactly one QR overlay
+
+  Scenario: The size button enlarges it to nearly fill the window, and back
+    # Bigger is a resize of the same box, not a second player: the iframe has
+    # to come through it untouched, or the video starts again from zero.
+    When I open the item "A talk worth keeping"
+    And I click the video poster
+    And I remember the player's iframe
+    And I enlarge the player
+    Then the player should nearly fill the window
+    And the player should be the very same iframe
+    When I shrink the player back
+    Then the player should be in the "bottom-left" corner
+    And the player should be the very same iframe
+
+  Scenario: Enlarged, it does not hide its own QR code
+    # The code is drawn in the middle of the window, which is where a big
+    # player sits. A small one stays above the overlay; a big one steps under.
+    When I open the item "A talk worth keeping"
+    And I click the video poster
+    And I enlarge the player
+    And I open the player's QR code
+    Then the QR code should be in front of the player

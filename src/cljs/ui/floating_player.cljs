@@ -106,6 +106,26 @@
             from-bottom)
      :left (if (#{:top-left :bottom-left} corner) pad from-right)}))
 
+(def ^:private enlarged-width
+  "The widest 16:9 video that fits the window with corner-padding all round
+   and the grip strip still on top: the window's width, unless its height is
+   the tighter of the two. One CSS expression, for the same reason the corners
+   are calc: the browser re-solves it on every resize, and nothing here has to
+   listen."
+  (str "min(calc(100vw - " (* 2 corner-padding) "px), "
+       "calc((100vh - var(--top-strip-height) - " (+ handle-height (* 2 corner-padding)) "px) * 16 / 9))"))
+
+(def ^:private enlarged-height (str "calc(" enlarged-width " * 9 / 16)"))
+
+(defn- enlarged-position
+  "Centred in what is left of the window under the top strip. Size included,
+   since unlike a corner this box is not the same size as every other."
+  []
+  {:width enlarged-width
+   :left (str "calc((100vw - " enlarged-width ") / 2)")
+   :top (str "calc(var(--top-strip-height) + (100vh - var(--top-strip-height) - "
+             handle-height "px - " enlarged-height ") / 2)")})
+
 (defn- quadrant
   "The corner the box belongs in, from where its centre was let go."
   [centre-x centre-y]
@@ -156,6 +176,18 @@
     (for [x [3 8 13 18] y [3 6]]
       ^{:key (str x "-" y)} [:circle {:cx x :cy y :r 1}])]])
 
+(defn- size-icon
+  "Four corners pointing out to enlarge, pointing in to shrink back -- what
+   the click will do, not what the player is."
+  [enlarged?]
+  [:svg {:width 13 :height 13 :viewBox "0 0 16 16" :aria-hidden "true"}
+   [:path {:fill "none"
+           :stroke "currentColor"
+           :stroke-width 1.8
+           :d (if enlarged?
+                "M6 1v5H1M10 1v5h5M15 10h-5v5M1 10h5v5"
+                "M1 6V1h5M10 1h5v5M15 10v5h-5M6 15H1v-5")}]])
+
 (defn component
   "Mounted once, from ui/component, and never anywhere else."
   [_*state]
@@ -165,6 +197,9 @@
         ;; the app's own markers rather than on top of one.
         *corner (r/atom :bottom-left)
         *drag (r/atom nil)
+        ;; Local for the reason the corner is, and dropped by the X for the
+        ;; reason the QR flag is: the next video starts small, in its corner.
+        *enlarged? (r/atom false)
         *qr-open? (r/atom false)]
     (fn [*state]
       (when-let [{:keys [id url]} (:playing-video @*state)]
@@ -174,26 +209,43 @@
         ;; to 420px of player.
         [:<>
          [:div#floating-player
-          {:style (if-let [{:keys [left top]} @*drag]
-                    ;; Under the pointer, and with the transition off, or the
-                    ;; box would lag its own drag by the settling animation.
-                    {:left (str left "px") :top (str top "px") :transition "none"}
-                    (corner-position @*corner))}
+          {:class (when @*enlarged? "enlarged")
+           :style (cond
+                    @*enlarged? (enlarged-position)
+                    @*drag (let [{:keys [left top]} @*drag]
+                             ;; Under the pointer, and with the transition off,
+                             ;; or the box would lag its own drag by the
+                             ;; settling animation.
+                             {:left (str left "px") :top (str top "px") :transition "none"})
+                    :else (corner-position @*corner))}
           [:div.floating-player-handle
-           {:title "Drag the player to another corner"
-            :on-pointer-down #(begin-drag! *drag %)
-            :on-pointer-move #(drag-to! *drag %)
-            :on-pointer-up #(settle! *drag *corner %)
-            ;; A cancelled pointer (the OS taking over, a touch turning into a
-            ;; scroll) would otherwise leave the box wherever it was and the
-            ;; drag still believing it is running.
-            :on-pointer-cancel #(settle! *drag *corner %)} [grip]
+           ;; Enlarged, the box has nowhere to be dragged to -- it already
+           ;; fills the window, and the quadrant arithmetic in settle! is for
+           ;; the small one. So the strip only drags in a corner.
+           (if @*enlarged?
+             {}
+             {:title "Drag the player to another corner"
+              :on-pointer-down #(begin-drag! *drag %)
+              :on-pointer-move #(drag-to! *drag %)
+              :on-pointer-up #(settle! *drag *corner %)
+              ;; A cancelled pointer (the OS taking over, a touch turning into
+              ;; a scroll) would otherwise leave the box wherever it was and
+              ;; the drag still believing it is running.
+              :on-pointer-cancel #(settle! *drag *corner %)}) [grip]
            [:span.floating-player-controls
-            ;; Neither control may start a drag. A pointerdown reaching the
-            ;; strip captures the pointer, and the click that follows is then
+            ;; No control may start a drag. A pointerdown reaching the strip
+            ;; captures the pointer, and the click that follows is then
             ;; delivered to the capturing element rather than to the button
             ;; under the finger.
             {:on-pointer-down #(.stopPropagation %)}
+            [:button.floating-player-size
+             {:type "button"
+              :title (if @*enlarged? "Back to the corner" "Enlarge to fill the window")
+              :aria-label (if @*enlarged? "Shrink the player" "Enlarge the player")
+              ;; Only ever a resize of the same iframe, never a remount: see
+              ;; the ns doc on why it must not move.
+              :on-click (fn [e] (.stopPropagation e) (swap! *enlarged? not))}
+             [size-icon @*enlarged?]]
             [:span.qr-open.floating-player-qr
              {:title "Show a QR code for the video playing here, to carry it to a phone"
               :role "button"
@@ -211,6 +263,7 @@
                           ;; next video starts, and the overlay would come back
                           ;; up on its own over a video nobody asked to share.
                           (reset! *qr-open? false)
+                          (reset! *enlarged? false)
                           (close! *state))} "✕"]]]
           [:iframe#floating-player-frame
            {:src (youtube/embed-url id)
@@ -225,7 +278,9 @@
             :allow "autoplay; encrypted-media; picture-in-picture; fullscreen"
             ;; Belt to the pointer capture's braces, and free: while the drag
             ;; runs there is nothing in the iframe worth clicking anyway.
-            :style (when @*drag {:pointer-events "none"})}]]
+            :style (cond-> {}
+                     @*enlarged? (assoc :width enlarged-width :height enlarged-height)
+                     @*drag (assoc :pointer-events "none"))}]]
          ;; `url`, not a watch address rebuilt from `id`: what the item carried
          ;; is what a phone should be sent to.
          (when @*qr-open? [qr-overlay/overlay url #(reset! *qr-open? false)])]))))

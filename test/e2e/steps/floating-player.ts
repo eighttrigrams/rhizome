@@ -58,6 +58,16 @@ When("I close the player", async ({ page }) => {
   await settle(page);
 });
 
+When("I enlarge the player", async ({ page }) => {
+  await page.locator(".floating-player-size").click();
+  await settle(page);
+});
+
+When("I shrink the player back", async ({ page }) => {
+  await page.locator(".floating-player-size").click();
+  await settle(page);
+});
+
 When("I open the player's QR code", async ({ page }) => {
   await page.locator(".floating-player-qr").click();
   await expect(page.locator("#qr-overlay")).toBeVisible();
@@ -197,4 +207,36 @@ Then("the player should not offer its QR code", async ({ page }) => {
 
 Then("there should be exactly one QR overlay", async ({ page }) => {
   await expect(page.locator("#qr-overlay")).toHaveCount(1);
+});
+
+// Off the composited page, polled, for the same reasons as the corners: the
+// size is calc against the viewport, and growing into it is a transition.
+// "Nearly fills" is said as: centred both ways, the tighter side exactly
+// CORNER_PADDING clear of its edges, and the video still 16:9.
+Then("the player should nearly fill the window", async ({ page }) => {
+  const fit = async () => page.evaluate((pad) => {
+    const r = document.querySelector("#floating-player")!.getBoundingClientRect();
+    const f = document.querySelector("#floating-player-frame")!.getBoundingClientRect();
+    const near = (a: number, b: number) => Math.abs(a - b) <= 2;
+    const centred = near(r.left, window.innerWidth - r.right)
+      && near(r.top, window.innerHeight - r.bottom);
+    const snug = near(Math.min(r.left, r.top), pad);
+    const sixteenNine = Math.abs(f.width / f.height - 16 / 9) < 0.02;
+    return { centred, snug, sixteenNine };
+  }, CORNER_PADDING);
+  await expect.poll(fit, {
+    message: "the player never grew to nearly fill the window",
+    timeout: 5000,
+  }).toEqual({ centred: true, snug: true, sixteenNine: true });
+});
+
+// What is on top at the middle of the code is the question, not z-index
+// numbers: the code is drawn in the middle of the window, which is exactly
+// where an enlarged player sits.
+Then("the QR code should be in front of the player", async ({ page }) => {
+  const box = (await page.locator(".qr-overlay-code").boundingBox())!;
+  const onTop = await page.evaluate(([x, y]) =>
+    !!document.elementFromPoint(x, y)?.closest("#qr-overlay"),
+    [box.x + box.width / 2, box.y + box.height / 2]);
+  expect(onTop, "the enlarged player is covering the QR code").toBe(true);
 });

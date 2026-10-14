@@ -855,7 +855,7 @@ ul.cards {
     border-radius: 6px;
     overflow: hidden;
     box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
-    transition: top 180ms ease, left 180ms ease;
+    transition: top 180ms ease, left 180ms ease, width 180ms ease;
 }
 
 #floating-player-frame {
@@ -863,6 +863,24 @@ ul.cards {
     width: 420px;
     height: 236px;
     border: 0;
+    transition: width 180ms ease, height 180ms ease;
+}
+
+/* Enlarged to nearly fill the window. Its size and place are set inline, as
+   calc against the viewport (ui.floating-player/enlarged-position); all that is
+   left here is that the strip no longer offers to drag, because there is no
+   corner for a box this size to go to. */
+#floating-player.enlarged .floating-player-handle {
+    cursor: default;
+}
+
+/* The one case where the player's place above the QR overlay would hide the
+   code: enlarged, it sits right where the code is drawn, the middle of the
+   window. So while a code is up, a big player steps down beneath the overlay
+   (2001) and is dimmed with the rest of the page. A small one stays above it,
+   bright and playable, as before. */
+body:has(#qr-overlay) #floating-player.enlarged {
+    z-index: 2000;
 }
 
 /* The grip. The video itself cannot be the drag surface -- the iframe swallows
@@ -887,7 +905,8 @@ ul.cards {
     cursor: grabbing;
 }
 
-/* The player's own controls: a QR of whatever is playing, and the X. The QR is
+/* The player's own controls: the size toggle, a QR of whatever is playing, and
+   the X. The QR is
    the same icon as the one under a poster and takes the same .qr-open styling;
    only its padding is trimmed to sit in a 24px strip. */
 .floating-player-controls {
@@ -911,6 +930,20 @@ ul.cards {
 body:has(#qr-overlay) .floating-player-qr {
     pointer-events: none;
     opacity: 0.4;
+}
+
+.floating-player-size {
+    display: flex;
+    align-items: center;
+    padding: 0 3px;
+    color: inherit;
+    background: none;
+    border: 0;
+    cursor: pointer;
+}
+
+.floating-player-size:hover {
+    color: #ffffff;
 }
 
 .floating-player-close {
