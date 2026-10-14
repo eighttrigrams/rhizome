@@ -24,6 +24,9 @@
             ["@codemirror/view" :refer [EditorView placeholder]]
             ["@codemirror/commands" :as commands]
             ["@codemirror/lang-markdown" :refer [markdown]]
+            ["@codemirror/search" :refer
+             [openSearchPanel closeSearchPanel searchPanelOpen findNext findPrevious
+              getSearchQuery]]
             ["@eighttrigrams/kw-codemirror" :as ijkl]))
 
 ;; No red squiggles under the prose. The editing surface is a contenteditable,
@@ -32,6 +35,46 @@
 ;; this is here as well because it is the one place a *derived* element gets its
 ;; attributes, and an inherited default is a weaker promise than an explicit no.
 (def ^:private no-spellcheck (.of (.-contentAttributes EditorView) #js {:spellcheck "false"}))
+
+;; ---------------------------------------------------------------------------
+;; Finding in the text
+;;
+;; Daniel's VSCode find, the chords zoo's editor already answers to: ⌘ä opens the
+;; find box -- the key that is `ä` on his German keyboard and `'` on a US one --
+;; and ⌘. and ⌘, go to the next and the previous match. By `e.code`, so it is the
+;; physical key whichever glyph the layout puts on it. The box itself is
+;; CodeMirror's own search panel, which basicSetup already brings (behind ⌘F);
+;; this only gives it his keys.
+;;
+;; ⌘. and ⌘, are taken only when there is something to look for -- a query from
+;; an earlier find, or a selection to seed one -- and are the browser's
+;; otherwise.
+;;
+;; Escape, while the box is open, closes the box and nothing else. The modals
+;; listen for Escape further out and close the item on it, so without the stop
+;; here one press both shut the box and threw away the view of the text it was
+;; finding in. Now it takes two: the first leaves you on the match, the second
+;; leaves the item.
+
+(defn- command-chord?
+  [^js e code]
+  (boolean (and (.-metaKey e) (not (.-altKey e)) (not (.-ctrlKey e)) (not (.-shiftKey e))
+                (= code (.-code e)))))
+
+(defn- find-keys
+  "A keydown listener for `view`, for the capture phase on its element: it runs
+  before CodeMirror's keymaps and before the search panel's own field, and what
+  it takes it stops, so nothing further out hears it."
+  [^js view]
+  (fn [^js e]
+    (let [state (.-state view)
+          take! (fn [] (.preventDefault e) (.stopPropagation e))
+          step (cond (command-chord? e "Period") findNext
+                     (command-chord? e "Comma") findPrevious)]
+      (cond (command-chord? e "Quote") (do (take!) (openSearchPanel view))
+            (and step (.-valid (getSearchQuery state))) (do (take!) (step view))
+            (and (= "Escape" (.-code e)) (searchPanelOpen state)) (do (take!)
+                                                                      (closeSearchPanel view))))))
 
 (defn create-editor
   "Create CodeMirror 6 editor with cljs-text-editor-style keyboard handling"
@@ -85,6 +128,8 @@
         view (new EditorView #js {:state state :parent element})]
     ;; Store reference for later access
     (aset element "__codemirror" view)
+    ;; Find's chords, ahead of the scheme's listener on the same element.
+    (.addEventListener (.-dom view) "keydown" (find-keys view) true)
     ;; The scheme. install puts a capture-phase keydown listener on the view's
     ;; own element, so these chords win before CodeMirror's keymaps — which is
     ;; what the listener this replaces did, one level further out on `element`.
