@@ -484,6 +484,195 @@
                    (fn [_bypassed?] (set-is-context-impl db item is-context)))))))
        (catch NumberFormatException _ (json-response 400 {:error "Invalid item ID"}))))
 
+(def ^:private patchable-properties
+  "What PATCH /api/items/:id may change, named as GET /api/items/:id serves it.
+  `:column` is the key of the row `datastore/get-item` returns, which is what
+  `write-item-rows!` writes from. `:problem` takes a proposed new value and
+  answers nil when it is acceptable, else what was expected."
+  (let [string-or-null (fn [v] (when-not (or (nil? v) (string? v)) "a string, or null"))]
+    {:title {:column :title
+             :problem (fn [v] (when-not (and (string? v) (not (str/blank? v)))
+                                "a non-blank string"))}
+     :short-title {:column :short_title :problem string-or-null}
+     :tags {:column :tags :problem string-or-null}
+     :annotation {:column :annotation :problem string-or-null}
+     :date {:column :date
+            :problem (fn [v] (when-not (or (nil? v)
+                                           (and (string? v)
+                                                (re-matches #"\d{4}-\d{2}-\d{2}" v)
+                                                (try (java.time.LocalDate/parse v)
+                                                     (catch Exception _ nil))))
+                               "a date as YYYY-MM-DD, or null"))}
+     :sort-idx {:column :sort_idx
+                :problem (fn [v] (when-not (integer? v) "an integer"))}
+     :hide-in-global-search {:column :hide_in_global_search
+                             :problem (fn [v] (when-not (boolean? v) "true or false"))}
+     :human-readable-id {:column :human_readable_id
+                         :problem (fn [v] (when-not (or (nil? v)
+                                                        (and (string? v) (re-find #"\D" v)))
+                                            (str "a string with at least one non-digit character,"
+                                                 " or null")))}}))
+
+(def ^:private elsewhere
+  "Properties an item has that PATCH does not change, and where that is done."
+  {:description "PUT /api/items/:id"
+   :is-context "PUT /api/items/:id/is-context"
+   :contexts "PUT /api/relations"
+   :part-of "PUT /api/relations"})
+
+(defn- patch-changes-problem
+  "What is wrong with the \"changes\" of a PATCH body, as a message, or nil when
+  it is well formed. Looks at the request alone, so the answer is the same with
+  the gate open or shut and whether or not the item exists."
+  [changes]
+  (cond
+    (not (and (map? changes) (seq changes)))
+      "changes is required: an object of at least one property, each {\"old\": …, \"new\": …}"
+    :else
+      (some (fn [[prop change]]
+              (let [spec (get patchable-properties prop)]
+                (cond
+                  (nil? spec)
+                    (str "\"" (name prop) "\" is not a property PATCH changes"
+                         (when-let [where (elsewhere prop)] (str " — that is " where))
+                         ". Properties: " (str/join ", " (map name (keys patchable-properties))))
+                  (not (and (map? change) (contains? change :old) (contains? change :new)))
+                    (str "\"" (name prop) "\" needs both \"old\" and \"new\" (null is a value)")
+                  :else
+                    (when-let [expected ((:problem spec) (:new change))]
+                      (str "\"" (name prop) "\": \"new\" must be " expected)))))
+            changes)))
+
+(defn- patch-mismatch-refusal
+  [item mismatched]
+  (log/info {:intent "patch-item" :id (:id item) :refused "old-values-differ"
+             :mismatched (mapv name (keys mismatched))}
+            "REST patch-item: refused, nothing written")
+  (json-response 409
+                 {:error (str "item " (:id item) ": \"old\" is not what is stored now for "
+                              (str/join ", " (map name (keys mismatched)))
+                              ". Nothing was written, not even the properties whose \"old\" was right."
+                              " \"mismatched\" gives, for each, what was sent and what is there now: read"
+                              " the item again (GET /api/items/" (:id item) ") and send the PATCH over"
+                              " with current values, if the change still makes sense.")
+                  :refused "old-values-differ"
+                  :item-id (:id item)
+                  :mismatched mismatched}))
+
+(defn- patch-handle-taken-refusal
+  [item handle]
+  (json-response 409
+                 {:error (str "human-readable-id \"" handle "\" belongs to another item already,"
+                              " and it is unique. Nothing was written.")
+                  :refused "human-readable-id-taken"
+                  :item-id (:id item)}))
+
+(defn- patch-item-impl
+  "The check and the write, in one transaction: what is compared is what is
+  written over, so a save that lands between a caller's read and this request
+  makes the answer no, and a save that lands between the comparison and the
+  write cannot. Nothing is written unless every \"old\" matched."
+  [db id changes]
+  (try
+    (let [result
+          (db/with-transaction [tx db]
+            (let [current (datastore/get-item tx {:id id})
+                  served (item->api current)
+                  mismatched (into {}
+                                   (keep (fn [[prop {:keys [old]}]]
+                                           (let [now (get served prop)]
+                                             (when (not= old now)
+                                               [prop {:sent old :current now}]))))
+                                   changes)
+                  effective (into {} (remove (fn [[prop {:keys [new]}]] (= new (get served prop))))
+                                  changes)
+                  handle (get-in effective [:human-readable-id :new])]
+              (cond
+                (nil? (:id current))
+                  {:response (json-response 404 {:error "Item not found"})}
+                (seq mismatched)
+                  {:response (patch-mismatch-refusal current mismatched)}
+                (and handle
+                     (db/execute-one! tx ["SELECT id FROM items WHERE human_readable_id = ? AND id <> ?"
+                                          handle id]))
+                  {:response (patch-handle-taken-refusal current handle)}
+                (empty? effective)
+                  {:response (json-response (item->api current))}
+                :else
+                  ;; Every field is written, so the item it starts from is the whole
+                  ;; current one. The handle is dropped from it, because the writer
+                  ;; clears or sets it whenever the key is there at all.
+                  (let [item (reduce-kv (fn [m prop {:keys [new]}]
+                                          (assoc m (get-in patchable-properties [prop :column]) new))
+                                        (dissoc current :human_readable_id)
+                                        effective)
+                        {:keys [display-title-changed?]} (datastore/write-item-rows! tx item "api")]
+                    {:updated (datastore/get-item tx {:id id})
+                     :display-title-changed? display-title-changed?}))))]
+      (or (:response result)
+          (let [updated (:updated result)]
+            ;; After the commit: `update-item` does this on a future, which would
+            ;; outlive the transaction's connection.
+            (when (:display-title-changed? result)
+              (try (relations/update-collection-title-in-collection-items-for-children
+                     db id (:title updated) (:short_title updated))
+                   (catch Exception e
+                     (log/error e "REST API: patch-item could not carry the title to its children"))))
+            (json-response (item->api updated)))))
+    (catch Exception e
+      (log/error e "REST API: patch-item failed")
+      (json-response 500 {:error (.getMessage e)}))))
+
+(defn patch-item
+  "PATCH /api/items/:id — change properties of an item by compare-and-set.
+  JSON body: {\"changes\": {<property>: {\"old\": …, \"new\": …}, …}} — one
+  property or several. Answers with the item as it now stands.
+
+  Properties, named and shaped as GET /api/items/:id serves them: \"title\"
+  (non-blank string), \"short-title\", \"tags\" and \"annotation\" (string or
+  null), \"date\" (YYYY-MM-DD or null), \"sort-idx\" (integer), \"hide-in-global-search\"
+  (boolean), \"human-readable-id\" (null, or a string with at least one non-digit
+  character; unique). null as \"new\" clears the property. Not here: the
+  description (PUT /api/items/:id), is-context (PUT /api/items/:id/is-context),
+  contexts and part-of (PUT /api/relations), timestamps, embedding, data.
+
+  \"old\" is what the property is now, exactly as GET serves it, and a property GET
+  leaves out is null: no human-readable-id, annotation or date is null, and so
+  is a hide-in-global-search that is false — GET only says it when true. Only
+  when every \"old\" matches is any \"new\" written, and then all of them are, in
+  one transaction with the comparison. Otherwise 409 {\"refused\":
+  \"old-values-differ\", \"mismatched\": {<property>: {\"sent\", \"current\"}}}
+  lists each property whose \"old\" was wrong with what is there now, and
+  nothing is written. A 409 is for the caller to read the item again and decide.
+  A \"human-readable-id\" another item holds is 409 {\"refused\":
+  \"human-readable-id-taken\"}. A \"new\" equal to what is stored is not a write.
+
+  400 for an unknown property, a missing or empty \"changes\", an entry without
+  both \"old\" and \"new\" keys, and a \"new\" of the wrong type; 404 for an item
+  that does not exist.
+
+  A title change is what the app's own save does: the previous version goes to
+  the history, stamped with the source it had; the item is then stamped \"api\".
+  Titles shown in the collection items of the item's children follow.
+
+  Gated by recording mode, with no door: shut, the request is logged and
+  answered 200 with the item as it stands, and nothing is compared or written."
+  [db id req]
+  (try (let [id (Integer/parseInt id)
+             body (parse-json-body req)
+             changes (when (map? body) (:changes body))]
+         (if-let [problem (patch-changes-problem changes)]
+           (json-response 400 {:error problem})
+           (let [item (datastore/get-item db {:id id})]
+             (if (nil? (:id item))
+               (json-response 404 {:error "Item not found"})
+               (mw/log-and-guard
+                 "patch-item"
+                 {:id id :title (:title item) :changes changes}
+                 (json-response (item->api item))
+                 (fn [] (patch-item-impl db id changes)))))))
+       (catch NumberFormatException _ (json-response 400 {:error "Invalid item ID"}))))
+
 (defn- force-show-badge!
   "link-item-to-another-item! preserves :show-badge? on existing entries; this
   patches :data.contexts.<target>.show-badge? to the requested value so the

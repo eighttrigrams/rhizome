@@ -48,3 +48,12 @@ no line of ours: every line of ours in the current description is still
 there afterwards, and none would have a lower us-vs-them caution than
 now. Otherwise it is refused with 409, listing the lines that would degrade.
 The 'imports' case above stays as it is and is tried first.
+
+`PATCH /api/items/:id` changes properties other than the description
+(title, short-title, tags, annotation, date, sort-idx, hide-in-global-search,
+human-readable-id), one or more at a time, each with its old and its new value.
+The old value is compared with what is stored, and only when every old value
+matches are the new ones written, all of them or none, with check and write in
+one transaction. A mismatch is refused with 409, listing each property whose
+old value was wrong with what is there now. It has no door: with the gate shut
+the request is logged and dropped like any other.

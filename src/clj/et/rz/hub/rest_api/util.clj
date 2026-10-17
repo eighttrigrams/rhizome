@@ -33,7 +33,7 @@
 
 (defn item->api
   [{:keys [id title short_title human_readable_id description is_context data inserted_at updated_at
-           date annotation hide_in_global_search part_of_sort_idx part_of_path]
+           date annotation hide_in_global_search part_of_sort_idx part_of_path tags sort_idx]
     :as item}]
   (cond-> {:id id
            :title title
@@ -46,6 +46,12 @@
     date (assoc :date date)
     annotation (assoc :annotation annotation)
     (helpers/int->bool hide_in_global_search) (assoc :hide-in-global-search true)
+    ;; `tags` and `sort-idx` are served whenever the row carries the column, null
+    ;; tags included, so a caller of PATCH /api/items/:id can read the old value
+    ;; it has to name. `contains?` and not truthiness: tags may be "" or nil and
+    ;; sort-idx -1 (the unset default), and each must come back as it is stored.
+    (contains? item :tags) (assoc :tags tags)
+    (contains? item :sort_idx) (assoc :sort-idx sort_idx)
     ;; Only rows that came out of the parts query carry this: it is the item's
     ;; index under the one whole that was asked about, which is not a property
     ;; of the item and cannot be answered anywhere else.

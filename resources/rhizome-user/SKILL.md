@@ -149,6 +149,8 @@ List endpoints return JSON arrays of item objects. A single item looks like:
   "id": 34696,
   "title": "...",
   "short-title": "...",
+  "tags": "...",
+  "sort-idx": -1,
   "is-context": false,
   "description": "...",
   "inserted-at": "...",
@@ -165,8 +167,9 @@ Rhizome is the human's memory — **do not write to it unless the human
 explicitly asks**. Reads are free; a write puts machine-authored text into a
 store whose value rests on its provenance.
 
-When asked, the write endpoints are `POST /contexts`, `POST /items` and
-`PUT /items/:id`. Three rules govern every one of them.
+When asked, the write endpoints are `POST /contexts`, `POST /items`,
+`PUT /items/:id` (the description) and `PATCH /items/:id` (the other
+properties, below). Three rules govern every one of them.
 
 **A mutation must say why it is happening.** Every POST/PUT/PATCH/DELETE body
 needs a non-blank `"reason"` field explaining the change; it is recorded in the
@@ -209,6 +212,33 @@ several entries for a one-line change. A repeated line of his, like a blank
 line, sitting between two lines you rewrote counts as gone too — keep it where
 it is. Adjust your text from that list; if you cannot without touching his
 lines, leave it and tell the human.
+
+**Changing other properties: `PATCH /items/:id`.** Every property is named
+and shaped as `GET /items/:id` serves it, and is sent with the value you read
+and the value you want:
+
+```bash
+curl -s -X PATCH "$RHIZOME/items/34696" -H 'Content-Type: application/json' \
+  -d '{"reason":"the human asked for it",
+       "changes":{"title":{"old":"Foo","new":"Bar"},
+                  "tags":{"old":"a b","new":"a b c"}}}'
+```
+
+Properties: `title`, `short-title`, `tags`, `annotation`, `date` (`YYYY-MM-DD`),
+`sort-idx` (an integer, `-1` = unset), `hide-in-global-search` (boolean),
+`human-readable-id`. `null` as `new` clears one. Not here: the description
+(`PUT /items/:id`), `is-context` (`PUT /items/:id/is-context`), filing under
+contexts (`PUT /relations`). `old` must be what GET serves now, and a property
+GET leaves out counts as `null` — no `annotation`, `date` or
+`human-readable-id`, and a `hide-in-global-search` that is false (GET says it
+only when true). If any `old` is wrong the answer is `409
+{"refused":"old-values-differ","mismatched":{"tags":{"sent":…,"current":…}}}`,
+nothing is written, not even the properties that were right: read the item
+again and decide whether the change still makes sense. A `human-readable-id`
+that another item holds is `409 {"refused":"human-readable-id-taken"}`.
+`400` for an unknown property, an entry without both `old` and `new`, a `new`
+of the wrong type. With recording off it is dropped like any other write — no
+door — and answered `200` with the item as it stands.
 
 URLs (YouTube, GitHub, Substack, …) passed as `title` on `POST /items` are
 auto-detected and enriched by the insertion pipeline — but only when you ask

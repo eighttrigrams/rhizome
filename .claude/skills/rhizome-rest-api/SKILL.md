@@ -112,6 +112,21 @@ at all.
   Filing, tags and annotations the owner gave the item are not consulted, so
   an agent-made item he has filed and annotated by hand still qualifies.
 
+`PATCH /api/items/:id` has **no door**. It changes `title`, `short-title`,
+`tags`, `annotation`, `date`, `sort-idx`, `hide-in-global-search` and
+`human-readable-id` by compare-and-set — `{"reason":…, "changes":{"title":
+{"old":"Foo","new":"Bar"}}}` — and with the gate shut it is an ordinary drop:
+logged (`intent=patch-item`, no `gate-bypassed`) and answered `200` with the
+item as it stands. With the gate open every `old` is compared, inside the same
+transaction as the write, against what `GET /api/items/:id` serves (absent =
+`null`, so a false `hide-in-global-search` is `null`); a mismatch is `409
+{"refused":"old-values-differ","mismatched":{<prop>:{"sent","current"}}}`,
+nothing written. A held `human-readable-id` is `409 "human-readable-id-taken"`.
+`400` for an unknown or unpatchable property (description, is-context and
+contexts have their own endpoints), a missing `old`/`new`, a wrong type; `404`
+for an unknown item. A title change goes to the history and stamps the item
+`api`, as the app's own save does.
+
 Through a door you may add and only add. That is what makes them safe to leave
 open, and it is why they refuse rather than update:
 
@@ -173,6 +188,8 @@ List endpoints return JSON arrays of item objects. A single item looks like:
   "id": 34696,
   "title": "...",
   "short-title": "...",
+  "tags": "...",
+  "sort-idx": -1,
   "is-context": false,
   "description": "...",
   "inserted-at": "...",

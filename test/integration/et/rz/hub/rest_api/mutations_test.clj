@@ -1171,3 +1171,344 @@
           (is (= 409 (:status resp)))
           (is (= "demote" (:refused (body-json resp))))
           (is (true? (is-context? ctx))))))))
+
+;; -- PATCH /api/items/:id -----------------------------------------------------
+
+(defn- PATCH*
+  [path body]
+  (send* (-> (mock/request :patch path)
+             (mock/content-type "application/json")
+             (mock/body (json/generate-string (with-default-reason body))))))
+
+(defn- patch*
+  "PATCH item `item` with `changes`, a map of property to [old new]."
+  [item changes]
+  (PATCH* (str "/api/items/" (:id item))
+          {:changes (into {} (map (fn [[prop [old new]]] [prop {:old old :new new}])) changes)}))
+
+(defn- served
+  "What GET /api/items/:id serves for the item."
+  [item]
+  (body-json (GET* (str "/api/items/" (:id item)))))
+
+(defn- history-rows
+  [item]
+  (jdbc/execute! db ["select version, title, source from history where id = ? order by version"
+                     (:id item)]))
+
+(defn- patch-fixture!
+  "A context, and an item filed under it that carries something in every field
+  PATCH touches or must leave alone."
+  []
+  (let [books (ds/new-context db {:title "Books"})
+        item (ds/new-item db "Sapiens" "S" #{(:id books)} nil "api")
+        _ (ds/update-context-description db {:id (:id item) :description "A brief history"} "api")
+        item (ds/update-item db (assoc (ds/get-item db {:id (:id item)})
+                                       :tags "history"
+                                       :annotation "read in 2020"
+                                       :date "2020-01-02"
+                                       :sort_idx 7
+                                       :human_readable_id "sapiens"
+                                       :hide_in_global_search true)
+                             "api")]
+    {:books books :item item}))
+
+(deftest patch-item-changes-one-property-test
+  (test-with-fresh-db "title, old matching: written, and the item as it now stands is the answer"
+    (let [{:keys [item]} (patch-fixture!)
+          resp (patch* item {:title ["Sapiens" "Homo Deus"]})
+          body (body-json resp)]
+      (is (= 200 (:status resp)))
+      (is (= "Homo Deus" (:title body)))
+      (is (= (:id item) (:id body)))
+      (is (= "Homo Deus" (:title (ds/get-item db {:id (:id item)})))))))
+
+(deftest patch-item-changes-several-properties-at-once-test
+  (test-with-fresh-db "every property in one request, and what is not named survives"
+    (let [{:keys [books item]} (patch-fixture!)
+          _ (ds/update-context-description db {:id (:id item) :description "A brief history\nline 2"} "app")
+          before (ds/get-item db {:id (:id item)})
+          resp (patch* item {:title ["Sapiens" "Homo Deus"]
+                             :short-title ["S" "HD"]
+                             :tags ["history" "history future"]
+                             :annotation ["read in 2020" nil]
+                             :date ["2020-01-02" "2021-03-04"]
+                             :sort-idx [7 9]
+                             :hide-in-global-search [true false]
+                             :human-readable-id ["sapiens" "homo-deus"]})
+          body (body-json resp)
+          after (ds/get-item db {:id (:id item)})]
+      (is (= 200 (:status resp)))
+      (is (= "Homo Deus" (:title after)))
+      (is (= "HD" (:short_title after)))
+      (is (= "history future" (:tags after)))
+      (is (nil? (:annotation after)))
+      (is (= "2021-03-04" (:date after)))
+      (is (= 9 (:sort_idx after)))
+      (is (false? (:hide_in_global_search after)))
+      (is (= "homo-deus" (:human_readable_id after)))
+      (is (= {:title "Homo Deus" :short-title "HD" :tags "history future" :date "2021-03-04"
+              :sort-idx 9 :human-readable-id "homo-deus"}
+             (select-keys body [:title :short-title :tags :date :sort-idx :human-readable-id])))
+      (is (not (contains? body :annotation)))
+      (is (not (contains? body :hide-in-global-search)))
+      (testing "what was not named is as it was"
+        (is (= (:description before) (:description after)))
+        (is (= (:inserted_at before) (:inserted_at after)))
+        (is (= (:is_context before) (:is_context after)))
+        (is (= (:data before) (:data after)))
+        (is (= {(keyword (str (:id books))) "Books"} (:contexts body)))))))
+
+(deftest patch-item-refuses-all-when-one-old-differs-test
+  (test-with-fresh-db "one wrong old among several: 409, nothing written, each mismatch listed"
+    (let [{:keys [item]} (patch-fixture!)
+          before (ds/get-item db {:id (:id item)})
+          history-before (history-rows item)
+          resp (patch* item {:title ["Sapiens" "Homo Deus"]
+                             :tags ["wrong" "x"]
+                             :sort-idx [7 8]
+                             :annotation [nil "y"]})
+          body (body-json resp)]
+      (is (= 409 (:status resp)))
+      (is (= "old-values-differ" (:refused body)))
+      (is (= {:tags {:sent "wrong" :current "history"}
+              :annotation {:sent nil :current "read in 2020"}}
+             (:mismatched body))
+          "the two that are wrong, with what is there now; the two that were right are not listed")
+      (is (= before (ds/get-item db {:id (:id item)})) "not a column of it moved")
+      (is (= history-before (history-rows item))))))
+
+(deftest patch-item-what-get-serves-works-as-old-test
+  (test-with-fresh-db "each property's GET value is accepted as its old, and the new one reads back"
+    (let [{:keys [item]} (patch-fixture!)
+          start (served item)
+          news {:title "T2" :short-title "S2" :tags "t2" :annotation "a2" :date "2022-02-02"
+                :sort-idx 2 :hide-in-global-search false :human-readable-id "t-two"}]
+      (is (= "history" (:tags start)))
+      (is (= 7 (:sort-idx start)))
+      (doseq [[prop new] news]
+        (let [current (served item)
+              resp (patch* item {prop [(get current prop) new]})]
+          (is (= 200 (:status resp)) (str prop))
+          (is (= new (get (served item) prop (when (= prop :hide-in-global-search) false))) (str prop)))))))
+
+(deftest patch-item-defaults-round-trip-test
+  (test-with-fresh-db "a fresh item: tags \"\" and sort-idx -1 are served and accepted; absent is null"
+    (let [books (ds/new-context db {:title "Books"})
+          item (ds/new-item db "Plain" "" #{(:id books)} nil "api")
+          start (served item)]
+      (is (= "" (:tags start)))
+      (is (= -1 (:sort-idx start)))
+      (is (not (contains? start :annotation)))
+      (is (not (contains? start :date)))
+      (is (not (contains? start :human-readable-id)))
+      (is (not (contains? start :hide-in-global-search)))
+      (testing "absent is null, and \"\" is not null"
+        (is (= 409 (:status (patch* item {:annotation ["" "x"]}))))
+        (is (= 409 (:status (patch* item {:tags [nil "x"]}))))
+        (is (= 409 (:status (patch* item {:hide-in-global-search [false true]})))))
+      (let [resp (patch* item {:tags ["" "a b"]
+                               :sort-idx [-1 3]
+                               :annotation [nil "n"]
+                               :date [nil "2023-05-06"]
+                               :human-readable-id [nil "plain-one"]
+                               :hide-in-global-search [nil true]})]
+        (is (= 200 (:status resp)))
+        (is (= {:tags "a b" :sort-idx 3 :annotation "n" :date "2023-05-06"
+                :human-readable-id "plain-one" :hide-in-global-search true}
+               (select-keys (body-json resp) [:tags :sort-idx :annotation :date
+                                              :human-readable-id :hide-in-global-search]))))
+      (testing "null clears"
+        (let [resp (patch* item {:tags ["a b" nil] :date ["2023-05-06" nil]
+                                 :human-readable-id ["plain-one" nil]})]
+          (is (= 200 (:status resp)))
+          (is (nil? (:tags (body-json resp))))
+          (is (not (contains? (body-json resp) :date)))
+          (is (not (contains? (body-json resp) :human-readable-id))))))))
+
+(deftest patch-item-a-new-equal-to-the-stored-value-is-not-a-write-test
+  (test-with-fresh-db "no history row, nothing moves"
+    (let [{:keys [item]} (patch-fixture!)
+          before (ds/get-item db {:id (:id item)})
+          history-before (history-rows item)
+          resp (patch* item {:title ["Sapiens" "Sapiens"]})]
+      (is (= 200 (:status resp)))
+      (is (= before (ds/get-item db {:id (:id item)})))
+      (is (= history-before (history-rows item))))))
+
+(deftest patch-item-title-change-leaves-a-history-row-stamped-api-test
+  (test-with-fresh-db "the version it replaces is archived, and the current row is stamped api"
+    (let [books (ds/new-context db {:title "Books"})
+          item (ds/new-item db "Sapiens" "" #{(:id books)} nil "app")
+          _ (ds/update-context-description db {:id (:id item) :description "his text"} "app")
+          history-before (history-rows item)
+          resp (patch* item {:title ["Sapiens" "Sapiens, 2011"]})
+          rows (history-rows item)]
+      (is (= 200 (:status resp)))
+      (is (= (inc (count history-before)) (count rows)) "one row more")
+      (is (= {:history/title "Sapiens" :history/source "app"}
+             (select-keys (last rows) [:history/title :history/source]))
+          "the row for the old title carries the source its text had")
+      (is (= "api" (:description_source (ds/get-item db {:id (:id item)})))
+          "the writer of the title change is the stamp on the current row")
+      (testing "the owner's lines are still the owner's"
+        (is (every? #(= 1.0 (:caution %)) (:ranges (provenance/of-item db (:id item)))))))))
+
+(deftest patch-item-title-change-reaches-the-children-test
+  (test-with-fresh-db "a context renamed: the collection titles of the items filed under it follow"
+    (let [books (ds/new-context db {:title "Books"})
+          item (ds/new-item db "Sapiens" "" #{(:id books)} nil "api")
+          resp (patch* books {:title ["Books" "Reading"]})]
+      (is (= 200 (:status resp)))
+      (is (= "Reading" (get-in (ds/get-item db {:id (:id item)}) [:data :contexts (:id books) :title]))))))
+
+(deftest patch-item-human-readable-id-keeps-its-rules-test
+  (test-with-fresh-db "digits-only is a 400, a handle someone holds is a 409, null clears"
+    (let [{:keys [item]} (patch-fixture!)
+          books (ds/new-context db {:title "Other"})
+          other (ds/new-item db "Other item" "" #{(:id books)} nil "api")]
+      (is (= 400 (:status (patch* item {:human-readable-id ["sapiens" "12345"]}))))
+      (let [resp (patch* other {:human-readable-id [nil "sapiens"]})]
+        (is (= 409 (:status resp)))
+        (is (= "human-readable-id-taken" (:refused (body-json resp))))
+        (is (nil? (:human_readable_id (ds/get-item db {:id (:id other)})))))
+      (is (= "sapiens" (:human_readable_id (ds/get-item db {:id (:id item)}))))
+      (let [resp (patch* item {:human-readable-id ["sapiens" nil]})]
+        (is (= 200 (:status resp)))
+        (is (nil? (:human_readable_id (ds/get-item db {:id (:id item)})))))
+      (testing "the handle is free again"
+        (is (= 200 (:status (patch* other {:human-readable-id [nil "sapiens"]}))))))))
+
+(deftest patch-item-refuses-the-whole-request-for-a-held-handle-test
+  (test-with-fresh-db "a taken handle among several changes: nothing else is written either"
+    (let [{:keys [item]} (patch-fixture!)
+          books (ds/new-context db {:title "Other"})
+          other (ds/new-item db "Other item" "" #{(:id books)} nil "api")
+          before (ds/get-item db {:id (:id other)})
+          resp (patch* other {:title ["Other item" "Renamed"] :human-readable-id [nil "sapiens"]})]
+      (is (= 409 (:status resp)))
+      (is (= before (ds/get-item db {:id (:id other)})))
+      (is (= "sapiens" (:human_readable_id (ds/get-item db {:id (:id item)})))))))
+
+(deftest patch-item-with-the-gate-shut-is-dropped-test
+  (test-with-fresh-db "logged and answered with the item as it stands; nothing compared, nothing written"
+    (let [{:keys [item]} (patch-fixture!)
+          before (ds/get-item db {:id (:id item)})]
+      (with-gate-shut
+        (let [resp (patch* item {:title ["Sapiens" "Dropped"]})]
+          (is (= 200 (:status resp)))
+          (is (= "Sapiens" (:title (body-json resp))))
+          (is (= before (ds/get-item db {:id (:id item)}))))
+        (testing "a wrong old is no 409 either: the gate answers first"
+          (is (= 200 (:status (patch* item {:title ["wrong" "Dropped"]})))))
+        (testing "no door: an item nothing of his is in is dropped as well"
+          (let [m (machine-made-item! "Machine made")
+                resp (patch* m {:title ["Machine made" "Dropped"]})]
+            (is (= 200 (:status resp)))
+            (is (= "Machine made" (:title (ds/get-item db {:id (:id m)}))))))
+        (testing "a malformed request is still a 400, and a missing item a 404"
+          (is (= 400 (:status (PATCH* (str "/api/items/" (:id item)) {:changes {}}))))
+          (is (= 404 (:status (patch* {:id 99999} {:title ["a" "b"]})))))))))
+
+(deftest patch-item-bad-requests-test
+  (test-with-fresh-db "400s, gate open or shut"
+    (let [{:keys [item]} (patch-fixture!)
+          path (str "/api/items/" (:id item))
+          bad-bodies [{}
+                      {:changes {}}
+                      {:changes "title"}
+                      {:changes [{:title {:old "Sapiens" :new "x"}}]}
+                      {:changes {:nope {:old 1 :new 2}}}
+                      {:changes {:description {:old "A brief history" :new "x"}}}
+                      {:changes {:is-context {:old false :new true}}}
+                      {:changes {:title {:old "Sapiens"}}}
+                      {:changes {:title {:new "x"}}}
+                      {:changes {:title "x"}}
+                      {:changes {:title {:old "Sapiens" :new nil}}}
+                      {:changes {:title {:old "Sapiens" :new ""}}}
+                      {:changes {:title {:old "Sapiens" :new 5}}}
+                      {:changes {:short-title {:old "S" :new 5}}}
+                      {:changes {:tags {:old "history" :new ["a"]}}}
+                      {:changes {:annotation {:old "read in 2020" :new {:a 1}}}}
+                      {:changes {:date {:old "2020-01-02" :new "tomorrow"}}}
+                      {:changes {:date {:old "2020-01-02" :new "2020-13-45"}}}
+                      {:changes {:date {:old "2020-01-02" :new 20200102}}}
+                      {:changes {:sort-idx {:old 7 :new "8"}}}
+                      {:changes {:sort-idx {:old 7 :new 8.5}}}
+                      {:changes {:sort-idx {:old 7 :new nil}}}
+                      {:changes {:hide-in-global-search {:old true :new 0}}}
+                      {:changes {:hide-in-global-search {:old true :new nil}}}
+                      {:changes {:human-readable-id {:old "sapiens" :new 12}}}
+                      {:changes {:human-readable-id {:old "sapiens" :new "123"}}}
+                      {:changes {:human-readable-id {:old "sapiens" :new ""}}}
+                      ;; one good entry does not carry a bad one
+                      {:changes {:title {:old "Sapiens" :new "fine"} :nope {:old 1 :new 2}}}]
+          before (ds/get-item db {:id (:id item)})]
+      (doseq [shut? [false true]
+              body bad-bodies]
+        (let [resp (if shut?
+                     (with-gate-shut (PATCH* path body))
+                     (PATCH* path body))]
+          (is (= 400 (:status resp)) (pr-str shut? body))))
+      (is (= 400 (:status (PATCH* "/api/items/abc" {:changes {:title {:old "a" :new "b"}}}))))
+      (is (= before (ds/get-item db {:id (:id item)}))))))
+
+(deftest patch-item-names-where-an-unpatchable-property-is-changed-test
+  (test-with-fresh-db "the 400 for description says where description goes"
+    (let [{:keys [item]} (patch-fixture!)
+          resp (patch* item {:description ["A brief history" "x"]})]
+      (is (= 400 (:status resp)))
+      (is (re-find #"PUT /api/items/:id" (:error (body-json resp)))))))
+
+(deftest patch-item-requires-a-reason-test
+  (test-with-fresh-db "like every mutation"
+    (let [{:keys [item]} (patch-fixture!)
+          resp (send* (-> (mock/request :patch (str "/api/items/" (:id item)))
+                          (mock/content-type "application/json")
+                          (mock/body (json/generate-string
+                                       {:changes {:title {:old "Sapiens" :new "x"}}}))))]
+      (is (= 400 (:status resp)))
+      (is (= "Sapiens" (:title (ds/get-item db {:id (:id item)})))))))
+
+(deftest patch-item-404-for-a-missing-item-test
+  (test-with-fresh-db "an id that names nothing is a 404"
+    (is (= 404 (:status (patch* {:id 99999} {:title ["a" "b"]}))))))
+
+(deftest patch-item-checks-and-writes-in-one-transaction-test
+  (test-with-fresh-db "a write landing after the comparison is not possible; one before it is a 409"
+    (let [{:keys [item]} (patch-fixture!)
+          real ds/write-item-rows!]
+      (testing "an exception in the write rolls the whole thing back"
+        (with-redefs [ds/write-item-rows! (fn [tx it source]
+                                            (real tx it source)
+                                            (throw (ex-info "boom" {})))]
+          (let [resp (patch* item {:title ["Sapiens" "Half"] :tags ["history" "half"]})]
+            (is (= 500 (:status resp)))
+            (is (= "Sapiens" (:title (ds/get-item db {:id (:id item)}))))
+            (is (= "history" (:tags (ds/get-item db {:id (:id item)})))))))
+      (testing "a change that lands between the caller's read and the request"
+        (ds/update-item db (assoc (ds/get-item db {:id (:id item)}) :title "Changed meanwhile") "app")
+        (let [resp (patch* item {:title ["Sapiens" "Mine"]})]
+          (is (= 409 (:status resp)))
+          (is (= "Changed meanwhile" (get-in (body-json resp) [:mismatched :title :current])))
+          (is (= "Changed meanwhile" (:title (ds/get-item db {:id (:id item)})))))))))
+
+(deftest patch-item-is-listed-in-describe-test
+  (testing "the endpoint describes itself"
+    (let [resp (with-redefs [config/config {:db db}]
+                 (@handler (mock/request :get "/api/describe")))
+          endpoints (:endpoints (body-json resp))
+          doc (:doc (first (filter #(= "patch-item" (:name %)) endpoints)))]
+      (is (some? doc))
+      (is (re-find #"PATCH /api/items/:id" doc)))))
+
+(deftest get-item-serves-tags-and-sort-idx-test
+  (test-with-fresh-db "tags and sort-idx are on GET /api/items/:id and in lists"
+    (let [{:keys [item books]} (patch-fixture!)
+          one (served item)
+          in-list (first (filter #(= (:id item) (:id %))
+                                 (body-json (GET* (str "/api/items/" (:id books) "/related")))))]
+      (is (= "history" (:tags one)))
+      (is (= 7 (:sort-idx one)))
+      (is (= "history" (:tags in-list)))
+      (is (= 7 (:sort-idx in-list))))))

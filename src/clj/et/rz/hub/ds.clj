@@ -353,6 +353,31 @@
                     (catch Exception e (log/error (.getMessage e)))))))
    (get-item db item)))
 
+(defn write-item-rows!
+  "`update-item`'s writes and nothing past them: the date, the columns
+   `update-item'` sets, and the history row a changed title leaves. Returns
+   `{:old-item :title-changed? :display-title-changed?}`.
+
+   What it leaves out is `update-item`'s last step, the `future` that carries a
+   changed title into the collection items of the item's children. That future
+   runs on the handle it is given after this function has returned, and a handle
+   that is a transaction's connection is closed by then. So a caller that wants
+   its check and its write in one transaction -- PATCH /api/items/:id -- calls
+   this inside it, and, when `:display-title-changed?` comes back true, runs
+   `et.rz.hub.ds.relations/update-collection-title-in-collection-items-for-children`
+   once the transaction is over.
+
+   Like `update-item`, it writes every column from `item`, so `item` is the whole
+   current item with the changes laid over it."
+  [db {:keys [id date] :as item} source]
+  (delete-date db id)
+  (when date (insert-date db id date))
+  (let [{:keys [old-item title-changed?] :as result} (update-item' db item source)]
+    (when title-changed?
+      (save-revision-to-history! db id (:description old-item) (:title old-item)
+                                 (:description_source old-item)))
+    (select-keys result [:old-item :title-changed? :display-title-changed?])))
+
 (defn update-context-description
   [db {:keys [id description]} source]
   (let [old-item (get-item db {:id id})

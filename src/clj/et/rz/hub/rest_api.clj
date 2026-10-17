@@ -1,6 +1,6 @@
 (ns et.rz.hub.rest-api
   (:require [clojure.string :as str]
-            [compojure.core :refer [context GET POST PUT]]
+            [compojure.core :refer [context GET PATCH POST PUT]]
             [et.rz.config :as config]
             [et.rz.hub.rest-api.middleware :as mw]
             [et.rz.hub.rest-api.mutations :as mutations]
@@ -65,6 +65,8 @@
            (GET "/items/:id" [id] (queries/get-item (db-fn) id))
            (PUT "/items/:id" [id :as req]
                 (mutations/update-item-description (db-fn) id req))
+           (PATCH "/items/:id" [id :as req]
+                  (mutations/patch-item (db-fn) id req))
            (PUT "/items/:id/is-context" [id :as req]
                 (mutations/set-is-context (db-fn) id req))
            (POST "/items" req (mutations/create-item (db-fn) req))
