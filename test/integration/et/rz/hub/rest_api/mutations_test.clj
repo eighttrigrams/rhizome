@@ -10,6 +10,7 @@
             [et.rz.hub.rest-api.middleware :as mw]
             [et.rz.hub.scrapers.website :as website-scraper]
             [et.rz.hub.ds :as ds]
+            [et.rz.hub.provenance :as provenance]
             [et.rz.hub.ds.relations :as relations]
             [et.rz.hub.ds.search-test :refer [reset-db with-time db]]))
 
@@ -795,6 +796,69 @@
         (let [resp (PUT* (str "/api/items/" (:id item)) {:description new-text})]
           (is (= 200 (:status resp)))
           (is (= new-text (:description (ds/get-item db {:id (:id item)})))))))))
+
+(deftest update-description-rechecks-inside-the-transaction-test
+  (test-with-fresh-db "the gate's look said yes, the write's look says no: nothing is written"
+    ;; Stands in for an app save landing between the two looks. The first call
+    ;; is the gate's and is told the write is harmless; the one inside the
+    ;; transaction asks the real question and gets the real answer.
+    (let [books (ds/new-context db {:title "Books"})
+          item (ds/new-item db "Sapiens" "" #{(:id books)} nil "api")
+          _ (ds/update-context-description db {:id (:id item) :description "mine"} "app")
+          real provenance/degradations
+          calls (atom 0)]
+      (with-redefs [provenance/degradations (fn [versions text]
+                                              (if (= 1 (swap! calls inc)) [] (real versions text)))]
+        (with-gate-shut
+          (let [resp (PUT* (str "/api/items/" (:id item)) {:description "not mine"})]
+            (is (= 2 @calls) "asked twice: the gate, then the transaction")
+            (is (= 409 (:status resp)))
+            (is (= "degrades-owner-lines" (:refused (body-json resp))))
+            (is (= "mine" (:description (ds/get-item db {:id (:id item)}))))))))))
+
+(deftest update-description-import-door-rechecks-inside-the-transaction-test
+  (test-with-fresh-db "the import door goes through the same re-check, and files nothing when refused"
+    (let [imports (imports-context!)
+          books (ds/new-context db {:title "Books"})
+          item (ds/new-item db "Sapiens" "" #{(:id books)} nil "api")
+          real-lookup @#'et.rz.hub.rest-api.mutations/imports-context-id]
+      ;; The gate saw an empty description, and while it looks the handle up he
+      ;; saves one in the app -- after the gate's look, before the transaction.
+      (with-redefs [et.rz.hub.rest-api.mutations/imports-context-id
+                    (fn [handle]
+                      (ds/update-context-description db {:id (:id item) :description "his"} "app")
+                      (real-lookup handle))]
+        (with-gate-shut
+          (let [resp (PUT* (str "/api/items/" (:id item)) {:description "an agent's"})
+                stored (ds/get-item db {:id (:id item)})]
+            (is (= 409 (:status resp)))
+            (is (= "his" (:description stored)))
+            (is (not (contains? (get-in stored [:data :contexts]) (:id imports))))))))))
+
+(deftest update-description-after-his-title-only-change-test
+  (test-with-fresh-db "a title change of his stamps the row, but the agent's lines stay the agent's"
+    (let [books (ds/new-context db {:title "Books"})
+          item (ds/new-item db "Sapiens" "" #{(:id books)} nil "api")
+          _ (ds/update-context-description db {:id (:id item) :description "agent a\nagent b"} "api")
+          _ (ds/update-item db (assoc (ds/get-item db {:id (:id item)}) :title "Sapiens (2011)") "app")]
+      (is (= "app" (:description_source (ds/get-item db {:id (:id item)})))
+          "the current row now carries his stamp")
+      (is (every? #(= 0.0 (:caution %)) (:ranges (provenance/of-item db (:id item))))
+          "and still every line is the agent's")
+      (with-gate-shut
+        (let [resp (PUT* (str "/api/items/" (:id item)) {:description "agent X\nagent Y"})]
+          (is (= 200 (:status resp)))
+          (is (= "agent X\nagent Y" (:description (ds/get-item db {:id (:id item)})))))))))
+
+(deftest update-description-must-be-a-string-test
+  (test-with-fresh-db "a description that is not a string is a 400, gate open or shut"
+    (let [books (ds/new-context db {:title "Books"})
+          item (ds/new-item db "Sapiens" "" #{(:id books)} nil "api")
+          path (str "/api/items/" (:id item))]
+      (doseq [bad [42 ["a"] {:a 1} true]]
+        (is (= 400 (:status (PUT* path {:description bad}))))
+        (with-gate-shut
+          (is (= 400 (:status (PUT* path {:description bad})))))))))
 
 (deftest update-description-404-for-a-missing-item-test
   (test-with-fresh-db "an id that names nothing is a 404, gate open or shut"

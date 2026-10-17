@@ -197,8 +197,11 @@ standing no, so do not retry it — tell the human.
 `caution` ranges say which lines are his (1.00) and which an agent's (0.00).
 Append below his text, or rewrite stretches at 0.00, and it goes through.
 Changing a line of his — even one character — counts as removing it; so does
-moving it. Putting a line into the middle of his paragraph lowers every line of
-his in that paragraph, so put new text after a blank line, not inside. A
+moving it. Putting a line into the middle of his text lowers every line of his
+in that stretch, and text he wrote in one go is one stretch, blank lines and
+all, so a paragraph put between two of his paragraphs is inside it. Append
+after his text; insert between only where the `caution` ranges show two
+separate stretches of his (a range at 0.00 between them). A
 refusal is `409 {"refused":"degrades-owner-lines","degraded":[…]}`, one entry
 per line of his that would suffer: `line` (one-based, in the description as it
 is now), `text`, `before` and `after` (`null` = the line would be gone). Expect

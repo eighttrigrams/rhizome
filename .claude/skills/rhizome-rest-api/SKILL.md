@@ -79,14 +79,23 @@ at all.
     the owner's degrades** (`provenance/degradations` over
     `et.uvt.caution/degradations`): each of his lines still there, none with
     lower caution than now. Files nothing, needs no `imports`. Check and write
-    in one transaction. Appending and rewriting agent-only stretches pass.
+    in one transaction — the import door's write goes through the same
+    re-check, and a refusal found inside it is logged with
+    `refused-in-transaction=true` after the `gate-bypassed` line. Appending
+    after his text and rewriting agent-only stretches pass. Inserting between
+    two of his paragraphs passes only where the caution ranges show two
+    separate islands: text he wrote in one go is one island, blank lines
+    included, so a paragraph put between two of his is inside it.
     Refused: changing a line of his (= gone, and the new line lowers the rest
-    of its island); moving one (= gone); one line inserted into his paragraph
+    of its island); moving one (= gone); one line inserted into his island
     (every line of his in that island is reported, also far ones); a
     recurring line of his, e.g. a blank, between two rewritten neighbours
-    (gone). Known gap: a block of an agent's bigger than the island piece it
-    cuts off becomes its own island, nothing reported. An empty current
-    description has nothing of his to lower.
+    (gone). Known gaps: a block of an agent's bigger than the island piece it
+    cuts off becomes its own island, nothing reported. The same gap lets a
+    pebble through in two writes: insert a two-line brick, then delete one
+    line of it, and one agent line sits inside his paragraph while his
+    caution never drops. An empty current description has nothing of his to
+    lower.
 - `POST /api/contexts` — always, with recording off: a new context rewrites
   nothing. Refused (`409 {"refused":"imports-handle"}`) when
   `human-readable-id` is `imports`.
@@ -99,6 +108,9 @@ at all.
   go, through the app's own `switch-between-item-and-context!` and its rule
   that a context filed under nothing stays a context. Asking for the state the
   item is already in answers 200 with `"unchanged": true`.
+  Known gap: machine-made looks only at the sources of title and description.
+  Filing, tags and annotations the owner gave the item are not consulted, so
+  an agent-made item he has filed and annotated by hand still qualifies.
 
 Through a door you may add and only add. That is what makes them safe to leave
 open, and it is why they refuse rather than update:

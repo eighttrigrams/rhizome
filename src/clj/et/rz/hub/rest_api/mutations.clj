@@ -167,18 +167,13 @@
           (fn [_bypassed?] (create-item-impl db body scrape?))))))
 
 (defn- update-item-description-impl
-  [db id description file-under-imports-id]
+  "The write with the gate open: the owner's own hand, so nothing is checked and
+  nothing is filed. Both doors write through `write-without-degrading-impl`."
+  [db id description]
   (try (let [updated (datastore/update-context-description
                        db
                        {:id id :description description}
-                       "api")
-             ;; Only ever set on the door path. An item that arrived that way is
-             ;; filed in Imports so it turns up where things that came in from
-             ;; outside turn up; a write through an open gate is the owner's own
-             ;; hand and does not need announcing to itself.
-             updated (if file-under-imports-id
-                       (insertion/ensure-contexts! db updated #{file-under-imports-id})
-                       updated)]
+                       "api")]
          (embed-item-best-effort! db updated)
          (json-response (item->api updated)))
        (catch Exception e
@@ -199,7 +194,10 @@
                               " description would lower " (count degraded) " of them (see"
                               " \"degraded\": line, text, caution before, caution after, null when"
                               " the line would be gone). Leave his lines as they are and where they"
-                              " are, and keep new text out of the middle of his paragraphs.")
+                              " are, and append after his text; text he wrote in one go is one"
+                              " stretch, blank lines and all, so a paragraph put between two of his"
+                              " is inside it. Insert between only where the item's caution ranges"
+                              " show two separate stretches of his.")
                   :refused "degrades-owner-lines"
                   :item-id (:id item)
                   :item-title (:title item)
@@ -211,21 +209,38 @@
                            description))
 
 (defn- write-without-degrading-impl
-  "The description door's write. Asked again inside the transaction that writes,
-  so what is checked is what is written over: a version that landed between the
-  gate's look and this one is part of the history this one reads, and if it
-  makes the answer no, the answer is no."
-  [db item description]
+  "The write behind both of PUT's doors. Asked again inside the transaction that
+  writes, so what is checked is what is written over: a version that landed
+  between the gate's look and this one is part of the history this one reads,
+  and if it makes the answer no, the answer is no. The import door comes through
+  here too: its description was empty at the gate's look, which answers [], but
+  an app save in between would not be.
+
+  `file-under-imports-id`, set on the import door's path alone, files the item
+  there once the description is in, so what came in from outside turns up where
+  the rest of it does; a write through an open gate is the owner's own hand and
+  does not need announcing to itself. After the transaction and not in it: the
+  filing adds a context and cannot lower a line, so it does not need the check."
+  [db item description file-under-imports-id]
   (try (let [result (db/with-transaction [tx db]
                       (let [degraded (degradations tx (:id item) description)]
                         (if (seq degraded)
-                          {:refusal (degradation-refusal item degraded)}
+                          (do (log/warn {:intent "update-item-description"
+                                         :id (:id item)
+                                         :refused-in-transaction true
+                                         :degraded-count (count degraded)}
+                                        (str "REST update-item-description: refused inside the"
+                                             " transaction, nothing written (the gate-bypassed"
+                                             " line above was the gate's look)"))
+                              {:refusal (degradation-refusal item degraded)})
                           {:updated (datastore/update-context-description
                                       tx
                                       {:id (:id item) :description description}
                                       "api")})))]
          (or (:refusal result)
-             (let [updated (:updated result)]
+             (let [updated (cond-> (:updated result)
+                             file-under-imports-id
+                               (#(insertion/ensure-contexts! db % #{file-under-imports-id})))]
                ;; Outside the transaction: it calls out to Ollama, and a write
                ;; lock is not something to hold across a network round trip.
                (embed-item-best-effort! db updated)
@@ -269,8 +284,8 @@
   (try (let [id (Integer/parseInt id)
              {:keys [description]} (parse-json-body req)]
          (cond
-           (not description)
-             (json-response 400 {:error "description is required"})
+           (not (string? description))
+             (json-response 400 {:error "description is required (a string)"})
            :else
              (let [item (datastore/get-item db {:id id})
                    ;; Looked up at most once, and not at all unless the gate is
@@ -295,9 +310,9 @@
                      (fn [] (or @import-door? (empty? @degraded)))
                      (fn [bypassed?]
                        (cond
-                         (not bypassed?) (update-item-description-impl db id description nil)
-                         @import-door? (update-item-description-impl db id description @imports-id)
-                         :else (write-without-degrading-impl db item description)))))))))
+                         (not bypassed?) (update-item-description-impl db id description)
+                         @import-door? (write-without-degrading-impl db item description @imports-id)
+                         :else (write-without-degrading-impl db item description nil)))))))))
        (catch NumberFormatException _ (json-response 400 {:error "Invalid item ID"}))))
 
 (defn- imports-handle?
