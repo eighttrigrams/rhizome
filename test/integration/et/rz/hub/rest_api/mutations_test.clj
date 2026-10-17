@@ -1305,8 +1305,7 @@
       (is (not (contains? start :hide-in-global-search)))
       (testing "absent is null, and \"\" is not null"
         (is (= 409 (:status (patch* item {:annotation ["" "x"]}))))
-        (is (= 409 (:status (patch* item {:tags [nil "x"]}))))
-        (is (= 409 (:status (patch* item {:hide-in-global-search [false true]})))))
+        (is (= 409 (:status (patch* item {:tags [nil "x"]})))))
       (let [resp (patch* item {:tags ["" "a b"]
                                :sort-idx [-1 3]
                                :annotation [nil "n"]
@@ -1325,6 +1324,59 @@
           (is (nil? (:tags (body-json resp))))
           (is (not (contains? (body-json resp) :date)))
           (is (not (contains? (body-json resp) :human-readable-id))))))))
+
+(deftest patch-item-hide-in-global-search-false-and-null-are-one-state-test
+  (test-with-fresh-db "old may be false or null when GET leaves the property out"
+    (let [books (ds/new-context db {:title "Books"})
+          item (ds/new-item db "Plain" "" #{(:id books)} nil "api")]
+      (is (not (contains? (served item) :hide-in-global-search)))
+      (testing "a new false equal to the stored state is no write"
+        (let [before (ds/get-item db {:id (:id item)})]
+          (is (= 200 (:status (patch* item {:hide-in-global-search [false false]}))))
+          (is (= before (ds/get-item db {:id (:id item)})))))
+      (is (= 200 (:status (patch* item {:hide-in-global-search [false true]}))))
+      (is (true? (:hide-in-global-search (served item))))
+      (testing "once true, neither false nor null matches"
+        (is (= 409 (:status (patch* item {:hide-in-global-search [false false]}))))
+        (is (= 409 (:status (patch* item {:hide-in-global-search [nil false]})))))
+      (is (= 200 (:status (patch* item {:hide-in-global-search [true false]}))))
+      (is (= 200 (:status (patch* item {:hide-in-global-search [nil true]}))))
+      (testing "something that is not a boolean never matches"
+        (is (= 409 (:status (patch* item {:hide-in-global-search ["true" false]}))))))))
+
+(deftest patch-item-one-property-moves-nothing-else-test
+  (test-with-fresh-db "each property patched alone: every other column is as it was"
+    (let [{:keys [item]} (patch-fixture!)
+          id (:id item)
+          volatile-keys [:updated_at :description_source]]
+      (doseq [[prop col old new]
+              [[:title :title "Sapiens" "Homo Deus"]
+               [:short-title :short_title "S" "HD"]
+               [:tags :tags "history" "history books"]
+               [:annotation :annotation "read in 2020" "read again"]
+               [:date :date "2020-01-02" "2021-03-04"]
+               [:sort-idx :sort_idx 7 9]
+               [:hide-in-global-search :hide_in_global_search true false]
+               [:human-readable-id :human_readable_id "sapiens" "sapiens-2"]]]
+        (let [before (ds/get-item db {:id id})
+              resp (patch* item {prop [old new]})
+              after (ds/get-item db {:id id})]
+          (is (= 200 (:status resp)) (name prop))
+          (is (= (apply dissoc before col volatile-keys)
+                 (apply dissoc after col volatile-keys))
+              (str (name prop) " moved a column it did not name"))
+          (when (= prop :human-readable-id)
+            (is (= "sapiens-2" (:human_readable_id after)))))))))
+
+(deftest patch-item-repeated-title-changes-keep-the-owners-caution-test
+  (test-with-fresh-db "three title PATCHes in a row: his lines are still his"
+    (let [books (ds/new-context db {:title "Books"})
+          item (ds/new-item db "One" "" #{(:id books)} nil "app")
+          _ (ds/update-context-description db {:id (:id item) :description "his text\n\nmore of his"} nil)]
+      (doseq [[old new] [["One" "Two"] ["Two" "Three"] ["Three" "Four"]]]
+        (is (= 200 (:status (patch* item {:title [old new]})))))
+      (is (= "his text\n\nmore of his" (:description (ds/get-item db {:id (:id item)}))))
+      (is (every? #(= 1.0 (:caution %)) (:ranges (provenance/of-item db (:id item))))))))
 
 (deftest patch-item-a-new-equal-to-the-stored-value-is-not-a-write-test
   (test-with-fresh-db "no history row, nothing moves"
@@ -1441,6 +1493,12 @@
                       {:changes {:human-readable-id {:old "sapiens" :new 12}}}
                       {:changes {:human-readable-id {:old "sapiens" :new "123"}}}
                       {:changes {:human-readable-id {:old "sapiens" :new ""}}}
+                      {:changes {:human-readable-id {:old "sapiens" :new " "}}}
+                      {:changes {:human-readable-id {:old "sapiens" :new " abc"}}}
+                      {:changes {:human-readable-id {:old "sapiens" :new "abc "}}}
+                      {:changes {:sort-idx {:old 7 :new 99999999999999999999999}}}
+                      {:changes {:sort-idx {:old 7 :new 2147483648}}}
+                      {:changes {:sort-idx {:old 7 :new -2147483649}}}
                       ;; one good entry does not carry a bad one
                       {:changes {:title {:old "Sapiens" :new "fine"} :nope {:old 1 :new 2}}}]
           before (ds/get-item db {:id (:id item)})]

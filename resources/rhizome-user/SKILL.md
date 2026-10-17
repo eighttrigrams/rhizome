@@ -225,13 +225,16 @@ curl -s -X PATCH "$RHIZOME/items/34696" -H 'Content-Type: application/json' \
 ```
 
 Properties: `title`, `short-title`, `tags`, `annotation`, `date` (`YYYY-MM-DD`),
-`sort-idx` (an integer, `-1` = unset), `hide-in-global-search` (boolean),
-`human-readable-id`. `null` as `new` clears one. Not here: the description
+`sort-idx` (a 32-bit integer, `-1` = unset), `hide-in-global-search` (boolean),
+`human-readable-id` (no surrounding whitespace, at least one non-digit).
+`null` as `new` clears `short-title`, `tags`, `annotation`, `date` and
+`human-readable-id`; for `title`, `sort-idx` and `hide-in-global-search` it is
+a `400`. Not here: the description
 (`PUT /items/:id`), `is-context` (`PUT /items/:id/is-context`), filing under
 contexts (`PUT /relations`). `old` must be what GET serves now, and a property
 GET leaves out counts as `null` — no `annotation`, `date` or
 `human-readable-id`, and a `hide-in-global-search` that is false (GET says it
-only when true). If any `old` is wrong the answer is `409
+only when true; for that one property `old` may be `false` or `null`). If any `old` is wrong the answer is `409
 {"refused":"old-values-differ","mismatched":{"tags":{"sent":…,"current":…}}}`,
 nothing is written, not even the properties that were right: read the item
 again and decide whether the change still makes sense. A `human-readable-id`

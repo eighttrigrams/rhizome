@@ -119,7 +119,7 @@ at all.
 logged (`intent=patch-item`, no `gate-bypassed`) and answered `200` with the
 item as it stands. With the gate open every `old` is compared, inside the same
 transaction as the write, against what `GET /api/items/:id` serves (absent =
-`null`, so a false `hide-in-global-search` is `null`); a mismatch is `409
+`null`; a false `hide-in-global-search` is `null`, and for it `old` may be `false` or `null`); a mismatch is `409
 {"refused":"old-values-differ","mismatched":{<prop>:{"sent","current"}}}`,
 nothing written. A held `human-readable-id` is `409 "human-readable-id-taken"`.
 `400` for an unknown or unpatchable property (description, is-context and

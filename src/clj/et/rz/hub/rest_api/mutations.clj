@@ -504,14 +504,29 @@
                                                      (catch Exception _ nil))))
                                "a date as YYYY-MM-DD, or null"))}
      :sort-idx {:column :sort_idx
-                :problem (fn [v] (when-not (integer? v) "an integer"))}
+                ;; int32: the writer reads sort_idx back with Integer/parseInt and
+                ;; falls back to -1 on anything it cannot, so a wider number would
+                ;; be stored and then silently reset by the next write.
+                :problem (fn [v] (when-not (and (integer? v) (<= -2147483648 v 2147483647))
+                                   "an integer within 32 bits"))}
      :hide-in-global-search {:column :hide_in_global_search
                              :problem (fn [v] (when-not (boolean? v) "true or false"))}
      :human-readable-id {:column :human_readable_id
                          :problem (fn [v] (when-not (or (nil? v)
-                                                        (and (string? v) (re-find #"\D" v)))
-                                            (str "a string with at least one non-digit character,"
-                                                 " or null")))}}))
+                                                        (and (string? v)
+                                                             (= v (str/trim v))
+                                                             (re-find #"\D" v)))
+                                            (str "a string without leading or trailing whitespace,"
+                                                 " with at least one non-digit character, or null")))}}))
+
+;; GET leaves a false hide-in-global-search out, so false and null name one
+;; stored state. For comparing, the two are the same; nothing else is loosened.
+(defn- same-value?
+  [prop a b]
+  (if (= prop :hide-in-global-search)
+    (let [norm (fn [v] (if (nil? v) false v))] ; anything but nil/false/true stays itself
+      (= (norm a) (norm b)))
+    (= a b)))
 
 (def ^:private elsewhere
   "Properties an item has that PATCH does not change, and where that is done."
@@ -581,10 +596,10 @@
                   mismatched (into {}
                                    (keep (fn [[prop {:keys [old]}]]
                                            (let [now (get served prop)]
-                                             (when (not= old now)
+                                             (when-not (same-value? prop old now)
                                                [prop {:sent old :current now}]))))
                                    changes)
-                  effective (into {} (remove (fn [[prop {:keys [new]}]] (= new (get served prop))))
+                  effective (into {} (remove (fn [[prop {:keys [new]}]] (same-value? prop new (get served prop))))
                                   changes)
                   handle (get-in effective [:human-readable-id :new])]
               (cond
@@ -630,15 +645,19 @@
 
   Properties, named and shaped as GET /api/items/:id serves them: \"title\"
   (non-blank string), \"short-title\", \"tags\" and \"annotation\" (string or
-  null), \"date\" (YYYY-MM-DD or null), \"sort-idx\" (integer), \"hide-in-global-search\"
-  (boolean), \"human-readable-id\" (null, or a string with at least one non-digit
-  character; unique). null as \"new\" clears the property. Not here: the
+  null), \"date\" (YYYY-MM-DD or null), \"sort-idx\" (32-bit integer), \"hide-in-global-search\"
+  (boolean), \"human-readable-id\" (null, or a string without surrounding
+  whitespace and with at least one non-digit character; unique). null as \"new\"
+  clears \"short-title\", \"tags\", \"annotation\", \"date\" and
+  \"human-readable-id\"; for \"title\", \"sort-idx\" and
+  \"hide-in-global-search\" it is a 400. Not here: the
   description (PUT /api/items/:id), is-context (PUT /api/items/:id/is-context),
   contexts and part-of (PUT /api/relations), timestamps, embedding, data.
 
   \"old\" is what the property is now, exactly as GET serves it, and a property GET
-  leaves out is null: no human-readable-id, annotation or date is null, and so
-  is a hide-in-global-search that is false — GET only says it when true. Only
+  leaves out is null: no human-readable-id, annotation or date is null, and a
+  hide-in-global-search that is false is null too: for that property \"old\" may be
+  false or null, either matches. Only
   when every \"old\" matches is any \"new\" written, and then all of them are, in
   one transaction with the comparison. Otherwise 409 {\"refused\":
   \"old-values-differ\", \"mismatched\": {<property>: {\"sent\", \"current\"}}}
