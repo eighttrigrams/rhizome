@@ -183,6 +183,14 @@ back `403 {"dropped":true,"recording":false,"intent":"..."}` and nothing is
 stored; the attempt is logged either way. Never ask for the gate to be
 bypassed — report the drop and let the human decide.
 
+A few writes go through with recording off, because they can only add: a new
+item filed under the context with handle `imports`, a description on an item
+that has none yet, a new context (`POST /contexts`), and turning an item into a
+context (`PUT /items/:id/is-context`, `{"is-context": true}`) when every
+version of it was written by a machine. What they will not do comes back as a
+`409` saying why (`"collision"`, or `"refused"` with a reason); that is a
+standing no, so do not retry it — tell the human.
+
 URLs (YouTube, GitHub, Substack, …) passed as `title` on `POST /items` are
 auto-detected and enriched by the insertion pipeline — but only when you ask
 for that with `?scrape=true`. Without it nothing is fetched: the title is

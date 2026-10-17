@@ -160,3 +160,22 @@
   (of-versions (:versions (relations/get-relation-description-history db
                                                                      item-id
                                                                      container-id))))
+
+(defn machine-made-throughout?
+  "True when every one of `versions` was written by a machine — each carries a
+  source, read through `source-of`, that is not in `ours`. `versions` is what
+  `ds/get-description-history` returns, current row and every history row, in
+  any order: the question is about all of them and not about which came last.
+
+  A version with no source falls on the owner's side, as everywhere else here,
+  so an item old enough to predate the column is never machine-made. Nor is one
+  with no versions at all: nothing to go on is not evidence that no hand of his
+  was in it.
+
+  It is what lets the REST API turn an item into a context with the recording
+  gate shut (`rest-api.mutations/set-is-context`): a thing no version of which is
+  his cannot be one whose standing he decided on. Title changes stamp the source
+  as well as description changes do, so this covers both."
+  [versions]
+  (boolean (and (seq versions)
+                (every? #(not (contains? ours (source-of (:source %)))) versions))))

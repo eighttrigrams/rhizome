@@ -56,11 +56,12 @@ A red ⚠ REC badge appears in the top-left corner while the mode is active.
 Toggle it off with the same shortcut. Every attempted write is logged to
 `rhizome/rhizome.log` regardless of whether it was executed or dropped.
 
-Two endpoints have a door in the shut gate. Both are logged with
+Four endpoints have a door in the shut gate. All are logged with
 `gate-bypassed=true` on the intent line, so that is what to grep for when a
-write appears that the badge says should not have. Both go by the handle and
-not by the title, and neither creates the `imports` context, so while no
-context carries the handle there is no door at all.
+write appears that the badge says should not have. The two import doors go by
+the handle and not by the title, and nothing creates the `imports` context with
+the gate shut, so while no context carries the handle there is no import door
+at all.
 
 - `POST /api/items` — when `context-ids` names `imports`, the item is written
   with recording off, whatever else is named alongside.
@@ -68,6 +69,18 @@ context carries the handle there is no door at all.
   description is written with recording off, and the item is also filed under
   `imports`. Filing under `imports` happens on the door path only — with
   recording on, the endpoint replaces the description and touches nothing else.
+- `POST /api/contexts` — always, with recording off: a new context rewrites
+  nothing. Refused (`409 {"refused":"imports-handle"}`) when
+  `human-readable-id` is `imports`.
+- `PUT /api/items/:id/is-context` with `{"is-context": true}` — the item is
+  made a context when it is **machine-made throughout**: every version of it,
+  current row and history (`ds/get-description-history`), has a non-blank
+  source outside `provenance/ours` (`app`, `obsidian`). A blank source is the
+  owner's, so legacy items never qualify. `{"is-context": false}` (context →
+  item) is never let through a shut gate. With the gate open both directions
+  go, through the app's own `switch-between-item-and-context!` and its rule
+  that a context filed under nothing stays a context. Asking for the state the
+  item is already in answers 200 with `"unchanged": true`.
 
 Through a door you may add and only add. That is what makes them safe to leave
 open, and it is why both refuse rather than update:
@@ -76,6 +89,11 @@ open, and it is why both refuse rather than update:
 |---|---|
 | `POST` names a URL already in the graph | `409 {"collision":true,"existing-item-id":…}` |
 | `PUT` at an item that already has a description, gate shut | `409 {"collision":true,"item-id":…}` |
+| `POST /api/contexts` with handle `imports`, gate shut | `409 {"refused":"imports-handle"}` |
+| `PUT …/is-context` true, gate shut, a version of the owner's | `409 {"refused":"not-machine-made"}` |
+| `PUT …/is-context` true, gate shut, the item with handle `imports` | `409 {"refused":"imports-handle"}` |
+| `PUT …/is-context` false, gate shut | `409 {"refused":"demote"}` |
+| `PUT …/is-context` false, a context filed under nothing (any gate) | `409 {"refused":"in-no-context"}` |
 | gated for any other reason | the drop stub — `403 {"dropped":true}`, or for `POST`/`PUT` on items a 2xx echo of what the write would have looked like |
 
 A 409 is a standing refusal: sending it again changes nothing, and the way

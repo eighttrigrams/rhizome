@@ -65,6 +65,8 @@
            (GET "/items/:id" [id] (queries/get-item (db-fn) id))
            (PUT "/items/:id" [id :as req]
                 (mutations/update-item-description (db-fn) id req))
+           (PUT "/items/:id/is-context" [id :as req]
+                (mutations/set-is-context (db-fn) id req))
            (POST "/items" req (mutations/create-item (db-fn) req))
            (GET "/items/:id/related/deletion-preview" [id]
                 (mutations/deletion-preview-related-items (db-fn) id))

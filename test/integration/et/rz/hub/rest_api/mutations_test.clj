@@ -280,16 +280,16 @@
             "and nothing was written")))))
 
 (deftest create-context-recording-off-test
-  (testing "with recording off, the write is dropped and no row is created"
+  (testing "with recording off, the context is created all the same -- a door"
     (reset-db)
     (with-time
       (mw/toggle!)
       (try
-        (let [resp (POST* "/api/contexts" {:title "ShouldNotPersist"})
+        (let [resp (POST* "/api/contexts" {:title "MadeThroughTheDoor"})
               body (body-json resp)]
           (is (= 201 (:status resp)))
-          (is (nil? (:id body)))
-          (is (= "ShouldNotPersist" (:title body))))
+          (is (integer? (:id body)) "a real id, not the dropped-write stub")
+          (is (true? (:is_context (ds/get-item db {:id (:id body)})))))
         (finally (mw/toggle!))))))
 
 (deftest reason-required-on-mutations-test
@@ -909,3 +909,151 @@
           names (set (map :name endpoints))]
       (is (not (contains? names "delete-related-items")))
       (is (not (contains? names "deletion-preview-related-items"))))))
+
+;; -- the door on POST /api/contexts ------------------------------------------
+
+(deftest create-context-with-the-gate-shut-keeps-its-extras-test
+  (test-with-fresh-db "a context made through the shut gate is made in full, handle and all"
+    (with-gate-shut
+      (let [resp (POST* "/api/contexts" {:title "Books" :human-readable-id "books"})]
+        (is (= 201 (:status resp)))
+        (is (= "books" (:human_readable_id (ds/get-item db {:id (:id (body-json resp))}))))))))
+
+(deftest create-context-refuses-the-imports-handle-with-the-gate-shut-test
+  (test-with-fresh-db "the handle that opens the import doors is not conjured from out here"
+    (with-gate-shut
+      (let [resp (POST* "/api/contexts" {:title "Imports" :human-readable-id "imports"})
+            body (body-json resp)]
+        (is (= 409 (:status resp)))
+        (is (= "imports-handle" (:refused body)))
+        (is (empty? (titled "Imports")) "and nothing was written")))))
+
+(deftest create-context-with-the-imports-handle-and-the-gate-open-test
+  (test-with-fresh-db "with the gate open the owner may make it"
+    (let [resp (POST* "/api/contexts" {:title "Imports" :human-readable-id "imports"})]
+      (is (= 201 (:status resp)))
+      (is (= "imports" (:human-readable-id (body-json resp)))))))
+
+;; -- PUT /api/items/:id/is-context -------------------------------------------
+
+(defn- set-is-context*
+  [item is-context]
+  (PUT* (str "/api/items/" (:id item) "/is-context") {:is-context is-context}))
+
+(defn- is-context? [item] (:is_context (ds/get-item db {:id (:id item)})))
+
+(defn- machine-made-item!
+  "An item that came in through the API and nothing else has touched."
+  [title]
+  (let [books (ds/new-context db {:title "Books"} "api")]
+    (ds/new-item db title "" #{(:id books)} nil "api")))
+
+(defn- stamp-source!
+  "Overwrite the source on the item's current row and every history row."
+  [item source]
+  (jdbc/execute-one! db ["update items set description_source = ? where id = ?" source (:id item)])
+  (jdbc/execute-one! db ["update history set source = ? where id = ?" source (:id item)]))
+
+(deftest set-is-context-with-the-gate-open-both-ways-test
+  (test-with-fresh-db "recording on: promote, then demote, through the app's own switch"
+    (let [books (ds/new-context db {:title "Books"})
+          item (ds/new-item db "Sapiens" "" #{(:id books)} nil "app")
+          up (set-is-context* item true)]
+      (is (= 200 (:status up)))
+      (is (true? (:is-context (body-json up))))
+      (is (true? (is-context? item)))
+      (let [down (set-is-context* item false)]
+        (is (= 200 (:status down)))
+        (is (false? (:is-context (body-json down))))
+        (is (false? (is-context? item)))))))
+
+(deftest set-is-context-keeps-the-app-rule-about-unfiled-contexts-test
+  (test-with-fresh-db "a context filed under nothing does not become an item"
+    (let [ctx (ds/new-context db {:title "Standalone"})
+          resp (set-is-context* ctx false)]
+      (is (= 409 (:status resp)))
+      (is (= "in-no-context" (:refused (body-json resp))))
+      (is (true? (is-context? ctx))))))
+
+(deftest set-is-context-already-in-that-state-is-a-no-op-test
+  (test-with-fresh-db "asking for what already is answers with the item, unchanged"
+    (let [ctx (ds/new-context db {:title "Books"})
+          item (ds/new-item db "Sapiens" "" #{(:id ctx)} nil "app")]
+      (doseq [[it state] [[ctx true] [item false]]]
+        (let [resp (set-is-context* it state)
+              body (body-json resp)]
+          (is (= 200 (:status resp)))
+          (is (true? (:unchanged body)))
+          (is (= (:id it) (:id body)))))
+      (testing "with the gate shut too -- there is nothing to write"
+        (with-gate-shut
+          (is (true? (:unchanged (body-json (set-is-context* item false))))))))))
+
+(deftest set-is-context-bad-requests-test
+  (test-with-fresh-db "a missing flag, a bad id, an unknown item"
+    (let [ctx (ds/new-context db {:title "Books"})]
+      (is (= 400 (:status (PUT* (str "/api/items/" (:id ctx) "/is-context") {}))))
+      (is (= 400 (:status (set-is-context* ctx "yes"))))
+      (is (= 400 (:status (PUT* "/api/items/abc/is-context" {:is-context true}))))
+      (is (= 404 (:status (PUT* "/api/items/99999/is-context" {:is-context true})))))))
+
+(deftest set-is-context-gate-shut-promotes-a-machine-made-item-test
+  (test-with-fresh-db "every version from a machine: the door opens"
+    (let [item (machine-made-item! "Sapiens")
+          _ (ds/update-context-description db {:id (:id item) :description "one"} "api")
+          _ (ds/update-context-description db {:id (:id item) :description "two"} "scraper")]
+      (with-gate-shut
+        (let [resp (set-is-context* item true)]
+          (is (= 200 (:status resp)))
+          (is (true? (:is-context (body-json resp))))
+          (is (true? (is-context? item))))))))
+
+(deftest set-is-context-gate-shut-refuses-an-item-with-one-app-version-test
+  (test-with-fresh-db "one version of the owner's in the history is enough to refuse"
+    (let [item (machine-made-item! "Sapiens")
+          _ (ds/update-context-description db {:id (:id item) :description "his"} "app")
+          _ (ds/update-context-description db {:id (:id item) :description "then ours"} "api")]
+      (is (= "api" (:description_source (ds/get-item db {:id (:id item)})))
+          "the current row is the machine's -- only the history holds his")
+      (with-gate-shut
+        (let [resp (set-is-context* item true)]
+          (is (= 409 (:status resp)))
+          (is (= "not-machine-made" (:refused (body-json resp))))
+          (is (false? (is-context? item))))))))
+
+(deftest set-is-context-gate-shut-refuses-a-blank-source-test
+  (test-with-fresh-db "a version with no source is read as the owner's"
+    (let [item (machine-made-item! "Sapiens")
+          _ (ds/update-context-description db {:id (:id item) :description "old"} "api")
+          _ (ds/update-context-description db {:id (:id item) :description "new"} "api")]
+      (jdbc/execute-one! db ["update history set source = NULL where id = ?" (:id item)])
+      (with-gate-shut
+        (let [resp (set-is-context* item true)]
+          (is (= 409 (:status resp)))
+          (is (= "not-machine-made" (:refused (body-json resp))))
+          (is (false? (is-context? item)))))
+      (testing "and an empty string reads the same as a null, on the current row too"
+        (stamp-source! item "")
+        (with-gate-shut
+          (is (= "not-machine-made" (:refused (body-json (set-is-context* item true))))))))))
+
+(deftest set-is-context-gate-shut-refuses-the-imports-handle-test
+  (test-with-fresh-db "the item carrying 'imports' is not made a context from out here"
+    (let [item (machine-made-item! "Imports")]
+      (jdbc/execute-one! db ["update items set human_readable_id = 'imports' where id = ?" (:id item)])
+      (with-gate-shut
+        (let [resp (set-is-context* item true)]
+          (is (= 409 (:status resp)))
+          (is (= "imports-handle" (:refused (body-json resp))))
+          (is (false? (is-context? item))))))))
+
+(deftest set-is-context-gate-shut-refuses-to-demote-test
+  (test-with-fresh-db "context to item is never let through the shut gate"
+    (let [books (ds/new-context db {:title "Books"} "api")
+          ctx (ds/new-context db {:title "Novels"} "api")]
+      (relations/link-item-to-another-item! db ctx books true)
+      (with-gate-shut
+        (let [resp (set-is-context* ctx false)]
+          (is (= 409 (:status resp)))
+          (is (= "demote" (:refused (body-json resp))))
+          (is (true? (is-context? ctx))))))))

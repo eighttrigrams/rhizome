@@ -28,3 +28,16 @@ to pass the recording gate when the following is the case
 Note that in such a case (where the recording gate is bypassed, in contrast to 
 a circumstance when the gate is open), the Item gets associated with the 'imports'
 context (if it not already is).
+
+Context creation with `POST /api/contexts` bypasses the recording gate,
+except when the human readable id is 'imports' (then it is refused).
+Nothing may, with the gate shut, create a context with the handle 'imports'
+or turn an Item with that handle into a context, since that handle is what
+opens the doors above.
+
+`PUT /api/items/:id/is-context` turns an Item into a context or back.
+With the gate shut it is let through only when
+- the Item is to become a context (never the other way), and
+- every version of the Item (current and history) has a source which is
+  not ours ('app', 'obsidian'); a blank source counts as ours, and
+- the Item does not have the human readable id 'imports'

@@ -8,6 +8,7 @@
             [et.rz.hub.ds.relations :as relations]
             [et.rz.hub.ds.part-of :as part-of]
             [et.rz.hub.ds.search :as search]
+            [et.rz.hub.provenance :as provenance]
             [et.rz.hub.rest-api.middleware :as mw]
             [et.rz.hub.repository.insertion :as insertion]
             [et.rz.hub.repository.deletion]
@@ -260,6 +261,23 @@
                                                    (when bypassed? @imports-id))))))))
        (catch NumberFormatException _ (json-response 400 {:error "Invalid item ID"}))))
 
+(defn- imports-handle?
+  "True when `handle` is the human-readable id that opens the import doors."
+  [handle]
+  (= "imports" handle))
+
+(defn- imports-handle-refusal
+  "The standing refusal for a gate-shut request that would make a context of the
+  handle \"imports\" — creating one, or turning the item that carries it into
+  one. See `imports-context-id` for why that handle is never conjured from out
+  here: the doors it opens would no longer be gated by anything."
+  [& what]
+  (json-response 409
+                 {:error (str (apply str what) " while recording is off. That handle opens"
+                              " the import doors, and an agent that could make it would be"
+                              " opening its own gate. It is done in the app.")
+                  :refused "imports-handle"}))
+
 (defn- context-extras-set
   [{:keys [short-title human-readable-id sort-idx hide-in-global-search]}]
   (cond-> {}
@@ -292,7 +310,16 @@
   must be unique and contain at least one non-digit character),
   \"sort-idx\" (optional int), \"hide-in-global-search\" (optional bool — when
   true, the context is excluded from global contexts search). Gated by
-  recording mode."
+  recording mode.
+
+  With the gate shut the context is created all the same, and the log line
+  carries `gate-bypassed`. A new context is a new item and nothing else: it
+  rewrites nothing that is there, so it is one more door of the kind POST
+  /api/items has, and it is filed nowhere it was not asked to be. The one thing
+  it may not do is take the handle \"imports\" — that handle is what opens the
+  import doors, and a request that could conjure it would be opening its own
+  gate. Asking for it with the gate shut is answered 409 {\"refused\":
+  \"imports-handle\"}, and nothing is written."
   [db req]
   (let [body (parse-json-body req)]
     (if-not (:title body)
@@ -300,8 +327,108 @@
       (mw/log-and-guard
         "create-context"
         (select-keys body [:title :short-title :human-readable-id :sort-idx :hide-in-global-search])
-        (json-response 201 {:id nil :title (:title body)})
-        (fn [] (create-context-impl db body))))))
+        ;; Reached only with the gate shut and the door unopened, and the door
+        ;; stays unopened for one request alone: the one naming the handle.
+        (imports-handle-refusal "POST /api/contexts may not create the context with the handle"
+                                " \"imports\"")
+        (fn [] (not (imports-handle? (:human-readable-id body))))
+        (fn [_bypassed?] (create-context-impl db body))))))
+
+(defn- is-context-refusal
+  [refused item error]
+  (json-response 409 {:error error
+                      :refused refused
+                      :item-id (:id item)
+                      :item-title (:title item)}))
+
+(defn- machine-made-throughout?
+  [db item]
+  (provenance/machine-made-throughout?
+    (:versions (datastore/get-description-history db {:id (:id item)}))))
+
+(defn- shut-gate-is-context-refusal
+  "Why a gate-shut flip of `item` to `is-context?` was not let through. Only
+  reached when it was not, so there is always a reason, and each is a standing
+  one: sending it again from out here changes nothing."
+  [item is-context?]
+  (cond
+    (not is-context?)
+      (is-context-refusal "demote" item
+                          (str "item " (:id item) " (\"" (:title item) "\") is a context. With"
+                               " recording off, PUT /api/items/:id/is-context turns an item into a"
+                               " context and never the other way: a context is a place things are"
+                               " filed, and taking it away is done in the app."))
+    (imports-handle? (:human_readable_id item))
+      (imports-handle-refusal "PUT /api/items/" (:id item) "/is-context may not turn the item with"
+                              " the handle \"imports\" into a context")
+    :else
+      (is-context-refusal "not-machine-made" item
+                          (str "item " (:id item) " (\"" (:title item) "\") has a version that is"
+                               " the owner's own (source \"app\" or \"obsidian\", or no source at"
+                               " all). With recording off, only an item every version of which"
+                               " was written by a machine can be made a context."))))
+
+(defn- set-is-context-impl
+  [db item is-context?]
+  (try
+    ;; The app's own rule, kept by reusing the app's own switch: a context that
+    ;; is filed under nothing cannot become an item, which would leave it filed
+    ;; nowhere. The switch declines that silently; out here it is said.
+    (if (and (not is-context?) (empty? (get-in item [:data :contexts])))
+      (is-context-refusal "in-no-context" item
+                          (str "item " (:id item) " (\"" (:title item) "\") is a context filed under"
+                               " no other context. Made an item it would sit nowhere, so it stays a"
+                               " context. File it under a context first (PUT /api/relations)."))
+      (json-response (item->api (datastore/switch-between-item-and-context! db item))))
+    (catch Exception e
+      (log/error e "REST API: set-is-context failed")
+      (json-response 500 {:error (.getMessage e)}))))
+
+(defn set-is-context
+  "PUT /api/items/:id/is-context — turn an item into a context, or a context
+  into an item. JSON body: {\"is-context\" (required bool)}. Answers with the
+  item as it now stands. 400 when \"is-context\" is not a boolean, 404 when the
+  item does not exist. An item already in the state asked for is answered 200
+  with the item and \"unchanged\": true, and nothing is written.
+
+  The same switch the app uses, with its rule: a context filed under no other
+  context is not turned into an item, since it would be filed nowhere — 409
+  {\"refused\": \"in-no-context\"}.
+
+  Gated by recording mode, with a door. With the gate shut an item is turned
+  into a context when it is machine-made throughout: every version of it, the
+  current one and each in its history, has a source that is not the owner's
+  (not \"app\", not \"obsidian\", and not blank — a version with no source is read
+  as his, so old items never qualify). Title changes stamp the source too, so
+  that covers title and description alike. What no hand of his has touched is
+  not a thing whose standing he decided. Logged with `gate-bypassed`.
+
+  Everything else asked with the gate shut is a standing refusal, 409 with
+  \"refused\" saying which: \"not-machine-made\" for an item a version of which is
+  his; \"imports-handle\" for the item carrying the handle \"imports\", which is
+  never made a context from out here (see POST /api/contexts); \"demote\" for any
+  context to item, which takes a place away and so is done in the app."
+  [db id req]
+  (try (let [id (Integer/parseInt id)
+             is-context (:is-context (parse-json-body req))]
+         (if-not (boolean? is-context)
+           (json-response 400 {:error "is-context is required (true or false)"})
+           (let [item (datastore/get-item db {:id id})]
+             (cond
+               (nil? (:id item))
+                 (json-response 404 {:error "Item not found"})
+               (= is-context (boolean (:is_context item)))
+                 (json-response (assoc (item->api item) :unchanged true))
+               :else
+                 (mw/log-and-guard
+                   "set-is-context"
+                   {:id id :title (:title item) :is-context is-context}
+                   (shut-gate-is-context-refusal item is-context)
+                   (fn [] (and is-context
+                               (not (imports-handle? (:human_readable_id item)))
+                               (machine-made-throughout? db item)))
+                   (fn [_bypassed?] (set-is-context-impl db item is-context)))))))
+       (catch NumberFormatException _ (json-response 400 {:error "Invalid item ID"}))))
 
 (defn- force-show-badge!
   "link-item-to-another-item! preserves :show-badge? on existing entries; this

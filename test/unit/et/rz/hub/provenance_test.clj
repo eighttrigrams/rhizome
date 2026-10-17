@@ -137,3 +137,15 @@
     (testing "the vocabulary is rhizome's own, not the library's examples"
       (is (not (str/includes? legend "machine")))
       (is (not (str/includes? legend "\"ui\""))))))
+
+(deftest machine-made-throughout-test
+  (testing "every version from a machine"
+    (is (true? (provenance/machine-made-throughout? [(v "b" "scraper") (v "a" "api")]))))
+  (testing "one version of the owner's anywhere in the history"
+    (is (false? (provenance/machine-made-throughout? [(v "b" "api") (v "a" "app")])))
+    (is (false? (provenance/machine-made-throughout? [(v "b" "obsidian") (v "a" "api")]))))
+  (testing "a blank source is his, null or empty string"
+    (is (false? (provenance/machine-made-throughout? [(v "b" "api") (v "a" nil)])))
+    (is (false? (provenance/machine-made-throughout? [(v "b" "") (v "a" "api")]))))
+  (testing "no versions at all is not evidence of anything"
+    (is (false? (provenance/machine-made-throughout? [])))))
