@@ -149,3 +149,17 @@
     (is (false? (provenance/machine-made-throughout? [(v "b" "") (v "a" "api")]))))
   (testing "no versions at all is not evidence of anything"
     (is (false? (provenance/machine-made-throughout? [])))))
+
+(deftest degradations-test
+  (testing "newest first, as ds hands it over, and reversed on the way in"
+    ;; Read in the wrong order, the api version would be the oldest and own
+    ;; nothing of his, and the change would come back clean.
+    (is (= [1] (map :line (provenance/degradations [(v "his\nagent" "api") (v "his" "app")]
+                                                   "HIS\nagent")))))
+  (testing "a blank source is his"
+    (is (seq (provenance/degradations [(v "his" nil)] "changed"))))
+  (testing "appending lowers nothing"
+    (is (= [] (provenance/degradations [(v "his one\nhis two" "app")] "his one\nhis two\n\nmore"))))
+  (testing "an empty current description has nothing of his to lower"
+    (is (= [] (provenance/degradations [(v "" "app")] "new")))
+    (is (= [] (provenance/degradations [(v nil nil) (v "old of his" "app")] "new")))))

@@ -732,12 +732,10 @@
           (is (contains? (get-in stored [:data :contexts]) (:id books))
               "alongside where it already was"))))))
 
-(deftest update-description-refuses-over-an-existing-description-test
-  (test-with-fresh-db "an item that already has a description is refused, out loud"
-    ;; The half that makes the door an add and not an overwrite. Without it a
-    ;; caller could replace any text in the graph with the gate shut. And it is
-    ;; a refusal rather than a drop, because no amount of sending it again from
-    ;; out here will make it land, and a caller cannot learn that from a stub.
+(deftest update-description-refuses-changing-a-line-of-the-owners-test
+  (test-with-fresh-db "a description that would replace his line is refused, out loud, with the line"
+    ;; A changed line is a gone line: the diff is a delete and an insert. The
+    ;; refusal is a standing one and names what it was about to cost.
     (let [imports (imports-context!)
           books (ds/new-context db {:title "Books"})
           item (ds/new-item db "Sapiens" "" #{(:id books)} nil "api")
@@ -747,11 +745,62 @@
               body (body-json resp)
               stored (ds/get-item db {:id (:id item)})]
           (is (= 409 (:status resp)))
-          (is (true? (:collision body)))
+          (is (= "degrades-owner-lines" (:refused body)))
           (is (= (:id item) (:item-id body)))
-          (is (re-find #"already has a description" (:error body)))
+          (is (= [{:line 1 :text "mine" :before 1.0 :after nil}] (:degraded body)))
           (is (= "mine" (:description stored)) "and the text that was there is still there")
           (is (not (contains? (get-in stored [:data :contexts]) (:id imports)))))))))
+
+(deftest update-description-refuses-a-line-put-into-his-paragraph-test
+  (test-with-fresh-db "one stray line inside his stretch lowers every line of his in it"
+    (let [books (ds/new-context db {:title "Books"})
+          item (ds/new-item db "Sapiens" "" #{(:id books)} nil "api")
+          his "his one\nhis two\nhis three\nhis four"
+          _ (ds/update-context-description db {:id (:id item) :description his} "app")]
+      (with-gate-shut
+        (let [resp (PUT* (str "/api/items/" (:id item))
+                         {:description "his one\nhis two\nstray\nhis three\nhis four"})
+              body (body-json resp)]
+          (is (= 409 (:status resp)))
+          (is (= [1 2 3 4] (map :line (:degraded body))) "all of his, not only the neighbours")
+          (is (every? #(and (= 1.0 (:before %)) (< (:after %) 1.0)) (:degraded body)))
+          (is (= his (:description (ds/get-item db {:id (:id item)})))))))))
+
+(deftest update-description-appends-to-the-owners-text-test
+  (test-with-fresh-db "appending below his text lowers nothing, so it goes through the shut gate"
+    (let [imports (imports-context!)
+          books (ds/new-context db {:title "Books"})
+          item (ds/new-item db "Sapiens" "" #{(:id books)} nil "api")
+          _ (ds/update-context-description db {:id (:id item) :description "his one\nhis two"} "app")
+          new-text "his one\nhis two\n\nan agent's note\nand more"]
+      (with-gate-shut
+        (let [resp (PUT* (str "/api/items/" (:id item)) {:description new-text})
+              stored (ds/get-item db {:id (:id item)})]
+          (is (= 200 (:status resp)))
+          (is (= new-text (:description stored)))
+          (is (= "api" (:description_source stored)))
+          (is (not (contains? (get-in stored [:data :contexts]) (:id imports)))
+              "this door files nothing, imports or not"))))))
+
+(deftest update-description-rewrites-a-stretch-that-is-not-his-test
+  (test-with-fresh-db "rewriting what an agent wrote, his lines left be, goes through"
+    (let [books (ds/new-context db {:title "Books"})
+          item (ds/new-item db "Sapiens" "" #{(:id books)} nil "api")
+          _ (ds/update-context-description db {:id (:id item) :description "his one\nhis two"} "app")
+          _ (ds/update-context-description db {:id (:id item)
+                                              :description "his one\nhis two\n\nagent a\nagent b"}
+                                           "api")
+          new-text "his one\nhis two\n\nagent X\nagent Y"]
+      (with-gate-shut
+        (let [resp (PUT* (str "/api/items/" (:id item)) {:description new-text})]
+          (is (= 200 (:status resp)))
+          (is (= new-text (:description (ds/get-item db {:id (:id item)})))))))))
+
+(deftest update-description-404-for-a-missing-item-test
+  (test-with-fresh-db "an id that names nothing is a 404, gate open or shut"
+    (is (= 404 (:status (PUT* "/api/items/99999" {:description "x"}))))
+    (with-gate-shut
+      (is (= 404 (:status (PUT* "/api/items/99999" {:description "x"})))))))
 
 (deftest update-description-with-the-gate-open-replaces-an-existing-one-test
   (test-with-fresh-db "recording on, and replacing a description is an ordinary write"
@@ -764,18 +813,19 @@
       (is (= 200 (:status resp)))
       (is (= "second thoughts" (:description (ds/get-item db {:id (:id item)})))))))
 
-(deftest update-description-drops-without-the-imports-context-test
-  (test-with-fresh-db "no context carries the handle, so there is no door — and no refusal"
-    ;; Gated, not refused: there is nothing here to displace, and the day a
-    ;; context takes the handle this same request goes through. That is a shut
-    ;; gate and not a standing no, so it gets the stub the gate always gave.
+(deftest update-description-without-the-imports-context-goes-through-the-description-door-test
+  (test-with-fresh-db "no context carries the handle: an empty description is written all the same, filed nowhere"
+    ;; Not the import door -- there is none -- but nothing of his is lowered by
+    ;; writing onto an empty description, so the description door lets it in.
     (let [books (ds/new-context db {:title "Books"})
-          item (ds/new-item db "Sapiens" "" #{(:id books)} nil "api")]
+          item (ds/new-item db "Sapiens" "" #{(:id books)} nil "app")]
       (with-gate-shut
         (let [resp (PUT* (str "/api/items/" (:id item)) {:description "a history of us"})
               stored (ds/get-item db {:id (:id item)})]
           (is (= 200 (:status resp)))
-          (is (nil? (:description stored)) "nothing was written"))))))
+          (is (= "a history of us" (:description stored)))
+          (is (= #{(:id books)} (set (keys (get-in stored [:data :contexts]))))
+              "and filed nowhere new"))))))
 
 (deftest update-description-with-the-gate-open-does-not-file-under-imports-test
   (test-with-fresh-db "recording on: the description is replaced and nothing else happens"

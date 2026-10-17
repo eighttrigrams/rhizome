@@ -41,3 +41,10 @@ With the gate shut it is let through only when
 - every version of the Item (current and history) has a source which is
   not ours ('app', 'obsidian'); a blank source counts as ours, and
 - the Item does not have the human readable id 'imports'
+
+`PUT /api/items/:id` also passes the recording gate, without the 'imports'
+Item and without associating anything, when the new description lowers
+no line of ours: every line of ours in the current description is still
+there afterwards, and none would have a lower us-vs-them caution than
+now. Otherwise it is refused with 409, listing the lines that would degrade.
+The 'imports' case above stays as it is and is tried first.

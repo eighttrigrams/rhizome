@@ -178,18 +178,34 @@ curl -s -X POST "$RHIZOME/items" -H 'Content-Type: application/json' \
 ```
 
 **Mutations are gated by recording mode**, which the human toggles in the app
-(a red ⚠ REC badge shows while it is on). With recording off the request comes
-back `403 {"dropped":true,"recording":false,"intent":"..."}` and nothing is
-stored; the attempt is logged either way. Never ask for the gate to be
+(a red ⚠ REC badge shows while it is on). With recording off the request is
+dropped and nothing is stored, but the answer is still a `2xx` stub shaped like
+success (`{"created":true}` from `POST /items`, for instance), so read it with
+that in mind; the attempt is logged either way. Never ask for the gate to be
 bypassed — report the drop and let the human decide.
 
-A few writes go through with recording off, because they can only add: a new
-item filed under the context with handle `imports`, a description on an item
-that has none yet, a new context (`POST /contexts`), and turning an item into a
+A few writes go through with recording off, because they cannot lower the
+value of anything the human made: a new item filed under the context with
+handle `imports`, a new context (`POST /contexts`), turning an item into a
 context (`PUT /items/:id/is-context`, `{"is-context": true}`) when every
-version of it was written by a machine. What they will not do comes back as a
+version of it was written by a machine, and a description (`PUT /items/:id`)
+that leaves every line of the human's as it is. What they will not do comes back as a
 `409` saying why (`"collision"`, or `"refused"` with a reason); that is a
 standing no, so do not retry it — tell the human.
+
+**Editing a description with recording off.** Read the item first: its
+`caution` ranges say which lines are his (1.00) and which an agent's (0.00).
+Append below his text, or rewrite stretches at 0.00, and it goes through.
+Changing a line of his — even one character — counts as removing it; so does
+moving it. Putting a line into the middle of his paragraph lowers every line of
+his in that paragraph, so put new text after a blank line, not inside. A
+refusal is `409 {"refused":"degrades-owner-lines","degraded":[…]}`, one entry
+per line of his that would suffer: `line` (one-based, in the description as it
+is now), `text`, `before` and `after` (`null` = the line would be gone). Expect
+several entries for a one-line change. A repeated line of his, like a blank
+line, sitting between two lines you rewrote counts as gone too — keep it where
+it is. Adjust your text from that list; if you cannot without touching his
+lines, leave it and tell the human.
 
 URLs (YouTube, GitHub, Substack, …) passed as `title` on `POST /items` are
 auto-detected and enriched by the insertion pipeline — but only when you ask

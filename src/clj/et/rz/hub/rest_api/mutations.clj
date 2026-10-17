@@ -185,49 +185,86 @@
          (log/error e "REST API: update-item-description failed")
          (json-response 500 {:error (.getMessage e)}))))
 
-(defn- description-refusal
-  "The answer to a PUT, made with the gate shut, at an item that already carries
-  a description.
-
-  Not the ordinary dropped write. A drop is for a request the gate simply does
-  not admit, and it says so by answering with the item as it would have looked,
-  which leaves a caller unable to tell a write from a silence. This one is a
-  standing refusal: the text is there, and no amount of trying from out here
-  will replace it. Saying so out loud lets a caller stop rather than send it
-  again, and it is the same 409 POST answers a collision with — both mean the
-  graph already holds this and the way in only adds."
-  [item]
+(defn- degradation-refusal
+  "The answer to a gate-shut PUT whose description would lower lines of the
+  owner's. A standing refusal and not a drop, like the other doors' 409s: this
+  text will never land from out here, and a caller should be able to tell that
+  from a gate that is merely shut. The lines are in the body, one-based in the
+  description as it stands now, so the caller can see what it was about to cost
+  and write something that leaves them be."
+  [item degraded]
   (json-response 409
-                 {:error (str "item " (:id item) " (\"" (:title item) "\") already has a"
-                              " description. With recording off, PUT /api/items/:id writes a"
-                              " description that is not there yet and does not replace one."
-                              " Replacing it is done in the app.")
-                  :collision true
+                 {:error (str "item " (:id item) " (\"" (:title item) "\"): with recording off,"
+                              " PUT /api/items/:id may not lower any line of the owner's, and this"
+                              " description would lower " (count degraded) " of them (see"
+                              " \"degraded\": line, text, caution before, caution after, null when"
+                              " the line would be gone). Leave his lines as they are and where they"
+                              " are, and keep new text out of the middle of his paragraphs.")
+                  :refused "degrades-owner-lines"
                   :item-id (:id item)
-                  :item-title (:title item)}))
+                  :item-title (:title item)
+                  :degraded degraded}))
+
+(defn- degradations
+  [db id description]
+  (provenance/degradations (:versions (datastore/get-description-history db {:id id}))
+                           description))
+
+(defn- write-without-degrading-impl
+  "The description door's write. Asked again inside the transaction that writes,
+  so what is checked is what is written over: a version that landed between the
+  gate's look and this one is part of the history this one reads, and if it
+  makes the answer no, the answer is no."
+  [db item description]
+  (try (let [result (db/with-transaction [tx db]
+                      (let [degraded (degradations tx (:id item) description)]
+                        (if (seq degraded)
+                          {:refusal (degradation-refusal item degraded)}
+                          {:updated (datastore/update-context-description
+                                      tx
+                                      {:id (:id item) :description description}
+                                      "api")})))]
+         (or (:refusal result)
+             (let [updated (:updated result)]
+               ;; Outside the transaction: it calls out to Ollama, and a write
+               ;; lock is not something to hold across a network round trip.
+               (embed-item-best-effort! db updated)
+               (json-response (item->api updated)))))
+       (catch Exception e
+         (log/error e "REST API: update-item-description failed")
+         (json-response 500 {:error (.getMessage e)}))))
 
 (defn update-item-description
   "PUT /api/items/:id — replace an item's description. JSON body: {\"description\"}.
   404 if the item does not exist.
 
-  Gated by recording mode, with a door beside the one POST /api/items has: when
-  a context carrying the human-readable id \"imports\" exists and the item being
-  written to has no description yet, the write goes through with the gate still
-  shut. Both halves are the same idea as over there — through a door you may add
-  and only add. An item that already has a description is not writable this way
-  at all, so nothing a caller sends can displace text that is already in the
-  graph, and the gate has to be opened from the app to replace one.
+  Gated by recording mode, with two doors. Through either you may only add, in
+  the sense that nothing of the owner's is worth less afterwards.
 
-  Trying it anyway is answered with 409 {\"collision\": true} rather than the
-  dropped-write stub, so a caller can tell a standing refusal from a gate that
-  happens to be shut, and stop instead of sending it again. The stub is still
-  what a request gets when it is only gated — an item with no description and no
-  context carrying the handle, where there is no door rather than a refusal.
+  The import door: when a context carrying the human-readable id \"imports\"
+  exists and the item has no description yet, the description is written and
+  the item is also filed under \"imports\", if it is not already, so what came
+  in from outside turns up where the rest of it does.
 
-  An item written through the door is also filed under \"imports\", if it is not
-  already, so what came in from outside turns up where the rest of it does. That
-  happens on the door path alone: with recording on this endpoint replaces a
-  description and touches nothing else."
+  The description door: otherwise, the description is written when it lowers
+  no line of the owner's — every line of his in the current description is still
+  there afterwards and none would be read with less caution than now. Changing a
+  line of his counts as removing it; so does moving it; one line put into the
+  middle of a stretch of his lowers every line of his in that stretch; a
+  recurring line of his (a blank one) between two rewritten neighbours counts as
+  gone. Appending, and rewriting stretches no hand of his is in, go through.
+  This door files nothing and needs no \"imports\" context. The check and the
+  write share one transaction.
+
+  A description this door turns away is answered 409 {\"refused\":
+  \"degrades-owner-lines\", \"degraded\": [{\"line\", \"text\", \"before\",
+  \"after\"}]}, \"after\" null for a line that would be gone, \"line\" one-based in
+  the description as it stands. That is a standing refusal: changing what the
+  owner wrote is done in the app. There is no plain drop on this endpoint: with
+  the gate shut a description either goes through a door or is refused.
+
+  Both doors are logged with gate-bypassed. With recording on this endpoint
+  replaces a description and touches nothing else."
   [db id req]
   (try (let [id (Integer/parseInt id)
              {:keys [description]} (parse-json-body req)]
@@ -239,26 +276,28 @@
                    ;; Looked up at most once, and not at all unless the gate is
                    ;; shut and something asks — the common path does not pay for
                    ;; it, and the answer is wanted twice on the path that does.
-                   imports-id (delay (imports-context-id db))]
-               (if-not item
+                   imports-id (delay (imports-context-id db))
+                   import-door? (delay (boolean (and @imports-id
+                                                     (str/blank? (:description item)))))
+                   ;; The gate's look. The write looks again, in its transaction.
+                   degraded (delay (degradations db id description))]
+               (if (nil? (:id item))
                  (json-response 404 {:error "Item not found"})
-                 (mw/log-and-guard
-                   "update-item-description"
-                   {:id id :title (:title item) :description-length (count description)}
-                   ;; Reached only with the gate shut and the door unopened, so
-                   ;; the two cases can be told apart here rather than by asking
-                   ;; a second time how the gate stands. A non-empty description
-                   ;; is what closes the door, and it is the refusal; anything
-                   ;; else is an ordinary drop.
-                   (if (str/blank? (:description item))
-                     (json-response (item->api (assoc item :description description)))
-                     (description-refusal item))
-                   (fn [] (and @imports-id (str/blank? (:description item))))
-                   (fn [bypassed?]
-                     (update-item-description-impl db
-                                                   id
-                                                   description
-                                                   (when bypassed? @imports-id))))))))
+                 ;; The dropped response is a delay, and `force` takes it out at
+                 ;; the end: it is the refusal, and working out a refusal costs
+                 ;; the history and the alignment, which an open gate should not
+                 ;; pay for. `force` hands any other answer back unchanged.
+                 (force
+                   (mw/log-and-guard
+                     "update-item-description"
+                     {:id id :title (:title item) :description-length (count description)}
+                     (delay (degradation-refusal item @degraded))
+                     (fn [] (or @import-door? (empty? @degraded)))
+                     (fn [bypassed?]
+                       (cond
+                         (not bypassed?) (update-item-description-impl db id description nil)
+                         @import-door? (update-item-description-impl db id description @imports-id)
+                         :else (write-without-degrading-impl db item description)))))))))
        (catch NumberFormatException _ (json-response 400 {:error "Invalid item ID"}))))
 
 (defn- imports-handle?
@@ -610,7 +649,9 @@
 
 (defn ^:no-describe toggle-recording-mode
   "POST /api/recording-mode/toggle — toggle the write-gate. While ON, mutating
-  endpoints execute; while OFF they log intent and return 403 {:dropped true}.
+  endpoints execute; while OFF they log intent and answer with a 2xx stub
+  shaped like the endpoint's success, except where a door lets them through or a
+  door refuses them with 409.
   Prefer the in-app shortcut Option+Shift+W for day-to-day toggling."
   []
   (let [now (mw/toggle!)]

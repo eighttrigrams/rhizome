@@ -47,16 +47,20 @@ ${CLAUDE_SKILL_DIR}/scripts/rhizome-cli.sh 3006 /describe | jq
 
 ## Writing and the recording gate
 
-`POST /api/contexts`, `POST /api/items`, and `PUT /api/items/:id` all first
-log the intended action, then either execute (when recording is on) or drop the
-request with `403 {"dropped":true,"recording":false,"intent":"..."}`.
+Every mutating endpoint first logs the intended action, then either executes
+(when recording is on) or drops the request. A drop is not an error status: each
+endpoint answers with a stub in the shape of its success, `2xx` — `POST
+/api/items` `201 {"created":true}`, `PUT /api/relations` `200` with the source
+item as it stands, `POST /api/backfill/embeddings` `200 {"dry-run":true}`, `POST
+…/related/delete` `200 {"dropped":true}`. Nothing in the answer says it was
+dropped except the stub's shape; the log says it.
 
 To enable recording: inside the running Rhizome app, press **Option+Shift+W**.
 A red ⚠ REC badge appears in the top-left corner while the mode is active.
 Toggle it off with the same shortcut. Every attempted write is logged to
 `rhizome/rhizome.log` regardless of whether it was executed or dropped.
 
-Four endpoints have a door in the shut gate. All are logged with
+Four endpoints have doors in the shut gate. All are logged with
 `gate-bypassed=true` on the intent line, so that is what to grep for when a
 write appears that the badge says should not have. The two import doors go by
 the handle and not by the title, and nothing creates the `imports` context with
@@ -65,10 +69,24 @@ at all.
 
 - `POST /api/items` — when `context-ids` names `imports`, the item is written
   with recording off, whatever else is named alongside.
-- `PUT /api/items/:id` — when the item has **no description yet**, the
-  description is written with recording off, and the item is also filed under
-  `imports`. Filing under `imports` happens on the door path only — with
-  recording on, the endpoint replaces the description and touches nothing else.
+- `PUT /api/items/:id` — two doors.
+  - Import door: when the item has **no description yet** and `imports`
+    exists, the description is written with recording off, and the item is
+    also filed under `imports`. Filing under `imports` happens on this path
+    only — with recording on, the endpoint replaces the description and
+    touches nothing else.
+  - Description door: otherwise, the description is written when **no line of
+    the owner's degrades** (`provenance/degradations` over
+    `et.uvt.caution/degradations`): each of his lines still there, none with
+    lower caution than now. Files nothing, needs no `imports`. Check and write
+    in one transaction. Appending and rewriting agent-only stretches pass.
+    Refused: changing a line of his (= gone, and the new line lowers the rest
+    of its island); moving one (= gone); one line inserted into his paragraph
+    (every line of his in that island is reported, also far ones); a
+    recurring line of his, e.g. a blank, between two rewritten neighbours
+    (gone). Known gap: a block of an agent's bigger than the island piece it
+    cuts off becomes its own island, nothing reported. An empty current
+    description has nothing of his to lower.
 - `POST /api/contexts` — always, with recording off: a new context rewrites
   nothing. Refused (`409 {"refused":"imports-handle"}`) when
   `human-readable-id` is `imports`.
@@ -83,18 +101,18 @@ at all.
   item is already in answers 200 with `"unchanged": true`.
 
 Through a door you may add and only add. That is what makes them safe to leave
-open, and it is why both refuse rather than update:
+open, and it is why they refuse rather than update:
 
 | situation | answer |
 |---|---|
 | `POST` names a URL already in the graph | `409 {"collision":true,"existing-item-id":…}` |
-| `PUT` at an item that already has a description, gate shut | `409 {"collision":true,"item-id":…}` |
+| `PUT /api/items/:id`, gate shut, would lower a line of the owner's | `409 {"refused":"degrades-owner-lines","degraded":[{"line","text","before","after"}]}` — `after` null for a line that would be gone, `line` one-based in the current description |
 | `POST /api/contexts` with handle `imports`, gate shut | `409 {"refused":"imports-handle"}` |
 | `PUT …/is-context` true, gate shut, a version of the owner's | `409 {"refused":"not-machine-made"}` |
 | `PUT …/is-context` true, gate shut, the item with handle `imports` | `409 {"refused":"imports-handle"}` |
 | `PUT …/is-context` false, gate shut | `409 {"refused":"demote"}` |
 | `PUT …/is-context` false, a context filed under nothing (any gate) | `409 {"refused":"in-no-context"}` |
-| gated for any other reason | the drop stub — `403 {"dropped":true}`, or for `POST`/`PUT` on items a 2xx echo of what the write would have looked like |
+| gated for any other reason | the endpoint's `2xx` drop stub (see above); `PUT /api/items/:id` has none — with the gate shut it is a door or a refusal |
 
 A 409 is a standing refusal: sending it again changes nothing, and the way
 through is the app. A drop just means the gate is shut right now.

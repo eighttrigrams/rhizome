@@ -91,6 +91,14 @@
   [source]
   (if (str/blank? source) "app" source))
 
+(defn- as-history
+  "`versions` as `et.uvt.caution` wants a history: oldest first, a source on
+  every version (`source-of`), and text where there was none. The reversal is
+  the one `of-versions` explains; it is here so that it is written once."
+  [versions]
+  (mapv (fn [{:keys [text source]}] {:text (or text "") :source (source-of source)})
+        (reverse versions)))
+
 (defn of-versions
   "`{:legend :ranges}` for a description's version history, or nil when there is
   no description to be careful in.
@@ -118,10 +126,7 @@
   [versions]
   (when (and (seq versions) (not (str/blank? (:text (first versions)))))
     {:legend legend
-     :ranges (uvt/assess (mapv (fn [{:keys [text source]}]
-                                 {:text (or text "") :source (source-of source)})
-                               (reverse versions))
-                         {:ours ours})}))
+     :ranges (uvt/assess (as-history versions) {:ours ours})}))
 
 (defn of-item
   "`{:legend :ranges}` for the item's current description, or nil when it has
@@ -179,3 +184,33 @@
   [versions]
   (boolean (and (seq versions)
                 (every? #(not (contains? ours (source-of (:source %)))) versions))))
+
+(defn degradations
+  "The owner's lines in the current description that writing `text` through the
+  REST API would make worse, as `uvt/degradations` reports them: one
+  `{:line :text :before :after}` each, `:line` one-based in the current text,
+  `:after` nil for a line that would be gone. Empty means the write lowers
+  nothing of his.
+
+  `versions` is what `ds/get-description-history` returns, newest first, read
+  the way `of-versions` reads it: reversed, blanks as his, missing text as \"\".
+  The candidate is stamped \"api\", because that is how the write would land.
+
+  What counts as worse is the library's business and is not restated here, but
+  a refusal reads oddly without it, so in short: a changed line of his is gone
+  (a diff is a delete and an insert) and the new line lowers the rest of its
+  paragraph-sized island; a moved line is gone; one line of an agent's put into
+  the middle of his stretch lowers every line of his in that stretch, near or
+  far; and a line he repeats, a blank one say, between two rewritten neighbours
+  is gone too. A block of the agent's bigger than the piece of his island it
+  cuts off is the one thing that slips through: it becomes an island of its own
+  and nothing is reported.
+
+  An empty current description answers `[]`, as it answers nil in `of-versions`:
+  there is no line of his in it to lower. Handed over as it is, the library reads
+  \"\" as one blank line of whoever wrote it last, and an item he left without a
+  description would refuse every first description written onto it."
+  [versions text]
+  (if (str/blank? (:text (first versions)))
+    []
+    (uvt/degradations (as-history versions) {:text text :source "api"} {:ours ours})))
