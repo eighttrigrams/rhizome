@@ -52,7 +52,22 @@
    else that takes the focus is overruled. The case that needs it: the player's
    QR overlay hands the focus to #main-layer when it closes -- right when no
    viewer is up, and with one up it would put the hidden app's single-key
-   shortcuts under the keyboard."
+   shortcuts under the keyboard.
+
+   And the viewer's own keys follow it where the focus goes outside it. Into
+   the player, a click on one of its buttons leaves the focus on that button,
+   where ← → and Escape mean nothing and never reach the viewer; and its X
+   takes itself away and leaves the focus on <body>, where no focusin fires
+   and nothing listens. Either way the viewer's keys were dead until it was
+   clicked. So while it is up the viewer also takes ← → and Escape that come
+   from the player, and every key that arrives at <body>, and the focus back
+   with them. Other keys on a player button, Enter and Space, stay the
+   button's. Not by keeping the player's controls from taking the focus: they
+   are the player's, and its drag depends on how the pointer is held.
+
+   Both listeners are made per mount and removed as the same functions. Put on
+   by name, a hot reload in between would have the unmount remove the new
+   definition and leave the old one on document for good."
   (:require [clojure.string :as str]
             [reagent.core :as r]))
 
@@ -107,87 +122,107 @@
   [e]
   (let [target (.-target e)]
     (when-not (and (instance? js/Element target) (.closest target focus-may-be-in))
-      (when-let [el (.getElementById js/document "image-viewer")] (.focus el)))))
+      (focus-viewer!))))
+
+(defn- handle-key!
+  "The viewer's keys, against the list as it is now. Every key is stopped, not
+   only the ones used here: while the viewer is up the app underneath must take
+   no keystrokes at all. Tab is held too. The overlay stops the mouse and
+   nothing else (cookbook #39), so a Tab let through walks the focus out to
+   controls behind it that nobody can see."
+  [*state e]
+  (.stopPropagation e)
+  (let [imgs (images (:items @*state))
+        idx (index-of imgs @*open)]
+    (case (.-code e)
+      "Escape" (do (.preventDefault e) (close!))
+      "ArrowLeft" (do (.preventDefault e) (step! imgs idx -1))
+      "ArrowRight" (do (.preventDefault e) (step! imgs idx 1))
+      "Tab" (.preventDefault e)
+      nil)))
+
+(defn- focus-viewer! []
+  (when-let [el (.getElementById js/document "image-viewer")] (.focus el)))
 
 (defn- src [file] (str "/imgs/" (js/encodeURIComponent file)))
 
 (defn- overlay
-  [_*state]
-  (r/create-class
-    {;; Focused on mount so the keys arrive here at all -- the same move
-     ;; ui.qr-overlay makes, for the same reason: unfocused, ← → and Escape go to
-     ;; #main-layer, whose single-key shortcuts would act on the list behind.
-     :component-did-mount (fn [_]
-                            (.addEventListener js/document "focusin" keep-focus!)
-                            (when-let [el (.getElementById js/document "image-viewer")] (.focus el)))
-     ;; And handed back, or the app is left deaf on <body> once this is gone --
-     ;; after the guard is down, or the guard would take it straight back.
-     :component-will-unmount (fn [_]
-                               (.removeEventListener js/document "focusin" keep-focus!)
-                               (when-let [el (.getElementById js/document "main-layer")]
-                                 (.focus el)))
-     :reagent-render
-       (fn [*state]
-         (let [{:keys [file title] :as open} @*open
-               imgs (images (:items @*state))
-               idx (index-of imgs open)
-               title (or (not-empty (:title (:item (get imgs idx)))) (not-empty title) file)
-               prev? (and idx (pos? idx))
-               next? (and idx (< (inc idx) (count imgs)))
-               stop (fn [e] (.stopPropagation e))]
-           [:div#image-viewer
-            {:tabIndex 0
-             :role "dialog"
-             :aria-modal "true"
-             :aria-label "Image viewer"
-             ;; Every key is stopped, not only the ones used here: while this is
-             ;; up the app underneath must take no keystrokes at all. Tab is
-             ;; held too. The overlay stops the mouse and nothing else (cookbook
-             ;; #39), so a Tab let through walks the focus out to controls
-             ;; behind it that nobody can see.
-             :on-key-down (fn [e]
-                            (.stopPropagation e)
-                            (case (.-code e)
-                              "Escape" (do (.preventDefault e) (close!))
-                              "ArrowLeft" (do (.preventDefault e) (step! imgs idx -1))
-                              "ArrowRight" (do (.preventDefault e) (step! imgs idx 1))
-                              "Tab" (.preventDefault e)
-                              nil))
-             :on-click (fn [e] (stop e) (close!))}
-            [:div.image-viewer-frame
-             [:img.image-viewer-image
-              ;; Clicking the picture itself does not close it; only around it.
-              {:src (src file) :alt title :on-click stop}]]
-            [:div.image-viewer-bar
-             {:on-click stop
-              ;; A pressed button would otherwise take the focus, and the one
-              ;; at the end of the row turns disabled under it -- which drops
-              ;; the focus to <body>, and ← → and Escape with it.
-              :on-mouse-down #(.preventDefault %)}
-             ;; Nothing to step with for an image that is not in the list: a
-             ;; position of "- / n" and two dead buttons would only say so.
-             (when idx
-               [:button.image-viewer-prev
-                {:type "button"
-                 :title "Previous image (←)"
-                 :aria-label "Previous image"
-                 :disabled (not prev?)
-                 :on-click (fn [e] (stop e) (step! imgs idx -1))} "‹"])
-             (when idx [:span.image-viewer-position (str (inc idx) " / " (count imgs))])
-             [:span.image-viewer-title title]
-             (when idx
-               [:button.image-viewer-next
-                {:type "button"
-                 :title "Next image (→)"
-                 :aria-label "Next image"
-                 :disabled (not next?)
-                 :on-click (fn [e] (stop e) (step! imgs idx 1))} "›"])]
-            [:button.image-viewer-close
-             {:type "button"
-              :on-mouse-down #(.preventDefault %)
-              :title "Close (Esc)"
-              :aria-label "Close the image viewer"
-              :on-click (fn [e] (stop e) (close!))} "✕"]]))}))
+  [*state]
+  (let [;; This mount's own two, so that what is removed is what was added.
+        on-focusin (fn [e] (keep-focus! e))
+        on-stray-key (fn [e]
+                       (let [target (.-target e)]
+                         (when (or (identical? target (.-body js/document))
+                                   (and (instance? js/Element target)
+                                        (.closest target "#floating-player")
+                                        (#{"Escape" "ArrowLeft" "ArrowRight"} (.-code e))))
+                           (focus-viewer!)
+                           (handle-key! *state e))))]
+    (r/create-class
+      {;; Focused on mount so the keys arrive here at all -- the same move
+       ;; ui.qr-overlay makes, for the same reason: unfocused, ← → and Escape go to
+       ;; #main-layer, whose single-key shortcuts would act on the list behind.
+       :component-did-mount (fn [_]
+                              (.addEventListener js/document "focusin" on-focusin)
+                              (.addEventListener js/document "keydown" on-stray-key)
+                              (focus-viewer!))
+       ;; And handed back, or the app is left deaf on <body> once this is gone --
+       ;; after the guards are down, or the focus one would take it straight back.
+       :component-will-unmount (fn [_]
+                                 (.removeEventListener js/document "focusin" on-focusin)
+                                 (.removeEventListener js/document "keydown" on-stray-key)
+                                 (when-let [el (.getElementById js/document "main-layer")]
+                                   (.focus el)))
+       :reagent-render
+         (fn [*state]
+           (let [{:keys [file title] :as open} @*open
+                 imgs (images (:items @*state))
+                 idx (index-of imgs open)
+                 title (or (not-empty (:title (:item (get imgs idx)))) (not-empty title) file)
+                 prev? (and idx (pos? idx))
+                 next? (and idx (< (inc idx) (count imgs)))
+                 stop (fn [e] (.stopPropagation e))]
+             [:div#image-viewer
+              {:tabIndex 0
+               :role "dialog"
+               :aria-modal "true"
+               :aria-label "Image viewer"
+               :on-key-down #(handle-key! *state %)
+               :on-click (fn [e] (stop e) (close!))}
+              [:div.image-viewer-frame
+               [:img.image-viewer-image
+                ;; Clicking the picture itself does not close it; only around it.
+                {:src (src file) :alt title :on-click stop}]]
+              [:div.image-viewer-bar
+               {:on-click stop
+                ;; A pressed button would otherwise take the focus, and the one
+                ;; at the end of the row turns disabled under it -- which drops
+                ;; the focus to <body>, and ← → and Escape with it.
+                :on-mouse-down #(.preventDefault %)}
+               ;; Nothing to step with for an image that is not in the list: a
+               ;; position of "- / n" and two dead buttons would only say so.
+               (when idx
+                 [:button.image-viewer-prev
+                  {:type "button"
+                   :title "Previous image (←)"
+                   :aria-label "Previous image"
+                   :disabled (not prev?)
+                   :on-click (fn [e] (stop e) (step! imgs idx -1))} "‹"])
+               (when idx [:span.image-viewer-position (str (inc idx) " / " (count imgs))])
+               [:span.image-viewer-title title]
+               (when idx
+                 [:button.image-viewer-next
+                  {:type "button"
+                   :title "Next image (→)"
+                   :aria-label "Next image"
+                   :disabled (not next?)
+                   :on-click (fn [e] (stop e) (step! imgs idx 1))} "›"])]
+              [:button.image-viewer-close
+               {:type "button"
+                :on-mouse-down #(.preventDefault %)
+                :title "Close (Esc)"
+                :aria-label "Close the image viewer"
+                :on-click (fn [e] (stop e) (close!))} "✕"]]))})))
 
 (defn component
   "Mounted once, from ui/component."
