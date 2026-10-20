@@ -118,6 +118,9 @@
   "The viewer itself, the floating player above it, and the player's QR overlay."
   "#image-viewer, #floating-player, #qr-overlay")
 
+(defn- focus-viewer! []
+  (when-let [el (.getElementById js/document "image-viewer")] (.focus el)))
+
 (defn- keep-focus!
   [e]
   (let [target (.-target e)]
@@ -140,9 +143,6 @@
       "ArrowRight" (do (.preventDefault e) (step! imgs idx 1))
       "Tab" (.preventDefault e)
       nil)))
-
-(defn- focus-viewer! []
-  (when-let [el (.getElementById js/document "image-viewer")] (.focus el)))
 
 (defn- src [file] (str "/imgs/" (js/encodeURIComponent file)))
 
