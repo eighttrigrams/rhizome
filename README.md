@@ -148,6 +148,8 @@ $ make e2e NO_BUILD=1 T="creates a context"      # iterate fast on one scenario
 
 Both work on the host system and in the Docker containers.
 
+The image viewer scenarios call the `sqlite3` CLI (a prerequisite above) to give their items a file, writing straight into `test/rhizome-e2e.db`: no route sets one.
+
 ## Package, deploy and run
 
 **Two processes out of one jar**, both started from the deploy directory: the

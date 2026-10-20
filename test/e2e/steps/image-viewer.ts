@@ -5,7 +5,7 @@ import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { settle } from "../settle";
 
-const { When, Then } = createBdd();
+const { When, Then, AfterAll } = createBdd();
 
 const repoRoot = path.resolve(__dirname, "../../..");
 
@@ -55,6 +55,20 @@ function stamp() {
   return new Date(Date.UTC(2099, 0, 1) + made * 1000).toISOString().slice(0, 19).replace("T", " ");
 }
 
+// The app as it read when the viewer opened, to tell whether a key got through.
+let behind: string | null = null;
+
+//
+// Past the hover preview's 300ms grace first. The viewer comes up under the
+// pointer, so the card it was opened from sees the pointer leave, and the lhs
+// lets go of that card's preview 300ms later (on-mouse-leave in
+// ui.main.rhs.items-list-items) -- a change behind the viewer that no key made.
+async function rememberBehind(page: any) {
+  await page.waitForTimeout(400);
+  await settle(page);
+  behind = await page.locator("#main-layer").innerText();
+}
+
 // Every image the viewer showed in this scenario, by file.
 let shown: string[] = [];
 
@@ -67,45 +81,105 @@ function card(page: any, title: string) {
   return page.locator("#rhs-component li.item-card").filter({ hasText: title }).first();
 }
 
+// Every fixture image written, so it can be taken away again: the folder is the
+// dev one, and a dev session should not find the suite's pictures in it.
+const written = new Set<string>();
+
+AfterAll(() => {
+  for (const f of written) fs.rmSync(f, { force: true });
+  written.clear();
+});
+
+// A string as an SQL literal. The values come from the feature file, and a
+// title or a file name with an apostrophe would otherwise end the literal.
+function sql(text: string) {
+  return `'${text.replace(/'/g, "''")}'`;
+}
+
+async function makeItem(request: any, contextTitle: string, title: string, file?: string) {
+  const found = await request.get(`/api/items?q=${encodeURIComponent(contextTitle)}`);
+  expect(found.ok(), `searching for "${contextTitle}" failed`).toBeTruthy();
+  const context = (await found.json())
+    .find((i: any) => i.title === contextTitle && i["is-context"]);
+  expect(context, `no context titled "${contextTitle}"`).toBeTruthy();
+  const resp = await request.post("/api/items", {
+    data: { title, "context-ids": [context.id], reason: "e2e test setup" },
+  });
+  expect(resp.status(), await resp.text()).toBe(201);
+  const { id } = await resp.json();
+  const at = sql(stamp());
+  // Only an import sets an item's file (et.rz.hub.repository.insertion.file),
+  // and no route reaches that, so the link goes into the row directly.
+  const data = file
+    ? `data = json_set(coalesce(data, '{}'), '$."resource-links".file', ${sql(file)}),`
+    : "";
+  execFileSync("sqlite3", [
+    e2eDb,
+    `UPDATE items SET ${data} updated_at = ${at}, updated_at_ctx = ${at} WHERE id = ${Number(id)};`,
+  ]);
+  if (file && !file.endsWith(".pdf")) {
+    fs.mkdirSync(imagesFolder, { recursive: true });
+    const target = path.join(imagesFolder, file);
+    fs.writeFileSync(target, PNG);
+    written.add(target);
+  }
+  shown = [];
+}
+
 When(
   "{string} holds an item {string} with the file {string}",
-  async ({ request }, contextTitle: string, title: string, file: string) => {
-    const found = await request.get(`/api/items?q=${encodeURIComponent(contextTitle)}`);
-    expect(found.ok(), `searching for "${contextTitle}" failed`).toBeTruthy();
-    const context = (await found.json())
-      .find((i: any) => i.title === contextTitle && i["is-context"]);
-    expect(context, `no context titled "${contextTitle}"`).toBeTruthy();
-    const resp = await request.post("/api/items", {
-      data: { title, "context-ids": [context.id], reason: "e2e test setup" },
-    });
-    expect(resp.status(), await resp.text()).toBe(201);
-    const { id } = await resp.json();
-    const at = stamp();
-    // Only an import sets an item's file (et.rz.hub.repository.insertion.file),
-    // and no route reaches that, so the link goes into the row directly.
-    execFileSync("sqlite3", [
-      e2eDb,
-      `UPDATE items SET data = json_set(coalesce(data, '{}'), '$."resource-links".file', '${file}'),
-                        updated_at = '${at}', updated_at_ctx = '${at}'
-        WHERE id = ${Number(id)};`,
-    ]);
-    if (!file.endsWith(".pdf")) {
-      fs.mkdirSync(imagesFolder, { recursive: true });
-      fs.writeFileSync(path.join(imagesFolder, file), PNG);
-    }
-    shown = [];
-  },
+  async ({ request }, contextTitle: string, title: string, file: string) =>
+    makeItem(request, contextTitle, title, file),
+);
+
+When(
+  "{string} holds an item {string} with no file",
+  async ({ request }, contextTitle: string, title: string) =>
+    makeItem(request, contextTitle, title),
 );
 
 When("I click the green badge of {string}", async ({ page }, title: string) => {
   await watchOpens(page);
   await card(page, title).locator(".badge", { hasText: "🟢" }).click();
   await settle(page);
+  await rememberBehind(page);
 });
 
 When("I Option+click the green badge of {string}", async ({ page }, title: string) => {
   await watchOpens(page);
   await card(page, title).locator(".badge", { hasText: "🟢" }).click({ modifiers: ["Alt"] });
+  await settle(page);
+});
+
+When("{string} is a context", async ({}, title: string) => {
+  execFileSync("sqlite3", [e2eDb, `UPDATE items SET is_context = 1 WHERE title = ${sql(title)};`]);
+});
+
+// The ⭕ on the item's card in the list, which selects it as the context.
+When("I open the context {string} from the list", async ({ page }, title: string) => {
+  await page.locator("#rhs-component li.item-card")
+    .filter({ has: page.locator("p", { hasText: new RegExp(`^${title}$`) }) }).first()
+    .locator(".badge", { hasText: "⭕" }).click();
+  await page.waitForLoadState("networkidle");
+  await settle(page);
+  // Off the cards: a pointer left over one keeps its hover preview standing in
+  // the lhs, in place of the selected context's card.
+  await page.mouse.move(1, 1);
+  await settle(page);
+});
+
+When("I click the green badge of {string} in the lhs", async ({ page }, title: string) => {
+  await watchOpens(page);
+  await page.locator("#lhs-component li.item-card").filter({ hasText: title }).first()
+    .locator(".badge", { hasText: "🟢" }).click();
+  await settle(page);
+});
+
+// The card at the second place the item stands, for an item listed twice.
+When("I click the green badge of the 2nd {string}", async ({ page }, title: string) => {
+  await watchOpens(page);
+  await page.locator("#rhs-component li.item-card").filter({ hasText: title }).nth(1)
+    .locator(".badge", { hasText: "🟢" }).click();
   await settle(page);
 });
 
@@ -192,8 +266,10 @@ Then("the focus should still be in the image viewer", async ({ page }) => {
   expect(inside).toBe(true);
 });
 
-Then("there should be no search input", async ({ page }) => {
-  await expect(page.locator("#search-input")).toHaveCount(0);
+Then("the app behind the viewer should be as it was", async ({ page }) => {
+  expect(behind, "nothing was remembered when the viewer opened").not.toBeNull();
+  await settle(page);
+  expect(await page.locator("#main-layer").innerText()).toBe(behind);
 });
 
 Then(
@@ -202,3 +278,23 @@ Then(
     await expect.poll(() => opened.get(page)).toContain(file);
   },
 );
+
+Then("the viewer should show the title {string}", async ({ page }, title: string) => {
+  await expect(page.locator(".image-viewer-title")).toHaveText(title);
+});
+
+Then("the viewer should offer no stepping", async ({ page }) => {
+  await expect(page.locator(".image-viewer-prev")).toHaveCount(0);
+  await expect(page.locator(".image-viewer-next")).toHaveCount(0);
+  await expect(page.locator(".image-viewer-position")).toHaveCount(0);
+});
+
+// What is painted in the middle of the code, not what is in the DOM: the code
+// can be there and still be drawn under the viewer.
+Then("the QR code should be in front of the image viewer", async ({ page }) => {
+  const box = (await page.locator(".qr-overlay-code").boundingBox())!;
+  const onTop = await page.evaluate(([x, y]) =>
+    !!document.elementFromPoint(x, y)?.closest("#qr-overlay"),
+    [box.x + box.width / 2, box.y + box.height / 2]);
+  expect(onTop, "the image viewer is covering the QR code").toBe(true);
+});
