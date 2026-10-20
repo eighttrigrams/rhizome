@@ -1128,3 +1128,103 @@ body:has(#qr-overlay) .floating-player-qr {
     white-space: pre-wrap;
     overflow-wrap: anywhere;
 }
+
+/* The image viewer (ui.image-viewer). It leaves the same 20px on every side as
+   the enlarged floating player, under the top strip, so the two big things the
+   app opens look like one family. Dark rather than milky like the QR overlay:
+   this is for looking at a picture, and the list behind would only compete.
+
+   z-index 2002: above the modal layer (1010/1011), the discard dialog (2000)
+   and the QR overlay (2001); below the floating player (10002), so a video
+   started earlier goes on playing in its corner over the picture, the way it
+   does over everything else. */
+#image-viewer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    z-index: 2002;
+    background-color: rgba(0, 0, 0, 0.92);
+    outline: none;
+    cursor: zoom-out;
+}
+
+.image-viewer-frame {
+    position: absolute;
+    top: calc(20px + var(--top-strip-height));
+    left: 20px;
+    right: 20px;
+    bottom: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* contain: the whole picture, at the largest size that fits the frame. */
+.image-viewer-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    cursor: default;
+}
+
+.image-viewer-bar {
+    position: absolute;
+    left: 20px;
+    right: 20px;
+    bottom: 14px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    color: #cbc9b5;
+    cursor: default;
+}
+
+.image-viewer-position {
+    font-variant-numeric: tabular-nums;
+    color: #8f8d7d;
+}
+
+.image-viewer-title {
+    max-width: 60vw;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.image-viewer-prev,
+.image-viewer-next,
+.image-viewer-close {
+    width: 36px;
+    height: 36px;
+    font-size: 20px;
+    line-height: 1;
+    color: #cbc9b5;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.image-viewer-close {
+    position: absolute;
+    top: calc(16px + var(--top-strip-height));
+    right: 20px;
+    font-size: 18px;
+}
+
+.image-viewer-prev:hover:not(:disabled),
+.image-viewer-next:hover:not(:disabled),
+.image-viewer-close:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.image-viewer-prev:disabled,
+.image-viewer-next:disabled {
+    opacity: 0.3;
+    cursor: default;
+}

@@ -1,6 +1,7 @@
 (ns ui
   (:require [reagent.core :as r]
             [ui.floating-player :as floating-player]
+            [ui.image-viewer :as image-viewer]
             [ui.key-handler :as key-handler]
             [ui.main :as main]
             [ui.modals :as modals]
@@ -98,4 +99,5 @@
                  ;; unmounts. Its iframe reloads the moment it is moved in the
                  ;; DOM, so the one place it can be mounted from is one that is
                  ;; up for as long as the page is -- which is this list.
-                 [floating-player/component *state]])})))
+                 [floating-player/component *state]
+                 [image-viewer/component *state]])})))

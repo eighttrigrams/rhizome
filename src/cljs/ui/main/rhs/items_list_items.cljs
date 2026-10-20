@@ -222,5 +222,5 @@
                  item)})
           (when (and (:selected-item @*state) rhs? (not= (:sort_idx item) -1))
             {:number {:number (utils/sort-idx->display (:sort_idx item))}})
-          (when-let [file (:file (:resource-links (:data item)))] {:file {:file file}})
+          (when-let [file (:file (:resource-links (:data item)))] {:file {:file file :id (:id item)}})
           (:contexts (:data item))))]]]])
