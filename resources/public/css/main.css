@@ -1228,3 +1228,11 @@ body:has(#qr-overlay) .floating-player-qr {
     opacity: 0.3;
     cursor: default;
 }
+
+/* The floating player stays above the image viewer, and its QR button with it,
+   so a code can be opened from there while a picture is up. The QR overlay is
+   at 2001, under the viewer's 2002; with a viewer up it has to come forward or
+   it opens drawn underneath it. */
+body:has(#image-viewer) #qr-overlay {
+    z-index: 2003;
+}

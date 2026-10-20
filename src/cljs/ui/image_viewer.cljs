@@ -34,11 +34,25 @@
    namespace's rather than the component's own; defonce, so a hot reload does
    not drop it.
 
-   What is kept is the item's id and its file, not a position: a position goes
-   stale the moment the list changes, while the id finds the item again wherever
-   it moved to. The file is kept as well so an item that has dropped out of the
-   list stays on screen instead of the viewer blanking -- it is just no longer
-   anywhere to step from."
+   What is kept is the item's id, its place in the list and its file. The place
+   because an id is not enough to say which card was meant: hierarchy mode lists
+   a node once per path, so one item can stand twice in one list, and found by
+   id alone the second copy was the first again -- Next from it jumped back, and
+   whatever came after it could not be reached. The id because the place goes
+   stale when the list changes: if the item is no longer at its place, the
+   viewer falls back to wherever the id first is. The file and the title so an
+   item that is not in the list at all -- the green badge is on the left-hand
+   cards too, whose item is usually not among the ones listed on the right --
+   is still shown, alone, with nothing offered to step to.
+
+   ## Where the focus may go while it is up
+
+   Only into the viewer and into the floating player, which sits above it on
+   purpose and whose controls, and QR overlay, are there to be used. Anything
+   else that takes the focus is overruled. The case that needs it: the player's
+   QR overlay hands the focus to #main-layer when it closes -- right when no
+   viewer is up, and with one up it would put the hidden app's single-key
+   shortcuts under the keyboard."
   (:require [clojure.string :as str]
             [reagent.core :as r]))
 
@@ -55,24 +69,45 @@
 (defn- file-of [item] (:file (:resource-links (:data item))))
 
 (defn open!
-  "Show `file`, the image of the item `id`."
-  [id file]
-  (reset! *open {:id id :file file}))
+  "Show `file`, the image of the item `id` called `title`, which stands at
+   `pos` in the list -- nil for a card that is not one of the list's."
+  [{:keys [id file title pos]}]
+  (reset! *open {:id id :file file :title title :pos pos}))
 
 (defn close! [] (reset! *open nil))
 
 (defn open? [] (some? @*open))
 
 (defn images
-  "The items of `items` that have an image file, in their order."
+  "The items of `items` that have an image file, in their order, each with
+   the place it stands at in `items`."
   [items]
-  (filterv (comp image-file? file-of) items))
+  (into [] (keep-indexed (fn [pos item] (when (image-file? (file-of item)) {:pos pos :item item})))
+        items))
+
+(defn- index-of
+  "Where in `imgs` the open image is: at its own place if the list still has
+   the item there, else wherever the item first is, else nowhere."
+  [imgs {:keys [id pos]}]
+  (let [at (fn [pred] (first (keep-indexed (fn [i img] (when (pred img) i)) imgs)))]
+    (or (when pos (at #(and (= pos (:pos %)) (= id (:id (:item %))))))
+        (at #(= id (:id (:item %)))))))
 
 (defn- step!
   [imgs idx delta]
   (when idx
-    (when-let [item (get imgs (+ idx delta))]
-      (open! (:id item) (file-of item)))))
+    (when-let [{:keys [pos item]} (get imgs (+ idx delta))]
+      (open! {:id (:id item) :file (file-of item) :title (:title item) :pos pos}))))
+
+(def ^:private focus-may-be-in
+  "The viewer itself, the floating player above it, and the player's QR overlay."
+  "#image-viewer, #floating-player, #qr-overlay")
+
+(defn- keep-focus!
+  [e]
+  (let [target (.-target e)]
+    (when-not (and (instance? js/Element target) (.closest target focus-may-be-in))
+      (when-let [el (.getElementById js/document "image-viewer")] (.focus el)))))
 
 (defn- src [file] (str "/imgs/" (js/encodeURIComponent file)))
 
@@ -83,17 +118,20 @@
      ;; ui.qr-overlay makes, for the same reason: unfocused, ← → and Escape go to
      ;; #main-layer, whose single-key shortcuts would act on the list behind.
      :component-did-mount (fn [_]
+                            (.addEventListener js/document "focusin" keep-focus!)
                             (when-let [el (.getElementById js/document "image-viewer")] (.focus el)))
-     ;; And handed back, or the app is left deaf on <body> once this is gone.
+     ;; And handed back, or the app is left deaf on <body> once this is gone --
+     ;; after the guard is down, or the guard would take it straight back.
      :component-will-unmount (fn [_]
+                               (.removeEventListener js/document "focusin" keep-focus!)
                                (when-let [el (.getElementById js/document "main-layer")]
                                  (.focus el)))
      :reagent-render
        (fn [*state]
-         (let [{:keys [id file]} @*open
+         (let [{:keys [file title] :as open} @*open
                imgs (images (:items @*state))
-               idx (first (keep-indexed (fn [i item] (when (= id (:id item)) i)) imgs))
-               item (when idx (get imgs idx))
+               idx (index-of imgs open)
+               title (or (not-empty (:title (:item (get imgs idx)))) (not-empty title) file)
                prev? (and idx (pos? idx))
                next? (and idx (< (inc idx) (count imgs)))
                stop (fn [e] (.stopPropagation e))]
@@ -119,28 +157,31 @@
             [:div.image-viewer-frame
              [:img.image-viewer-image
               ;; Clicking the picture itself does not close it; only around it.
-              {:src (src file) :alt (or (not-empty (:title item)) file) :on-click stop}]]
+              {:src (src file) :alt title :on-click stop}]]
             [:div.image-viewer-bar
              {:on-click stop
               ;; A pressed button would otherwise take the focus, and the one
               ;; at the end of the row turns disabled under it -- which drops
               ;; the focus to <body>, and ← → and Escape with it.
               :on-mouse-down #(.preventDefault %)}
-             [:button.image-viewer-prev
-              {:type "button"
-               :title "Previous image (←)"
-               :aria-label "Previous image"
-               :disabled (not prev?)
-               :on-click (fn [e] (stop e) (step! imgs idx -1))} "‹"]
-             [:span.image-viewer-position
-              (if idx (str (inc idx) " / " (count imgs)) (str "– / " (count imgs)))]
-             [:span.image-viewer-title (or (not-empty (:title item)) file)]
-             [:button.image-viewer-next
-              {:type "button"
-               :title "Next image (→)"
-               :aria-label "Next image"
-               :disabled (not next?)
-               :on-click (fn [e] (stop e) (step! imgs idx 1))} "›"]]
+             ;; Nothing to step with for an image that is not in the list: a
+             ;; position of "- / n" and two dead buttons would only say so.
+             (when idx
+               [:button.image-viewer-prev
+                {:type "button"
+                 :title "Previous image (←)"
+                 :aria-label "Previous image"
+                 :disabled (not prev?)
+                 :on-click (fn [e] (stop e) (step! imgs idx -1))} "‹"])
+             (when idx [:span.image-viewer-position (str (inc idx) " / " (count imgs))])
+             [:span.image-viewer-title title]
+             (when idx
+               [:button.image-viewer-next
+                {:type "button"
+                 :title "Next image (→)"
+                 :aria-label "Next image"
+                 :disabled (not next?)
+                 :on-click (fn [e] (stop e) (step! imgs idx 1))} "›"])]
             [:button.image-viewer-close
              {:type "button"
               :on-mouse-down #(.preventDefault %)
