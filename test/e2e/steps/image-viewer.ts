@@ -5,7 +5,7 @@ import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { settle } from "../settle";
 
-const { When, Then, AfterAll } = createBdd();
+const { Before, When, Then, AfterAll } = createBdd();
 
 const repoRoot = path.resolve(__dirname, "../../..");
 
@@ -56,15 +56,24 @@ function stamp() {
 }
 
 // The app as it read when the viewer opened, to tell whether a key got through.
+// Reset per scenario, so a check can never be made against the last one's.
 let behind: string | null = null;
 
-//
-// Past the hover preview's 300ms grace first. The viewer comes up under the
+Before(() => {
+  behind = null;
+});
+
+// The lhs hover preview, item or relation: a details panel straight under the
+// lhs that is not the selected context's (.card-shown). The item view would
+// match too; no scenario takes a reading with one open.
+const HOVER_PREVIEW = "#lhs-component > .details-component:not(.card-shown)";
+
+// Taken once the hover preview has gone. The viewer comes up under the
 // pointer, so the card it was opened from sees the pointer leave, and the lhs
 // lets go of that card's preview 300ms later (on-mouse-leave in
 // ui.main.rhs.items-list-items) -- a change behind the viewer that no key made.
 async function rememberBehind(page: any) {
-  await page.waitForTimeout(400);
+  await expect(page.locator(HOVER_PREVIEW)).toHaveCount(0);
   await settle(page);
   behind = await page.locator("#main-layer").innerText();
 }
@@ -142,7 +151,9 @@ When("I click the green badge of {string}", async ({ page }, title: string) => {
   await watchOpens(page);
   await card(page, title).locator(".badge", { hasText: "🟢" }).click();
   await settle(page);
-  await rememberBehind(page);
+  // Only with a viewer up. Without one -- a file that is not an image -- the
+  // pointer is still on the card, and its preview rightly stays.
+  if ((await page.locator("#image-viewer").count()) > 0) await rememberBehind(page);
 });
 
 When("I Option+click the green badge of {string}", async ({ page }, title: string) => {
@@ -278,6 +289,20 @@ Then(
     await expect.poll(() => opened.get(page)).toContain(file);
   },
 );
+
+// Twice, so it ends as it started, small in its corner -- what is under test
+// is where the focus is left, on the button.
+When("I press the player's size button twice", async ({ page }) => {
+  await page.locator(".floating-player-size").click();
+  await page.locator(".floating-player-size").click();
+  await settle(page);
+  expect(await page.evaluate(() => document.activeElement?.className),
+    "the button did not keep the focus, so this checks nothing").toBe("floating-player-size");
+});
+
+Then("the focus should be on the page itself", async ({ page }) => {
+  expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);
+});
 
 Then("the viewer should show the title {string}", async ({ page }, title: string) => {
   await expect(page.locator(".image-viewer-title")).toHaveText(title);

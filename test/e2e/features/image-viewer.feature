@@ -145,3 +145,14 @@ Feature: Images open in the app
     When I press "c" in the viewer
     Then the focus should still be in the image viewer
     And the app behind the viewer should be as it was
+    # A player button keeps the focus once clicked, and the player's X leaves
+    # it on <body>, which no focusin follows. The viewer's keys go on working
+    # from both.
+    When I press the player's size button twice
+    And I press "ArrowLeft" in the viewer
+    Then the focus should still be in the image viewer
+    And the app behind the viewer should be as it was
+    When I close the player
+    Then the focus should be on the page itself
+    When I press "Escape" in the viewer
+    Then the image viewer should be gone
