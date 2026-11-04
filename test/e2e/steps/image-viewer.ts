@@ -5,7 +5,7 @@ import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { settle } from "../settle";
 
-const { Before, When, Then, AfterAll } = createBdd();
+const { Before, Given, When, Then, AfterAll } = createBdd();
 
 const repoRoot = path.resolve(__dirname, "../../..");
 
@@ -206,6 +206,53 @@ Then("the list should read {string}", async ({ page }, csv: string) => {
 When("I press {string} in the viewer", async ({ page }, key: string) => {
   await page.keyboard.press(key);
   await settle(page);
+});
+
+// How long each image is held back by "the images arrive slowly". Long against
+// the viewer's rest before it fetches (rest-ms, 150) and the steps' settle, so
+// that a reading taken just after the last step is taken mid-load.
+const SLOW_MS = 1500;
+
+// The files the page has asked for since "I count the images fetched".
+const fetched = new WeakMap<any, string[]>();
+
+Given("the images arrive slowly", async ({ page }) => {
+  await page.route("**/imgs/**", async (route: any) => {
+    const seen = fetched.get(page);
+    if (seen) seen.push(decodeURIComponent(new URL(route.request().url()).pathname.slice("/imgs/".length)));
+    await new Promise((r) => setTimeout(r, SLOW_MS));
+    // The viewer may have stepped on and dropped this load, or the page gone.
+    await route.continue().catch(() => {});
+  });
+});
+
+When("I count the images fetched from here on", async ({ page }) => {
+  fetched.set(page, []);
+});
+
+// One step after another as fast as a key held down repeats, with no settle
+// in between: the next press arrives before anything could have loaded.
+When("I quickly press {string} in the viewer", async ({ page }, keys: string) => {
+  for (const key of keys.split(",").map((k) => k.trim())) {
+    await page.keyboard.press(key);
+    await page.waitForTimeout(20);
+  }
+  await settle(page);
+});
+
+// Taken while the image the counter names is still held back by the route.
+// Whatever <img> is visible then can only be an earlier picture -- the one the
+// viewer froze on -- so none may be: hidden, or not there yet, is right.
+Then("no picture should be shown while it is on its way", async ({ page }) => {
+  const shown = await page.locator(".image-viewer-image").evaluateAll((imgs: HTMLImageElement[]) =>
+    imgs.filter((img) => getComputedStyle(img).visibility !== "hidden")
+      .map((img) => ({ src: img.getAttribute("src"), complete: img.complete })));
+  expect(shown, "a picture is up although the one the counter names has not arrived").toEqual([]);
+  await expect(page.locator(".image-viewer-status")).toBeVisible();
+});
+
+Then("the only image fetched should have been {string}", async ({ page }, file: string) => {
+  expect(fetched.get(page)).toEqual([file]);
 });
 
 When("I click the next button", async ({ page }) => {

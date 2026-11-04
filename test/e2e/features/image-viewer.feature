@@ -44,6 +44,22 @@ Feature: Images open in the app
     When I press "ArrowLeft" in the viewer
     Then the viewer should be at image 2 of 3, "Lighthouse"
 
+  Scenario: Stepped through fast, only the image it stops at is fetched, and nothing stale is shown
+    # The owner's pictures are camera originals, and cycled fast the viewer
+    # froze on one of them while the counter went on. Here every image takes a
+    # second and a half to arrive, which leaves time to look at the viewer while
+    # the last one is still on its way: what it shows then must not be the
+    # picture it was showing before, under the new counter.
+    Given the images arrive slowly
+    When I click the green badge of "Cliffs"
+    Then the image should have loaded
+    When I count the images fetched from here on
+    And I quickly press "ArrowRight, ArrowRight, ArrowLeft, ArrowRight" in the viewer
+    Then the viewer should be at image 3 of 3, "Harbour at dawn"
+    And no picture should be shown while it is on its way
+    And the image should have loaded
+    And the only image fetched should have been "e2e-harbour.jpg"
+
   Scenario: Escape closes it, and the app has its keys back
     When I click the green badge of "Lighthouse"
     And I press "Escape" in the viewer
