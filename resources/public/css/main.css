@@ -1169,6 +1169,30 @@ body:has(#qr-overlay) .floating-player-qr {
     cursor: default;
 }
 
+/* Not shown until it has arrived: before that it would be a picture building
+   up line by line, or nothing; the word below says what is going on instead.
+   Still laid out, so the load goes on as for any visible image. */
+.image-viewer-image-pending {
+    visibility: hidden;
+}
+
+/* Over the frame's middle, where the picture will be. "Loading…" waits a
+   moment before it shows, so an image that comes quickly never flashes it. */
+.image-viewer-status {
+    position: absolute;
+    color: #8f8d7d;
+    cursor: default;
+}
+
+.image-viewer-loading {
+    animation: image-viewer-appear 0s linear 400ms both;
+}
+
+@keyframes image-viewer-appear {
+    from { visibility: hidden; }
+    to { visibility: visible; }
+}
+
 .image-viewer-bar {
     position: absolute;
     left: 20px;

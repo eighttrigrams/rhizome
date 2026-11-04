@@ -67,7 +67,30 @@
 
    Both listeners are made per mount and removed as the same functions. Put on
    by name, a hot reload in between would have the unmount remove the new
-   definition and leave the old one on document for good."
+   definition and leave the old one on document for good.
+
+   ## One <img> per image, loaded once the owner rests on it
+
+   The owner's pictures are camera originals, megabytes and thousands of pixels
+   each. The first version kept one <img> for the life of the viewer and swapped
+   its src on every step. Cycled fast, the picture froze on one image while the
+   counter and the title went on, and it stayed frozen until the viewer was
+   closed and opened again -- which is to say, until there was a new <img>.
+   Headless Chromium did not show the freeze here (fast steps, throttled
+   network, delayed responses, 50 MB files), so which of the browser's load
+   states the old element got stuck in is not known. What was seen: a swapped
+   src leaves the old picture standing, under the new counter, for as long as
+   the new one takes; and every step starts a load of a whole original, so a
+   flurry of steps is a flurry of big loads, nearly all of them given up.
+
+   So neither is done any more. Each image is its own `picture`, keyed by its
+   file: a step throws the element away with whatever it was loading, and no
+   load state is carried from one image to the next. Until its picture has
+   arrived nothing stale is shown, but a word that it is coming (after a
+   moment, so a quick load does not flash it), or that it could not come. And
+   the element asks for the file only once the owner has stayed on it for
+   `rest-ms`. The counter and the title move at once; while the owner is still
+   stepping, nothing is fetched at all."
   (:require [clojure.string :as str]
             [reagent.core :as r]))
 
@@ -146,6 +169,44 @@
 
 (defn- src [file] (str "/imgs/" (js/encodeURIComponent file)))
 
+(def ^:private rest-ms
+  "How long the owner has to stay on an image before its file is asked for.
+   Well under the second the owner steps at when reading, well over the
+   gap between two steps of a key held down (about 30ms) or of quick clicks."
+  150)
+
+(defn- picture
+  "The image `file`, mounted afresh for every file (see the namespace doc).
+   :resting until rest-ms are up, then :loading with the <img> in place but not
+   yet shown, then :loaded or :failed."
+  [_file _title]
+  (let [*phase (r/atom :resting)
+        timer (atom nil)]
+    (r/create-class
+      {:component-did-mount (fn [_]
+                              (reset! timer (js/setTimeout #(reset! *phase :loading) rest-ms)))
+       :component-will-unmount (fn [_] (js/clearTimeout @timer))
+       :reagent-render
+         (fn [file title]
+           (let [phase @*phase]
+             ;; The <img> first. Behind the word that goes away on :loaded, it
+             ;; changed its place in the fragment as it went, which React took for
+             ;; a new element -- and a new element fetches the file again.
+             [:<>
+              (when-not (= :resting phase)
+                [:img.image-viewer-image
+                 {:src (src file)
+                  :alt title
+                  :class (when-not (= :loaded phase) "image-viewer-image-pending")
+                  :on-load #(reset! *phase :loaded)
+                  :on-error #(reset! *phase :failed)
+                  ;; Clicking the picture itself does not close it; only around it.
+                  :on-click (fn [e] (.stopPropagation e))}])
+              (case phase
+                :loaded nil
+                :failed [:div.image-viewer-status.image-viewer-failed "The image could not be loaded"]
+                [:div.image-viewer-status.image-viewer-loading "Loading…"])]))})))
+
 (defn- overlay
   [*state]
   (let [;; This mount's own two, so that what is removed is what was added.
@@ -190,9 +251,7 @@
                :on-key-down #(handle-key! *state %)
                :on-click (fn [e] (stop e) (close!))}
               [:div.image-viewer-frame
-               [:img.image-viewer-image
-                ;; Clicking the picture itself does not close it; only around it.
-                {:src (src file) :alt title :on-click stop}]]
+               ^{:key file} [picture file title]]
               [:div.image-viewer-bar
                {:on-click stop
                 ;; A pressed button would otherwise take the focus, and the one
