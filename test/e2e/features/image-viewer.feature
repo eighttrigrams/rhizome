@@ -44,6 +44,20 @@ Feature: Images open in the app
     When I press "ArrowLeft" in the viewer
     Then the viewer should be at image 2 of 3, "Lighthouse"
 
+  Scenario: The arrows stay where they are, whatever the title and the counter
+    # Clicked on the same spot over and over, an arrow has to stay under the
+    # pointer. The owner's report: depending on how long the title was, it
+    # moved left or right between two clicks. Here the titles go from one
+    # letter to a hundred and twenty, and the counter from "9 / 11" to "10 / 11".
+    And "Album" holds an item "A" with the file "e2e-a.png"
+    And "Album" holds 6 more images
+    And "Album" holds an item "Evening light over the old pier, with the fishing boats coming in one by one and the gulls following them all the way home" with the file "e2e-pier.jpg"
+    When I reload the app
+    And I click the green badge of "Evening light over the old pier"
+    Then the viewer should be at image 1 of 11, "Evening light over the old pier, with the fishing boats coming in one by one and the gulls following them all the way home"
+    When I click through to the last image and back, noting where the arrows are
+    Then the arrows should have stayed in place
+
   Scenario: Stepped through fast, only the image it stops at is fetched, and nothing stale is shown
     # The owner's pictures are camera originals, and cycled fast the viewer
     # froze on one of them while the counter went on. Here every image takes a

@@ -1197,6 +1197,13 @@ body:has(#qr-overlay) .floating-player-qr {
     to { opacity: 1; }
 }
 
+/* The arrows at the bar's left start, level with the frame's left edge, and
+   after them what changes width from image to image: the counter, then the
+   title. So the arrows stay put under the pointer whatever is written beside
+   them (they were once in the middle of a centred row, between the counter
+   and the title, and moved with both). Left rather than at a fixed offset
+   from the centre: there it would take a guess at the longest counter, and
+   the title would have to start in the middle, with half the room. */
 .image-viewer-bar {
     position: absolute;
     left: 20px;
@@ -1205,19 +1212,38 @@ body:has(#qr-overlay) .floating-player-qr {
     height: 36px;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 14px;
     color: #cbc9b5;
     cursor: default;
 }
 
+/* A left-hand card's image: nothing to step with, so the title alone, in the
+   middle. */
+.image-viewer-bar-alone {
+    justify-content: center;
+}
+
+.image-viewer-arrows {
+    flex: none;
+    display: flex;
+    gap: 6px;
+}
+
+/* A width of its own, room for "999 / 999" (a space and the slash are
+   narrower than a digit), so the title does not jump either
+   when the counter gains a digit. */
 .image-viewer-position {
+    flex: none;
+    width: 8ch;
+    white-space: nowrap;
     font-variant-numeric: tabular-nums;
     color: #8f8d7d;
 }
 
+/* The rest of the bar, one line, cut short with an ellipsis. */
 .image-viewer-title {
-    max-width: 60vw;
+    min-width: 0;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;

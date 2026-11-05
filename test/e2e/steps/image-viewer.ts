@@ -147,6 +147,15 @@ When(
     makeItem(request, contextTitle, title),
 );
 
+// Filler images, "Picture 1" to "Picture n", made one after another: the
+// last one made stands first in the list.
+When(
+  "{string} holds {int} more images",
+  async ({ request }, contextTitle: string, n: number) => {
+    for (let i = 1; i <= n; i++) await makeItem(request, contextTitle, `Picture ${i}`, `e2e-picture-${i}.png`);
+  },
+);
+
 When("I click the green badge of {string}", async ({ page }, title: string) => {
   await watchOpens(page);
   await card(page, title).locator(".badge", { hasText: "🟢" }).click();
@@ -343,6 +352,55 @@ Then(
     await noteShown(page);
   },
 );
+
+// Where the two arrows were at each stop of "I click through to the last image
+// and back", with what the bar said then, so a failure names the stop.
+type Box = { x: number; y: number; width: number; height: number };
+let arrowsAt: { at: string; title: string; prev: Box; next: Box }[] = [];
+
+async function noteArrows(page: any) {
+  arrowsAt.push({
+    at: await page.locator(".image-viewer-position").innerText(),
+    title: await page.locator(".image-viewer-title").innerText(),
+    prev: (await page.locator(".image-viewer-prev").boundingBox())!,
+    next: (await page.locator(".image-viewer-next").boundingBox())!,
+  });
+}
+
+// With the buttons, as the owner steps: Next until it is disabled, then
+// Previous until that is. A disabled button is still laid out, and measured.
+When("I click through to the last image and back, noting where the arrows are", async ({ page }) => {
+  arrowsAt = [];
+  await noteArrows(page);
+  for (const button of [".image-viewer-next", ".image-viewer-prev"]) {
+    while (await page.locator(button).isEnabled()) {
+      await page.locator(button).click();
+      await settle(page);
+      await noteArrows(page);
+    }
+  }
+});
+
+Then("the arrows should have stayed in place", async () => {
+  // Not vacuous: the walk went from one digit to two, and from the shortest
+  // title to the longest.
+  const at = arrowsAt.map((a) => a.at);
+  expect(at).toContain("9 / 11");
+  expect(at).toContain("10 / 11");
+  const lengths = arrowsAt.map((a) => a.title.length);
+  expect(Math.min(...lengths)).toBe(1);
+  expect(Math.max(...lengths)).toBeGreaterThan(100);
+  const [first] = arrowsAt;
+  for (const stop of arrowsAt) {
+    for (const side of ["prev", "next"] as const) {
+      for (const k of ["x", "y", "width", "height"] as const) {
+        expect(Math.abs(stop[side][k] - first[side][k]),
+          `the ${side} arrow's ${k} at ${stop.at} ("${stop.title.slice(0, 30)}") is ` +
+          `${stop[side][k]}, at ${first.at} it was ${first[side][k]}`).toBeLessThanOrEqual(0.5);
+      }
+    }
+  }
+});
 
 Then("the previous button should be disabled", async ({ page }) => {
   await expect(page.locator(".image-viewer-prev")).toBeDisabled();

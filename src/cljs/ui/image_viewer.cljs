@@ -267,8 +267,15 @@
                :on-click (fn [e] (stop e) (close!))}
               [:div.image-viewer-frame
                ^{:key file} [picture file title]]
+              ;; The arrows first, side by side, at the bar's left start, and
+              ;; everything that changes width from image to image after them:
+              ;; the counter, then the title. Between the arrows, centred with
+              ;; them, the title's length and the counter's digits moved both
+              ;; arrows -- the owner clicked the same spot twice and the second
+              ;; click missed. Now where they are depends on the window alone.
               [:div.image-viewer-bar
-               {:on-click stop
+               {:class (when-not idx "image-viewer-bar-alone")
+                :on-click stop
                 ;; A pressed button would otherwise take the focus, and the one
                 ;; at the end of the row turns disabled under it -- which drops
                 ;; the focus to <body>, and ← → and Escape with it.
@@ -276,21 +283,21 @@
                ;; Nothing to step with for an image that is not in the list: a
                ;; position of "- / n" and two dead buttons would only say so.
                (when idx
-                 [:button.image-viewer-prev
-                  {:type "button"
-                   :title "Previous image (←)"
-                   :aria-label "Previous image"
-                   :disabled (not prev?)
-                   :on-click (fn [e] (stop e) (step! imgs idx -1))} "‹"])
+                 [:span.image-viewer-arrows
+                  [:button.image-viewer-prev
+                   {:type "button"
+                    :title "Previous image (←)"
+                    :aria-label "Previous image"
+                    :disabled (not prev?)
+                    :on-click (fn [e] (stop e) (step! imgs idx -1))} "‹"]
+                  [:button.image-viewer-next
+                   {:type "button"
+                    :title "Next image (→)"
+                    :aria-label "Next image"
+                    :disabled (not next?)
+                    :on-click (fn [e] (stop e) (step! imgs idx 1))} "›"]])
                (when idx [:span.image-viewer-position (str (inc idx) " / " (count imgs))])
-               [:span.image-viewer-title title]
-               (when idx
-                 [:button.image-viewer-next
-                  {:type "button"
-                   :title "Next image (→)"
-                   :aria-label "Next image"
-                   :disabled (not next?)
-                   :on-click (fn [e] (stop e) (step! imgs idx 1))} "›"])]
+               [:span.image-viewer-title title]]
               [:button.image-viewer-close
                {:type "button"
                 :on-mouse-down #(.preventDefault %)
