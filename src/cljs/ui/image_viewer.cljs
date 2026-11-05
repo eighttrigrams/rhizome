@@ -95,8 +95,8 @@
    Until its picture has arrived nothing stale is shown, but a word that it is
    coming (after a moment, so a quick load does not flash it), or that it
    could not come. And the element asks for the file only once the owner has
-   stayed on it for `rest-ms`. The counter and the title move at once; while the owner is still
-   stepping, nothing is fetched at all."
+   stayed on it for `rest-ms`. The counter and the title move at once; while
+   the owner is still stepping, nothing is fetched at all."
   (:require [clojure.string :as str]
             [reagent.core :as r]))
 

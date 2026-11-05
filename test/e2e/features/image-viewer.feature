@@ -69,7 +69,8 @@ Feature: Images open in the app
     Given the images arrive slowly
     When I click the green badge of "Cliffs"
     And I count the images fetched from here on
-    And I press "ArrowRight, ArrowRight" every 400ms in the viewer
+    Then the image should be on its way
+    When I press "ArrowRight, ArrowRight" every 400ms in the viewer
     Then the viewer should be at image 3 of 3, "Harbour at dawn"
     And the loads of "e2e-cliffs.webp, e2e-lighthouse.png" should have been given up
     And the image should have loaded

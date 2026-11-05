@@ -247,6 +247,13 @@ Then("the loads of {string} should have been given up", async ({ page }, csv: st
   }).toEqual([...want].sort());
 });
 
+// The <img> is in with its src, past rest-ms: its load has begun, so a step
+// from here is a step away from an image that is loading. Without this the
+// scenario had about a frame of margin before its first key.
+Then("the image should be on its way", async ({ page }) => {
+  await expect(page.locator(".image-viewer-image")).toHaveAttribute("src", /^\/imgs\//);
+});
+
 When("I click the middle of the viewer's picture", async ({ page }) => {
   const frame = (await page.locator(".image-viewer-frame").boundingBox())!;
   await page.mouse.click(frame.x + frame.width / 2, frame.y + frame.height / 2);
