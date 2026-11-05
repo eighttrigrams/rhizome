@@ -84,12 +84,18 @@
    flurry of steps is a flurry of big loads, nearly all of them given up.
 
    So neither is done any more. Each image is its own `picture`, keyed by its
-   file: a step throws the element away with whatever it was loading, and no
-   load state is carried from one image to the next. Until its picture has
-   arrived nothing stale is shown, but a word that it is coming (after a
-   moment, so a quick load does not flash it), or that it could not come. And
-   the element asks for the file only once the owner has stayed on it for
-   `rest-ms`. The counter and the title move at once; while the owner is still
+   file: a step throws the element away, and no load state is carried from one
+   image to the next. Throwing it away does not end its load, though. Chromium
+   lets a removed <img> download to the end -- measured in review: eight steps
+   at 200ms through big files aborted nothing, six dead loads held all six
+   connections to the server, and the image on screen was not even asked for
+   for seconds (cookbook #397). The old src swap had aborted them. So on its
+   way out the element has its src taken off, which is what aborts the load.
+
+   Until its picture has arrived nothing stale is shown, but a word that it is
+   coming (after a moment, so a quick load does not flash it), or that it
+   could not come. And the element asks for the file only once the owner has
+   stayed on it for `rest-ms`. The counter and the title move at once; while the owner is still
    stepping, nothing is fetched at all."
   (:require [clojure.string :as str]
             [reagent.core :as r]))
@@ -181,11 +187,16 @@
    yet shown, then :loaded or :failed."
   [_file _title]
   (let [*phase (r/atom :resting)
-        timer (atom nil)]
+        timer (atom nil)
+        img (atom nil)]
     (r/create-class
       {:component-did-mount (fn [_]
                               (reset! timer (js/setTimeout #(reset! *phase :loading) rest-ms)))
-       :component-will-unmount (fn [_] (js/clearTimeout @timer))
+       ;; Runs before React takes the node out. removeAttribute rather than
+       ;; src "": an empty src fires error, into on-error, on the way out.
+       :component-will-unmount (fn [_]
+                                 (js/clearTimeout @timer)
+                                 (some-> @img (.removeAttribute "src")))
        :reagent-render
          (fn [file title]
            (let [phase @*phase]
@@ -196,6 +207,7 @@
               (when-not (= :resting phase)
                 [:img.image-viewer-image
                  {:src (src file)
+                  :ref #(reset! img %)
                   :alt title
                   :class (when-not (= :loaded phase) "image-viewer-image-pending")
                   :on-load #(reset! *phase :loaded)
