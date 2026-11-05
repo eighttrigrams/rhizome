@@ -658,7 +658,7 @@ the text a delete carried off is still there to read.
 | `:semsearch` `:ollama-url`, `:ollama-model` | The embedder, which runs **in the hub** — one model on one machine, so a remote query crosses the wire as a string rather than as a vector. Absent → the embedder is inert. |
 | `:semsearch` `:vec-path` | **Refused.** It moved into `:hub`: loading the extension is the database's business, and a `:vec-path` left here would turn semantic search off everywhere without a word. |
 | `:substack` `:external-substacks` | List of external Substack hostnames (regex-matched on titles). |
-| `:private-addr`, `:private-user-agent` | Prod-only allowlist: `/ui` is reachable only from this remote-addr + user-agent. Not used when `:dev? true`. |
+| `:private-addr`, `:private-user-agent` | Prod-only allowlist: `/ui` is reachable only from this remote-addr + user-agent. `:private-user-agent` is optional — leave it out and only the address is checked, which is what a normal browser needs, since its user agent changes with every update. Not used when `:dev? true`. |
 
 ## Running multiple checkouts side-by-side
 

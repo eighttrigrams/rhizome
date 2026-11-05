@@ -82,14 +82,21 @@
    because the hub answers the same commands off its own DataSource and one
    definition beats two that agree to match (arch rework 2, step 2). What stays
    here is the part that is about *this* surface: only the local browser may
-   POST to it outside dev mode."
+   POST to it outside dev mode.
+
+   The user-agent half of the check is optional: with `:private-user-agent`
+   absent from config.edn only the address is checked. That is what lets an
+   ordinary browser (Chrome's \"Install page as app\") be the client, whose
+   user agent changes with every update; a pinned string only suits a frozen
+   wrapper like the old nativefier build."
   []
   (let [h (et.rz.hub.ui-api/handler #(:db config/config) {:intercept ui-intercept})]
     (fn [req]
       (if (and (not (:dev? config/config))
                (or (not (= (:private-addr config/config) (:remote-addr req)))
-                   (not (= (:private-user-agent config/config)
-                           (get-in req [:headers "user-agent"])))))
+                   (and (some? (:private-user-agent config/config))
+                        (not (= (:private-user-agent config/config)
+                                (get-in req [:headers "user-agent"]))))))
         (do (log/warn (pr-str req)) {:status 403})
         (h req)))))
 
