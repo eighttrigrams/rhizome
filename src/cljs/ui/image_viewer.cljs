@@ -181,6 +181,8 @@
    gap between two steps of a key held down (about 30ms) or of quick clicks."
   150)
 
+(defn- stop [e] (.stopPropagation e))
+
 (defn- picture
   "The image `file`, mounted afresh for every file (see the namespace doc).
    :resting until rest-ms are up, then :loading with the <img> in place but not
@@ -213,11 +215,13 @@
                   :on-load #(reset! *phase :loaded)
                   :on-error #(reset! *phase :failed)
                   ;; Clicking the picture itself does not close it; only around it.
-                  :on-click (fn [e] (.stopPropagation e))}])
+                  :on-click stop}])
+              ;; Where the picture is to come, so a click on it does not close
+              ;; the viewer either.
               (case phase
                 :loaded nil
-                :failed [:div.image-viewer-status.image-viewer-failed "The image could not be loaded"]
-                [:div.image-viewer-status.image-viewer-loading "Loading…"])]))})))
+                :failed [:div.image-viewer-status.image-viewer-failed {:on-click stop} "The image could not be loaded"]
+                [:div.image-viewer-status.image-viewer-loading {:on-click stop} "Loading…"])]))})))
 
 (defn- overlay
   [*state]
@@ -253,8 +257,7 @@
                  idx (index-of imgs open)
                  title (or (not-empty (:title (:item (get imgs idx)))) (not-empty title) file)
                  prev? (and idx (pos? idx))
-                 next? (and idx (< (inc idx) (count imgs)))
-                 stop (fn [e] (.stopPropagation e))]
+                 next? (and idx (< (inc idx) (count imgs)))]
              [:div#image-viewer
               {:tabIndex 0
                :role "dialog"

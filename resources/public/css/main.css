@@ -1171,9 +1171,11 @@ body:has(#qr-overlay) .floating-player-qr {
 
 /* Not shown until it has arrived: before that it would be a picture building
    up line by line, or nothing; the word below says what is going on instead.
-   Still laid out, so the load goes on as for any visible image. */
+   opacity rather than visibility: a hidden element is not hit, and a click on
+   the picture's place would fall through to the backdrop and close the
+   viewer. Still laid out, so the load goes on as for any visible image. */
 .image-viewer-image-pending {
-    visibility: hidden;
+    opacity: 0;
 }
 
 /* Over the frame's middle, where the picture will be. "Loading…" waits a
@@ -1188,9 +1190,11 @@ body:has(#qr-overlay) .floating-player-qr {
     animation: image-viewer-appear 0s linear 400ms both;
 }
 
+/* By opacity, like the pending picture above: unseen, but still there to
+   take a click. */
 @keyframes image-viewer-appear {
-    from { visibility: hidden; }
-    to { visibility: visible; }
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 .image-viewer-bar {
