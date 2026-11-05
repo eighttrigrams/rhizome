@@ -228,14 +228,54 @@ Given("the images arrive slowly", async ({ page }) => {
 
 When("I count the images fetched from here on", async ({ page }) => {
   fetched.set(page, []);
+  const seen: string[] = [];
+  given_up.set(page, seen);
+  page.on("requestfailed", (req: any) => {
+    const url = new URL(req.url());
+    if (url.pathname.startsWith("/imgs/")) seen.push(decodeURIComponent(url.pathname.slice("/imgs/".length)));
+  });
 });
 
-// One step after another as fast as a key held down repeats, with no settle
-// in between: the next press arrives before anything could have loaded.
+// The loads the page gave up on (requestfailed) since the count began.
+const given_up = new WeakMap<any, string[]>();
+
+Then("the loads of {string} should have been given up", async ({ page }, csv: string) => {
+  const want = csv.split(",").map((f) => f.trim());
+  // An abort reaches requestfailed when the route lets go of the request, so wait.
+  await expect.poll(() => [...(given_up.get(page) ?? [])].sort(), {
+    message: "the images stepped past went on loading, holding the connections",
+  }).toEqual([...want].sort());
+});
+
+When("I click the middle of the viewer's picture", async ({ page }) => {
+  const frame = (await page.locator(".image-viewer-frame").boundingBox())!;
+  await page.mouse.click(frame.x + frame.width / 2, frame.y + frame.height / 2);
+  await settle(page);
+});
+
+Then("the image viewer should still be up", async ({ page }) => {
+  await expect(page.locator("#image-viewer")).toBeVisible();
+});
+
+// One step after another, with no settle in between: the next press arrives
+// before anything could have loaded. 60ms apart, not closer: the gap has to be
+// wide enough that a viewer fetching at once (rest-ms 0) would fetch on every
+// step -- at 20ms such a mutant still came through -- and still well under
+// rest-ms (150).
 When("I quickly press {string} in the viewer", async ({ page }, keys: string) => {
   for (const key of keys.split(",").map((k) => k.trim())) {
     await page.keyboard.press(key);
-    await page.waitForTimeout(20);
+    await page.waitForTimeout(60);
+  }
+  await settle(page);
+});
+
+// Slower than rest-ms, so every image stepped onto is fetched, and each is
+// still being held by the route when the next step comes.
+When("I press {string} every {int}ms in the viewer", async ({ page }, keys: string, ms: number) => {
+  for (const key of keys.split(",").map((k) => k.trim())) {
+    await page.keyboard.press(key);
+    await page.waitForTimeout(ms);
   }
   await settle(page);
 });
@@ -245,7 +285,10 @@ When("I quickly press {string} in the viewer", async ({ page }, keys: string) =>
 // viewer froze on -- so none may be: hidden, or not there yet, is right.
 Then("no picture should be shown while it is on its way", async ({ page }) => {
   const shown = await page.locator(".image-viewer-image").evaluateAll((imgs: HTMLImageElement[]) =>
-    imgs.filter((img) => getComputedStyle(img).visibility !== "hidden")
+    imgs.filter((img) => {
+      const style = getComputedStyle(img);
+      return style.visibility !== "hidden" && style.opacity !== "0";
+    })
       .map((img) => ({ src: img.getAttribute("src"), complete: img.complete })));
   expect(shown, "a picture is up although the one the counter names has not arrived").toEqual([]);
   await expect(page.locator(".image-viewer-status")).toBeVisible();

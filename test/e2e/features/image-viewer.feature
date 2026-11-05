@@ -60,6 +60,26 @@ Feature: Images open in the app
     And the image should have loaded
     And the only image fetched should have been "e2e-harbour.jpg"
 
+  Scenario: An image stepped past while it loads stops loading
+    # A step takes the image's <img> away, and a removed <img> goes on
+    # downloading unless its src is taken off first. Stepped through big
+    # originals a little slower than the viewer waits before it fetches, the
+    # dead loads would fill the browser's six connections to the server, and
+    # the image on screen would wait behind them.
+    Given the images arrive slowly
+    When I click the green badge of "Cliffs"
+    And I count the images fetched from here on
+    And I press "ArrowRight, ArrowRight" every 400ms in the viewer
+    Then the viewer should be at image 3 of 3, "Harbour at dawn"
+    And the loads of "e2e-cliffs.webp, e2e-lighthouse.png" should have been given up
+    And the image should have loaded
+
+  Scenario: A click on the picture's place while it loads does not close the viewer
+    Given the images arrive slowly
+    When I click the green badge of "Cliffs"
+    And I click the middle of the viewer's picture
+    Then the image viewer should still be up
+
   Scenario: Escape closes it, and the app has its keys back
     When I click the green badge of "Lighthouse"
     And I press "Escape" in the viewer
