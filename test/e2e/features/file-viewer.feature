@@ -4,8 +4,8 @@ Feature: Documents, sounds and videos open in the app
   pdf in the browser's own pdf viewer, a sound and a video in a player, and
   anything the browser cannot show with a word that it cannot, and the file to
   download. They are served from /files/, which answers the Range requests a
-  player seeks with. Back and forth step through the files of the kind that is
-  open. Option+click still sends a file out to the system's viewer.
+  player seeks with. Back and forth step through pictures only: any other file
+  opens alone. Option+click still sends a file out to the system's viewer.
 
   Background:
     Given I am on the app
@@ -71,15 +71,15 @@ Feature: Documents, sounds and videos open in the app
     And I click the download button
     Then "e2e-tax letter #2.pdf" should have been downloaded
 
-  Scenario: Back and forth stay within the kind that is open
-    # Newest first: Bell, Old film, Harbour film, Chime, Letter. From Bell the
-    # next sound is Chime, past the video and the flv.
+  Scenario: A sound opens alone, with nothing to step to
+    # Stepping is for pictures only (the owner's answer). There are two
+    # sounds in the list, and still no arrows, no counter, and → does nothing.
     When I click the green badge of "Bell"
-    Then the viewer should be at file 1 of 2, "Bell"
+    Then the viewer should show the audio "e2e-bell.mp3"
+    And the viewer should offer no stepping
     When I press "ArrowRight" in the viewer
-    Then the viewer should be at file 2 of 2, "Chime"
-    And the viewer should show the audio "e2e-chime.mp3"
-    And the next button should be disabled
+    Then the viewer should show the audio "e2e-bell.mp3"
+    And the viewer should offer no stepping
 
   Scenario: Option+click still sends a video out
     When I Option+click the green badge of "Harbour film"

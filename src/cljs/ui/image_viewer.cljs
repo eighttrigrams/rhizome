@@ -1,6 +1,6 @@
 (ns ui.image-viewer
-  "An item's file, shown over nearly the whole window, with a way to step to
-   the previous and next file of its kind in the list.
+  "An item's file, shown over nearly the whole window; a picture with a way
+   to step to the previous and next picture in the list.
 
    The green badge used to hand every file to the Mac's own viewer (/open/...),
    which only works when the browser sits at the server's Mac. Now a plain click
@@ -25,13 +25,11 @@
    /files/ is et.rz.server.files, which does the Range requests a media element
    seeks with.
 
-   ## Stepping: within the kind that is open
+   ## Stepping: pictures only
 
-   ← and → go to the previous and next file of the same kind: from a picture
-   through the pictures, as before, from a video through the videos. Through
-   every file instead, a pdf or a sound would stand between two photos of an
-   album, and step by step the player would start and stop. It is the simplest
-   rule that keeps what the image viewer did.
+   ← and → go to the previous and next picture, as they always did. A
+   document, a sound or a video opens alone, with nothing to step to -- the
+   owner's answer (\"stepping in the viewer stays as it is, only images\").
 
    ## Which files, in which order
 
@@ -164,9 +162,12 @@
         items))
 
 (defn- steps
-  "What ← and → walk while `open` is up: the list's files of its kind."
+  "What ← and → walk while `open` is up: the list's pictures, when a picture
+   is open; nothing otherwise, so any other file stands alone."
   [items open]
-  (of-kind items (kind (:file open))))
+  (if (= :image (kind (:file open)))
+    (of-kind items :image)
+    []))
 
 (defn- index-of
   "Where in `imgs` the open image is: at its own place if the list still has

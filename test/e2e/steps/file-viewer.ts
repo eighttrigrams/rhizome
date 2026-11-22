@@ -121,13 +121,3 @@ Then("{string} should have been downloaded", async ({}, file: string) => {
   expect(download.suggestedFilename()).toBe(file);
   expect(await download.failure()).toBeNull();
 });
-
-// As "at image n of m" in image-viewer.ts, but for any kind: that one also
-// notes the <img> shown, which a sound has none of.
-Then(
-  "the viewer should be at file {int} of {int}, {string}",
-  async ({ page }, n: number, of: number, title: string) => {
-    await expect(page.locator(".image-viewer-position")).toHaveText(`${n} / ${of}`);
-    await expect(page.locator(".image-viewer-title")).toHaveText(title);
-  },
-);
