@@ -105,6 +105,22 @@
   (is (= #{"empty.pdf" "not really.mp3"} (in :imports)))
   (is (= #{"a sound.mp3"} (in :audio))))
 
+(deftest an-unreadable-file-does-not-stop-the-import
+  ;; Second review, finding 1: the content check read the file outside the
+  ;; batch's try, and one unreadable file ended the whole run, every run.
+  ;; Listed before the others (list order is the directory's), and readable
+  ;; to nobody -- as Syncthing's 0600 for another user is to the hub.
+  (let [locked (arrive! "aaa locked.pdf" pdf)]
+    (arrive! "zzz fine.pdf" pdf)
+    (arrive! "mmm fine too.pdf" pdf)
+    (.setReadable locked false false)
+    (if (.canRead locked)
+      (println "SKIPPED (running as root, which reads anything): an-unreadable-file-does-not-stop-the-import")
+      (do
+        (is (= #{"zzz fine.pdf" "mmm fine too.pdf"} (set (import!))))
+        (is (= #{"aaa locked.pdf"} (in :imports)))
+        (.setReadable locked true false)))))
+
 (deftest two-names-that-repair-to-one
   ;; Today's behaviour, kept: the second is refused ("File already exists")
   ;; and stays in imports -- under its repaired name, which it was given
