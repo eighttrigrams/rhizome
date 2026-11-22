@@ -166,3 +166,16 @@
       (str/replace #"[/\p{Cntrl}]" "-")
       str/trim
       shorten))
+
+(defn unusable
+  "Why the repaired name `name` cannot be filed, or nil. Repair trims, and a
+   name that was only spaces before its suffix (\"   .pdf\", \" .hidden.jpg\")
+   comes out a dotfile -- hidden, and an item with an empty title. Second
+   review, finding 3. Not repaired further: what the name should be is not
+   known; the file stays in imports for the human to name."
+  [^String name]
+  (let [dot (str/last-index-of name ".")
+        stem (if dot (subs name 0 dot) name)]
+    (cond
+      (str/starts-with? name ".") "after repair it would start with a dot (a hidden file)"
+      (str/blank? stem) "after repair nothing is left before its suffix")))

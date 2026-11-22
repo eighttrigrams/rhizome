@@ -134,6 +134,16 @@
         (is (= #{"aaa locked.pdf"} (in :imports)))
         (.setReadable locked true false)))))
 
+(deftest a-name-that-repairs-to-a-dotfile-is-left
+  ;; Second review, finding 3: trimming made these hidden files with an empty
+  ;; title. Left for the human to name.
+  (arrive! "   .pdf" pdf)
+  (arrive! " .hidden.jpg" (byte-array (map unchecked-byte [0xff 0xd8 0xff 0xe0 0])))
+  (arrive! "kept.pdf" pdf)
+  (is (= ["kept.pdf"] (import!)))
+  (is (= #{"   .pdf" " .hidden.jpg"} (in :imports)))
+  (is (empty? (in :images))))
+
 (deftest two-names-that-repair-to-one
   ;; Today's behaviour, kept: the second is refused ("File already exists")
   ;; and stays in imports -- under its repaired name, which it was given
@@ -165,6 +175,14 @@
   (testing "trailing space left by the cut goes too"
     (let [r (names/repair (str (apply str (repeat 250 "a")) " bbbbbbbbbbbb.pdf"))]
       (is (not (str/includes? r " .pdf"))))))
+
+(deftest unusable
+  (is (nil? (names/unusable "a.pdf")))
+  (is (nil? (names/unusable "a.b.pdf")))
+  (is (re-find #"dot" (names/unusable ".pdf")))
+  (is (re-find #"dot" (names/unusable ".hidden.jpg")))
+  (is (re-find #"nothing" (names/unusable "")))
+  (is (re-find #"nothing" (names/unusable "   "))))
 
 (deftest content-checks
   (let [f (fn [file-name bytes]
