@@ -118,8 +118,26 @@
                 (is (same-file? on-disk target))))))))))
 
 (deftest get-target-for-a-file-not-there-yet-is-nfc
-  (with-redefs [config/config (assoc-in config/config [:folders :docs] (folder :docs))]
-    (is (= (str (io/file (folder :docs) (names/nfc nfd-name))) (home/get-target nfd-name)))))
+  (on-utf-8-paths
+    (with-redefs [config/config (assoc-in config/config [:folders :docs] (folder :docs))]
+      (is (= (str (io/file (folder :docs) (names/nfc nfd-name))) (home/get-target nfd-name))))))
+
+(defn- with-folders
+  "config's :folders pointed at this test's temp folders."
+  [f]
+  (with-redefs [config/config (update config/config :folders merge
+                                      {:imports (folder :imports) :docs (folder :docs)})]
+    (f)))
+
+(deftest get-target-stays-inside-the-folder
+  ;; Review findings 2 and 4: /open/ hands its name straight to get-target,
+  ;; whose fallback for a name not on disk joined it onto the folder unguarded.
+  (spit (io/file *root* "x.pdf") "outside")
+  (.mkdirs (io/file (folder :docs)))
+  (with-folders
+    #(doseq [asked ["../x.pdf" "../../x.pdf" "../nowhere.pdf" (str (io/file *root* "x.pdf")) "/etc/x.pdf"]]
+       (testing asked
+         (is (nil? (home/get-target asked)))))))
 
 (deftest the-traversal-guard-holds-in-every-form
   (on-utf-8-paths

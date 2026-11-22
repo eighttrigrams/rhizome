@@ -51,24 +51,33 @@
   [^File root ^File f]
   (str/starts-with? (.getCanonicalPath f) (str (.getCanonicalPath root) File/separator)))
 
-(defn- usable?
-  "Whether `f` is a file inside `root`. False, rather than an exception, where
-   the JVM cannot write the name in its path encoding."
-  [^File root ^File f]
-  (try
-    (.toPath f)
-    (and (.isFile f) (inside? root f))
-    (catch InvalidPathException _ false)))
+(defn path-in
+  "The File `name` names inside the folder `root`, whether or not it exists,
+   or nil when it is a path rather than a name (a separator in it), would lie
+   outside the folder (by canonical path: a symlink out), or the JVM cannot
+   write the name in its path
+   encoding. java.io.File's own constructor, not io/file: that one throws on
+   an absolute name, which reached a request as a 500."
+  ^File [root ^String name]
+  ;; A name, not a path: the folders are flat, and a name with a separator in
+  ;; it ("../x", "/etc/x", which File would join *under* root) is no file
+  ;; of theirs. The canonical check below stays, for a symlink out.
+  (when-not (or (str/includes? name "/") (str/includes? name File/separator) (str/includes? name "\u0000"))
+    (let [root (io/file root)
+          f (File. ^File root name)]
+      (try
+        (.toPath f)
+        (when (inside? root f) f)
+        (catch InvalidPathException _ nil)))))
 
 (defn resolve-in
   "The file called `name` inside the folder `root`, in whichever of its forms
    it is on disk, or nil. Never one outside `root` (by canonical path)."
   [root name]
-  (let [root (io/file root)]
-    (some (fn [form]
-            (let [f (io/file root form)]
-              (when (usable? root f) f)))
-          (forms name))))
+  (some (fn [form]
+          (when-let [f (path-in root form)]
+            (when (.isFile f) f)))
+        (forms name)))
 
 (defn file-response
   "ring.util.response/file-response, tried for each form of `path`. Ring's own

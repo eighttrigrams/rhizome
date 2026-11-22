@@ -141,6 +141,24 @@
       (spit (io/file beside "x.pdf") "x")
       (is (= 404 (:status (get-file (str "/files/..%2Fdocs-other%2Fx.pdf"))))))))
 
+(deftest a-symlink-out-of-the-folder-is-not-found
+  ;; Names with a separator are refused before the canonical check; a link
+  ;; inside the folder that points out of it is what the check is still for.
+  (spit (io/file *root* "secret.pdf") "secret")
+  (java.nio.file.Files/createSymbolicLink (.toPath (io/file (get (folders) :docs) "link.pdf"))
+                                          (.toPath (io/file *root* "secret.pdf"))
+                                          (make-array FileAttribute 0))
+  (is (= 404 (:status (get-file "/files/link.pdf")))))
+
+(deftest an-absolute-path-is-not-found
+  ;; Review finding 2: io/file threw IllegalArgumentException on an absolute
+  ;; child, and the request got a 500.
+  (spit (io/file *root* "secret.pdf") "secret")
+  (doseq [path [(str "/files/" (java.net.URLEncoder/encode (str (io/file *root* "secret.pdf")) "UTF-8"))
+                "/files/%2Fetc%2Fpasswd.pdf"]]
+    (testing path
+      (is (= 404 (:status (get-file path)))))))
+
 (deftest not-found
   (doseq [path ["/files/" "/files/nope.mp4" "/files/noext" "/files/clip.xyz"]]
     (testing path
