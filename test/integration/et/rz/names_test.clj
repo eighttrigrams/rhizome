@@ -17,6 +17,7 @@
             [et.rz.server.files :as files]
             [et.rz.hub.repository.homefolder :as home]
             [et.rz.hub.repository.insertion.batch :as batch]
+            [et.rz.hub.repository.insertion.arrival :as arrival]
             [et.rz.hub.repository.insertion.common :as common]
             [et.rz.hub.repository.insertion.file :as file])
   (:import (java.nio.file Files)
@@ -175,7 +176,10 @@
                   home/ren (fn [from to] (swap! calls conj [:ren from to]) false)
                   home/move-file (fn [n] (swap! calls conj [:move n]))
                   file/ingest (fn [_ n _ _] (swap! calls conj [:ingest n]))
-                  common/get-item-or-throw-error (constantly 1)]
+                  common/get-item-or-throw-error (constantly 1)
+                  ;; no files behind these names: nothing to settle or check
+                  arrival/unsettled (constantly #{})
+                  arrival/content-problem (constantly nil)]
       (batch/ingest nil "IMPORT" nil nil))
     (is (= [[:ren nfd-name (names/nfc nfd-name)]] @calls))))
 
@@ -197,7 +201,10 @@
                   home/ren (fn [from to] (swap! calls conj [:ren from to]))
                   home/move-file (fn [n] (swap! calls conj [:move n]))
                   file/ingest (fn [_ n _ _] (swap! calls conj [:ingest n]))
-                  common/get-item-or-throw-error (constantly 1)]
+                  common/get-item-or-throw-error (constantly 1)
+                  ;; no files behind these names: nothing to settle or check
+                  arrival/unsettled (constantly #{})
+                  arrival/content-problem (constantly nil)]
       (batch/ingest nil "IMPORT" nil nil))
     (is (= [[:ren nfd-name (names/nfc nfd-name)]
             [:ingest (names/nfc nfd-name)]

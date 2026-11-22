@@ -113,3 +113,56 @@
       (log/error msg)
       (when refuse?
         (throw (ex-info (str "Refusing to start. " msg) {:sun.jnu.encoding (path-encoding)}))))))
+
+;; ## Repairing a name at import
+;;
+;; Files come in from four Macs through Syncthing, and a name that was fine on
+;; APFS can be one Linux will not take, or one that only looks the same. The
+;; import repairs it in place, on disk and in the db alike, rather than refuse
+;; the file (the owner: "fix it in place during ingest").
+
+(def ^:private max-bytes
+  "What ext4 and most Linux filesystems allow for one name -- in bytes, and
+   an umlaut is two of them in UTF-8, so a name that fits on a Mac (255 UTF-16
+   units) may not fit here."
+  255)
+
+(defn- utf-8-length [^String s] (alength (.getBytes s "UTF-8")))
+
+(defn- graphemes
+  "`s` cut into what a reader takes for one character each: a base and its
+   combining marks stay together, so cutting between two never leaves half
+   an umlaut, even one with no precomposed form."
+  [^String s]
+  (let [it (doto (java.text.BreakIterator/getCharacterInstance) (.setText s))]
+    (loop [start (.first it) end (.next it) out []]
+      (if (= end java.text.BreakIterator/DONE)
+        out
+        (recur end (.next it) (conj out (subs s start end)))))))
+
+(defn- shorten
+  "`name` at most max-bytes long in UTF-8, its suffix kept, cut by whole
+   graphemes from the end of the stem."
+  [^String name]
+  (if (<= (utf-8-length name) max-bytes)
+    name
+    (let [dot (str/last-index-of name ".")
+          [stem suffix] (if (and dot (pos? dot)) [(subs name 0 dot) (subs name dot)] [name ""])
+          budget (- max-bytes (utf-8-length suffix))]
+      (str (str/trimr
+             (loop [taken [] used 0 [g & more] (graphemes stem)]
+               (let [n (when g (utf-8-length g))]
+                 (if (or (nil? g) (> (+ used n) budget))
+                   (apply str taken)
+                   (recur (conj taken g) (+ used n) more)))))
+           suffix))))
+
+(defn repair
+  "`name` as the import files it: NFC; a / , NUL or other control character
+   replaced by -; spaces trimmed at both ends; at most 255 bytes in UTF-8,
+   its suffix kept. A name with nothing to repair comes back unchanged."
+  [^String name]
+  (-> (nfc name)
+      (str/replace #"[/\p{Cntrl}]" "-")
+      str/trim
+      shorten))
