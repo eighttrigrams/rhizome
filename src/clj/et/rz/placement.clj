@@ -30,7 +30,8 @@
       one place and stays there. Placement is then free, and the hub
       wins by default: it is where the accompanying db write happens, so doing
       it there keeps one user action to one round trip.
-   2. **this-machine access** -- the OS `open` call, the Obsidian temp file, an
+   2. **this-machine access** -- the OS `open` call (`/open/`, until it went
+      with the in-app viewers), the Obsidian temp file, an
       HTTP multipart tempfile, bytes served to this browser. No sync can carry
       these; they are meaningless anywhere but the machine the human is at.
 
@@ -45,7 +46,9 @@
    only members were the four Obsidian commands (`edit-item-in-obsidian`,
    `sync-obsidian-changes`, `discard-obsidian-changes`,
    `get-obsidian-file-content`), and Obsidian support was removed on 2026-09-18
-   -- see `opener`, and the cookbook recipe it points at. So every `/ui` command
+   -- see the cookbook recipe \"Obsidian round trip: editing an item's
+   description in a real editor, with no API\" (#184); the note on it lived in
+   `et.rz.server.opener`, removed with `/open/`. So every `/ui` command
    is the hub's, and `route-placement` says `/ui` is `:hub` rather than
    `:split`. `et.rz.placement-sweep-test` ties those two statements together, so they
    cannot come apart.
@@ -148,7 +151,6 @@
      rather than by where it is used keeps the table honest."
   {"/ui"                 :hub
    "/api"                :hub
-   "/open/:file-id"      :local
    "/img-by-id/:item-id" :local
    "/upload"             :local
    "/test/reset"         :hub

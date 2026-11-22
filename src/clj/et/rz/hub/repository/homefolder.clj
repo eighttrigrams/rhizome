@@ -68,8 +68,8 @@
   [file-name]
   (when-let [k (folder-key-for file-name)]
     ;; The file as it is on disk, NFC or NFD; for one not there yet, NFC.
-    ;; Inside the folder either way, or nil: the name is free text, and
-    ;; /open/ hands it straight here (et.rz.names/path-in).
+    ;; Inside the folder either way, or nil: the name is free text
+    ;; (et.rz.names/path-in).
     (some-> (or (names/resolve-in (folder k) file-name)
                 (names/path-in (folder k) (names/nfc file-name)))
             str)))

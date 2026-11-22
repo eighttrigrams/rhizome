@@ -112,7 +112,7 @@
               (is (= 200 (:status res)))))
           (testing "file-response, as /imgs/* uses it"
             (is (same-file? on-disk (:body (names/file-response asked {:root (folder :docs)})))))
-          (testing "homefolder/get-target, behind /open/"
+          (testing "homefolder/get-target, behind move-file"
             (with-redefs [config/config (assoc-in config/config [:folders :docs] (folder :docs))]
               (let [target (io/file (home/get-target asked))]
                 (is (= (str (io/file (folder :docs))) (.getParent target)))
@@ -131,8 +131,9 @@
     (f)))
 
 (deftest get-target-stays-inside-the-folder
-  ;; Review findings 2 and 4: /open/ hands its name straight to get-target,
-  ;; whose fallback for a name not on disk joined it onto the folder unguarded.
+  ;; Review findings 2 and 4: get-target's fallback for a name not on disk
+  ;; joined it onto the folder unguarded (and /open/, since removed, handed it
+  ;; any name).
   (spit (io/file *root* "x.pdf") "outside")
   (.mkdirs (io/file (folder :docs)))
   (with-folders

@@ -13,7 +13,6 @@
             [et.rz.hub.repository :as r]
             [et.rz.hub.poll :as poll]
             [et.rz.hub.ds :as datastore]
-            [et.rz.server.opener :as opener]
             [et.rz.server.files :as files]
             [et.rz.names :as names]
             et.rz.hub.dispatch
@@ -31,8 +30,6 @@
   (:gen-class))
 
 (defn api-handler [{{msg :msg} :body}] (tap> [:resources (r/list-resources)]) {:body {:echo msg}})
-
-(defn- open [{{:keys [file-id]} :route-params}] (opener/open file-id) {:status 200})
 
 (defn- ui-intercept
   "Where a `/ui` command runs, decided per call from `placement`.
@@ -285,7 +282,6 @@
     (context "/ui" [] (POST "/" [] (api)))
     (rest-surface)
     (POST "/test/reset" [] reset-handler)
-    (GET "/open/:file-id" [] open)
     (GET "/img-by-id/:item-id" [] img-by-id-handler)
     (POST "/upload" [] (upload-surface))
     (GET "/" [] (response/resource-response "public/index.html"))

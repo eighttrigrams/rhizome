@@ -45,7 +45,8 @@
   #{"app" "obsidian"})
 
 ;; `"obsidian"` names a feature that no longer exists: the editor round trip was
-;; removed on 2026-09-18 with the hub/server split (see `opener`). The marker
+;; removed on 2026-09-18 with the hub/server split (cookbook #184, "Obsidian
+;; round trip"; the note was in et.rz.server.opener, since removed). The marker
 ;; stays in the set above, and must, because the *rows* outlive the feature --
 ;; every description the owner ever synced back from his editor carries it.
 ;; Dropping it would flip each of those lines from 1.00, sacred, to 0.00, free
