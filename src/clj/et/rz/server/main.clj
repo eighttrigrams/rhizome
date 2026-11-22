@@ -14,6 +14,7 @@
             [et.rz.hub.poll :as poll]
             [et.rz.hub.ds :as datastore]
             [et.rz.server.opener :as opener]
+            [et.rz.server.files :as files]
             et.rz.hub.dispatch
             et.rz.hub.rest-api
             [et.rz.hub.ui-api :as et.rz.hub.ui-api]
@@ -294,6 +295,7 @@
       wrap-env-defaults
       (wrap-resource "public")
       (wrap-imgs images-folder preview-images-folder)
+      files/wrap-files
       wrap-params))
 
 (defn check-folders-exist!
