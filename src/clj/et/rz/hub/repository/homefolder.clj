@@ -74,17 +74,44 @@
                 (names/path-in (folder k) (names/nfc file-name)))
             str)))
 
+(defn- taken?
+  "Whether `target` in `dir` is already another file than `from`, in either
+   Unicode form. Not the same file: on APFS the NFC form of an NFD name *is*
+   that file, and renaming it to itself is fine."
+  [^java.io.File from dir target]
+  (some (fn [form]
+          (let [f (io/file dir form)]
+            (and (.exists f)
+                 (not (java.nio.file.Files/isSameFile (.toPath from) (.toPath f))))))
+        (names/forms target)))
+
 (defn ren
+  "Rename in imports. False, without renaming, where the new name is taken:
+   File.renameTo overwrites on Linux."
   [file-name target]
   (log/info (str "Will rename " file-name " to " target))
-  (.renameTo (io/file (folder :imports) file-name)
-             (io/file (folder :imports) target)))
+  (let [from (io/file (folder :imports) file-name)]
+    (if (taken? from (folder :imports) target)
+      (do (log/error (str "Not renaming " file-name ": " target " already exists in imports"))
+          false)
+      (.renameTo from (io/file (folder :imports) target)))))
 
 (defn move-file
+  "Move out of imports into the file's folder. Throws rather than overwrite
+   (File.renameTo would, on Linux) or leave a failed move unsaid."
   [file-name]
   (let [target (get-target file-name)]
     (log/info (str "Will move " file-name " to " target))
-    (.renameTo (io/file (folder :imports) file-name) (io/file target))))
+    (cond
+      (nil? target)
+      (throw (Exception. (str "No place to move " file-name " to")))
+
+      ;; get-target answers the file on disk where there is one, in either form
+      (.exists (io/file target))
+      (throw (Exception. (str "Not moving " file-name ": " target " already exists")))
+
+      (not (.renameTo (io/file (folder :imports) file-name) (io/file target)))
+      (throw (Exception. (str "Could not move " file-name " to " target))))))
 
 (defn list-files
   []

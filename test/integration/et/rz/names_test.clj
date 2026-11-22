@@ -139,6 +139,46 @@
        (testing asked
          (is (nil? (home/get-target asked)))))))
 
+(deftest ren-does-not-overwrite
+  ;; Review finding 3: File.renameTo overwrites on Linux.
+  (put! :imports "a.pdf")
+  (put! :imports "b.pdf")
+  (with-folders
+    #(do
+       (is (false? (home/ren "a.pdf" "b.pdf")))
+       (is (= "a.pdf" (slurp (io/file (folder :imports) "a.pdf"))))
+       (is (= "b.pdf" (slurp (io/file (folder :imports) "b.pdf"))))
+       (testing "to a free name it renames"
+         (is (true? (home/ren "a.pdf" "c.pdf")))
+         (is (.exists (io/file (folder :imports) "c.pdf")))))))
+
+(deftest move-file-does-not-overwrite
+  (put! :imports "a.pdf")
+  (put! :docs "a.pdf")
+  (spit (io/file (folder :docs) "a.pdf") "the one already filed")
+  (with-folders
+    #(do
+       (is (thrown-with-msg? Exception #"already exists" (home/move-file "a.pdf")))
+       (is (= "the one already filed" (slurp (io/file (folder :docs) "a.pdf"))))
+       (is (.exists (io/file (folder :imports) "a.pdf")))
+       (testing "to a free place it moves"
+         (put! :imports "b.pdf")
+         (is (nil? (home/move-file "b.pdf")))
+         (is (.exists (io/file (folder :docs) "b.pdf")))
+         (is (not (.exists (io/file (folder :imports) "b.pdf"))))))))
+
+(deftest an-import-whose-rename-fails-files-nothing
+  (let [calls (atom [])]
+    (with-redefs [home/list-files (constantly [nfd-name])
+                  home/supported-file-type? (constantly true)
+                  home/importable? (constantly true)
+                  home/ren (fn [from to] (swap! calls conj [:ren from to]) false)
+                  home/move-file (fn [n] (swap! calls conj [:move n]))
+                  file/ingest (fn [_ n _ _] (swap! calls conj [:ingest n]))
+                  common/get-item-or-throw-error (constantly 1)]
+      (batch/ingest nil "IMPORT" nil nil))
+    (is (= [[:ren nfd-name (names/nfc nfd-name)]] @calls))))
+
 (deftest the-traversal-guard-holds-in-every-form
   (on-utf-8-paths
     (spit (io/file *root* (str "J" "ü" "rgen.pdf")) "outside")

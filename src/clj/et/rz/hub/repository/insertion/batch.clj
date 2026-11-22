@@ -22,9 +22,15 @@
                  (if-not (home/importable? file-name)
                    (log/warn (str "Skipping " orig-file-name
                                   " -- its destination folder does not exist; left in imports."))
-                   (do
-                     (when-not (= orig-file-name file-name) (home/ren orig-file-name file-name))
-                     (log/info (str "Importing " file-name " ... "))
-                     (try (file/ingest db file-name #{import-id} nil)
-                          (home/move-file file-name)
-                          (catch Exception e (log/error (.getMessage e))))))))))))
+                   (if (and (not= orig-file-name file-name)
+                            (not (home/ren orig-file-name file-name)))
+                     ;; The rename failed (the name is taken, say): the file
+                     ;; stays in imports under its old name, and is not filed
+                     ;; under a name it does not have.
+                     (log/error (str "Skipping " orig-file-name
+                                     " -- could not rename it to " file-name "; left in imports."))
+                     (do
+                       (log/info (str "Importing " file-name " ... "))
+                       (try (file/ingest db file-name #{import-id} nil)
+                            (home/move-file file-name)
+                            (catch Exception e (log/error (.getMessage e)))))))))))))
