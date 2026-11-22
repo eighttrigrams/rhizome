@@ -63,31 +63,59 @@
      (println "SKIPPED (this JVM's sun.jnu.encoding is" (System/getProperty "sun.jnu.encoding")
               "-- run under LC_ALL=C.UTF-8):" ~(str *ns*))))
 
+(defn- separate-spellings?
+  "Whether the filesystem under `dir` keeps NFC and NFD apart, as Linux does.
+   APFS on a Mac does not: there a file written in one form is found in the
+   other, and the two cannot both exist. Probed by making both and counting."
+  [dir]
+  (let [probe (io/file dir "probe")]
+    (.mkdirs probe)
+    (spit (io/file probe (names/nfc "\u00fc")) "c")
+    (spit (io/file probe (names/nfd "\u00fc")) "d")
+    (let [n (count (.list probe))]
+      (doseq [^java.io.File f (.listFiles probe)] (.delete f))
+      (.delete probe)
+      (= 2 n))))
+
 (deftest both-forms-on-disk-each-found-by-both
   (on-utf-8-paths
     (put! :docs nfc-name)
     (put! :docs nfd-name)
-    (testing "the disk really holds two different spellings"
-      (is (= #{nfc-name nfd-name} (set (.list (io/file (folder :docs))))))
-      (is (not (.exists (io/file (folder :docs) (names/nfd nfc-name)))))
-      (is (not (.exists (io/file (folder :docs) (names/nfc nfd-name))))))
-    (doseq [[on-disk asked] [[nfc-name nfc-name]
-                             [nfc-name (names/nfd nfc-name)]
-                             [nfd-name nfd-name]
-                             [nfd-name (names/nfc nfd-name)]]]
-      (testing (str "on disk " (if (= on-disk nfc-name) "NFC" "NFD")
-                    ", asked " (if (= asked (names/nfc asked)) "NFC" "NFD"))
-        (testing "resolve-in"
-          (is (= on-disk (some-> (names/resolve-in (folder :docs) asked) .getName))))
-        (testing "/files/"
-          (let [res ((files/wrap-files (constantly {:status 418}) (constantly {:docs (folder :docs)}))
-                     (mock/request :get (str "/files/" (url asked))))]
-            (is (= 200 (:status res)))))
-        (testing "file-response, as /imgs/* uses it"
-          (is (= on-disk (some-> (names/file-response asked {:root (folder :docs)}) :body .getName))))
-        (testing "homefolder/get-target, behind /open/"
-          (with-redefs [config/config (assoc-in config/config [:folders :docs] (folder :docs))]
-            (is (= (str (io/file (folder :docs) on-disk)) (home/get-target asked)))))))))
+    (let [separate? (separate-spellings? *root*)
+          ;; Where the filesystem keeps the forms apart (Linux), the very file
+          ;; on disk must come back. Where it does not (APFS), the name comes
+          ;; back as asked, and it is the same name only up to normalisation.
+          same-file? (fn [on-disk ^java.io.File f]
+                       (and f (if separate?
+                                (= on-disk (.getName f))
+                                (= (names/nfc on-disk) (names/nfc (.getName f))))))]
+      (when-not separate?
+        (println "NOTE: this filesystem takes NFC and NFD for one name (APFS?);"
+                 "the cases that need both on disk at once are left out:" (str *root*)))
+      (when separate?
+        (testing "the disk really holds two different spellings"
+          (is (= #{nfc-name nfd-name} (set (.list (io/file (folder :docs))))))
+          (is (not (.exists (io/file (folder :docs) (names/nfd nfc-name)))))
+          (is (not (.exists (io/file (folder :docs) (names/nfc nfd-name)))))))
+      (doseq [[on-disk asked] [[nfc-name nfc-name]
+                               [nfc-name (names/nfd nfc-name)]
+                               [nfd-name nfd-name]
+                               [nfd-name (names/nfc nfd-name)]]]
+        (testing (str "on disk " (if (= on-disk nfc-name) "NFC" "NFD")
+                      ", asked " (if (= asked (names/nfc asked)) "NFC" "NFD"))
+          (testing "resolve-in"
+            (is (same-file? on-disk (names/resolve-in (folder :docs) asked))))
+          (testing "/files/"
+            (let [res ((files/wrap-files (constantly {:status 418}) (constantly {:docs (folder :docs)}))
+                       (mock/request :get (str "/files/" (url asked))))]
+              (is (= 200 (:status res)))))
+          (testing "file-response, as /imgs/* uses it"
+            (is (same-file? on-disk (:body (names/file-response asked {:root (folder :docs)})))))
+          (testing "homefolder/get-target, behind /open/"
+            (with-redefs [config/config (assoc-in config/config [:folders :docs] (folder :docs))]
+              (let [target (io/file (home/get-target asked))]
+                (is (= (str (io/file (folder :docs))) (.getParent target)))
+                (is (same-file? on-disk target))))))))))
 
 (deftest get-target-for-a-file-not-there-yet-is-nfc
   (with-redefs [config/config (assoc-in config/config [:folders :docs] (folder :docs))]
