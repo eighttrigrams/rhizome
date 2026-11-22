@@ -41,19 +41,16 @@ const PNG = Buffer.from(
 // Mirrors the corner-padding of ui.floating-player, which the viewer matches.
 const PADDING = 20;
 
-// What /open/ was asked for, per page. The route answers it here, so nothing
-// reaches the server's `open` -- there is no Mac in the box to open it on, and
-// the request going out is the whole of what the app does about it.
-const opened = new WeakMap<any, string[]>();
+// What the browser downloaded, per page, by the name it would save under.
+// Option+click on the green badge downloads the file (/files/<name>?download);
+// it used to send it to /open/, the server machine's own viewer.
+const downloaded = new WeakMap<any, string[]>();
 
-async function watchOpens(page: any) {
-  if (opened.has(page)) return;
+async function watchDownloads(page: any) {
+  if (downloaded.has(page)) return;
   const seen: string[] = [];
-  opened.set(page, seen);
-  await page.route("**/open/**", async (route: any) => {
-    seen.push(decodeURIComponent(new URL(route.request().url()).pathname.slice("/open/".length)));
-    await route.fulfill({ status: 200, body: "" });
-  });
+  downloaded.set(page, seen);
+  page.on("download", (d: any) => seen.push(d.suggestedFilename()));
 }
 
 // The list is newest first (updated_at_ctx, and updated_at outside a context),
@@ -177,7 +174,7 @@ When(
 );
 
 When("I click the green badge of {string}", async ({ page }, title: string) => {
-  await watchOpens(page);
+  await watchDownloads(page);
   await card(page, title).locator(".badge", { hasText: "🟢" }).click();
   await settle(page);
   // Only with a viewer up. Without one -- a file that is not an image -- the
@@ -186,7 +183,7 @@ When("I click the green badge of {string}", async ({ page }, title: string) => {
 });
 
 When("I Option+click the green badge of {string}", async ({ page }, title: string) => {
-  await watchOpens(page);
+  await watchDownloads(page);
   await card(page, title).locator(".badge", { hasText: "🟢" }).click({ modifiers: ["Alt"] });
   await settle(page);
 });
@@ -209,7 +206,7 @@ When("I open the context {string} from the list", async ({ page }, title: string
 });
 
 When("I click the green badge of {string} in the lhs", async ({ page }, title: string) => {
-  await watchOpens(page);
+  await watchDownloads(page);
   await page.locator("#lhs-component li.item-card").filter({ hasText: title }).first()
     .locator(".badge", { hasText: "🟢" }).click();
   await settle(page);
@@ -217,7 +214,7 @@ When("I click the green badge of {string} in the lhs", async ({ page }, title: s
 
 // The card at the second place the item stands, for an item listed twice.
 When("I click the green badge of the 2nd {string}", async ({ page }, title: string) => {
-  await watchOpens(page);
+  await watchDownloads(page);
   await page.locator("#rhs-component li.item-card").filter({ hasText: title }).nth(1)
     .locator(".badge", { hasText: "🟢" }).click();
   await settle(page);
@@ -459,9 +456,9 @@ Then("the app behind the viewer should be as it was", async ({ page }) => {
 });
 
 Then(
-  "the file {string} should have been sent to the system's viewer",
+  "the file {string} should have been downloaded",
   async ({ page }, file: string) => {
-    await expect.poll(() => opened.get(page)).toContain(file);
+    await expect.poll(() => downloaded.get(page)).toContain(file);
   },
 );
 

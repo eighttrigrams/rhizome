@@ -2,20 +2,29 @@
   (:require [ui.actions :as actions]
             [ui.image-viewer :as image-viewer]))
 
+(defn- download!
+  "Have the browser download `file`: a link with the download attribute,
+   clicked and dropped. The server's Content-Disposition names it."
+  [file]
+  (let [a (.createElement js/document "a")]
+    (set! (.-href a) (image-viewer/download-href file))
+    (set! (.-download a) "")
+    (.appendChild (.-body js/document) a)
+    (.click a)
+    (.remove a)))
+
 (defn- open-file!
   "The green badge. Every file opens in the app's own viewer, which shows what
-   the browser can show and offers the rest to download. Option+click still
-   sends it out to the server machine's system viewer (/open/), the way every
-   click used to -- kept for now, while the server is the Mac in front of the
-   owner."
+   the browser can show and offers the rest to download. Option+click
+   downloads it, whatever its kind -- the owner's \"option+click becomes
+   download\". It used to send the file to the server machine's own viewer
+   (/open/, macOS `open`), which only ever worked with the browser sitting at
+   the server's Mac."
   [e {:keys [file] :as link}]
   (.stopPropagation e)
-  (if-not (.-altKey e)
-    (image-viewer/open! link)
-    ;; encodeURIComponent, not encodeURI: a # or a ? in the name is otherwise
-    ;; taken for the start of a fragment or a query, and the server is asked
-    ;; for the name cut short there. Compojure decodes the route param.
-    (js/fetch (str "/open/" (js/encodeURIComponent file)))))
+  (if (.-altKey e)
+    (download! file)
+    (image-viewer/open! link)))
 
 (defn component
   [*state contexts]

@@ -4,7 +4,7 @@
 
    The green badge used to hand every file to the Mac's own viewer (/open/...),
    which only works when the browser sits at the server's Mac. Now a plain click
-   opens every file here; Option+click still goes out. See
+   opens every file here, and Option+click downloads it. See
    ui.main.context-badges. The name is the image viewer's still, because that is
    what it was first, and its ids and classes are that one's.
 
@@ -219,7 +219,11 @@
 ;; read as the start of a fragment or a query. The server url-decodes it.
 (defn- file-src [file] (str "/files/" (js/encodeURIComponent file)))
 
-(defn- download-href [file] (str (file-src file) "?download"))
+(defn download-href
+  "Where `file` is sent as an attachment (Content-Disposition), for the
+   Download button and for Option+click on the green badge."
+  [file]
+  (str (file-src file) "?download"))
 
 (def ^:private rest-ms
   "How long the owner has to stay on an image before its file is asked for.

@@ -5,7 +5,7 @@ Feature: Documents, sounds and videos open in the app
   anything the browser cannot show with a word that it cannot, and the file to
   download. They are served from /files/, which answers the Range requests a
   player seeks with. Back and forth step through pictures only: any other file
-  opens alone. Option+click still sends a file out to the system's viewer.
+  opens alone. Option+click downloads a file of any kind.
 
   Background:
     Given I am on the app
@@ -81,7 +81,7 @@ Feature: Documents, sounds and videos open in the app
     Then the viewer should show the audio "e2e-bell.mp3"
     And the viewer should offer no stepping
 
-  Scenario: Option+click still sends a video out
+  Scenario: Option+click downloads a video
     When I Option+click the green badge of "Harbour film"
-    Then the file "e2e-harbour.mp4" should have been sent to the system's viewer
+    Then the file "e2e-harbour.mp4" should have been downloaded
     And the image viewer should be gone

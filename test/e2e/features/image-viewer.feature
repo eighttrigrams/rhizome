@@ -1,8 +1,8 @@
 Feature: Images open in the app
 
   The green badge of an item with an image file opens the image over nearly the
-  whole window, instead of in the system's own viewer. Option+click still sends
-  it out there. In the viewer, back and forth step through the images of the
+  whole window, instead of in the system's own viewer. Option+click downloads
+  it. In the viewer, back and forth step through the images of the
   list as it is on screen, in its order, and pass over the items whose file is
   not an image. (Other kinds of file open in the same viewer: see
   file-viewer.feature.)
@@ -116,14 +116,14 @@ Feature: Images open in the app
     And I click the viewer's backdrop
     Then the image viewer should be gone
 
-  Scenario: Option+click sends the image out, as every click used to
+  Scenario: Option+click downloads the image
     When I Option+click the green badge of "Lighthouse"
-    Then the file "e2e-lighthouse.png" should have been sent to the system's viewer
+    Then the file "e2e-lighthouse.png" should have been downloaded
     And the image viewer should be gone
 
-  Scenario: A file that is not an image goes out on Option+click as well
+  Scenario: A file that is not an image is downloaded on Option+click as well
     When I Option+click the green badge of "Tax letter"
-    Then the file "e2e-tax-letter.pdf" should have been sent to the system's viewer
+    Then the file "e2e-tax-letter.pdf" should have been downloaded
     And the image viewer should be gone
 
   Scenario: A name with a space and a # survives both ways
@@ -134,7 +134,7 @@ Feature: Images open in the app
     And the image should have loaded
     When I press "Escape" in the viewer
     And I Option+click the green badge of "Night swim"
-    Then the file "e2e-night swim #2.png" should have been sent to the system's viewer
+    Then the file "e2e-night swim #2.png" should have been downloaded
 
   Scenario: Opened from the left-hand card, it shows the picture alone
     # A context with a file of its own, selected: its card is on the left, and
