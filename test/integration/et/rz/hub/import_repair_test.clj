@@ -144,6 +144,22 @@
   (is (= #{"   .pdf" " .hidden.jpg"} (in :imports)))
   (is (empty? (in :images))))
 
+(deftest only-the-top-level-of-imports-is-imported
+  ;; Second review, finding 4: list-files used file-seq, and a file in a
+  ;; subfolder -- Syncthing's .stversions/, a folder the human made -- was
+  ;; listed by its bare name, as if it lay in imports.
+  (let [sub (io/file (folder :imports) ".stversions")
+        deeper (io/file (folder :imports) "Holiday")]
+    (.mkdirs sub) (.mkdirs deeper)
+    (spit (io/file sub "old copy.pdf") "%PDF-1.4")
+    (spit (io/file deeper "inside.pdf") "%PDF-1.4")
+    (arrive! "top.pdf" pdf)
+    (with-redefs [config/config (assoc-in config/config [:folders :imports] (folder :imports))]
+      (is (= ["top.pdf"] (vec (home/list-files)))))
+    (is (= ["top.pdf"] (import!)))
+    (is (.exists (io/file sub "old copy.pdf")))
+    (is (.exists (io/file deeper "inside.pdf")))))
+
 (deftest two-names-that-repair-to-one
   ;; Today's behaviour, kept: the second is refused ("File already exists")
   ;; and stays in imports -- under its repaired name, which it was given

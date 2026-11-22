@@ -119,6 +119,9 @@
     (do (log/warn (str "Imports folder does not exist: " (folder :imports)
                        " -- cannot import anything."))
         [])
-    (->> (vec (file-seq (io/file (folder :imports))))
-         (filter #(not (.isDirectory %)))
-         (map #(.getName %)))))
+    ;; The top level only, regular files only: file-seq walked subfolders too
+    ;; and gave their files by bare name, which then do not exist in imports
+    ;; -- Syncthing's .stversions/, for one.
+    (->> (.listFiles (io/file (folder :imports)))
+         (filter #(.isFile ^java.io.File %))
+         (map #(.getName ^java.io.File %)))))
