@@ -18,6 +18,7 @@
             [et.rz.hub.repository.homefolder :as home]
             [et.rz.hub.repository.insertion.batch :as batch]
             [et.rz.hub.repository.insertion.arrival :as arrival]
+            [et.rz.hub.repository.insertion.unique :as unique]
             [et.rz.hub.repository.insertion.common :as common]
             [et.rz.hub.repository.insertion.file :as file])
   (:import (java.nio.file Files)
@@ -180,7 +181,8 @@
                   common/get-item-or-throw-error (constantly 1)
                   ;; no files behind these names: nothing to settle or check
                   arrival/unsettled (constantly #{})
-                  arrival/content-problem (constantly nil)]
+                  arrival/content-problem (constantly nil)
+                  unique/free-name (fn [_ _ _ n] n)]
       (batch/ingest nil "IMPORT" nil nil))
     (is (= [[:ren nfd-name (names/nfc nfd-name)]] @calls))))
 
@@ -205,7 +207,8 @@
                   common/get-item-or-throw-error (constantly 1)
                   ;; no files behind these names: nothing to settle or check
                   arrival/unsettled (constantly #{})
-                  arrival/content-problem (constantly nil)]
+                  arrival/content-problem (constantly nil)
+                  unique/free-name (fn [_ _ _ n] n)]
       (batch/ingest nil "IMPORT" nil nil))
     (is (= [[:ren nfd-name (names/nfc nfd-name)]
             [:ingest (names/nfc nfd-name)]

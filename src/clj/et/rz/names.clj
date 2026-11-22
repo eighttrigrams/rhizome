@@ -140,22 +140,34 @@
         out
         (recur end (.next it) (conj out (subs s start end)))))))
 
-(defn- shorten
-  "`name` at most max-bytes long in UTF-8, its suffix kept, cut by whole
-   graphemes from the end of the stem."
+(defn- split-suffix
+  "[stem suffix] of `name`, the suffix with its dot; a leading dot is no suffix."
   [^String name]
-  (if (<= (utf-8-length name) max-bytes)
-    name
-    (let [dot (str/last-index-of name ".")
-          [stem suffix] (if (and dot (pos? dot)) [(subs name 0 dot) (subs name dot)] [name ""])
-          budget (- max-bytes (utf-8-length suffix))]
+  (let [dot (str/last-index-of name ".")]
+    (if (and dot (pos? dot)) [(subs name 0 dot) (subs name dot)] [name ""])))
+
+(defn- fit
+  "stem + `tag` + suffix of `name`, at most max-bytes long in UTF-8: the stem
+   cut by whole graphemes from its end where it has to be, never the tag or
+   the suffix."
+  [^String name ^String tag]
+  (let [[stem suffix] (split-suffix name)
+        budget (- max-bytes (utf-8-length tag) (utf-8-length suffix))]
+    (if (<= (+ (utf-8-length stem) (utf-8-length tag) (utf-8-length suffix)) max-bytes)
+      (str stem tag suffix)
       (str (str/trimr
              (loop [taken [] used 0 [g & more] (graphemes stem)]
                (let [n (when g (utf-8-length g))]
                  (if (or (nil? g) (> (+ used n) budget))
                    (apply str taken)
                    (recur (conj taken g) (+ used n) more)))))
-           suffix))))
+           tag suffix))))
+
+(defn- shorten
+  "`name` at most max-bytes long in UTF-8, its suffix kept, cut by whole
+   graphemes from the end of the stem."
+  [^String name]
+  (fit name ""))
 
 (defn repair
   "`name` as the import files it: NFC; a / , NUL or other control character
@@ -179,3 +191,26 @@
     (cond
       (str/starts-with? name ".") "after repair it would start with a dot (a hidden file)"
       (str/blank? stem) "after repair nothing is left before its suffix")))
+
+
+;; ## A second file of the same name
+;;
+;; The owner: "import the second as (2)". Files come from four Macs, and two of
+;; them can carry one name; the second is filed as `name (2).ext`, then (3)...
+
+(defn numbered
+  "`name` as the `n`th of its name: `stem (n).suffix`, at most 255 bytes --
+   the stem shortened for the number, never the number or the suffix. The
+   number goes after the whole stem, also one that already ends in a number
+   (\"x (2).pdf\" taken gives \"x (2) (2).pdf\"): two different files
+   are never read as one counted on."
+  [^String name n]
+  (fit name (str " (" n ")")))
+
+(defn first-free
+  "`name` if `taken?` says it is free, else the first free `numbered` one,
+   from 2 on."
+  [taken? name]
+  (if-not (taken? name)
+    name
+    (->> (iterate inc 2) (map #(numbered name %)) (remove taken?) first)))

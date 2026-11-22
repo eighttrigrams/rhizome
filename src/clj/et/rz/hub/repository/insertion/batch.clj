@@ -7,6 +7,7 @@
             [et.rz.config :as config]
             [clojure.java.io :as io]
             [et.rz.hub.repository.insertion.arrival :as arrival]
+            [et.rz.hub.repository.insertion.unique :as unique]
             [et.rz.hub.repository.insertion.common :as common]))
 
 (defn match? [title] (str/starts-with? title "IMPORT"))
@@ -44,23 +45,32 @@
                                 " (" (pr-str file-name) "); left in imports."))
                  (try
                    (when (home/supported-file-type? file-name)
-                     (if-not (home/importable? file-name)
-                       (log/warn (str "Skipping " orig-file-name
-                                      " -- its destination folder does not exist; left in imports."))
-                       (if-let [problem (arrival/content-problem (io/file dir orig-file-name) file-name)]
-                         (log/warn (str "Skipping " orig-file-name " -- " problem "; left in imports."))
-                         (if (and (not= orig-file-name file-name)
-                                  (not (home/ren orig-file-name file-name)))
-                           ;; The rename failed (the name is taken, say): the file
-                           ;; stays in imports under its old name, and is not filed
-                           ;; under a name it does not have.
-                           (log/error (str "Skipping " orig-file-name
-                                           " -- could not rename it to " file-name "; left in imports."))
-                           (do
-                             (log/info (str "Importing " file-name " ... "))
-                             (try (file/ingest db file-name #{import-id} nil)
-                                  (home/move-file file-name)
-                                  (catch Exception e (log/error (.getMessage e)))))))))
+                     (let [wanted-name file-name
+                           ;; Taken already -- in a media folder, by an item, or
+                           ;; by another file here: filed as "name (2).ext", the
+                           ;; first free number (the owner: "import the second
+                           ;; as (2)"; insertion/unique).
+                           file-name (unique/free-name db dir orig-file-name file-name)]
+                       (when (not= wanted-name file-name)
+                         (log/info (str "Numbering the name " (pr-str wanted-name) " -> " (pr-str file-name)
+                                        ": the name is taken")))
+                       (if-not (home/importable? file-name)
+                         (log/warn (str "Skipping " orig-file-name
+                                        " -- its destination folder does not exist; left in imports."))
+                         (if-let [problem (arrival/content-problem (io/file dir orig-file-name) file-name)]
+                           (log/warn (str "Skipping " orig-file-name " -- " problem "; left in imports."))
+                           (if (and (not= orig-file-name file-name)
+                                    (not (home/ren orig-file-name file-name)))
+                             ;; The rename failed (the name is taken, say): the file
+                             ;; stays in imports under its old name, and is not filed
+                             ;; under a name it does not have.
+                             (log/error (str "Skipping " orig-file-name
+                                             " -- could not rename it to " file-name "; left in imports."))
+                             (do
+                               (log/info (str "Importing " file-name " ... "))
+                               (try (file/ingest db file-name #{import-id} nil)
+                                    (home/move-file file-name)
+                                    (catch Exception e (log/error (.getMessage e))))))))))
                    (catch java.io.IOException e
                      (log/warn (str "Skipping " orig-file-name " -- it cannot be read ("
                                     (.getMessage e) "); left in imports."))))))))))

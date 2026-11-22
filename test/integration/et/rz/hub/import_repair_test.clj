@@ -21,12 +21,18 @@
             [et.rz.hub.repository.insertion.batch :as batch]
             [et.rz.hub.repository.insertion.common :as common]
             [et.rz.hub.repository.insertion.file :as file]
-            [et.rz.hub.repository.homefolder :as home])
+            [et.rz.hub.repository.homefolder :as home]
+            [et.rz.hub.ds :as datastore])
   (:import (java.nio.file Files)
            (java.nio.file.attribute FileAttribute)))
 
 (def ^:private pdf (.getBytes "%PDF-1.4\n%%EOF\n" "ISO-8859-1"))
 (def ^:private mp3 (byte-array (concat [(unchecked-byte 0xff) (unchecked-byte 0xfb) (unchecked-byte 0x90) (unchecked-byte 0xc0)] (repeat 60 0))))
+
+(def ^:dynamic *items*
+  "The file names the db holds, this test's: what the stubbed file/ingest
+   stored, and what a test puts there as an item made before."
+  nil)
 
 (def ^:dynamic *root* nil)
 
@@ -36,6 +42,7 @@
   (fn [t]
     (let [root (.toFile (Files/createTempDirectory "rhizome-import-test" (make-array FileAttribute 0)))]
       (binding [*root* root
+                *items* (atom #{})
                 ;; a short look, for speed; the test of a growing file sets its own
                 arrival/*look-ms* 100]
         (doseq [k [:imports :docs :audio :video :images]] (.mkdirs (io/file (folder k))))
@@ -56,15 +63,20 @@
 (defn- in [k] (set (.list (io/file (folder k)))))
 
 (defn- import!
-  "Run the batch import; the names it would have stored in the db, in order."
+  "Run the batch import; the names it would have stored in the db, in order.
+   The db stands in as *items*: the write stubbed, but not the checks around
+   it -- file/ingest's \"File already exists\" refusal, and the lookup by
+   file name that decides whether a name is taken (insertion/unique)."
   []
   (let [stored (atom [])]
     (with-redefs [config/config (update config/config :folders merge
                                         (into {} (map (fn [k] [k (folder k)])) [:imports :docs :audio :video :images]))
                   common/get-item-or-throw-error (constantly 1)
-                  ;; the db write stubbed, but not the check it starts with:
-                  ;; the "File already exists" refusal is file/ingest's own
-                  file/ingest (fn [_ n _ _] (home/validate-not-exists n) (swap! stored conj n))]
+                  datastore/get-item-by-path (fn [_ _ n] (when (contains? @*items* n) {:id 1}))
+                  file/ingest (fn [_ n _ _]
+                                (home/validate-not-exists n)
+                                (swap! *items* conj n)
+                                (swap! stored conj n))]
       (batch/ingest nil "IMPORT" nil nil))
     @stored))
 
@@ -161,15 +173,52 @@
     (is (.exists (io/file deeper "inside.pdf")))))
 
 (deftest two-names-that-repair-to-one
-  ;; Today's behaviour, kept: the second is refused ("File already exists")
-  ;; and stays in imports -- under its repaired name, which it was given
-  ;; before the refusal. Nothing is overwritten, nothing filed twice.
+  ;; The owner: "import the second as (2)". " same.pdf" repairs to the name
+  ;; "same.pdf" has: both are filed, one of them numbered.
   (arrive! "same.pdf" pdf)
   (arrive! " same.pdf" pdf)
-  (let [stored (import!)]
-    (is (= ["same.pdf"] stored))
-    (is (= #{"same.pdf"} (in :docs)))
-    (is (= 1 (count (in :imports))))))
+  (is (= #{"same.pdf" "same (2).pdf"} (set (import!))))
+  (is (= #{"same.pdf" "same (2).pdf"} (in :docs)))
+  (is (empty? (in :imports))))
+
+;; ## Duplicates
+
+(deftest a-name-taken-in-the-folder-is-numbered
+  (spit (io/file (folder :docs) "letter.pdf") "the first, filed before")
+  (arrive! "letter.pdf" pdf)
+  (is (= ["letter (2).pdf"] (import!)))
+  (testing "the next one after that is (3)"
+    (arrive! "letter.pdf" pdf)
+    (is (= ["letter (3).pdf"] (import!))))
+  (testing "the existing file is neither renamed nor overwritten"
+    (is (= "the first, filed before" (slurp (io/file (folder :docs) "letter.pdf")))))
+  (is (= #{"letter.pdf" "letter (2).pdf" "letter (3).pdf"} (in :docs))))
+
+(deftest a-name-only-the-db-has-is-numbered
+  ;; An item has the name, its file is gone from the folder: still taken.
+  (swap! *items* conj "gone.pdf")
+  (arrive! "gone.pdf" pdf)
+  (is (= ["gone (2).pdf"] (import!))))
+
+(deftest a-name-taken-in-the-other-unicode-form-is-numbered
+  (if-not (names/utf-8-paths?)
+    (println "SKIPPED (sun.jnu.encoding" (names/path-encoding) "): a-name-taken-in-the-other-unicode-form-is-numbered")
+    (let [nfc "M\u00fcller.pdf"]
+      (spit (io/file (folder :docs) nfc) "filed before")
+      (arrive! (names/nfd nfc) pdf)
+      (is (= ["M\u00fcller (2).pdf"] (import!)))
+      (is (= "filed before" (slurp (io/file (folder :docs) nfc)))))))
+
+(deftest a-numbered-name-stays-within-255-bytes
+  (if-not (names/utf-8-paths?)
+    (println "SKIPPED (sun.jnu.encoding" (names/path-encoding) "): a-numbered-name-stays-within-255-bytes")
+    (let [long-name (str (apply str (repeat 125 "\u00fc")) ".pdf")] ; 254 bytes
+      (spit (io/file (folder :docs) long-name) "filed before")
+      (arrive! long-name pdf)
+      (let [[filed] (import!)]
+        (is (<= (alength (.getBytes ^String filed "UTF-8")) 255))
+        (is (str/ends-with? filed "\u00fc (2).pdf"))
+        (is (.exists (io/file (folder :docs) filed)))))))
 
 ;; ## The pieces
 
@@ -199,6 +248,16 @@
   (is (re-find #"dot" (names/unusable ".hidden.jpg")))
   (is (re-find #"nothing" (names/unusable "")))
   (is (re-find #"nothing" (names/unusable "   "))))
+
+(deftest numbered-and-first-free
+  (is (= "x (2).pdf" (names/numbered "x.pdf" 2)))
+  (is (= "x (2) (2).pdf" (names/numbered "x (2).pdf" 2)))
+  (is (= "noext (3)" (names/numbered "noext" 3)))
+  (is (= "x.pdf" (names/first-free #{} "x.pdf")))
+  (is (= "x (3).pdf" (names/first-free #{"x.pdf" "x (2).pdf"} "x.pdf")))
+  (let [r (names/numbered (str (apply str (repeat 200 "\u00fc")) ".pdf") 12)]
+    (is (= 255 (alength (.getBytes r "UTF-8"))))
+    (is (str/ends-with? r "\u00fc (12).pdf"))))
 
 (deftest content-checks
   (let [f (fn [file-name bytes]
