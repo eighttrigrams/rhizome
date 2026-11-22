@@ -1,25 +1,52 @@
 (ns ui.image-viewer
-  "An item's image file, shown over nearly the whole window, with a way to step
-   to the previous and next image in the list.
+  "An item's file, shown over nearly the whole window, with a way to step to
+   the previous and next file of its kind in the list.
 
-   The green badge used to hand every file to the Mac's own viewer (/open/...).
-   For an image it now opens here; Option+click still goes out, and every other
-   kind of file goes out as before -- there is nothing in the app to show a pdf
-   or an mp4 in. See ui.main.context-badges.
+   The green badge used to hand every file to the Mac's own viewer (/open/...),
+   which only works when the browser sits at the server's Mac. Now a plain click
+   opens every file here; Option+click still goes out. See
+   ui.main.context-badges. The name is the image viewer's still, because that is
+   what it was first, and its ids and classes are that one's.
 
-   ## Which images, in which order
+   ## What is shown, by kind
+
+   The kind is the file's suffix, as et.rz.hub.repository.homefolder files it:
+
+   - a picture (jpg jpeg png webp): an <img> from /imgs/, as it always was;
+   - a video (mp4 mov): <video controls>, from /files/;
+   - audio (mp3 wav ogg m4a): <audio controls>, from /files/;
+   - a pdf: in an <iframe>, the browser's own pdf viewer, from /files/;
+   - anything else (flv, tiff, ...): not shown; it says so, and offers the file
+     to download.
+
+   A video or a sound the browser cannot play after all (a mov whose codec it
+   lacks) ends the same way: said so, with the download offered. Every kind has
+   the Download button in the bar, for a file that is to go to a Mac app.
+   /files/ is et.rz.server.files, which does the Range requests a media element
+   seeks with.
+
+   ## Stepping: within the kind that is open
+
+   ← and → go to the previous and next file of the same kind: from a picture
+   through the pictures, as before, from a video through the videos. Through
+   every file instead, a pdf or a sound would stand between two photos of an
+   album, and step by step the player would start and stop. It is the simplest
+   rule that keeps what the image viewer did.
+
+   ## Which files, in which order
 
    The right-hand list, `(:items @*state)`, as it is on screen: it already is
    the context with its secondary contexts, the filters, the search and the
    hierarchy mode applied, which is exactly \"the selection as we see it\". The
-   viewer walks it in order and skips whatever has no image file. It is read on
+   viewer walks it in order and skips whatever has no file of the kind. It is read on
    every render rather than copied when the viewer opens, so a list that changes
    underneath is the list that is stepped through.
 
    An image counts by its file's suffix, the same four that
    et.rz.hub.repository.homefolder files under :images -- which is also what
    makes /imgs/<file> the address it is served at. tiff goes to :docs there, and
-   a browser cannot draw it anyway, so it is not an image here either.
+   a browser cannot draw it anyway, so it is not an image here either, but one
+   of the files that cannot be shown.
 
    ## Why what is open lives in this namespace, not in *state
 
@@ -102,13 +129,20 @@
 
 (defonce ^:private *open (r/atom nil))
 
-(def ^:private image-suffixes #{"jpg" "jpeg" "png" "webp"})
+(def ^:private kinds
+  {"jpg" :image "jpeg" :image "png" :image "webp" :image
+   "mp4" :video "mov" :video
+   "mp3" :audio "wav" :audio "ogg" :audio "m4a" :audio
+   "pdf" :pdf})
 
-(defn image-file?
+(defn kind
+  "What `file` is shown as: :image :video :audio :pdf, :other for any other
+   name, nil for no file."
   [file]
-  (boolean (when (string? file)
-             (when-let [idx (str/last-index-of file ".")]
-               (image-suffixes (str/lower-case (subs file (inc idx))))))))
+  (when (and (string? file) (not (str/blank? file)))
+    (or (when-let [idx (str/last-index-of file ".")]
+          (kinds (str/lower-case (subs file (inc idx)))))
+        :other)))
 
 (defn- file-of [item] (:file (:resource-links (:data item))))
 
@@ -122,12 +156,17 @@
 
 (defn open? [] (some? @*open))
 
-(defn images
-  "The items of `items` that have an image file, in their order, each with
-   the place it stands at in `items`."
-  [items]
-  (into [] (keep-indexed (fn [pos item] (when (image-file? (file-of item)) {:pos pos :item item})))
+(defn of-kind
+  "The items of `items` that have a file of kind `k`, in their order, each
+   with the place it stands at in `items`."
+  [items k]
+  (into [] (keep-indexed (fn [pos item] (when (and k (= k (kind (file-of item)))) {:pos pos :item item})))
         items))
+
+(defn- steps
+  "What ← and → walk while `open` is up: the list's files of its kind."
+  [items open]
+  (of-kind items (kind (:file open))))
 
 (defn- index-of
   "Where in `imgs` the open image is: at its own place if the list still has
@@ -164,7 +203,7 @@
    controls behind it that nobody can see."
   [*state e]
   (.stopPropagation e)
-  (let [imgs (images (:items @*state))
+  (let [imgs (steps (:items @*state) @*open)
         idx (index-of imgs @*open)]
     (case (.-code e)
       "Escape" (do (.preventDefault e) (close!))
@@ -174,6 +213,12 @@
       nil)))
 
 (defn- src [file] (str "/imgs/" (js/encodeURIComponent file)))
+
+;; encodeURIComponent, as for /imgs/: a # or a ? in the name would otherwise be
+;; read as the start of a fragment or a query. The server url-decodes it.
+(defn- file-src [file] (str "/files/" (js/encodeURIComponent file)))
+
+(defn- download-href [file] (str (file-src file) "?download"))
 
 (def ^:private rest-ms
   "How long the owner has to stay on an image before its file is asked for.
@@ -223,6 +268,84 @@
                 :failed [:div.image-viewer-status.image-viewer-failed {:on-click stop} "The image could not be loaded"]
                 [:div.image-viewer-status.image-viewer-loading {:on-click stop} "Loading…"])]))})))
 
+(defn- cannot-show
+  "Where a file that cannot be shown would have been: says so, and offers it."
+  [file why]
+  [:div.image-viewer-status.image-viewer-unshown {:on-click stop}
+   [:p why]
+   [:a.image-viewer-unshown-download {:href (download-href file) :download ""} "Download " file]])
+
+(defn- media
+  "A video or a sound, `tag` :video or :audio. Like `picture`, mounted afresh
+   per file and given its src only once the owner has rested on it. Not played
+   by itself: the player in the corner may be playing, and two at once is
+   noise.
+
+   On the way out it is paused and its src taken off, and load() is called --
+   the way to make a media element let go of its connection; just removed, it
+   may go on fetching (cookbook #397 measured that for <img>)."
+  [_tag _file _title]
+  (let [*phase (r/atom :resting)
+        timer (atom nil)
+        el (atom nil)]
+    (r/create-class
+      {:component-did-mount (fn [_]
+                              (reset! timer (js/setTimeout #(reset! *phase :loading) rest-ms)))
+       :component-will-unmount (fn [_]
+                                 (js/clearTimeout @timer)
+                                 (when-let [m @el]
+                                   (.pause m)
+                                   (.removeAttribute m "src")
+                                   (.load m)))
+       :reagent-render
+         (fn [tag file title]
+           (let [phase @*phase]
+             [:<>
+              (when-not (#{:resting :failed} phase)
+                [tag
+                 {:src (file-src file)
+                  :ref #(reset! el %)
+                  :controls true
+                  :preload "metadata"
+                  :aria-label title
+                  :class (str "image-viewer-media image-viewer-" (name tag)
+                              (when-not (= :loaded phase) " image-viewer-image-pending"))
+                  :on-loaded-metadata #(reset! *phase :loaded)
+                  :on-error #(when @el (reset! *phase :failed))
+                  :on-click stop}])
+              (case phase
+                :loaded nil
+                :failed [cannot-show file (if (= :video tag)
+                                            "This video cannot be played here."
+                                            "This sound cannot be played here.")]
+                [:div.image-viewer-status.image-viewer-loading {:on-click stop} "Loading…"])]))})))
+
+(defn- document
+  "A pdf, in the browser's own pdf viewer, once the owner has rested on it.
+   An <iframe> taken out of the page stops its load with it."
+  [_file _title]
+  (let [*rested (r/atom false)
+        timer (atom nil)]
+    (r/create-class
+      {:component-did-mount (fn [_]
+                              (reset! timer (js/setTimeout #(reset! *rested true) rest-ms)))
+       :component-will-unmount (fn [_] (js/clearTimeout @timer))
+       :reagent-render
+         (fn [file title]
+           (if @*rested
+             [:iframe.image-viewer-document {:src (file-src file) :title title :on-click stop}]
+             [:div.image-viewer-status.image-viewer-loading {:on-click stop} "Loading…"]))})))
+
+(defn- shown
+  "The element for `file`, by its kind."
+  [file title]
+  (case (kind file)
+    :image [picture file title]
+    :video [media :video file title]
+    :audio [media :audio file title]
+    :pdf [document file title]
+    [cannot-show file "This file cannot be shown here."]))
+
 (defn- overlay
   [*state]
   (let [;; This mount's own two, so that what is removed is what was added.
@@ -253,7 +376,7 @@
        :reagent-render
          (fn [*state]
            (let [{:keys [file title] :as open} @*open
-                 imgs (images (:items @*state))
+                 imgs (steps (:items @*state) open)
                  idx (index-of imgs open)
                  title (or (not-empty (:title (:item (get imgs idx)))) (not-empty title) file)
                  prev? (and idx (pos? idx))
@@ -262,11 +385,11 @@
               {:tabIndex 0
                :role "dialog"
                :aria-modal "true"
-               :aria-label "Image viewer"
+               :aria-label "File viewer"
                :on-key-down #(handle-key! *state %)
                :on-click (fn [e] (stop e) (close!))}
               [:div.image-viewer-frame
-               ^{:key file} [picture file title]]
+               ^{:key file} [shown file title]]
               ;; The arrows first, side by side, at the bar's left start, and
               ;; everything that changes width from image to image after them:
               ;; the counter, then the title. Between the arrows, centred with
@@ -286,23 +409,31 @@
                  [:span.image-viewer-arrows
                   [:button.image-viewer-prev
                    {:type "button"
-                    :title "Previous image (←)"
-                    :aria-label "Previous image"
+                    :title "Previous (←)"
+                    :aria-label "Previous"
                     :disabled (not prev?)
                     :on-click (fn [e] (stop e) (step! imgs idx -1))} "‹"]
                   [:button.image-viewer-next
                    {:type "button"
-                    :title "Next image (→)"
-                    :aria-label "Next image"
+                    :title "Next (→)"
+                    :aria-label "Next"
                     :disabled (not next?)
                     :on-click (fn [e] (stop e) (step! imgs idx 1))} "›"]])
                (when idx [:span.image-viewer-position (str (inc idx) " / " (count imgs))])
-               [:span.image-viewer-title title]]
+               [:span.image-viewer-title title]
+               ;; The file as an attachment, for when it is to go to a Mac
+               ;; app. Last, at the bar's right end, out of the arrows' way.
+               [:a.image-viewer-download
+                {:href (download-href file)
+                 :download ""
+                 :title "Download"
+                 :aria-label "Download"}
+                "⤓"]]
               [:button.image-viewer-close
                {:type "button"
                 :on-mouse-down #(.preventDefault %)
                 :title "Close (Esc)"
-                :aria-label "Close the image viewer"
+                :aria-label "Close the viewer"
                 :on-click (fn [e] (stop e) (close!))} "✕"]]))})))
 
 (defn component

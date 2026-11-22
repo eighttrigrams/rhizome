@@ -1283,6 +1283,60 @@ body:has(#qr-overlay) .floating-player-qr {
     cursor: default;
 }
 
+/* A video is fitted like a picture; a sound has nothing to show but its
+   controls, so it is a bar across the middle of the frame. A pdf takes the
+   whole frame: the browser's viewer inside it scrolls and zooms by itself. */
+.image-viewer-video {
+    max-width: 100%;
+    max-height: 100%;
+    background: #000;
+    cursor: default;
+}
+
+.image-viewer-audio {
+    width: min(640px, 100%);
+    cursor: default;
+}
+
+.image-viewer-document {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: #fff;
+}
+
+/* A file that cannot be shown: what it is, and the file to download. */
+.image-viewer-unshown {
+    text-align: center;
+}
+
+.image-viewer-unshown a {
+    color: #cbc9b5;
+}
+
+/* The bar's last item, at its right end, away from the arrows. */
+.image-viewer-download {
+    flex: none;
+    margin-left: auto;
+    width: 36px;
+    height: 36px;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    color: #cbc9b5;
+    text-decoration: none;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 50%;
+}
+
+.image-viewer-download:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.2);
+}
+
 /* The floating player stays above the image viewer, and its QR button with it,
    so a code can be opened from there while a picture is up. The QR overlay is
    at 2001, under the viewer's 2002; with a viewer up it has to come forward or

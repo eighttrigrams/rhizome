@@ -3,12 +3,14 @@
             [ui.image-viewer :as image-viewer]))
 
 (defn- open-file!
-  "The green badge. An image opens in the app's own viewer; Option+click sends
-   it out to the system's, the way every click used to. Anything that is not an
-   image always goes out -- there is nothing in the app to show it in."
+  "The green badge. Every file opens in the app's own viewer, which shows what
+   the browser can show and offers the rest to download. Option+click still
+   sends it out to the server machine's system viewer (/open/), the way every
+   click used to -- kept for now, while the server is the Mac in front of the
+   owner."
   [e {:keys [file] :as link}]
   (.stopPropagation e)
-  (if (and (image-viewer/image-file? file) (not (.-altKey e)))
+  (if-not (.-altKey e)
     (image-viewer/open! link)
     ;; encodeURIComponent, not encodeURI: a # or a ? in the name is otherwise
     ;; taken for the start of a fragment or a query, and the server is asked

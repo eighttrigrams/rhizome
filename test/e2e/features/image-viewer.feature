@@ -2,9 +2,10 @@ Feature: Images open in the app
 
   The green badge of an item with an image file opens the image over nearly the
   whole window, instead of in the system's own viewer. Option+click still sends
-  it out there, and any other kind of file always goes out. In the viewer, back
-  and forth step through the images of the list as it is on screen, in its
-  order, and pass over the items whose file is not an image.
+  it out there. In the viewer, back and forth step through the images of the
+  list as it is on screen, in its order, and pass over the items whose file is
+  not an image. (Other kinds of file open in the same viewer: see
+  file-viewer.feature.)
 
   Background:
     Given I am on the app
@@ -120,8 +121,8 @@ Feature: Images open in the app
     Then the file "e2e-lighthouse.png" should have been sent to the system's viewer
     And the image viewer should be gone
 
-  Scenario: A file that is not an image goes out on a plain click
-    When I click the green badge of "Tax letter"
+  Scenario: A file that is not an image goes out on Option+click as well
+    When I Option+click the green badge of "Tax letter"
     Then the file "e2e-tax-letter.pdf" should have been sent to the system's viewer
     And the image viewer should be gone
 

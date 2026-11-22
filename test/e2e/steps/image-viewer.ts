@@ -17,6 +17,19 @@ const e2eDb = path.join(repoRoot, "test/rhizome-e2e.db");
 // folder too.
 const imagesFolder = path.join(repoRoot, "files/Pictures/Tracked");
 
+// The other dev and e2e folders (et.rz.config/dev-folders), which /files/*
+// serves by suffix (et.rz.server.files), and the sample written into them for
+// each suffix. A suffix without a sample (flv, tiff) gets a few bytes that are
+// no such file: the viewer does not show it, it only offers it to download.
+const fixtures = path.join(repoRoot, "test/e2e/fixtures");
+const otherFiles: Record<string, { folder: string; sample?: string }> = {
+  pdf: { folder: "files/Documents/Tracked", sample: "e2e-letter.pdf" },
+  tiff: { folder: "files/Documents/Tracked" },
+  mp3: { folder: "files/Music/Tracked", sample: "e2e-chime.mp3" },
+  mp4: { folder: "files/Movies/Tracked", sample: "e2e-harbour.mp4" },
+  flv: { folder: "files/Movies/Tracked" },
+};
+
 // An 8x6 blue PNG. Written under every image name, .jpg and .webp included:
 // the browser goes by the bytes, not the suffix, and all the scenarios ask is
 // that a picture arrives.
@@ -90,7 +103,7 @@ function card(page: any, title: string) {
   return page.locator("#rhs-component li.item-card").filter({ hasText: title }).first();
 }
 
-// Every fixture image written, so it can be taken away again: the folder is the
+// Every fixture file written, so it can be taken away again: the folder is the
 // dev one, and a dev session should not find the suite's pictures in it.
 const written = new Set<string>();
 
@@ -126,7 +139,14 @@ async function makeItem(request: any, contextTitle: string, title: string, file?
     e2eDb,
     `UPDATE items SET ${data} updated_at = ${at}, updated_at_ctx = ${at} WHERE id = ${Number(id)};`,
   ]);
-  if (file && !file.endsWith(".pdf")) {
+  const other = file && otherFiles[file.slice(file.lastIndexOf(".") + 1).toLowerCase()];
+  if (other) {
+    const folder = path.join(repoRoot, other.folder);
+    fs.mkdirSync(folder, { recursive: true });
+    const target = path.join(folder, file!);
+    fs.writeFileSync(target, other.sample ? fs.readFileSync(path.join(fixtures, other.sample)) : "not shown here");
+    written.add(target);
+  } else if (file) {
     fs.mkdirSync(imagesFolder, { recursive: true });
     const target = path.join(imagesFolder, file);
     fs.writeFileSync(target, PNG);
