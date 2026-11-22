@@ -75,6 +75,12 @@ RUN if [ "$WITH_VEC" = "1" ]; then echo "1" > /etc/rhizome-use-ollama; else echo
 ENV VEC_PATH=/usr/local/lib/sqlite-vec/vec0
 ENV VEC_URL=http://127.0.0.1:11437
 
+# A UTF-8 locale for every java started in here. On Linux the JVM names files
+# in the locale's encoding, and under the image's default POSIX locale that
+# is ASCII: a file with an umlaut cannot be opened at all (et.rz.names, which
+# logs an error about it at start; production refuses to start).
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
+
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
