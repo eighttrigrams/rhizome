@@ -91,9 +91,14 @@
 (def ^:private fix
   "LC_ALL=C.UTF-8 (or any UTF-8 locale) in the environment of the java process")
 
+(defn path-encoding
+  "The encoding this JVM writes file names in."
+  []
+  (System/getProperty "sun.jnu.encoding"))
+
 (defn utf-8-paths?
   []
-  (= "UTF-8" (System/getProperty "sun.jnu.encoding")))
+  (= "UTF-8" (path-encoding)))
 
 (defn check-path-encoding!
   "At start: refuse to run (`refuse?`), or else log an error that cannot be
@@ -103,8 +108,8 @@
   [refuse?]
   (when-not (utf-8-paths?)
     (let [msg (str "This JVM cannot open files whose names are not plain ASCII (umlauts and the like): "
-                   "sun.jnu.encoding is " (System/getProperty "sun.jnu.encoding")
+                   "sun.jnu.encoding is " (path-encoding)
                    ", because the locale is not UTF-8. Every such file will be Not Found. Fix: " fix ".")]
       (log/error msg)
       (when refuse?
-        (throw (ex-info (str "Refusing to start. " msg) {:sun.jnu.encoding (System/getProperty "sun.jnu.encoding")}))))))
+        (throw (ex-info (str "Refusing to start. " msg) {:sun.jnu.encoding (path-encoding)}))))))

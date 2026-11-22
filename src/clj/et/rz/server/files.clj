@@ -141,8 +141,11 @@
   (let [ascii (str/replace file-name #"[^\x20-\x7e]|[\"\\]" "_")]
     (str "attachment; filename=\"" ascii "\"; filename*=UTF-8''"
          ;; URLEncoder writes a space as +, which RFC 5987 does not know, and a
-         ;; + of the name as %2B -- so every + it writes is a space.
-         (str/replace (URLEncoder/encode ^String file-name "UTF-8") "+" "%20"))))
+         ;; + of the name as %2B -- so every + it writes is a space. And it
+         ;; leaves * alone, which is not an attr-char there.
+         (-> (URLEncoder/encode ^String file-name "UTF-8")
+             (str/replace "+" "%20")
+             (str/replace "*" "%2A")))))
 
 (defn file-response
   "The answer for the file `f`, called `file-name`, to the request `req`."

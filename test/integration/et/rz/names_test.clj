@@ -209,12 +209,15 @@
 
 (deftest the-path-encoding-check
   (testing "where it is UTF-8, nothing"
-    (with-redefs [names/utf-8-paths? (constantly true)]
+    (with-redefs [names/path-encoding (constantly "UTF-8")]
       (is (nil? (names/check-path-encoding! true)))))
   (testing "where it is not: refused in production, named fix in the message"
-    (with-redefs [names/utf-8-paths? (constantly false)]
+    ;; The encoding itself is faked, not the yes/no, so the message says what
+    ;; a POSIX locale really makes it say.
+    (with-redefs [names/path-encoding (constantly "ANSI_X3.4-1968")]
       (let [e (try (names/check-path-encoding! true) nil (catch clojure.lang.ExceptionInfo e e))]
         (is (some? e))
+        (is (re-find #"sun\.jnu\.encoding is ANSI_X3\.4-1968" (ex-message e)))
         (is (re-find #"LC_ALL=C\.UTF-8" (ex-message e))))
       (testing "only logged in dev"
         (is (nil? (names/check-path-encoding! false)))))))

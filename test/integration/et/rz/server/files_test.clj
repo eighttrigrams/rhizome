@@ -212,6 +212,11 @@
                 "filename*=UTF-8''Brief%20%22neu%22.pdf")
            (headers "Content-Disposition")))))
 
+(deftest download-header-encodes-what-rfc-5987-does-not-allow
+  ;; * is no attr-char; URLEncoder leaves it be (review finding 5).
+  (is (= "attachment; filename=\"a*b.pdf\"; filename*=UTF-8''a%2Ab.pdf"
+         (#'files/attachment "a*b.pdf"))))
+
 (deftest download-header-of-a-name-outside-ascii
   ;; The header alone, so it is tested whatever the JVM's path encoding.
   (is (= (str "attachment; filename=\"J_rgen + 1.pdf\"; "
