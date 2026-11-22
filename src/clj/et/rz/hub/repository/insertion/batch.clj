@@ -18,10 +18,14 @@
         import-id (common/get-item-or-throw-error db "Imports")
         dir (get-in config/config [:folders :imports])
         ;; Files still on their way -- a temporary name, or one still being
-        ;; written -- are left quietly for the next import (arrival).
-        present (remove arrival/arriving? (home/list-files))
+        ;; written -- are left for the next import (arrival), and said.
+        listed (home/list-files)
+        present (remove arrival/arriving? listed)
         unsettled (arrival/unsettled dir present)]
-    (doseq [n unsettled] (log/debug (str "Leaving " n " for the next import: still being written")))
+    (doseq [n (filter arrival/arriving? listed)]
+      (log/info (str "Leaving " n " for the next import: a temporary or hidden file")))
+    (doseq [n unsettled]
+      (log/info (str "Leaving " n " for the next import: it changed while the import looked")))
     (doall (for [file-name (remove unsettled present)]
              (let [orig-file-name file-name
                    wanted (if-not (empty? extra) (str extra " " orig-file-name) orig-file-name)

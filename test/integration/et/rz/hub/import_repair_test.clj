@@ -35,7 +35,9 @@
 (use-fixtures :each
   (fn [t]
     (let [root (.toFile (Files/createTempDirectory "rhizome-import-test" (make-array FileAttribute 0)))]
-      (binding [*root* root]
+      (binding [*root* root
+                ;; a short look, for speed; the test of a growing file sets its own
+                arrival/*look-ms* 100]
         (doseq [k [:imports :docs :audio :video :images]] (.mkdirs (io/file (folder k))))
         (try (t)
              (finally (doseq [^java.io.File f (reverse (file-seq root))] (.delete f))))))))
@@ -63,8 +65,7 @@
                   ;; the db write stubbed, but not the check it starts with:
                   ;; the "File already exists" refusal is file/ingest's own
                   file/ingest (fn [_ n _ _] (home/validate-not-exists n) (swap! stored conj n))]
-      (binding [arrival/*look-ms* 50]
-        (batch/ingest nil "IMPORT" nil nil)))
+      (batch/ingest nil "IMPORT" nil nil))
     @stored))
 
 (deftest names-are-repaired-on-disk-and-in-the-db
@@ -84,18 +85,30 @@
       (is (= [(names/nfc nfd)] (import!)))
       (is (= #{(names/nfc nfd)} (in :docs))))))
 
-(deftest still-arriving-is-left-quietly
+(deftest still-arriving-is-left
   (doseq [n [".syncthing.a.pdf.tmp" "~syncthing~b.pdf.tmp" "c.pdf.part" "d.pdf.crdownload"
              "e.pdf.download" "f.pdf.tmp" ".DS_Store" "._g.pdf"]]
     (arrive! n pdf))
-  (arrive! "being written.pdf" pdf true)
   (arrive! "done.pdf" pdf)
-  (is (= ["done.pdf"] (import!)))
+  (let [growing (arrive! "being written.pdf" pdf)
+        writer (future
+                 (dotimes [_ 6]
+                   (Thread/sleep 50)
+                   (with-open [o (io/output-stream growing :append true)] (.write o (byte-array 10)))))]
+    (is (= ["done.pdf"] (binding [arrival/*look-ms* 400] (import!))))
+    @writer)
   (is (= #{"done.pdf"} (in :docs)))
   (is (= 9 (count (in :imports))))
   (testing "taken by the next import once it has settled"
-    (.setLastModified (io/file (folder :imports) "being written.pdf") an-hour-ago)
     (is (= ["being written.pdf"] (import!)))))
+
+(deftest a-file-dated-in-the-future-is-imported
+  ;; Second review, finding 2: Syncthing keeps the source's modification time,
+  ;; and a wrong clock on another Mac dates a whole file ahead. It was "just
+  ;; written" until that date, and not imported, silently.
+  (doto (arrive! "from the future.pdf" pdf)
+    (.setLastModified (+ (System/currentTimeMillis) (* 3600 1000 24 30))))
+  (is (= ["from the future.pdf"] (import!))))
 
 (deftest not-what-the-suffix-says-stays-in-imports
   (arrive! "empty.pdf" (byte-array 0))

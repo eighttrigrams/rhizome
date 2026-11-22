@@ -9,8 +9,9 @@
    has no suffix import knows). Now on purpose:
 
    - **still arriving** (`arriving?`, `unsettled`): Syncthing's and browsers'
-     temporaries, dotfiles, and any file whose size or modification time moved
-     in the last few seconds. Skipped quietly -- the next import takes it.
+     temporaries, dotfiles, and any file whose size or modification time moves
+     while the import looks. Skipped, with the reason logged at info -- the
+     next import takes it.
    - **not what its suffix says** (`content-problem`): empty, or first bytes
      that are not that kind of file (a half-copied or misnamed one). Left in
      imports, and named in the log with the reason, so nothing becomes an item
@@ -35,32 +36,28 @@
   [file-name]
   (boolean (some #(re-find % file-name) temporary)))
 
-(def ^:dynamic *settle-ms*
-  "How long a file must have been left alone to count as whole: its
-   modification time at least this far back, and its size and time unchanged
-   over a look of `*look-ms*`."
-  5000)
-
 (def ^:dynamic *look-ms*
-  "The one pause per import run in which sizes are watched for change."
+  "The one pause per import run in which every file is watched for change."
   1000)
 
 (defn- stamp [^File f] [(.length f) (.lastModified f)])
 
 (defn unsettled
-  "The names among `file-names` in `dir` that are still being written: touched
-   within *settle-ms*, or grown or touched during one look of *look-ms*. One
-   look for all of them, so an import waits a second, not a second per file.
-   No look at all when every file is old enough already -- the usual case."
+  "The names among `file-names` in `dir` that are still being written: their
+   size or modification time changed during one look of *look-ms*. One look
+   for all of them, so an import waits a second, not a second per file.
+
+   By the look alone, not by how long ago the file was touched: Syncthing
+   keeps the source's modification time, and a clock wrong on another Mac
+   would leave a file dated in the future 'just written' until that date --
+   not imported, and nothing said (second review, finding 2)."
   [dir file-names]
-  (let [files (into {} (map (fn [n] [n (io/file dir n)])) file-names)
-        now (System/currentTimeMillis)
-        recent (set (filter #(> (.lastModified ^File (files %)) (- now *settle-ms*)) file-names))
-        before (into {} (map (fn [[n f]] [n (stamp f)])) files)]
-    (if (seq recent)
-      (do (Thread/sleep (long *look-ms*))
-          (into recent (filter #(not= (before %) (stamp (files %)))) file-names))
-      recent)))
+  (if (empty? file-names)
+    #{}
+    (let [files (into {} (map (fn [n] [n (io/file dir n)])) file-names)
+          before (into {} (map (fn [[n f]] [n (stamp f)])) files)]
+      (Thread/sleep (long *look-ms*))
+      (set (filter #(not= (before %) (stamp (files %))) file-names)))))
 
 ;; ## What the suffix promises
 
