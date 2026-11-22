@@ -23,9 +23,9 @@
    Like /imgs/*: the client sends it through encodeURIComponent, so a space, a
    # or a ? arrive intact, and it is url-decoded here (UTF-8). The resolved file
    has to lie inside its folder, by canonical path, or it is 404 -- the name is
-   free text out of the database. The bytes of the name are not normalised:
-   the database holds NFC, and a disk that holds NFD (a Mac's, copied over) is
-   not found on Linux. That is as it was for /imgs/*, and left so.
+   free text out of the database. It is looked for as NFC, then as NFD, so a
+   file copied over from a Mac in NFD is found by the NFC name the database
+   holds (et.rz.names).
 
    ## Range
 
@@ -59,6 +59,7 @@
             [ring.util.mime-type :as mime]
             [ring.util.time :as time]
             [et.rz.config :as config]
+            [et.rz.names :as names]
             [et.rz.hub.repository.homefolder :as home])
   (:import (java.io File OutputStream)
            (java.net URLEncoder)
@@ -85,26 +86,12 @@
   (when (str/includes? file-name ".")
     (home/folder-key-for file-name)))
 
-(defn- inside?
-  [^File root ^File f]
-  (let [root-path (.getCanonicalPath root)]
-    (str/starts-with? (.getCanonicalPath f) (str root-path File/separator))))
-
 (defn resolve-file
   "The file `file-name` names in `folders` (a map like config's :folders), or
    nil when there is none, or it would lie outside its folder."
   [folders file-name]
   (when-let [dir (some->> (folder-key file-name) (get folders))]
-    (let [root (io/file dir)
-          f (io/file root file-name)]
-      (try
-        ;; toPath first: it throws where the JVM cannot write the name in the
-        ;; platform's encoding (a POSIX locale on Linux, and any non-ASCII
-        ;; name), where isFile would quietly ask about a name with ? in it.
-        (.toPath f)
-        (when (and (.isFile f) (inside? root f))
-          f)
-        (catch java.nio.file.InvalidPathException _ nil)))))
+    (names/resolve-in dir file-name)))
 
 (defn parse-range
   "The Range header against a file of `size` bytes:

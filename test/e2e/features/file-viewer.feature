@@ -50,6 +50,17 @@ Feature: Documents, sounds and videos open in the app
     Then the viewer should say "This file is not on the server."
     And the viewer should show no pdf
 
+  Scenario: A name with an umlaut is served
+    # Needs the server's JVM under a UTF-8 locale (test/playwright.config.ts);
+    # under a POSIX one it cannot name the file at all (et.rz.names). NFC
+    # against NFD is tested in et.rz.names-test, on the box's own Linux /tmp:
+    # ./files is the Mac's disk, mounted, and APFS takes both for one name.
+    And "Shelf" holds an item "Brief an Jürgen" with the file "e2e-Brief an Jürgen.pdf"
+    When I reload the app
+    And I click the green badge of "Brief an Jürgen"
+    Then the viewer should show the pdf "e2e-Brief an Jürgen.pdf"
+    And "e2e-Brief an Jürgen.pdf" should have come as "application/pdf"
+
   Scenario: What the browser cannot show, it says so and offers to download
     When I click the green badge of "Old film"
     Then the viewer should say "This file cannot be shown here."

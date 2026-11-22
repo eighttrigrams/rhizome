@@ -1,0 +1,134 @@
+(ns et.rz.names-test
+  "Umlauts in file names: a file on disk in NFC and one in NFD, each asked for
+   in both forms, through every lookup (et.rz.names, /files/, /imgs/*,
+   homefolder/get-target); an import that files an NFD name as NFC; and the
+   start-up check of the JVM's path encoding.
+
+   The tests that need a file with such a name on disk run only where the JVM
+   can name one -- under a UTF-8 locale (`LC_ALL=C.UTF-8 clj -M:test ...`).
+   Under a POSIX locale no form of the name can be found, which is what
+   `check-path-encoding!` is there to say, and they print that they were
+   skipped rather than pass on nothing."
+  (:require [clojure.java.io :as io]
+            [clojure.test :refer [deftest is testing use-fixtures]]
+            [ring.mock.request :as mock]
+            [et.rz.config :as config]
+            [et.rz.names :as names]
+            [et.rz.server.files :as files]
+            [et.rz.hub.repository.homefolder :as home]
+            [et.rz.hub.repository.insertion.batch :as batch]
+            [et.rz.hub.repository.insertion.common :as common]
+            [et.rz.hub.repository.insertion.file :as file])
+  (:import (java.nio.file Files)
+           (java.nio.file.attribute FileAttribute)))
+
+(def ^:private nfc-name "Brief an Jürgen.pdf")
+(def ^:private nfd-name "Notiz für Müller.pdf")
+
+(deftest the-two-forms
+  (is (= "Jürgen" (names/nfc "Jürgen")))
+  (is (= "Jürgen" (names/nfd "Jürgen")))
+  (is (not= (names/nfc nfd-name) nfd-name))
+  (testing "NFC first, then NFD"
+    (is (= [(names/nfc nfd-name) nfd-name] (names/forms nfd-name)))
+    (is (= [nfc-name (names/nfd nfc-name)] (names/forms nfc-name))))
+  (testing "a name with nothing to compose is tried once"
+    (is (= ["plain.pdf"] (names/forms "plain.pdf")))))
+
+(def ^:dynamic *root* nil)
+
+(use-fixtures :each
+  (fn [t]
+    (let [root (.toFile (Files/createTempDirectory "rhizome-names-test" (make-array FileAttribute 0)))]
+      (binding [*root* root]
+        (try (t)
+             (finally (doseq [^java.io.File f (reverse (file-seq root))] (.delete f))))))))
+
+(defn- folder [k] (str (io/file *root* (name k))))
+
+(defn- put!
+  "Write a file under folder `k` with exactly the bytes of `file-name`."
+  [k file-name]
+  (let [f (io/file (folder k) file-name)]
+    (io/make-parents f)
+    (spit f file-name)
+    f))
+
+(defn- url [file-name]
+  (.replace (java.net.URLEncoder/encode ^String file-name "UTF-8") "+" "%20"))
+
+(defmacro ^:private on-utf-8-paths [& body]
+  `(if (names/utf-8-paths?)
+     (do ~@body)
+     (println "SKIPPED (this JVM's sun.jnu.encoding is" (System/getProperty "sun.jnu.encoding")
+              "-- run under LC_ALL=C.UTF-8):" ~(str *ns*))))
+
+(deftest both-forms-on-disk-each-found-by-both
+  (on-utf-8-paths
+    (put! :docs nfc-name)
+    (put! :docs nfd-name)
+    (testing "the disk really holds two different spellings"
+      (is (= #{nfc-name nfd-name} (set (.list (io/file (folder :docs))))))
+      (is (not (.exists (io/file (folder :docs) (names/nfd nfc-name)))))
+      (is (not (.exists (io/file (folder :docs) (names/nfc nfd-name))))))
+    (doseq [[on-disk asked] [[nfc-name nfc-name]
+                             [nfc-name (names/nfd nfc-name)]
+                             [nfd-name nfd-name]
+                             [nfd-name (names/nfc nfd-name)]]]
+      (testing (str "on disk " (if (= on-disk nfc-name) "NFC" "NFD")
+                    ", asked " (if (= asked (names/nfc asked)) "NFC" "NFD"))
+        (testing "resolve-in"
+          (is (= on-disk (some-> (names/resolve-in (folder :docs) asked) .getName))))
+        (testing "/files/"
+          (let [res ((files/wrap-files (constantly {:status 418}) (constantly {:docs (folder :docs)}))
+                     (mock/request :get (str "/files/" (url asked))))]
+            (is (= 200 (:status res)))))
+        (testing "file-response, as /imgs/* uses it"
+          (is (= on-disk (some-> (names/file-response asked {:root (folder :docs)}) :body .getName))))
+        (testing "homefolder/get-target, behind /open/"
+          (with-redefs [config/config (assoc-in config/config [:folders :docs] (folder :docs))]
+            (is (= (str (io/file (folder :docs) on-disk)) (home/get-target asked)))))))))
+
+(deftest get-target-for-a-file-not-there-yet-is-nfc
+  (with-redefs [config/config (assoc-in config/config [:folders :docs] (folder :docs))]
+    (is (= (str (io/file (folder :docs) (names/nfc nfd-name))) (home/get-target nfd-name)))))
+
+(deftest the-traversal-guard-holds-in-every-form
+  (on-utf-8-paths
+    (spit (io/file *root* (str "J" "ü" "rgen.pdf")) "outside")
+    (.mkdirs (io/file (folder :docs)))
+    (doseq [asked ["../Jürgen.pdf" "../Jürgen.pdf"]]
+      (is (nil? (names/resolve-in (folder :docs) asked)))
+      (is (nil? (names/file-response asked {:root (folder :docs)}))))))
+
+(deftest an-import-files-an-nfd-name-as-nfc
+  ;; Disk-free: what batch/ingest does with the name, observed at the calls
+  ;; that put it on disk (ren, move-file) and into the db (file/ingest).
+  (let [calls (atom [])]
+    (with-redefs [home/list-files (constantly [nfd-name "plain.pdf"])
+                  home/supported-file-type? (constantly true)
+                  home/importable? (constantly true)
+                  home/ren (fn [from to] (swap! calls conj [:ren from to]))
+                  home/move-file (fn [n] (swap! calls conj [:move n]))
+                  file/ingest (fn [_ n _ _] (swap! calls conj [:ingest n]))
+                  common/get-item-or-throw-error (constantly 1)]
+      (batch/ingest nil "IMPORT" nil nil))
+    (is (= [[:ren nfd-name (names/nfc nfd-name)]
+            [:ingest (names/nfc nfd-name)]
+            [:move (names/nfc nfd-name)]
+            ;; already NFC: not renamed
+            [:ingest "plain.pdf"]
+            [:move "plain.pdf"]]
+           @calls))))
+
+(deftest the-path-encoding-check
+  (testing "where it is UTF-8, nothing"
+    (with-redefs [names/utf-8-paths? (constantly true)]
+      (is (nil? (names/check-path-encoding! true)))))
+  (testing "where it is not: refused in production, named fix in the message"
+    (with-redefs [names/utf-8-paths? (constantly false)]
+      (let [e (try (names/check-path-encoding! true) nil (catch clojure.lang.ExceptionInfo e e))]
+        (is (some? e))
+        (is (re-find #"LC_ALL=C\.UTF-8" (ex-message e))))
+      (testing "only logged in dev"
+        (is (nil? (names/check-path-encoding! false)))))))

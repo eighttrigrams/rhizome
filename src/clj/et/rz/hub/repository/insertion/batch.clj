@@ -3,6 +3,7 @@
             [clojure.string :as str]
             [et.rz.hub.repository.insertion.file :as file]
             [et.rz.hub.repository.homefolder :as home]
+            [et.rz.names :as names]
             [et.rz.hub.repository.insertion.common :as common]))
 
 (defn match? [title] (str/starts-with? title "IMPORT"))
@@ -14,13 +15,15 @@
         import-id (common/get-item-or-throw-error db "Imports")]
     (doall (for [file-name (home/list-files)]
              (let [orig-file-name file-name
-                   file-name (if-not (empty? extra) (str extra " " orig-file-name) orig-file-name)]
+                   ;; NFC, on disk (the ren below) and so in the db: a name from a
+                   ;; Mac may come in NFD, and on Linux that is another name (et.rz.names).
+                   file-name (names/nfc (if-not (empty? extra) (str extra " " orig-file-name) orig-file-name))]
                (when (home/supported-file-type? file-name)
                  (if-not (home/importable? file-name)
                    (log/warn (str "Skipping " orig-file-name
                                   " -- its destination folder does not exist; left in imports."))
                    (do
-                     (when-not (empty? extra) (home/ren orig-file-name file-name))
+                     (when-not (= orig-file-name file-name) (home/ren orig-file-name file-name))
                      (log/info (str "Importing " file-name " ... "))
                      (try (file/ingest db file-name #{import-id} nil)
                           (home/move-file file-name)

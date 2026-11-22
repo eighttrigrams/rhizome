@@ -15,6 +15,7 @@
             [et.rz.hub.ds :as datastore]
             [et.rz.server.opener :as opener]
             [et.rz.server.files :as files]
+            [et.rz.names :as names]
             et.rz.hub.dispatch
             et.rz.hub.rest-api
             [et.rz.hub.ui-api :as et.rz.hub.ui-api]
@@ -170,17 +171,19 @@
   from preview-images-folder, everything else under /imgs/* from images-folder.
   Ring's :uri is still percent-encoded, so the path is url-decoded before the
   file lookup -- without this, filenames containing spaces 404. file-response's
-  :root guards against directory traversal (also for decoded ..)."
+  :root guards against directory traversal (also for decoded ..). The name is
+  tried as NFC, then as NFD (et.rz.names): on Linux the two are different
+  files, and a Mac's disk may have handed over either."
   [handler images-folder preview-images-folder]
   (fn [req]
     (let [uri (:uri req)]
       (cond
         (str/starts-with? uri "/imgs/Preview/")
-        (or (response/file-response (codec/url-decode (subs uri (count "/imgs/Preview"))) {:root preview-images-folder})
+        (or (names/file-response (codec/url-decode (subs uri (count "/imgs/Preview"))) {:root preview-images-folder})
             {:status 404 :body "Not Found"})
 
         (str/starts-with? uri "/imgs/")
-        (or (response/file-response (codec/url-decode (subs uri (count "/imgs"))) {:root images-folder})
+        (or (names/file-response (codec/url-decode (subs uri (count "/imgs"))) {:root images-folder})
             {:status 404 :body "Not Found"})
 
         :else (handler req)))))
@@ -194,12 +197,11 @@
    without that check, and `et.rz.hub.rest-api.queries/image-file` said so in its
    docstring in as many words: 'not a model to copy'. It is copied now."
   [filename]
-  (let [root (io/file images-folder)
-        f    (io/file root filename)]
-    (if (and (str/starts-with? (.getCanonicalPath f) (.getCanonicalPath root))
-             (.isFile f))
-      (response/file-response (str f))
-      {:status 404 :body "Image file not found"})))
+  ;; In either Unicode form, and inside the folder by canonical path: see
+  ;; et.rz.names/resolve-in.
+  (if-let [f (names/resolve-in images-folder filename)]
+    (response/file-response (str f))
+    {:status 404 :body "Image file not found"}))
 
 (defn- img-by-id-handler
   "GET /img-by-id/:item-id -- the item's image, off this machine's disk.
@@ -548,6 +550,7 @@
              (or (nil? (:private-addr config/config))
                  (not (string? (:private-addr config/config)))))
     (throw (Exception. "config invalid")))
+  (names/check-path-encoding! (not (:dev? config/config)))
   (check-hub!)
   (prepare-for-writing!)
   ;; The file-type context gate moved to the hub with the seed it depends on

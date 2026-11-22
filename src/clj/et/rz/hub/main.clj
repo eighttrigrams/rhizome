@@ -37,6 +37,7 @@
             [clojure.string :as str]
             [compojure.core :refer [GET POST routes]]
             [et.rz.hub.sqlite.connection :as connection]
+            [et.rz.names :as names]
             [et.rz.hub.sqlite.schema :as schema]
             [et.rz.hub.dev-seed :as dev-seed]
             [et.rz.hub.repository.insertion.file :as file]
@@ -527,6 +528,9 @@
    of its own: the test harness boots servers inside a JVM that goes on running,
    and hangs its own."
   [& _args]
+  ;; Before anything touches a file: a JVM that cannot name one with an umlaut
+  ;; imports them as ? (et.rz.names). Refused in production, logged in dev.
+  (names/check-path-encoding! (let [{:keys [dev? e2e?]} (seed-opts)] (not (or dev? e2e?))))
   (check-elected!)
   (let [server (start! (config-opts))
         ds     (:ds server)]

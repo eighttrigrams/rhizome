@@ -23,7 +23,13 @@ const port = resolveE2EPort();
 // non-tty context, `clj` (the bash wrapper) reads from its stdin and gets
 // SIGTTIN if it's still attached to a controlling terminal -- the JVM never
 // starts and the webServer times out.
-const command = `clj -M:e2e -m et.rz.server.main < /dev/null`;
+//
+// LC_ALL=C.UTF-8: on Linux the JVM names files in the locale's encoding, and
+// under a POSIX one (a container's default) it cannot name a file with an
+// umlaut at all -- every such file is Not Found (et.rz.names). The hub is
+// started by scripts/e2e.sh, which a box mounts read-only; the server, which
+// serves the files, is started here.
+const command = `LC_ALL=C.UTF-8 clj -M:e2e -m et.rz.server.main < /dev/null`;
 
 const baseURL = `http://localhost:${port}`;
 

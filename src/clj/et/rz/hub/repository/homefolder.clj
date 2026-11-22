@@ -2,7 +2,8 @@
   (:require [cambium.core :as log]
             [clojure.string :as str]
             [clojure.java.io :as io]
-            [et.rz.config :as config]))
+            [et.rz.config :as config]
+            [et.rz.names :as names]))
 
 (defn- folder
   "Absolute path of the configured media folder `k` (e.g. :imports, :images)."
@@ -59,13 +60,16 @@
 (defn validate-not-exists
   [file-name]
   (doseq [k [:audio :images :docs :video]]
-    (when (.exists (io/file (folder k) file-name))
+    ;; In either Unicode form: on Linux an NFD twin is another name (et.rz.names).
+    (when (some #(.exists (io/file (folder k) %)) (names/forms file-name))
       (throw (Exception. (str "File already exists: " file-name))))))
 
 (defn get-target
   [file-name]
   (when-let [k (folder-key-for file-name)]
-    (str (io/file (folder k) file-name))))
+    ;; The file as it is on disk, NFC or NFD; for one not there yet, NFC.
+    (str (or (names/resolve-in (folder k) file-name)
+             (io/file (folder k) (names/nfc file-name))))))
 
 (defn ren
   [file-name target]
