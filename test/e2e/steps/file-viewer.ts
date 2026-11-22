@@ -1,7 +1,9 @@
+import * as fs from "fs";
+import * as path from "path";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 
-const { When, Then } = createBdd();
+const { Given, When, Then } = createBdd();
 
 // What /files/ answered in this scenario, by decoded file name. Taken off
 // the responses rather than routed, so what is checked is the server's own
@@ -86,7 +88,16 @@ Then("the player should be at {float} seconds", async ({ page }, t: number) => {
 });
 
 Then("the viewer should say {string}", async ({ page }, text: string) => {
-  await expect(page.locator("#image-viewer .image-viewer-unshown")).toContainText(text);
+  await expect(page.locator("#image-viewer .image-viewer-status")).toContainText(text);
+});
+
+// The dev and e2e :docs folder, where the Background's fixture step put it.
+Given("the file {string} is not on the server", async ({}, file: string) => {
+  fs.rmSync(path.resolve(__dirname, "../../../files/Documents/Tracked", file), { force: true });
+});
+
+Then("the viewer should show no pdf", async ({ page }) => {
+  await expect(page.locator("#image-viewer iframe")).toHaveCount(0);
 });
 
 Then("the viewer should offer {string} to download", async ({ page }, file: string) => {

@@ -322,18 +322,34 @@
 
 (defn- document
   "A pdf, in the browser's own pdf viewer, once the owner has rested on it.
-   An <iframe> taken out of the page stops its load with it."
+   An <iframe> taken out of the page stops its load with it.
+
+   Asked for with HEAD first: an <iframe> shows whatever comes, and a file the
+   server does not have came as a bare white page saying Not Found, under the
+   viewer's own bar. A missing file is said so in the viewer's words instead."
   [_file _title]
-  (let [*rested (r/atom false)
-        timer (atom nil)]
+  (let [*phase (r/atom :resting)
+        timer (atom nil)
+        gone? (atom false)]
     (r/create-class
-      {:component-did-mount (fn [_]
-                              (reset! timer (js/setTimeout #(reset! *rested true) rest-ms)))
-       :component-will-unmount (fn [_] (js/clearTimeout @timer))
+      {:component-did-mount
+         (fn [this]
+           (let [[_ file] (r/argv this)]
+             (reset! timer
+                     (js/setTimeout
+                       (fn []
+                         (-> (js/fetch (file-src file) #js {:method "HEAD"})
+                             (.then #(when-not @gone? (reset! *phase (if (.-ok %) :found :missing))))
+                             (.catch #(when-not @gone? (reset! *phase :missing)))))
+                       rest-ms))))
+       :component-will-unmount (fn [_]
+                                 (reset! gone? true)
+                                 (js/clearTimeout @timer))
        :reagent-render
          (fn [file title]
-           (if @*rested
-             [:iframe.image-viewer-document {:src (file-src file) :title title :on-click stop}]
+           (case @*phase
+             :found [:iframe.image-viewer-document {:src (file-src file) :title title :on-click stop}]
+             :missing [:div.image-viewer-status.image-viewer-failed {:on-click stop} "This file is not on the server."]
              [:div.image-viewer-status.image-viewer-loading {:on-click stop} "Loading…"]))})))
 
 (defn- shown

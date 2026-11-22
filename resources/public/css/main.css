@@ -1283,19 +1283,28 @@ body:has(#qr-overlay) .floating-player-qr {
     cursor: default;
 }
 
-/* A video is fitted like a picture; a sound has nothing to show but its
+/* A video is fitted into the frame whatever its own size, and is only
+   larger than its pixels where it is small; a sound has nothing to show but its
    controls, so it is a bar across the middle of the frame. A pdf takes the
    whole frame: the browser's viewer inside it scrolls and zooms by itself. */
 .image-viewer-video {
-    max-width: 100%;
-    max-height: 100%;
-    background: #000;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
     cursor: default;
 }
 
 .image-viewer-audio {
     width: min(640px, 100%);
     cursor: default;
+}
+
+/* A pdf's page is white to the edge, and Chrome puts its viewer's own
+   toolbar (download, print) in the top right corner: there the close button
+   would sit on top of it, all but unseen. So with a pdf up the frame starts
+   below the close button. */
+.image-viewer-frame:has(.image-viewer-document) {
+    top: calc(60px + var(--top-strip-height));
 }
 
 .image-viewer-document {

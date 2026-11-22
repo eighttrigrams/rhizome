@@ -42,6 +42,14 @@ Feature: Documents, sounds and videos open in the app
     When I seek the player to 1 seconds
     Then the player should be at 1 seconds
 
+  Scenario: A pdf the server does not have is said to be missing
+    # Asked for with HEAD first: in the <iframe>, a 404 was a white page
+    # saying "Not Found" under the viewer's bar.
+    Given the file "e2e-tax letter #2.pdf" is not on the server
+    When I click the green badge of "Letter"
+    Then the viewer should say "This file is not on the server."
+    And the viewer should show no pdf
+
   Scenario: What the browser cannot show, it says so and offers to download
     When I click the green badge of "Old film"
     Then the viewer should say "This file cannot be shown here."
