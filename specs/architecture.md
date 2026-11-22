@@ -96,7 +96,10 @@ anywhere but the machine the human is sitting at.
 - **`/imgs/*` and `/img-by-id/:item-id`**, because the bytes are already on this
   machine through iCloud. `/img-by-id` asks the hub *which* file and then serves
   it itself — the question crosses the wire, the image does not;
-- **`/open/:file-id`**, an OS `open` on this machine's disk;
+- **`/files/*`**, every other file an item carries (documents, sounds,
+  videos), with Range for seeking and `?download` for an attachment — the
+  in-app viewers' source. It replaced `/open/:file-id`, an OS `open` on this
+  machine's disk, which only worked with the browser at the server's Mac;
 - **`/upload`**'s HTTP multipart handling — though the bytes then go *to* the
   hub, see below.
 
