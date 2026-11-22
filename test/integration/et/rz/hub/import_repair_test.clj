@@ -222,10 +222,21 @@
                        ["a.flv" (s "FLV\u0001")]
                        ["a.tiff" (s "II*\u0000....")]
                        ["a.tiff" (s "MM\u0000*....")]
-                       ["a.txt" (s "anything")]]]
+                       ["a.txt" (s "anything")]
+                       ;; second review, finding 5: rare but valid
+                       ["a.tiff" (s "II+\u0000\u0008\u0000")]
+                       ["a.tiff" (s "MM\u0000+\u0000\u0008")]
+                       ["a.wav" (s "RF64....WAVEds64")]
+                       ["a.wav" (s "BW64....WAVEds64")]
+                       ["a.mp3" (byte-array (concat (repeat 1500 0) [0xff 0xfb 0x90 0xc0] (repeat 10 0)))]
+                       ["a.mp3" (byte-array (concat (.getBytes "junk junk junk") [(unchecked-byte 0xff) (unchecked-byte 0xfb)] (repeat 10 0)))]
+                       ["a.jpg" (s "\u0089PNG\r\n\u001a\n....")]
+                       ["a.png" (b 0xff 0xd8 0xff 0xe0 0)]
+                       ["a.webp" (s "GIF89a....")]]]
       (testing n (is (nil? (f n bytes)))))
     (doseq [[n bytes why] [["a.pdf" (byte-array 0) #"empty"]
-                           ["a.png" (s "GIF89a") #"not those of a PNG"]
+                           ["a.png" (s "<html>") #"not those of a picture"]
+                           ["a.mp3" (byte-array 5000) #"MP3"]
                            ["a.mp4" (s "<html>") #"MP4"]
                            ["a.jpg" (s "%PDF-1.4") #"JPEG"]]]
       (testing n (is (re-find why (f n bytes)))))))

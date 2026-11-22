@@ -72,32 +72,57 @@
    and the first atom itself for older QuickTime files that have none."
   #{"ftyp" "moov" "mdat" "wide" "free" "skip" "pnot"})
 
+(defn- picture?
+  "A picture the browser draws, whatever its suffix says: a .jpg that is
+   really a PNG shows all the same (second review, finding 5). GIF counts too,
+   though import files no .gif: it is what a misnamed .png sometimes is."
+  [head]
+  (or (= [0xff 0xd8 0xff] [(u8 head 0) (u8 head 1) (u8 head 2)])
+      (= "\u0089PNG\r\n\u001a\n" (ascii head 0 8))
+      (and (= "RIFF" (ascii head 0 4)) (= "WEBP" (ascii head 8 12)))
+      (#{"GIF87a" "GIF89a"} (ascii head 0 6))))
+
+(def ^:private mp3-window
+  "How far into the file the first MPEG frame may start: encoders and taggers
+   leave zero padding or junk in front of it."
+  4096)
+
+(defn- mp3?
+  "An ID3 tag at the start, or an MPEG audio frame sync (eleven bits set)
+   anywhere in the first mp3-window bytes."
+  [^bytes head]
+  (or (= "ID3" (ascii head 0 3))
+      (let [n (min mp3-window (alength head))]
+        (some (fn [i] (and (= 0xff (u8 head i))
+                           (= 0xe0 (bit-and 0xe0 (u8 head (inc i))))))
+              (range 0 (dec n))))))
+
 (def ^:private kinds
   "Suffix -> [what it should be, a test of the first bytes]."
-  (let [jpeg ["a JPEG" #(= [0xff 0xd8 0xff] [(u8 % 0) (u8 % 1) (u8 % 2)])]
+  (let [picture ["a picture (JPEG, PNG, WebP or GIF)" picture?]
         iso-media ["an MP4/QuickTime file" #(iso-media-atoms (ascii % 4 8))]]
-    {"jpg" jpeg
-     "jpeg" jpeg
-     "png" ["a PNG" #(= "\u0089PNG\r\n\u001a\n" (ascii % 0 8))]
-     "webp" ["a WebP" #(and (= "RIFF" (ascii % 0 4)) (= "WEBP" (ascii % 8 12)))]
+    {"jpg" picture
+     "jpeg" picture
+     "png" picture
+     "webp" picture
      ;; Readers accept the header anywhere in the first 1024 bytes.
      "pdf" ["a PDF" #(some-> (ascii % 0 (min 1024 (alength ^bytes %))) (str/includes? "%PDF-"))]
      "mp4" iso-media
      "mov" iso-media
      "m4a" iso-media
-     ;; An ID3 tag, or straight into an MPEG audio frame (11 bits of sync).
-     "mp3" ["an MP3" #(or (= "ID3" (ascii % 0 3))
-                          (and (= 0xff (u8 % 0)) (some-> (u8 % 1) (bit-and 0xe0) (= 0xe0))))]
-     "wav" ["a WAV" #(and (= "RIFF" (ascii % 0 4)) (= "WAVE" (ascii % 8 12)))]
+     "mp3" ["an MP3" mp3?]
+     ;; RF64 and BW64: the 64-bit WAVs, for files over 4 GB (broadcast audio).
+     "wav" ["a WAV" #(and (#{"RIFF" "RF64" "BW64"} (ascii % 0 4)) (= "WAVE" (ascii % 8 12)))]
      "ogg" ["an Ogg file" #(= "OggS" (ascii % 0 4))]
      "flv" ["an FLV" #(= "FLV" (ascii % 0 3))]
-     "tiff" ["a TIFF" #(#{"II*\u0000" "MM\u0000*"} (ascii % 0 4))]}))
+     ;; II*/MM* classic TIFF, II+/MM+ BigTIFF.
+     "tiff" ["a TIFF" #(#{"II*\u0000" "MM\u0000*" "II+\u0000" "MM\u0000+"} (ascii % 0 4))]}))
 
-(defn- head [^File f]
+(defn- head
+  "The first bytes of `f`, as many as any check looks at."
+  [^File f]
   (with-open [in (io/input-stream f)]
-    (let [buf (byte-array 1024)
-          n (.read in buf)]
-      (if (pos? n) (java.util.Arrays/copyOf buf n) (byte-array 0)))))
+    (.readNBytes in (int mp3-window))))
 
 (defn content-problem
   "Why the file `f`, called `file-name`, is not what its suffix says, or nil
