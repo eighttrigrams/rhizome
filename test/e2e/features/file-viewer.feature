@@ -66,6 +66,17 @@ Feature: Documents, sounds and videos open in the app
     Then the viewer should say "This file cannot be shown here."
     And the viewer should offer "e2e-old.flv" to download
 
+  Scenario: An mkv is not played, it is offered to download
+    # Filed byte for byte, for its subtitle tracks. Chrome plays no AC3 sound,
+    # which most of them carry, and Safari no Matroska at all.
+    And "Shelf" holds an item "Episode" with the file "e2e-episode.mkv"
+    When I reload the app
+    And I click the green badge of "Episode"
+    Then the viewer should say "This file cannot be shown here."
+    And the viewer should offer "e2e-episode.mkv" to download
+    When I click the download button
+    Then "e2e-episode.mkv" should have been downloaded
+
   Scenario: Download sends the file as an attachment
     When I click the green badge of "Letter"
     And I click the download button

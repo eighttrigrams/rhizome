@@ -28,6 +28,7 @@ const otherFiles: Record<string, { folder: string; sample?: string }> = {
   mp3: { folder: "files/Music/Tracked", sample: "e2e-chime.mp3" },
   mp4: { folder: "files/Movies/Tracked", sample: "e2e-harbour.mp4" },
   flv: { folder: "files/Movies/Tracked" },
+  mkv: { folder: "files/Movies/Tracked" },
 };
 
 // An 8x6 blue PNG. Written under every image name, .jpg and .webp included:

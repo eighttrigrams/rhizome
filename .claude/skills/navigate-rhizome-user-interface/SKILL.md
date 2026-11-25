@@ -80,7 +80,7 @@ The application must run, obviously
 ### Prerequisites
 - A "Files" context must exist in the database
 - An "Imports" context must exist in the database
-- Supported file types: mp3, ogg, m4a, wav, mp4, flv, mov, pdf, tiff, jpg, jpeg, png, webp
+- Supported file types: mp3, ogg, m4a, wav, mp4, flv, mov, mkv, pdf, tiff, jpg, jpeg, png, webp
 
 ### Import Process
 1. **Place files in import directory**:
