@@ -132,6 +132,8 @@
    "mp4" :video "mov" :video
    "mp3" :audio "wav" :audio "ogg" :audio "m4a" :audio
    "pdf" :pdf})
+;; Not here, so :other, a Download button: mkv. Most carry AC3 sound, which
+;; Chrome does not play, and Safari plays no Matroska at all.
 
 (defn kind
   "What `file` is shown as: :image :video :audio :pdf, :other for any other

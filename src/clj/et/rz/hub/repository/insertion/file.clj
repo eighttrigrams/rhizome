@@ -4,6 +4,8 @@
             [clojure.set :as set]
             [et.rz.hub.ds :as datastore]
             [et.rz.hub.ds.search :as search]
+            [et.rz.hub.ds.helpers :as helpers]
+            [et.rz.hub.db :as db]
             [et.rz.utils :refer [condx]]
             [et.rz.hub.repository.insertion.common :as common]
             [et.rz.hub.repository.homefolder :as home]))
@@ -26,6 +28,7 @@
    "MP4s"      "mp4"
    "FLVs"      "flv"
    "MOVs"      "mov"
+   "MKVs"      "mkv"
    "PDFs"      "pdf"
    "TIFFs"     "tiff"
    "JPEGs"     "jpg"
@@ -45,6 +48,7 @@
          "mp4"  ["mp4" "video"]
          "flv"  ["flv" "video"]
          "mov"  ["mov" "video"]
+         "mkv"  ["mkv" "video"]
          "pdf"  ["pdf"]
          "tiff" ["tiff" "docs"]
          "jpg"  ["jpg" "images"]
@@ -65,6 +69,41 @@
   [db]
   (let [present (set (keys (ids-by-named-id db (vals file-contexts))))]
     (remove present (vals file-contexts))))
+
+(def added-contexts
+  "The file-type contexts that came after databases already in use: named id
+   -> [title short-title]. On such a db `add-contexts!` creates them at
+   startup, so a jar that knows a new type comes up on the old db without a
+   hand step, and the gate below then passes.
+
+   Only these, not whatever is missing: a context of the older types that has
+   gone missing is still the gate's to refuse, since recreating it would file
+   new imports under an empty twin of the one the owner lost."
+  {"mkv" ["MKVs" "mkv"]})
+
+(defn add-contexts!
+  "Create those of `added-contexts` the db lacks; the named ids created, in a
+   set. A context of that title the owner made by hand, without a named id,
+   is given the id rather than a twin. Idempotent: once there, nothing more."
+  [db]
+  (let [missing (set (missing-contexts db))]
+    (set
+     (for [[named-id [title short-title]] added-contexts
+           :when (missing named-id)]
+       (let [own (db/execute-one! db ["SELECT id FROM items
+                                       WHERE is_context = 1 AND title = ? AND human_readable_id IS NULL
+                                       ORDER BY id LIMIT 1" title])]
+         (if-let [id (:items/id own)]
+           (do (db/execute-one! db ["UPDATE items SET human_readable_id = ? WHERE id = ?" named-id id])
+               (log/info (str "Gave the context '" title "' (id " id ") the named id '" named-id "'.")))
+           (let [now (helpers/gen-date)]
+             (db/execute-one! db [(str "INSERT INTO items
+                                         (title, short_title, data, is_context, human_readable_id,
+                                          description_source, inserted_at, updated_at, updated_at_ctx)
+                                        VALUES (?, ?, '{}', 1, ?, 'app', " now ", " now ", " now ")")
+                                  title short-title named-id])
+             (log/info (str "Created the file-type context '" title "' (named id '" named-id "')."))))
+         named-id)))))
 
 (defn ensure-contexts!
   "Hard startup gate: every file-type context must carry its named id, or we

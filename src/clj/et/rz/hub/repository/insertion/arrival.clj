@@ -115,6 +115,8 @@
      "wav" ["a WAV" #(and (#{"RIFF" "RF64" "BW64"} (ascii % 0 4)) (= "WAVE" (ascii % 8 12)))]
      "ogg" ["an Ogg file" #(= "OggS" (ascii % 0 4))]
      "flv" ["an FLV" #(= "FLV" (ascii % 0 3))]
+     ;; Matroska: the EBML header's id, 1A 45 DF A3.
+     "mkv" ["a Matroska file" #(= [0x1a 0x45 0xdf 0xa3] [(u8 % 0) (u8 % 1) (u8 % 2) (u8 % 3)])]
      ;; II*/MM* classic TIFF, II+/MM+ BigTIFF.
      "tiff" ["a TIFF" #(#{"II*\u0000" "MM\u0000*" "II+\u0000" "MM\u0000+"} (ascii % 0 4))]}))
 

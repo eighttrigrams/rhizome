@@ -196,6 +196,7 @@
                             ["a.mp4" :video "video/mp4"]
                             ["a.MOV" :video "video/quicktime"]
                             ["a.flv" :video "video/x-flv"]
+                            ["a.mkv" :video "video/x-matroska"]
                             ["a.tiff" :docs "image/tiff"]
                             ["a.jpg" :images "image/jpeg"]]]
     (write! k file-name (.getBytes "x"))

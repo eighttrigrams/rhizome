@@ -279,6 +279,7 @@
                        ["a.wav" (s "RIFF....WAVEfmt ")]
                        ["a.ogg" (s "OggS\u0000")]
                        ["a.flv" (s "FLV\u0001")]
+                       ["a.mkv" (b 0x1a 0x45 0xdf 0xa3 0xa3 0x42 0x86)]
                        ["a.tiff" (s "II*\u0000....")]
                        ["a.tiff" (s "MM\u0000*....")]
                        ["a.txt" (s "anything")]
@@ -297,5 +298,7 @@
                            ["a.png" (s "<html>") #"not those of a picture"]
                            ["a.mp3" (byte-array 5000) #"MP3"]
                            ["a.mp4" (s "<html>") #"MP4"]
+                           ["a.mkv" (s "\u0000\u0000\u0000\u0018ftypisom") #"Matroska"]
+                           ["a.mkv" (b 0x1a 0x45 0xdf) #"Matroska"]
                            ["a.jpg" (s "%PDF-1.4") #"JPEG"]]]
       (testing n (is (re-find why (f n bytes)))))))

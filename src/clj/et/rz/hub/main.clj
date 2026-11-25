@@ -512,6 +512,25 @@
   (and (not (:read-only? server))
        (not= "1" (System/getProperty "rhizome.e2e"))))
 
+(defn prepare-contents!
+  "What `-main` does to the database's contents before it serves: seed an
+   empty one, give an older one the file-type contexts added since it was made,
+   and refuse to go on without every file-type context. `seed` is `seed-opts`.
+   Throws when the gate refuses."
+  [ds {:keys [dev? e2e? skip-seed?] :as seed}]
+  (dev-seed/maybe-seed! (assoc seed :db ds))
+  ;; A missing file-type context silently drops files of that type on
+  ;; import, so refuse to come up without every named id. Exempt on an
+  ;; empty database: e2e runs against one by design, and a fresh db was
+  ;; just seeded above unless seeding was deliberately skipped.
+  ;; A type added since the db was made gets its context here, once, so
+  ;; a deploy needs no hand step before the gate (file/added-contexts).
+  (when-not (or e2e? (dev-seed/items-empty? ds))
+    (file/add-contexts! ds)
+    (file/ensure-contexts! ds))
+  (when (and dev? skip-seed?)
+    (log/info "hub: :skip-seed? is set, so nothing was seeded")))
+
 (defn -main
   "Start the hub from the config.edn in the directory it was launched in,
    and stay up.
@@ -546,16 +565,7 @@
       ;; single-process case, and the two are complementary the way the poller
       ;; predicates are.
       (upload/ensure-convert!)
-      (let [{:keys [dev? e2e? skip-seed?] :as seed} (seed-opts)]
-        (dev-seed/maybe-seed! (assoc seed :db ds))
-        ;; A missing file-type context silently drops files of that type on
-        ;; import, so refuse to come up without every named id. Exempt on an
-        ;; empty database: e2e runs against one by design, and a fresh db was
-        ;; just seeded above unless seeding was deliberately skipped.
-        (when-not (or e2e? (dev-seed/items-empty? ds))
-          (file/ensure-contexts! ds))
-        (when (and dev? skip-seed?)
-          (log/info "hub: :skip-seed? is set, so nothing was seeded"))))
+      (prepare-contents! ds (seed-opts)))
     (when (poll-scheduling-enabled? server)
       (poll/start-scheduler! ds))
     (log/info {:url (:url server)}

@@ -27,6 +27,7 @@
   (or (str/ends-with? (str/lower-case file-name) ".mp4")
       (str/ends-with? (str/lower-case file-name) ".flv")
       (str/ends-with? (str/lower-case file-name) ".mov")
+      (str/ends-with? (str/lower-case file-name) ".mkv")
       (str/ends-with? (str/lower-case file-name) ".mp3")
       (str/ends-with? (str/lower-case file-name) ".ogg")
       (str/ends-with? (str/lower-case file-name) ".m4a")
@@ -44,7 +45,7 @@
   [file-name]
   (case (get-suffix file-name)
     ("mp3" "wav" "ogg" "m4a")   :audio
-    ("mp4" "flv" "mov")         :video
+    ("mp4" "flv" "mov" "mkv")   :video
     ("pdf" "tiff")              :docs
     ("jpeg" "jpg" "png" "webp") :images
     nil))

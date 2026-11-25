@@ -69,10 +69,11 @@
 (def prefix "/files/")
 
 (def ^:private extra-mime-types
-  "What ring's table lacks among the suffixes homefolder files: wav and m4a.
-   mov is there already (video/quicktime)."
+  "What ring's table lacks among the suffixes homefolder files: wav, m4a and
+   mkv. mov is there already (video/quicktime)."
   {"wav" "audio/wav"
-   "m4a" "audio/mp4"})
+   "m4a" "audio/mp4"
+   "mkv" "video/x-matroska"})
 
 (defn content-type
   [file-name]
